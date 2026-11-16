@@ -202,13 +202,13 @@ await server.close();
 
 ## Error codes
 
-| Code     | When                                                                                           |
-| -------- | ---------------------------------------------------------------------------------------------- |
-| `WL7003` | `@warlock.js/ai-tools` or `@warlock.js/ai` is not installed; the message has the install line. |
-| `WL7004` | `--host` is not loopback and no token was given.                                               |
+| Code     | When                                                                                                       |
+| -------- | ---------------------------------------------------------------------------------------------------------- |
+| `WL7003` | `@warlock.js/ai-tools` or `@warlock.js/ai` is not installed; the message has the install line.             |
+| `WL7004` | `--host` is not loopback and no token was given.                                                           |
 | `WL7005` | A generate tool was asked to write, or a registered `writes: true` tool was called, on a read-only server. |
-| `WL8008` | `requests_recent`: no dev server recorded, or it does not answer.                              |
-| `WL8009` | `requests_recent`: the dev server answers but devtools is not mounted.                         |
+| `WL8008` | `requests_recent`: no dev server recorded, or it does not answer.                                          |
+| `WL8009` | `requests_recent`: the dev server answers but devtools is not mounted.                                     |
 
 ## Source file graph
 

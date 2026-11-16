@@ -24,7 +24,9 @@ function section(label: string, values: readonly string[], width = LABEL): strin
 
   const pad = " ".repeat(Math.max(width, label.length + 1));
 
-  return values.map((value, index) => (index === 0 ? `${label.padEnd(pad.length)}${value}` : `${pad}${value}`));
+  return values.map((value, index) =>
+    index === 0 ? `${label.padEnd(pad.length)}${value}` : `${pad}${value}`,
+  );
 }
 
 const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? "" : "s"}`;
@@ -52,8 +54,12 @@ function notes(result: ScryResult): string[] {
 }
 
 function countsLine(findings: readonly GrimoireFinding[]): string {
-  const errors = findings.filter((finding) => !finding.expected && finding.severity === "error").length;
-  const warnings = findings.filter((finding) => !finding.expected && finding.severity === "warning").length;
+  const errors = findings.filter(
+    (finding) => !finding.expected && finding.severity === "error",
+  ).length;
+  const warnings = findings.filter(
+    (finding) => !finding.expected && finding.severity === "warning",
+  ).length;
   const expected = findings.filter((finding) => finding.expected).length;
 
   return `${plural(errors, "error")}, ${plural(warnings, "warning")}, ${expected} expected`;
@@ -80,17 +86,28 @@ function formatFile(result: ScryFileResult & { bookEntry?: string | null }): str
     ...section("flows", entry.flows),
     ...section(
       "exports",
-      entry.exports.map((item) => (item.about === null ? item.name : `${item.name.padEnd(exportWidth)}  ${item.about}`)),
+      entry.exports.map((item) =>
+        item.about === null ? item.name : `${item.name.padEnd(exportWidth)}  ${item.about}`,
+      ),
     ),
     ...section("packages", entry.packages.length > 0 ? [entry.packages.join("  ")] : []),
     ...section("imports", entry.imports),
     ...section("used by", entry.importedBy),
     ...section(
       "routes",
-      entry.routes.map((route) => `${route.method} ${route.path}${route.via === "handles" ? "  (handles)" : "  (registers)"}`),
+      entry.routes.map(
+        (route) =>
+          `${route.method} ${route.path}${route.via === "handles" ? "  (handles)" : "  (registers)"}`,
+      ),
     ),
-    ...section("pages", entry.pages.map((page) => `${page.site} ${page.route}  (${page.via})`)),
-    ...section("screens", entry.screens.map((screen) => `${screen.app} ${screen.route}  (${screen.via})`)),
+    ...section(
+      "pages",
+      entry.pages.map((page) => `${page.site} ${page.route}  (${page.via})`),
+    ),
+    ...section(
+      "screens",
+      entry.screens.map((screen) => `${screen.app} ${screen.route}  (${screen.via})`),
+    ),
     ...section("entry", typeof result.bookEntry === "string" ? [result.bookEntry] : []),
     ...notes(result),
   ];
@@ -100,12 +117,26 @@ function formatImpact(result: ScryImpactResult): string[] {
   return [
     `impact of ${result.file}`,
     `${"importers".padEnd(11)}${result.importers.direct.length} direct, ${result.importers.all.length} in all`,
-    ...section("routes", result.routes.length > 0 ? [result.routes.map((route) => `${route.method} ${route.path}`).join("  ")] : [], 11),
-    ...section("pages", result.pages.length > 0 ? [result.pages.map((page) => `${page.app} ${page.route}`).join("  ")] : [], 11),
+    ...section(
+      "routes",
+      result.routes.length > 0
+        ? [result.routes.map((route) => `${route.method} ${route.path}`).join("  ")]
+        : [],
+      11,
+    ),
+    ...section(
+      "pages",
+      result.pages.length > 0
+        ? [result.pages.map((page) => `${page.app} ${page.route}`).join("  ")]
+        : [],
+      11,
+    ),
     ...section("flows", result.flows.length > 0 ? [result.flows.join("  ")] : [], 11),
     ...section(
       "features",
-      result.features.length > 0 ? [result.features.map((feature) => `${feature.id} (${feature.via})`).join("  ")] : [],
+      result.features.length > 0
+        ? [result.features.map((feature) => `${feature.id} (${feature.via})`).join("  ")]
+        : [],
       11,
     ),
     ...section("tests", result.tests.length > 0 ? [result.tests.join("  ")] : [], 11),
@@ -122,14 +153,30 @@ function formatRoute(result: ScryRouteResult): string[] {
 
   return [
     `${route.method} ${route.path}${route.name === null ? "" : `  ${route.name}`}`,
-    ...section("handler", [`${route.handler}${route.handlerFile === null ? "" : `  ${route.handlerFile}`}`], width),
+    ...section(
+      "handler",
+      [`${route.handler}${route.handlerFile === null ? "" : `  ${route.handlerFile}`}`],
+      width,
+    ),
     ...section("registered", route.sourceFile === null ? [] : [route.sourceFile], width),
-    ...section("middleware", route.middleware.length > 0 ? [route.middleware.join("  ")] : [], width),
+    ...section(
+      "middleware",
+      route.middleware.length > 0 ? [route.middleware.join("  ")] : [],
+      width,
+    ),
     ...section("auth", [auth], width),
     ...section("description", route.description === null ? [] : [route.description], width),
-    ...section("page", result.page === null ? [] : [`${result.page.site} ${result.page.route}  ${result.page.file}`], width),
+    ...section(
+      "page",
+      result.page === null ? [] : [`${result.page.site} ${result.page.route}  ${result.page.file}`],
+      width,
+    ),
     ...section("files", result.files, width),
-    ...section("steps", result.steps.map((step) => `${step.flow} step ${step.index}`), width),
+    ...section(
+      "steps",
+      result.steps.map((step) => `${step.flow} step ${step.index}`),
+      width,
+    ),
     ...notes(result),
   ];
 }
@@ -160,17 +207,31 @@ function formatFeature(result: ScryFeatureResult): string[] {
     ].join("  "),
     ...section(
       "flows",
-      result.flows.map((flow) => `${flow.id.padEnd(idWidth)}  ${flow.status.padEnd(statusWidth)} since ${flow.since}`),
+      result.flows.map(
+        (flow) =>
+          `${flow.id.padEnd(idWidth)}  ${flow.status.padEnd(statusWidth)} since ${flow.since}`,
+      ),
     ),
     ...section("own", [
       `${plural(bookmap.own.length, "file")}  (unreached: ${bookmap.unreached.length === 0 ? "none" : bookmap.unreached.length})`,
     ]),
     ...section("unreached", bookmap.unreached),
-    ...section("borrows", bookmap.borrowed.map((item) => item.file)),
-    ...section("routes", bookmap.routes.length > 0 ? [bookmap.routes.map((route) => `${route.method} ${route.path}`).join("  ")] : []),
+    ...section(
+      "borrows",
+      bookmap.borrowed.map((item) => item.file),
+    ),
+    ...section(
+      "routes",
+      bookmap.routes.length > 0
+        ? [bookmap.routes.map((route) => `${route.method} ${route.path}`).join("  ")]
+        : [],
+    ),
     ...section("pages", pages.length > 0 ? [pages.join("  ")] : []),
     ...section("changes", result.changes.map(changeLine)),
-    ...section("tasks", result.tasks.map((task) => `${task.id} ${task.status}  ${task.title}`)),
+    ...section(
+      "tasks",
+      result.tasks.map((task) => `${task.id} ${task.status}  ${task.title}`),
+    ),
     ...section("check", [countsLine(result.findings)]),
     ...notes(result),
   ];
@@ -203,7 +264,9 @@ function stepLines(steps: readonly FlowBookmapStep[]): string[] {
 }
 
 function criterionLines(criteria: readonly FlowBookmapCriterion[]): string[] {
-  const labels = criteria.map((criterion) => `${criterion.id}${criterion.app === null ? "" : ` [${criterion.app}]`}`);
+  const labels = criteria.map(
+    (criterion) => `${criterion.id}${criterion.app === null ? "" : ` [${criterion.app}]`}`,
+  );
   const labelWidth = Math.max(0, ...labels.map((label) => label.length));
   const texts = criteria.map((criterion) => shorten(criterion.text, 36));
   const textWidth = Math.max(0, ...texts.map((text) => text.length));
@@ -234,15 +297,29 @@ function formatFlow(result: ScryFlowResult): string[] {
       `who ${flow.who.value}`,
     ].join("  "),
     ...stepLines(result.bookmap.steps),
-    ...section("differs", flow.differs.map((line) => `${line.name}: ${line.text}`)),
-    ...section("not handled", flow.notHandled.map((line) => `${line.name}: ${line.text}`), 12),
-    ...section("unknown", flow.unknowns.map((item) => item.text.replace(/^Unknown:\s*/, ""))),
+    ...section(
+      "differs",
+      flow.differs.map((line) => `${line.name}: ${line.text}`),
+    ),
+    ...section(
+      "not handled",
+      flow.notHandled.map((line) => `${line.name}: ${line.text}`),
+      12,
+    ),
+    ...section(
+      "unknown",
+      flow.unknowns.map((item) => item.text.replace(/^Unknown:\s*/, "")),
+    ),
     ...criterionLines(result.bookmap.criteria),
     ...section("shown on", shown.length > 0 ? [shown.join("   ")] : []),
     ...section(
       "history",
       result.history.length > 0
-        ? [result.history.map((entry) => `${entry.version.value} ${entry.word} (${releaseOf(entry)})`).join("   ")]
+        ? [
+            result.history
+              .map((entry) => `${entry.version.value} ${entry.word} (${releaseOf(entry)})`)
+              .join("   "),
+          ]
         : [],
     ),
     ...section("check", [countsLine(result.findings)]),
@@ -251,13 +328,17 @@ function formatFlow(result: ScryFlowResult): string[] {
 }
 
 function formatSearch(result: ScrySearchResult): string[] {
-  if (result.hits.length === 0) return [`no match for ${JSON.stringify(result.text)}`, ...notes(result)];
+  if (result.hits.length === 0)
+    return [`no match for ${JSON.stringify(result.text)}`, ...notes(result)];
 
   const idWidth = Math.min(32, Math.max(0, ...result.hits.map((hit) => hit.id.length)));
 
   return [
     ...result.hits.map((hit) =>
-      (hit.detail === null ? `${hit.type.padEnd(9)}${hit.id}` : `${hit.type.padEnd(9)}${hit.id.padEnd(idWidth)}  ${hit.detail}`).trimEnd(),
+      (hit.detail === null
+        ? `${hit.type.padEnd(9)}${hit.id}`
+        : `${hit.type.padEnd(9)}${hit.id.padEnd(idWidth)}  ${hit.detail}`
+      ).trimEnd(),
     ),
     ...notes(result),
   ];

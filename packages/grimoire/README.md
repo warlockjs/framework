@@ -41,11 +41,11 @@ Docs: https://warlock.js.org/v/latest/grimoire/
 
 ## Who writes what
 
-| | Written by |
-| --- | --- |
-| `grimoire/book/`, `index.json`, `bookmap.json`, `*.bookmap.json` | Warlock. Never edit; not in git |
-| Features, flows, apps, tasks, release briefs, changelogs | The agent (or you) |
-| The collected list in a release file | `warlock grimoire release <version>`, between two markers |
+|                                                                  | Written by                                                |
+| ---------------------------------------------------------------- | --------------------------------------------------------- |
+| `grimoire/book/`, `index.json`, `bookmap.json`, `*.bookmap.json` | Warlock. Never edit; not in git                           |
+| Features, flows, apps, tasks, release briefs, changelogs         | The agent (or you)                                        |
+| The collected list in a release file                             | `warlock grimoire release <version>`, between two markers |
 
 Warlock never edits a file an agent wrote. The agent writes release numbers and dates into the
 feature changelogs and the release brief, then runs the release command.

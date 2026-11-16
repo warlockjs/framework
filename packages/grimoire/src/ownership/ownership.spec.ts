@@ -18,7 +18,10 @@ describe("resolveOwnership", () => {
       borrowedBy: [],
     });
     expect(ownership.files["src/app/orders/b.service.ts"]?.owner).toBeNull();
-    expect(ownership.features.catalog).toEqual({ own: ["src/app/catalog/a.service.ts"], borrowed: [] });
+    expect(ownership.features.catalog).toEqual({
+      own: ["src/app/catalog/a.service.ts"],
+      borrowed: [],
+    });
   });
 
   it("prefers the deepest folder", () => {
@@ -29,7 +32,10 @@ describe("resolveOwnership", () => {
           feature({ id: "catalog", folders: ["src/web/$sites/client/products"] }),
         ],
       }),
-      facts([codeFile("src/web/$sites/client/products/show.page.tsx"), codeFile("src/web/$sites/client/home.page.tsx")]),
+      facts([
+        codeFile("src/web/$sites/client/products/show.page.tsx"),
+        codeFile("src/web/$sites/client/home.page.tsx"),
+      ]),
     );
 
     expect(ownership.files["src/web/$sites/client/products/show.page.tsx"]?.owner).toBe("catalog");
@@ -39,12 +45,19 @@ describe("resolveOwnership", () => {
   it("lets a @feature tag win over the folders", () => {
     const ownership = resolveOwnership(
       written({
-        features: [feature({ id: "auth", folders: ["src/app/auth"] }), feature({ id: "shared", folders: ["src/app/shared"] })],
+        features: [
+          feature({ id: "auth", folders: ["src/app/auth"] }),
+          feature({ id: "shared", folders: ["src/app/shared"] }),
+        ],
       }),
       facts([codeFile("src/app/shared/jobs/delete.job.ts", [], { tags: { feature: ["auth"] } })]),
     );
 
-    expect(ownership.files["src/app/shared/jobs/delete.job.ts"]).toMatchObject({ owner: "auth", via: "tag", folder: null });
+    expect(ownership.files["src/app/shared/jobs/delete.job.ts"]).toMatchObject({
+      owner: "auth",
+      via: "tag",
+      folder: null,
+    });
     expect(ownership.features.auth?.own).toEqual(["src/app/shared/jobs/delete.job.ts"]);
     expect(ownership.features.shared?.own).toEqual([]);
   });
@@ -68,7 +81,10 @@ describe("resolveOwnership", () => {
   it("reports the same folder listed by two features as a conflict", () => {
     const ownership = resolveOwnership(
       written({
-        features: [feature({ id: "a", folders: ["src/app/shop"] }), feature({ id: "b", folders: ["src/app/shop"] })],
+        features: [
+          feature({ id: "a", folders: ["src/app/shop"] }),
+          feature({ id: "b", folders: ["src/app/shop"] }),
+        ],
       }),
       facts([codeFile("src/app/shop/x.ts")]),
     );
@@ -89,17 +105,26 @@ describe("resolveOwnership", () => {
       facts([codeFile("src/app/catalog/x.ts", [], { tags: { feature: ["nope"] } })]),
     );
 
-    expect(ownership.files["src/app/catalog/x.ts"]).toMatchObject({ owner: "catalog", via: "folder" });
+    expect(ownership.files["src/app/catalog/x.ts"]).toMatchObject({
+      owner: "catalog",
+      via: "folder",
+    });
   });
 
   it("records borrowers from direct imports of own files, never from specs", () => {
     const ownership = resolveOwnership(
       written({
-        features: [feature({ id: "catalog", folders: ["src/app/catalog"] }), feature({ id: "orders", folders: ["src/app/orders"] })],
+        features: [
+          feature({ id: "catalog", folders: ["src/app/catalog"] }),
+          feature({ id: "orders", folders: ["src/app/orders"] }),
+        ],
       }),
       facts([
         codeFile("src/app/catalog/repo.ts", ["src/app/shared/money.ts"]),
-        codeFile("src/app/orders/service.ts", ["src/app/catalog/repo.ts", "src/app/orders/model.ts"]),
+        codeFile("src/app/orders/service.ts", [
+          "src/app/catalog/repo.ts",
+          "src/app/orders/model.ts",
+        ]),
         codeFile("src/app/orders/model.ts"),
         codeFile("src/app/orders/tests/x.test.ts", ["src/app/shared/money.ts"], { type: "spec" }),
         codeFile("src/app/shared/money.ts"),

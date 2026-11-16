@@ -2,14 +2,25 @@
  * The `warlock grimoire` and `warlock scry` commands. Light on purpose: the
  * work lives in `./actions`, imported when a command runs.
  */
-import { command, withExplainCodes, withMcpTools, type CLICommand, type CLICommandPreload } from "@warlock.js/core";
+import {
+  command,
+  withExplainCodes,
+  withMcpTools,
+  type CLICommand,
+  type CLICommandPreload,
+} from "@warlock.js/core";
 import { explainGrimoireCode, grimoireCodeDocsUrl } from "../codes";
 import type { BookAdapter } from "../contracts/adapter";
 import type { WarlockAdapterOptions } from "./adapter";
 import { createGrimoireMcpTools } from "./mcp-tools";
 
 /** The preload of a command that reads routes: the `warlock inspect` boot. */
-const BOOT: CLICommandPreload = { runtimeStrategy: "development", config: true, env: true, bootstrap: true };
+const BOOT: CLICommandPreload = {
+  runtimeStrategy: "development",
+  config: true,
+  env: true,
+  bootstrap: true,
+};
 
 /** No boot, but a multi-site app's `src/config/web.ts` (its sites' base paths shape the page routes). */
 const WEB_CONFIG: CLICommandPreload = { config: ["web"] };
@@ -44,7 +55,9 @@ async function exitWith(code: number): Promise<void> {
 
   await Promise.race([
     Promise.all(
-      [process.stdout, process.stderr].map((stream) => new Promise<void>((resolve) => stream.write("", () => resolve()))),
+      [process.stdout, process.stderr].map(
+        (stream) => new Promise<void>((resolve) => stream.write("", () => resolve())),
+      ),
     ),
     new Promise<void>((resolve) => setTimeout(resolve, 500).unref()),
   ]);
@@ -80,7 +93,9 @@ function explainCode(code: string) {
 export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): CLICommand[] {
   let adapter: Promise<BookAdapter> | undefined;
   const loadAdapter = (): Promise<BookAdapter> => {
-    adapter ??= import("./adapter").then(({ createWarlockAdapter }) => createWarlockAdapter(options));
+    adapter ??= import("./adapter").then(({ createWarlockAdapter }) =>
+      createWarlockAdapter(options),
+    );
 
     return adapter;
   };
@@ -134,22 +149,36 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
     },
     options: [
       { text: "--json, -j", description: "Print the result as JSON", type: "boolean" },
-      { text: "--force, -f", description: "build: rebuild every book entry and read the routes again", type: "boolean" },
-      { text: "--site", description: "build: also write the static Grimoire site (default grimoire/book/site)", type: "boolean" },
-      { text: "--out", description: "build --site: the folder to write the site to (project-relative)", type: "string" },
+      {
+        text: "--force, -f",
+        description: "build: rebuild every book entry and read the routes again",
+        type: "boolean",
+      },
+      {
+        text: "--site",
+        description: "build: also write the static Grimoire site (default grimoire/book/site)",
+        type: "boolean",
+      },
+      {
+        text: "--out",
+        description: "build --site: the folder to write the site to (project-relative)",
+        type: "string",
+      },
     ],
   });
 
   const scry: CLICommand = command({
     name: "scry [file]",
     description:
-      "Grimoire (experimental): ask about a file, --impact <file>, --route \"<METHOD path>\", --feature <id>, --flow <feature>/<flow> or --search \"<text>\"; --json for JSON",
+      'Grimoire (experimental): ask about a file, --impact <file>, --route "<METHOD path>", --feature <id>, --flow <feature>/<flow> or --search "<text>"; --json for JSON',
     preAction: async ({ options: flags }) => {
       scry.commandPreload = undefined;
 
       // The first route question of a project with no route facts reads them once.
       const preload = await preloadFor(
-        async () => flags.route !== undefined && !(await (await import("./actions")).hasRouteFacts(process.cwd())),
+        async () =>
+          flags.route !== undefined &&
+          !(await (await import("./actions")).hasRouteFacts(process.cwd())),
       );
 
       if (preload) scry.commandPreload = preload;
@@ -161,7 +190,7 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
     },
     options: [
       { text: "--impact", description: "What a change to this file reaches", type: "string" },
-      { text: "--route", description: "One route: \"<METHOD> <path>\"", type: "string" },
+      { text: "--route", description: 'One route: "<METHOD> <path>"', type: "string" },
       { text: "--feature", description: "One feature by id", type: "string" },
       { text: "--flow", description: "One flow: <feature>/<flow>", type: "string" },
       { text: "--search", description: "Search by words", type: "string" },

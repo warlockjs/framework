@@ -34,7 +34,9 @@ export function isDate(value: string): boolean {
   const day = Number(match[3]);
   const date = new Date(Date.UTC(year, month - 1, day));
 
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  );
 }
 
 /**
@@ -43,7 +45,9 @@ export function isDate(value: string): boolean {
  * absolute or leaves the project.
  */
 export function projectFolder(value: string): string | null {
-  const posix = toPosixPath(value.trim()).replace(/^(?:\.\/)+/, "").replace(/\/+$/, "");
+  const posix = toPosixPath(value.trim())
+    .replace(/^(?:\.\/)+/, "")
+    .replace(/\/+$/, "");
 
   if (posix === "" || posix.startsWith("/") || /^[A-Za-z]:/.test(posix)) return null;
   if (posix.split("/").includes("..")) return null;
@@ -132,7 +136,11 @@ export class FrontMatterReader {
     const expected = options.check?.(field.value) ?? null;
 
     if (expected !== null) {
-      this.sink.report("GR1004", `The front matter key "${key}" is ${JSON.stringify(field.value)}; ${expected}.`, at);
+      this.sink.report(
+        "GR1004",
+        `The front matter key "${key}" is ${JSON.stringify(field.value)}; ${expected}.`,
+        at,
+      );
     }
 
     return { value: field.value, at };
@@ -140,7 +148,12 @@ export class FrontMatterReader {
 
   /** A required scalar; a missing one becomes `""` at the top of the file. */
   public required(key: string, check?: (value: string) => string | null): Located<string> {
-    return this.scalar(key, check ? { required: true, check } : { required: true }) ?? { value: "", at: this.top };
+    return (
+      this.scalar(key, check ? { required: true, check } : { required: true }) ?? {
+        value: "",
+        at: this.top,
+      }
+    );
   }
 
   /** A scalar that must be one of `values`; `fallback` is used when it is missing or wrong. */
@@ -152,7 +165,10 @@ export class FrontMatterReader {
 
     if (located === null) return { value: fallback, at: this.top };
 
-    return { value: values.includes(located.value as T) ? (located.value as T) : fallback, at: located.at };
+    return {
+      value: values.includes(located.value as T) ? (located.value as T) : fallback,
+      at: located.at,
+    };
   }
 
   /** An optional scalar that must be one of `values`; `null` when missing or wrong. */
@@ -191,7 +207,11 @@ export class FrontMatterReader {
       return [];
     }
 
-    const items = Array.isArray(field.value) ? field.value : field.value === "" ? [] : [field.value];
+    const items = Array.isArray(field.value)
+      ? field.value
+      : field.value === ""
+        ? []
+        : [field.value];
     const result: Located<string>[] = [];
 
     items.forEach((item, index) => {
@@ -199,7 +219,11 @@ export class FrontMatterReader {
       const expected = options.check?.(item) ?? null;
 
       if (expected !== null) {
-        this.sink.report("GR1004", `The "${key}" item ${JSON.stringify(item)} is wrong: ${expected}.`, at);
+        this.sink.report(
+          "GR1004",
+          `The "${key}" item ${JSON.stringify(item)} is wrong: ${expected}.`,
+          at,
+        );
 
         if (!options.keepWrong) return;
       }
@@ -213,12 +237,16 @@ export class FrontMatterReader {
 
 /** Checks used with `FrontMatterReader`; each returns the expected form, or `null` when the value is right. */
 export const checks = {
-  id: (value: string): string | null => (ID.test(value) ? null : "write it in lower-case words joined by dashes"),
-  version: (value: string): string | null => (VERSION.test(value) ? null : "write a version as <whole>.<decimal>, like 2.1"),
+  id: (value: string): string | null =>
+    ID.test(value) ? null : "write it in lower-case words joined by dashes",
+  version: (value: string): string | null =>
+    VERSION.test(value) ? null : "write a version as <whole>.<decimal>, like 2.1",
   date: (value: string): string | null => (isDate(value) ? null : "write a date as yyyy-mm-dd"),
   text: (value: string): string | null => (value.trim() === "" ? "write a value" : null),
-  route: (value: string): string | null => (value.startsWith("/") ? null : "a route path starts with /"),
-  flowRef: (value: string): string | null => (FLOW_REF.test(value) ? null : "write it as <feature>/<flow>"),
+  route: (value: string): string | null =>
+    value.startsWith("/") ? null : "a route path starts with /",
+  flowRef: (value: string): string | null =>
+    FLOW_REF.test(value) ? null : "write it as <feature>/<flow>",
   folder: (value: string): string | null =>
     projectFolder(value) === null ? "write a folder relative to the project root" : null,
   name: (value: string): string | null =>

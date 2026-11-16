@@ -264,9 +264,15 @@ const agent = ai.agent({ model }); // hand it anywhere a model goes
 // custom retry predicate or code list:
 ai.fallbackModel([primary, backup], { retryOn: ["PROVIDER_RATE_LIMIT", "PROVIDER_TIMEOUT"] });
 ai.fallbackModel([primary, backup], { retryOn: (error) => error instanceof ProviderError });
+
+// retryOn REPLACES the default set (both forms). To keep the default and add a reason:
+ai.fallbackModel([primary, backup], { alsoRetryOn: (error) => error instanceof MyQuotaError });
+ai.fallbackModel([primary, backup], {
+  retryOn: (error) => isDefaultFallbackRetryable(error) || error instanceof MyQuotaError,
+});
 ```
 
-Default retryable codes: `PROVIDER_RATE_LIMIT`, `PROVIDER_OVERLOADED`, `PROVIDER_TIMEOUT`, `PROVIDER_ERROR`. Auth / invalid-request / context-length / content-filter re-throw immediately (they'd fail identically downstream — retrying only burns budget). Identity/capabilities/pricing front the primary model. Usage aggregates across attempted models. Inspect `model.lastAttempts` for the failed models of the most recent call.
+Default retryable codes (exported as `DEFAULT_FALLBACK_RETRY_CODES`; `isDefaultFallbackRetryable(error)` tests them): `PROVIDER_RATE_LIMIT`, `PROVIDER_OVERLOADED`, `PROVIDER_TIMEOUT`, `PROVIDER_ERROR`. Auth / invalid-request / context-length / content-filter re-throw immediately (they'd fail identically downstream — retrying only burns budget). Identity/capabilities/pricing front the primary model. Usage aggregates across attempted models. A caller's own abort (aborted `signal`, abort error, `cancelled` category) never advances the chain. Inspect `model.lastAttempts` for the failed models of the most recent call.
 
 **Streaming caveat:** `stream()` can only fail over while no chunk has been emitted yet — once the first `delta` / `tool-call` reaches the consumer, a mid-stream failure propagates instead of restarting. It advances _instantly_ (no backoff) — pair with a backoff middleware if you want delay.
 
@@ -2505,7 +2511,7 @@ Scripting `[{ error: new ProviderRateLimitError("slow down") }]` drives the neve
 
 ---
 name: guard-input-output
-description: 'Build the composed guardrail middleware with @warlock.js/ai and wire it into an agent — `ai.guardrail({ input, output, tool, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `ai.guardrail.links`, `bufferStream`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool'', ''strip external images from model replies'', ''guardrails with streaming''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail` ships in core) or `import { guard } from "@warlock.js/ai"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
+description: 'Build the composed guardrail middleware with @warlock.js/ai and wire it into an agent — `ai.guardrail({ input, output, tool, toolResult, wrapToolResults, toolNames, escalation })`. Triggers: `ai.guardrail`, `guard`, `GuardOptions`, `GuardrailVerdict`, `GuardrailDetector`, `GuardrailPhase`, `GuardrailMatch`, `GuardrailViolationError`, `ai.guardrail.topic`, `ai.guardrail.injection`, `ai.guardrail.links`, `bufferStream`, `topicFilter`, `injectionDetector`, `toolNames`, `forTool`; ''add a guardrail to my agent'', ''block prompt injection'', ''filter banned topics'', ''guard agent input and output'', ''stop the model leaking data into a tool call'', ''scope a detector to one tool'', ''strip external images from model replies'', ''guardrails with streaming''; typical import `import { ai } from "@warlock.js/ai"` (`ai.guardrail` ships in core) or `import { guard } from "@warlock.js/ai"`. Skip: PII detection/redaction specifically — the `detect-and-redact-pii` topic; routing a block to a human — the `escalate-block-to-human` topic; the core middleware pipeline / hook contract — the `run-ai-agent` topic.'
 ---
 
 # Guard agent input, output, and tool args
@@ -2536,15 +2542,22 @@ const policy = guard({ input: [injection({ onMatch: "block" })] });
 
 ## The three phases
 
-| Phase      | Hook          | Inspected text                                        | Set with        |
-| ---------- | ------------- | ----------------------------------------------------- | --------------- |
-| **input**  | `trip.before` | the outbound prompt (`extractUserText(ctx.messages)`) | `input: [...]`  |
-| **output** | `trip.after`  | `response.content`                                    | `output: [...]` |
-| **tool**   | `tool.before` | `JSON.stringify(toolArgs)`                            | `tool: [...]`   |
+| Phase          | Hook          | Inspected text                                        | Set with            |
+| -------------- | ------------- | ----------------------------------------------------- | ------------------- |
+| **input**      | `trip.before` | the outbound prompt (`extractUserText(ctx.messages)`) | `input: [...]`      |
+| **output**     | `trip.after`  | `response.content`                                    | `output: [...]`     |
+| **tool**       | `tool.before` | `JSON.stringify(toolArgs)`                            | `tool: [...]`       |
+| **toolResult** | `tool.after`  | what the tool returned (string, else JSON)            | `toolResult: [...]` |
 
 Each phase array runs its detectors in **registration order**; the first non-`allow` verdict decides the action for that phase (short-circuit). A phase you don't configure is inert — a guard with no detectors is a no-op middleware.
 
 `input` detectors run **once per distinct user text per run**: later trips of a tool-using run with the same prompt skip them (one moderation call, not one per trip). A detector that faulted runs again next trip.
+
+`toolResult` detectors are the defence against indirect prompt injection (text a tool fetched). `block` fails that tool call (the model never sees the data), `redact` replaces the result data with the rewritten text, `flag` records. `wrapToolResults: true` wraps each successful result in `<untrusted-tool-result tool="name">…</untrusted-tool-result>` so the model treats it as data:
+
+```ts
+ai.guardrail({ toolResult: [ai.guardrail.injection({ onMatch: "block" })], wrapToolResults: true });
+```
 
 ## Streaming (`agent.stream()`, `ai.serve`)
 
@@ -2582,7 +2595,7 @@ if (result.error instanceof ai.errors.GuardrailViolationError) {
 
 Four zero-dependency detectors ship (a fifth, `moderation`, is an optional `openai` peer — see the `detect-and-redact-pii` topic):
 
-- **`ai.guardrail.injection(options?)`** — jailbreak / prompt-injection marker phrases, matched on normalized text (case, NFKC forms, zero-width characters, and runs of whitespace / `_` / `-` / `.` folded, so `"Ignore  previous\ninstructions"` matches). Extra `markers` (string, normalized the same way | RegExp, run on the original text without `g` / `y`); `onMatch` defaults to `"flag"`, callers commonly use `"block"` on input. Heuristic only; it does not see tool results.
+- **`ai.guardrail.injection(options?)`** — jailbreak / prompt-injection marker phrases, matched on normalized text (case, compatibility forms, zero-width characters, combining marks, look-alike Cyrillic / Greek letters, and runs of whitespace / dashes / `_` / `.` / `,` / `;` / `:` / `|` / `/` / `*` folded, so `"Ignore  previous\ninstructions"` matches). Extra `markers` (string, normalized the same way | RegExp, run on the original text without `g` / `y`); `onMatch` defaults to `"flag"`, callers commonly use `"block"` on input. Heuristic only; it sees tool results only through `toolResult`.
 - **`ai.guardrail.topic(options)`** — `deny` (string substring | RegExp) and/or `allow` (allow-list miss triggers `onMatch`). `onMatch` is `"block" | "flag"`, default `"block"`.
 - **`ai.guardrail.pii(options?)`** — PII regex + dictionary (its own skill).
 - **`ai.guardrail.links(options?)`** — `output` detector against exfiltration through rendered replies: strips Markdown images, reference definitions, `<img src|srcset>` and `<image src|href>` whose host is not on `allowHosts` (`"cdn.example.com"`, `"*.example.org"`); `links: true` also strips Markdown links, `<a href>` and `<https://…>` autolinks. Relative URLs stay; `data:` / `javascript:` / entity-encoded URLs are refused. `onMatch` default `"redact"` (keeps alt / link text), or `"block"` / `"flag"`. Not an HTML sanitizer.
@@ -2810,6 +2823,7 @@ AIError  (base — code, category, message, cause?, context?)
 │   ├── ProviderOverloadedError  PROVIDER_OVERLOADED        { retryAfter? } — provider busy (529 / 503), retryable
 │   ├── QuotaExceededError       PROVIDER_QUOTA_EXCEEDED    — NOT retryable (billing cap)
 │   ├── ProviderTimeoutError     PROVIDER_TIMEOUT
+│   ├── ProviderAbortError       PROVIDER_ERROR             — caller aborted (name AbortError, category cancelled)
 │   ├── ContextLengthExceededError CONTEXT_LENGTH_EXCEEDED  { limit?, actual?, modelName? }
 │   ├── ContentFilterError       CONTENT_FILTER             { reason?, categories? }
 │   ├── InvalidRequestError      PROVIDER_INVALID_REQUEST
@@ -2866,6 +2880,7 @@ async function settle(error: unknown, retry: () => Promise<void>): Promise<void>
 | `ProviderRateLimitError`                                                                                       | Yes — back off by `retryAfter` ms                                                       |
 | `ProviderOverloadedError`                                                                                      | Yes — back off (`retryAfter` when sent) or fail over                                    |
 | `ProviderTimeoutError`                                                                                         | Yes — short delay                                                                       |
+| `ProviderAbortError`                                                                                           | **No** — the caller cancelled the call; do not retry or fail over                       |
 | `ProviderError` (generic)                                                                                      | Read `error.retryable` (true for 5xx / 408 / 409)                                       |
 | `QuotaExceededError`                                                                                           | **No** — needs human intervention                                                       |
 | `ProviderAuthError`                                                                                            | **No** — fix config / rotate key                                                        |
@@ -2971,7 +2986,7 @@ const result = await chat.send("What is my name?"); // AgentResult, history incl
 
 What `send(input, options)` does, under a per-session lock:
 
-1. Load the record stored under `session:<id>`, mark it `pending: { runId, input }`.
+1. Load the record stored under `session:<id>`, mark it `pending: { runId, input }` (stores with the optional `markPending(runId, pending)` — memory, pg, sqlite — update only that field in place; others save the record).
 2. Run `agent.execute(input, { ...options, history, captureMessages: true, sessionId: id })`.
 3. On success, store the run's messages (without the agent's system prompt) plus the final reply with its `blocks`; on a failed / cancelled run keep the old history. Clear `pending`.
 
@@ -4307,6 +4322,8 @@ await pool.query(store.ensureSchema());
 
 `query()` runs the cosine floor (`threshold`) and `tags` overlap filter **in SQL** (a below-floor row never crosses the wire), orders by `embedding <=> $vec`, caps at `topK`, and maps the pgvector distance back to a `[0,1]` cosine-similarity `score` — the same scale the cache store emits. `removeNamespace()` is a prefix DELETE that escapes `_` / `%` so dropping `ai.rag.docs` never also catches `ai.rag.docs2`.
 
+`ai.rag({ store: pgVectorStore(...) })` takes the store directly (a `VectorStore` is used as is; a cache driver is wrapped). The store also offers `remove(key)` and `list(namespace)`, so `rag.clear()` drops only its own chunks.
+
 ## Pattern — a knowledge base from a website, backed by pgvector
 
 ```ts
@@ -4623,6 +4640,8 @@ Same config across process restarts → same synthetic name. Keeps workflow sign
 agent.execute(input: string, options?: AgentExecuteOptions): Promise<AgentResult<T>>;
 agent.stream(input: string, options?: AgentExecuteOptions): StreamContract<AgentResult<T>>;
 ```
+
+A non-string `input` is refused with an `InvalidRequestError` (`execute()` rejects, `stream()` throws); run failures still land on `result.error`.
 
 `AgentExecuteOptions` — every field optional:
 
@@ -4949,7 +4968,7 @@ function throwUnauthorized(): never {
 - Errors on the wire are `{ code, message, reference }` (fixed message per error kind); the full error is logged as `ai.serve` / `run.failed` under `reference`.
 - Default `toInput` requires a string `body.input` (else `400 invalid_input`); map a structured body with `toInput`.
 - A throwing callback answers `500 internal_error` (or the `ServeHttpError` status) and never crashes the process.
-- No `authToken` / `authorize` and no `public: true` → one-time warning in production.
+- No `authToken` / `authorize` and no `public: true` → one-time warning in production; `ai.serve` will refuse to start in 6.0, so set one now.
 - `streamToSSE(stream, { mapEvent, mapResult, mapError })` is the transport-agnostic building block; without options it is verbatim (trusted sinks only).
 
 ## Pattern — cancellation
@@ -5346,7 +5365,8 @@ const kb = ai.rag({
 Resolution is **loud at construction** (mirrors `ai.memory`):
 
 - `embedder` is **required** — a provider with no embedder must be caught here, not at first `index()`.
-- `store` falls back to `ai.config({ defaultStore })`; if neither resolves, the factory throws.
+- `store` is a vector-capable cache driver or a `VectorStore` (for example `ai.rag.pgVectorStore({ client: pool })`, used as is). It falls back to `ai.config({ defaultStore })`; if neither resolves, the factory throws.
+- `clear()` lists the namespace (`listKeys()` on the cache drivers that have it, `list()` on a `VectorStore`) and deletes exactly this rag's chunks; a store that cannot list falls back to similarity sweeps.
 
 ## Surface — `Rag`
 
@@ -5443,7 +5463,7 @@ Input is `{ query: string }`; output is the `RetrieveResult`. Default tool name 
 await kb.clear(); // drops every entry written under this rag's namespace
 ```
 
-`clear()` deletes by key prefix, so on a shared driver it also clears a nested namespace (`kb.acme` clears `kb.acme.private`) — give rags on one driver sibling names.
+`clear()` deletes only this rag's own chunks (a nested namespace such as `kb.acme.private` and siblings stay). It finds them with similarity queries, widening up to 5,000 candidates, so on a driver shared with far more unrelated entries give the rag its own driver; pre-5.53 chunks with a dotted document id stay until re-indexed.
 
 ## Namespace isolation (5.53)
 
@@ -6673,7 +6693,7 @@ Every field is optional; `resolveOutboundPolicy` fills safe defaults, so an untu
 
 Every violation throws `OutboundPolicyError` with `context` carrying the offending URL/host/address — never a silent fallback.
 
-**Address pinning (5.53).** With `denyPrivateIPsAfterDNS` on and the global `fetch`, every connection (first request and each redirect hop) resolves its host through a checked lookup and connects only to the addresses that passed — a DNS-rebinding host flipping to `127.0.0.1` / `169.254.169.254` after the pre-check is refused at connect time (`OutboundPolicyError`, message ends "when connecting"). TLS still verifies against the URL's host name. An injected `policy.fetch`, or an app-installed non-`Agent` global dispatcher (proxy, mock), keeps the pre-check only.
+**Address pinning (5.53).** With `denyPrivateIPsAfterDNS` on and the global `fetch`, every connection (first request and each redirect hop) resolves its host through a checked lookup and connects only to the addresses that passed — a DNS-rebinding host flipping to `127.0.0.1` / `169.254.169.254` after the pre-check is refused at connect time (`OutboundPolicyError`, message ends "when connecting"). TLS still verifies against the URL's host name. The pinned dispatcher inherits the connect options of the app's own global `Agent` (private CA, client certificate). An injected `policy.fetch`, an app-installed non-`Agent` global dispatcher (proxy, mock), an `Agent` whose `connect` is a function, or a runtime without a dispatcher keeps the pre-check only, with one `[warlock-ai] outbound address pinning is off` warning per reason.
 
 ## Redirects are never delegated to the platform (4.15.0)
 

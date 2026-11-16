@@ -2,9 +2,20 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { discoverPageGraph } from "../../../../web/src/build";
-import { collectPages, discoverGraphPages, exportsName, layoutChainOf } from "./collect-pages";
+import {
+  collectPages,
+  discoverGraphPages,
+  exportsName,
+  layoutChainOf,
+  type WebBuildModule,
+} from "./collect-pages";
 import type { InspectWarning } from "./inspect-report.types";
+
+// Loaded by path at run time so the typecheck of core does not compile web's source.
+const webBuildEntry = path.resolve(__dirname, "../../../../web/src/build/index.ts");
+const { discoverPageGraph } = (await import(
+  /* @vite-ignore */ webBuildEntry
+)) as Required<WebBuildModule>;
 
 let root: string;
 
@@ -80,7 +91,10 @@ describe("page facts", () => {
     write("src/web/$sites/shop/layout.tsx", layout);
     write("src/web/$sites/shop/cart/layout.tsx", "export const config = { middleware: [] };");
     write("src/web/$sites/shop/cart/cart.page.tsx", page);
-    write("src/web/$sites/shop/cart/cart.setup.ts", "export async function loader() { return {}; }");
+    write(
+      "src/web/$sites/shop/cart/cart.setup.ts",
+      "export async function loader() { return {}; }",
+    );
     write("src/web/$sites/admin/root.tsx", layout);
     write("src/web/$sites/admin/home.page.tsx", page);
 

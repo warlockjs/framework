@@ -33,12 +33,12 @@ Every source file has at most one owner.
 
 A file nobody claims has no owner. Two claims of the same strength are a conflict, and the file gets no owner:
 
-| Case | Reported as |
-| --- | --- |
-| Two different `@feature` tags in one file | [`GR3003`](../04-check/#gr3003) |
-| Two features list the same folder | [`GR3003`](../04-check/#gr3003) |
-| A `@feature` tag names no feature | [`GR3004`](../04-check/#gr3004) (the folders then decide) |
-| A file under `src/app/**` with no owner | [`GR3002`](../04-check/#gr3002) |
+| Case                                      | Reported as                                               |
+| ----------------------------------------- | --------------------------------------------------------- |
+| Two different `@feature` tags in one file | [`GR3003`](../04-check/#gr3003)                           |
+| Two features list the same folder         | [`GR3003`](../04-check/#gr3003)                           |
+| A `@feature` tag names no feature         | [`GR3004`](../04-check/#gr3004) (the folders then decide) |
+| A file under `src/app/**` with no owner   | [`GR3002`](../04-check/#gr3002)                           |
 
 Test files (`*.test.ts`, `*.spec.ts`) get an owner too, but they never count as a feature's own, borrowed or
 unreached files.
@@ -55,13 +55,13 @@ A feature **borrows** a file it does not own when one of its own files imports i
 Each step of a flow points at something in the book. The flow's book map lists the file the step starts from (the
 **entry**) and every project file the entry imports, directly or not.
 
-| Step | Matches | Entry | Files |
-| --- | --- | --- | --- |
-| `route   POST /api/orders` | routes with the same method and path (`ALL` matches any method) | the handler's file, else the routes file | the handler's imports, plus the routes file alone |
-| `page   /products/:id` | pages of the sites and screens of the mobile apps the feature lists; `:id` and `[id]` are the same, a trailing `/` is ignored | the first page or screen file | the imports of the page and its setup file (layouts are left out) |
-| `mail`, `job`, `event`, `notification` | the thing with that name | its file | its imports |
-| `affects   catalog/browse-products` | the feature and flow exist | none | none |
-| `outside service   payment gateway` | not checked | none | none |
+| Step                                   | Matches                                                                                                                       | Entry                                    | Files                                                             |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------- |
+| `route   POST /api/orders`             | routes with the same method and path (`ALL` matches any method)                                                               | the handler's file, else the routes file | the handler's imports, plus the routes file alone                 |
+| `page   /products/:id`                 | pages of the sites and screens of the mobile apps the feature lists; `:id` and `[id]` are the same, a trailing `/` is ignored | the first page or screen file            | the imports of the page and its setup file (layouts are left out) |
+| `mail`, `job`, `event`, `notification` | the thing with that name                                                                                                      | its file                                 | its imports                                                       |
+| `affects   catalog/browse-products`    | the feature and flow exist                                                                                                    | none                                     | none                                                              |
+| `outside service   payment gateway`    | not checked                                                                                                                   | none                                     | none                                                              |
 
 `found` is `true` when the step matched, `false` when it did not, and `null` when the book cannot tell (an outside
 service, or a route step before the routes were ever read).
@@ -99,7 +99,11 @@ open the handler to see which ones it really uses.
   ],
   "pages": {
     "web-client": [
-      { "route": "/products/:id", "file": "src/web/$sites/client/products/show.page.tsx", "type": "page" }
+      {
+        "route": "/products/:id",
+        "file": "src/web/$sites/client/products/show.page.tsx",
+        "type": "page"
+      }
     ]
   },
   "unreached": []

@@ -55,7 +55,9 @@ function targetOf(type, id) {
     }
     case "route": {
       const space = id.indexOf(" ");
-      return space < 0 ? null : `route/${encode(id.slice(0, space))}/${encode(id.slice(space + 1))}`;
+      return space < 0
+        ? null
+        : `route/${encode(id.slice(0, space))}/${encode(id.slice(space + 1))}`;
     }
     case "file":
       return `file/${encode(id)}`;
@@ -118,15 +120,17 @@ function graphView(ctx, graph, title) {
   if (centre) place.set(centre.id, [middleX, middleY]);
 
   const inner = centre ? Math.min(others.length, 18) : 0;
-  const rings = centre
-    ? [others.slice(0, inner), others.slice(inner)]
-    : [others, []];
+  const rings = centre ? [others.slice(0, inner), others.slice(inner)] : [others, []];
   rings.forEach((ring, index) => {
     const radiusX = centre ? (index === 0 ? 210 : 320) : 300;
     const radiusY = centre ? (index === 0 ? 150 : 195) : 185;
     ring.forEach((node, position) => {
-      const angle = (position / Math.max(ring.length, 1)) * 2 * Math.PI - Math.PI / 2 + index * 0.15;
-      place.set(node.id, [middleX + radiusX * Math.cos(angle), middleY + radiusY * Math.sin(angle)]);
+      const angle =
+        (position / Math.max(ring.length, 1)) * 2 * Math.PI - Math.PI / 2 + index * 0.15;
+      place.set(node.id, [
+        middleX + radiusX * Math.cos(angle),
+        middleY + radiusY * Math.sin(angle),
+      ]);
     });
   });
 
@@ -202,18 +206,31 @@ function list(ctx, items) {
 
 function table(ctx, headings, rows) {
   return ctx.el("table", { class: "grimoire-table" }, [
-    ctx.el("thead", {}, [ctx.el("tr", {}, headings.map((heading) => ctx.el("th", { text: heading })))]),
+    ctx.el("thead", {}, [
+      ctx.el(
+        "tr",
+        {},
+        headings.map((heading) => ctx.el("th", { text: heading })),
+      ),
+    ]),
     ctx.el(
       "tbody",
       {},
-      rows.map((row) => ctx.el("tr", {}, row.map((cell) => ctx.el("td", {}, cell)))),
+      rows.map((row) =>
+        ctx.el(
+          "tr",
+          {},
+          row.map((cell) => ctx.el("td", {}, cell)),
+        ),
+      ),
     ),
   ]);
 }
 
 function statusTone(status) {
   if (status === "shipped" || status === "passing" || status === "pass") return "good";
-  if (status === "retired" || status === "failing" || status === "fail" || status === "error") return "bad";
+  if (status === "retired" || status === "failing" || status === "fail" || status === "error")
+    return "bad";
   return "";
 }
 
@@ -231,7 +248,8 @@ function fileList(ctx, files, limit = 12) {
   if (!files.length) return ctx.el("span", { class: "muted", text: "none" });
   const shown = files.slice(0, limit);
   const items = shown.map((file) => [fileLink(ctx, file)]);
-  if (files.length > limit) items.push([ctx.el("span", { class: "muted", text: `+${files.length - limit} more` })]);
+  if (files.length > limit)
+    items.push([ctx.el("span", { class: "muted", text: `+${files.length - limit} more` })]);
   return list(ctx, items);
 }
 
@@ -324,7 +342,13 @@ async function featureView(ctx, id) {
             ctx,
             ["Flow", "Status", "Since", "Heading"],
             data.flows.map((flow) => [
-              [link(ctx, flow.id, `flow/${encodeURIComponent(plain(readme.id))}/${encodeURIComponent(flow.id)}`)],
+              [
+                link(
+                  ctx,
+                  flow.id,
+                  `flow/${encodeURIComponent(plain(readme.id))}/${encodeURIComponent(flow.id)}`,
+                ),
+              ],
               [badge(ctx, flow.status, statusTone(flow.status))],
               [flow.since],
               [flow.heading ?? ""],
@@ -345,7 +369,11 @@ async function featureView(ctx, id) {
         ? list(
             ctx,
             map.routes.map((item) => [
-              link(ctx, `${item.method} ${item.path}`, `route/${encodeURIComponent(item.method)}/${encodeURIComponent(item.path)}`),
+              link(
+                ctx,
+                `${item.method} ${item.path}`,
+                `route/${encodeURIComponent(item.method)}/${encodeURIComponent(item.path)}`,
+              ),
               " in ",
               fileLink(ctx, item.file),
             ]),
@@ -357,7 +385,11 @@ async function featureView(ctx, id) {
             ctx,
             Object.entries(map.pages).flatMap(([app, pages]) =>
               pages.map((item) => [
-                link(ctx, `${app} ${item.route}`, `page/${encodeURIComponent(app)}/${encodeURIComponent(item.route)}`),
+                link(
+                  ctx,
+                  `${app} ${item.route}`,
+                  `page/${encodeURIComponent(app)}/${encodeURIComponent(item.route)}`,
+                ),
               ]),
             ),
           )
@@ -370,14 +402,22 @@ async function featureView(ctx, id) {
   if (data.tasks.length) {
     out.append(
       section(ctx, "Open tasks", [
-        list(ctx, data.tasks.map((task) => [link(ctx, task.id, `task/${encodeURIComponent(task.id)}`), ` ${task.title} `, badge(ctx, task.status)])),
+        list(
+          ctx,
+          data.tasks.map((task) => [
+            link(ctx, task.id, `task/${encodeURIComponent(task.id)}`),
+            ` ${task.title} `,
+            badge(ctx, task.status),
+          ]),
+        ),
       ]),
     );
   }
 
   out.append(section(ctx, "Recent changes", [changesView(ctx, data.changes)]));
 
-  if (data.findings.length) out.append(section(ctx, "Findings", [findingsView(ctx, data.findings)]));
+  if (data.findings.length)
+    out.append(section(ctx, "Findings", [findingsView(ctx, data.findings)]));
   if (graph) out.append(graphView(ctx, graph, "The feature and its neighbours"));
   return out;
 }
@@ -391,7 +431,9 @@ function changesView(ctx, changes) {
       ` ${plain(change.version)} `,
       change.flow ? [flowLink(ctx, `${change.feature}/${change.flow}`), " "] : "",
       change.text,
-      change.release ? ` (release ${change.release}${change.date ? `, ${change.date}` : ""})` : " (not released)",
+      change.release
+        ? ` (release ${change.release}${change.date ? `, ${change.date}` : ""})`
+        : " (not released)",
     ]),
   );
 }
@@ -402,7 +444,13 @@ function findingsView(ctx, findings) {
     ["Code", "Severity", "Message", "Where"],
     findings.map((finding) => [
       [finding.code],
-      [badge(ctx, finding.expected ? `${finding.severity} (expected)` : finding.severity, finding.severity === "error" && !finding.expected ? "bad" : "")],
+      [
+        badge(
+          ctx,
+          finding.expected ? `${finding.severity} (expected)` : finding.severity,
+          finding.severity === "error" && !finding.expected ? "bad" : "",
+        ),
+      ],
       [finding.message],
       [finding.at ? `${finding.at.file}:${finding.at.line}` : (finding.subject.file ?? "")],
     ]),
@@ -432,7 +480,15 @@ async function flowView(ctx, feature, flowId) {
             map.steps.map((step) => [
               [String(step.index)],
               [step.kind],
-              [step.kind === "route" && step.target.includes(" ") ? link(ctx, step.target, `route/${encodeURIComponent(step.target.split(" ")[0])}/${encodeURIComponent(step.target.slice(step.target.indexOf(" ") + 1))}`) : step.target],
+              [
+                step.kind === "route" && step.target.includes(" ")
+                  ? link(
+                      ctx,
+                      step.target,
+                      `route/${encodeURIComponent(step.target.split(" ")[0])}/${encodeURIComponent(step.target.slice(step.target.indexOf(" ") + 1))}`,
+                    )
+                  : step.target,
+              ],
               [step.found === null ? "" : step.found ? "yes" : "no"],
               [step.files.length ? fileList(ctx, step.files, 6) : ""],
             ]),
@@ -461,7 +517,11 @@ async function flowView(ctx, feature, flowId) {
                         `:${test.line} `,
                         test.name ?? "",
                         " ",
-                        badge(ctx, test.stale ? `${test.result}, stale` : test.result, statusTone(test.result)),
+                        badge(
+                          ctx,
+                          test.stale ? `${test.result}, stale` : test.result,
+                          statusTone(test.result),
+                        ),
                       ]),
                     )
                   : el("span", { class: "muted", text: "no test" }),
@@ -480,7 +540,11 @@ async function flowView(ctx, feature, flowId) {
             map.shownBy.map((shown) => [
               shown.type === "layout"
                 ? `${shown.app} layout ${shown.id}`
-                : link(ctx, `${shown.app} ${shown.type} ${shown.id}`, `page/${encodeURIComponent(shown.app)}/${encodeURIComponent(shown.id)}`),
+                : link(
+                    ctx,
+                    `${shown.app} ${shown.type} ${shown.id}`,
+                    `page/${encodeURIComponent(shown.app)}/${encodeURIComponent(shown.id)}`,
+                  ),
               ` as block ${shown.block}`,
             ]),
           )
@@ -494,18 +558,29 @@ async function flowView(ctx, feature, flowId) {
         table(
           ctx,
           ["Question", "Answer"],
-          flow.cases.map((item) => [[item.question], [item.doesNotApply ? `does not apply: ${item.answer}` : item.answer]]),
+          flow.cases.map((item) => [
+            [item.question],
+            [item.doesNotApply ? `does not apply: ${item.answer}` : item.answer],
+          ]),
         ),
       ]),
     );
   }
 
   if (flow.unknowns.length) {
-    out.append(section(ctx, "Unknowns", [list(ctx, flow.unknowns.map((item) => [item.text]))]));
+    out.append(
+      section(ctx, "Unknowns", [
+        list(
+          ctx,
+          flow.unknowns.map((item) => [item.text]),
+        ),
+      ]),
+    );
   }
 
   out.append(section(ctx, "History", [changesView(ctx, data.history)]));
-  if (data.findings.length) out.append(section(ctx, "Findings", [findingsView(ctx, data.findings)]));
+  if (data.findings.length)
+    out.append(section(ctx, "Findings", [findingsView(ctx, data.findings)]));
   return out;
 }
 
@@ -513,17 +588,24 @@ async function pageView(ctx, app, key) {
   const path = `${encodeURIComponent(app)}/pages/${encodeURIComponent(key)}`;
   const [data, graph] = await Promise.all([
     ctx.api(`apps/${path}`),
-    ctx.api(`graph/page?app=${encodeURIComponent(app)}&page=${encodeURIComponent(key)}`).catch(() => null),
+    ctx
+      .api(`graph/page?app=${encodeURIComponent(app)}&page=${encodeURIComponent(key)}`)
+      .catch(() => null),
   ]);
   const { el } = ctx;
   const page = data.page;
   const out = el("div", { class: "grimoire-view" }, [
-    el("h2", { text: `${plain(page.heading) ?? page.id} (${app} ${plain(page.route) ?? plain(page.screen) ?? page.id})` }),
+    el("h2", {
+      text: `${plain(page.heading) ?? page.id} (${app} ${plain(page.route) ?? plain(page.screen) ?? page.id})`,
+    }),
   ]);
 
   if (page.purpose) out.append(el("p", { text: page.purpose }));
 
-  const rows = [...(data.layout ? data.layout.blocks.map((row) => ({ row, from: "layout" })) : []), ...page.blocks.map((row) => ({ row, from: "page" }))];
+  const rows = [
+    ...(data.layout ? data.layout.blocks.map((row) => ({ row, from: "layout" })) : []),
+    ...page.blocks.map((row) => ({ row, from: "page" })),
+  ];
   out.append(
     section(ctx, "Blocks", [
       rows.length
@@ -535,7 +617,13 @@ async function pageView(ctx, app, key) {
               [from],
               [row.flow ? flowLink(ctx, row.flow) : ""],
               [row.who.everyone ? "everyone" : row.who.conditions.join(", ")],
-              [row.changesWith.map((change) => (change.condition ? `${change.condition}: ${change.text}` : change.text)).join("; ")],
+              [
+                row.changesWith
+                  .map((change) =>
+                    change.condition ? `${change.condition}: ${change.text}` : change.text,
+                  )
+                  .join("; "),
+              ],
             ]),
           )
         : ctx.empty("No blocks are written for this page."),
@@ -544,9 +632,19 @@ async function pageView(ctx, app, key) {
 
   if (page.blockFiles.length) {
     out.append(
-      section(ctx, "Block details", page.blockFiles.map((block) =>
-        el("div", {}, [el("h4", { text: block.id }), list(ctx, block.details.map((detail) => [`${detail.name}: ${detail.text}`]))]),
-      )),
+      section(
+        ctx,
+        "Block details",
+        page.blockFiles.map((block) =>
+          el("div", {}, [
+            el("h4", { text: block.id }),
+            list(
+              ctx,
+              block.details.map((detail) => [`${detail.name}: ${detail.text}`]),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 
@@ -554,8 +652,12 @@ async function pageView(ctx, app, key) {
     out.append(
       section(ctx, "In the code", [
         el("p", {}, [fileLink(ctx, data.book.file)]),
-        data.book.layouts?.length ? el("p", {}, ["Layouts: ", fileList(ctx, data.book.layouts)]) : "",
-        data.book.requires?.length ? el("p", { text: `Requires: ${data.book.requires.join(", ")}` }) : "",
+        data.book.layouts?.length
+          ? el("p", {}, ["Layouts: ", fileList(ctx, data.book.layouts)])
+          : "",
+        data.book.requires?.length
+          ? el("p", { text: `Requires: ${data.book.requires.join(", ")}` })
+          : "",
       ]),
     );
   }
@@ -574,7 +676,12 @@ async function appsView(ctx) {
       section(ctx, `${app.id} (${app.type})`, [
         ctx.el("p", { class: "muted", text: app.root }),
         app.pages.length || app.screens.length
-          ? list(ctx, [...app.pages, ...app.screens].map((id) => [link(ctx, id, `page/${encodeURIComponent(app.id)}/${encodeURIComponent(id)}`)]))
+          ? list(
+              ctx,
+              [...app.pages, ...app.screens].map((id) => [
+                link(ctx, id, `page/${encodeURIComponent(app.id)}/${encodeURIComponent(id)}`),
+              ]),
+            )
           : ctx.empty("No pages written."),
       ]),
     ),
@@ -607,7 +714,11 @@ async function tasksView(ctx, only) {
             [link(ctx, task.id, `task/${encodeURIComponent(task.id)}`)],
             [task.type],
             [badge(ctx, task.status)],
-            [task.feature ? link(ctx, task.feature, `feature/${encodeURIComponent(task.feature)}`) : ""],
+            [
+              task.feature
+                ? link(ctx, task.feature, `feature/${encodeURIComponent(task.feature)}`)
+                : "",
+            ],
             [task.title],
             [task.decisionNeeded ?? ""],
           ]),
@@ -624,7 +735,11 @@ async function releasesView(ctx) {
     table(
       ctx,
       ["Release", "Date", "File"],
-      data.releases.map((item) => [[link(ctx, item.release, `release/${encodeURIComponent(item.release)}`)], [item.date], [item.file]]),
+      data.releases.map((item) => [
+        [link(ctx, item.release, `release/${encodeURIComponent(item.release)}`)],
+        [item.date],
+        [item.file],
+      ]),
     ),
   ]);
 }
@@ -636,7 +751,14 @@ async function releaseView(ctx, id) {
     ctx.el("h2", { text: `Release ${plain(data.release)} (${plain(data.date)})` }),
     data.brief ? ctx.el("p", { text: data.brief }) : "",
     section(ctx, "Collected entries", [
-      entries.length ? list(ctx, entries.map((entry) => [`${entry.feature} ${entry.version}: ${entry.text ?? JSON.stringify(entry)}`])) : ctx.empty("Nothing is listed for this release."),
+      entries.length
+        ? list(
+            ctx,
+            entries.map((entry) => [
+              `${entry.feature} ${entry.version}: ${entry.text ?? JSON.stringify(entry)}`,
+            ]),
+          )
+        : ctx.empty("Nothing is listed for this release."),
     ]),
   ]);
 }
@@ -646,7 +768,10 @@ async function checkView(ctx) {
   const { counts } = report;
   return ctx.el("div", { class: "grimoire-view" }, [
     ctx.el("h2", { text: report.ok ? "Check: no unexpected errors" : "Check: errors found" }),
-    ctx.el("p", { class: "muted", text: `${counts.errors} errors, ${counts.warnings} warnings, ${counts.expected} expected; routes ${report.routes}` }),
+    ctx.el("p", {
+      class: "muted",
+      text: `${counts.errors} errors, ${counts.warnings} warnings, ${counts.expected} expected; routes ${report.routes}`,
+    }),
     report.findings.length ? findingsView(ctx, report.findings) : ctx.empty("No findings."),
   ]);
 }
@@ -665,14 +790,25 @@ async function fileView(ctx, path) {
   if (entry.about) out.append(el("p", { text: entry.about }));
 
   const owner = [];
-  if (entry.feature) owner.push("Owned by ", link(ctx, entry.feature, `feature/${encodeURIComponent(entry.feature)}`), ". ");
+  if (entry.feature)
+    owner.push(
+      "Owned by ",
+      link(ctx, entry.feature, `feature/${encodeURIComponent(entry.feature)}`),
+      ". ",
+    );
   if (entry.borrowedBy.length) owner.push("Borrowed by ", entry.borrowedBy.join(", "), ". ");
-  if (entry.flows.length) owner.push("Used by flows: ", ...entry.flows.flatMap((flow) => [flowLink(ctx, flow), " "]));
+  if (entry.flows.length)
+    owner.push("Used by flows: ", ...entry.flows.flatMap((flow) => [flowLink(ctx, flow), " "]));
   if (owner.length) out.append(el("p", {}, owner));
 
   out.append(
     section(ctx, "Exports", [
-      entry.exports.length ? list(ctx, entry.exports.map((item) => [`${item.name}${item.about ? `: ${item.about}` : ""}`])) : el("span", { class: "muted", text: "none" }),
+      entry.exports.length
+        ? list(
+            ctx,
+            entry.exports.map((item) => [`${item.name}${item.about ? `: ${item.about}` : ""}`]),
+          )
+        : el("span", { class: "muted", text: "none" }),
     ]),
     section(ctx, "Imports", [fileList(ctx, entry.imports, 20)]),
     section(ctx, "Imported by", [fileList(ctx, entry.importedBy, 20)]),
@@ -681,7 +817,17 @@ async function fileView(ctx, path) {
   if (entry.routes.length) {
     out.append(
       section(ctx, "Routes", [
-        list(ctx, entry.routes.map((item) => [link(ctx, `${item.method} ${item.path}`, `route/${encodeURIComponent(item.method)}/${encodeURIComponent(item.path)}`), ` (${item.via})`])),
+        list(
+          ctx,
+          entry.routes.map((item) => [
+            link(
+              ctx,
+              `${item.method} ${item.path}`,
+              `route/${encodeURIComponent(item.method)}/${encodeURIComponent(item.path)}`,
+            ),
+            ` (${item.via})`,
+          ]),
+        ),
       ]),
     );
   }
@@ -691,7 +837,9 @@ async function fileView(ctx, path) {
 }
 
 async function routeView(ctx, method, path) {
-  const data = await ctx.api(`route?method=${encodeURIComponent(method)}&path=${encodeURIComponent(path)}`);
+  const data = await ctx.api(
+    `route?method=${encodeURIComponent(method)}&path=${encodeURIComponent(path)}`,
+  );
   const { el } = ctx;
   const found = data.route;
   const out = el("div", { class: "grimoire-view" }, [
@@ -702,7 +850,12 @@ async function routeView(ctx, method, path) {
   out.append(
     section(ctx, "Files behind it", [fileList(ctx, data.files, 20)]),
     section(ctx, "Flow steps", [
-      data.steps.length ? list(ctx, data.steps.map((step) => [flowLink(ctx, step.flow), ` step ${step.index}`])) : el("span", { class: "muted", text: "none" }),
+      data.steps.length
+        ? list(
+            ctx,
+            data.steps.map((step) => [flowLink(ctx, step.flow), ` step ${step.index}`]),
+          )
+        : el("span", { class: "muted", text: "none" }),
     ]),
   );
   return out;
@@ -712,7 +865,10 @@ async function modulesView(ctx) {
   const graph = await ctx.api("graph/modules");
   return ctx.el("div", { class: "grimoire-view" }, [
     ctx.el("h2", { text: "Module coupling" }),
-    ctx.el("p", { class: "muted", text: "Lines are imports between modules; thicker means more imports. The most connected modules are drawn." }),
+    ctx.el("p", {
+      class: "muted",
+      text: "Lines are imports between modules; thicker means more imports. The most connected modules are drawn.",
+    }),
     graphView(ctx, graph, "Modules"),
   ]);
 }
@@ -786,7 +942,8 @@ function header(ctx) {
         ),
       );
     } catch (error) {
-      if (mine === token) results.append(el("p", { class: "error", text: `Search failed: ${error.message}` }));
+      if (mine === token)
+        results.append(el("p", { class: "error", text: `Search failed: ${error.message}` }));
     }
   }
 
@@ -814,7 +971,9 @@ function header(ctx) {
 function withFlatChildren(context) {
   const flat = (children) =>
     Array.isArray(children)
-      ? children.flat(Infinity).filter((child) => child !== null && child !== undefined && child !== false)
+      ? children
+          .flat(Infinity)
+          .filter((child) => child !== null && child !== undefined && child !== false)
       : children;
   return { ...context, el: (tag, attrs, children) => context.el(tag, attrs, flat(children)) };
 }
@@ -822,7 +981,8 @@ function withFlatChildren(context) {
 async function renderGrimoire(context) {
   const ctx = withFlatChildren(context);
   const { root, el } = ctx;
-  if (typeof ctx.asset === "function") root.append(el("link", { rel: "stylesheet", href: ctx.asset("grimoire.css") }));
+  if (typeof ctx.asset === "function")
+    root.append(el("link", { rel: "stylesheet", href: ctx.asset("grimoire.css") }));
   const top = header(ctx);
   const content = el("div", { class: "grimoire-body" });
   root.append(top.element, content);

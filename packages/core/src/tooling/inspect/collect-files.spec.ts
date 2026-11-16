@@ -276,10 +276,14 @@ describe("collectFiles dirs", () => {
     expect(files.find((file) => file.file === "src/a.ts")?.imports).toEqual([
       { specifier: "../mobile/app/x", file: "mobile/app/x.tsx" },
     ]);
-    expect(files.find((file) => file.file === "mobile/app/x.tsx")?.importedBy).toEqual(["src/a.ts"]);
+    expect(files.find((file) => file.file === "mobile/app/x.tsx")?.importedBy).toEqual([
+      "src/a.ts",
+    ]);
     expect(files.find((file) => file.file === "mobile/index.ts")?.module).toBe("mobile");
     // Only `src/app/<module>` splits by module; a mobile app's `app/` folder is one module.
-    expect(files.find((file) => file.file === "mobile/app/products/[id].tsx")?.module).toBe("mobile/app");
+    expect(files.find((file) => file.file === "mobile/app/products/[id].tsx")?.module).toBe(
+      "mobile/app",
+    );
   });
 
   it("scans only src by default", () => {

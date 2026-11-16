@@ -48,7 +48,14 @@ function testModule(moduleId: string, tests: ReturnType<typeof testCase>[], stat
   return { moduleId, state: () => state, children: { allTests: () => tests } };
 }
 
-const SPEC = ['// @proves catalog/wishlist AC-1', 'it("adds", () => {});', "", '// @proves catalog/wishlist AC-2', 'it("removes", () => {});', ""].join("\n");
+const SPEC = [
+  "// @proves catalog/wishlist AC-1",
+  'it("adds", () => {});',
+  "",
+  "// @proves catalog/wishlist AC-2",
+  'it("removes", () => {});',
+  "",
+].join("\n");
 
 describe("grimoireReporter", () => {
   let root: string;
@@ -120,7 +127,12 @@ describe("grimoireReporter", () => {
     const reporter = grimoireReporter({ root });
 
     await reporter.onTestRunEnd?.(
-      [testModule(path.join(root, "src/a.spec.ts"), [testCase("adds", 2, "passed"), testCase("removes", 5, "passed")])],
+      [
+        testModule(path.join(root, "src/a.spec.ts"), [
+          testCase("adds", 2, "passed"),
+          testCase("removes", 5, "passed"),
+        ]),
+      ],
       [],
       "passed",
     );
@@ -143,8 +155,16 @@ describe("grimoireReporter", () => {
     const reporter = grimoireReporter({ root });
     const file = path.join(root, "src/a.spec.ts");
 
-    await reporter.onTestRunEnd?.([testModule(file, [testCase("adds", 2, "passed")])], [], "passed");
-    await reporter.onTestRunEnd?.([testModule(file, [testCase("adds", 2, "skipped")])], [], "passed");
+    await reporter.onTestRunEnd?.(
+      [testModule(file, [testCase("adds", 2, "passed")])],
+      [],
+      "passed",
+    );
+    await reporter.onTestRunEnd?.(
+      [testModule(file, [testCase("adds", 2, "skipped")])],
+      [],
+      "passed",
+    );
 
     expect((await readTestResults(root))?.results[0]?.outcome).toBe("pass");
   });
@@ -153,8 +173,16 @@ describe("grimoireReporter", () => {
     const file = path.join(root, "src/a.spec.ts");
     const reporter = grimoireReporter({ root });
 
-    await reporter.onTestRunEnd?.([testModule(file, [testCase("adds", 2, "passed")])], [], "passed");
-    await reporter.onTestRunEnd?.([testModule(file, [testCase("adds", 2, "pending")])], [], "interrupted");
+    await reporter.onTestRunEnd?.(
+      [testModule(file, [testCase("adds", 2, "passed")])],
+      [],
+      "passed",
+    );
+    await reporter.onTestRunEnd?.(
+      [testModule(file, [testCase("adds", 2, "pending")])],
+      [],
+      "interrupted",
+    );
 
     expect((await readTestResults(root))?.results[0]?.outcome).toBe("pass");
   });
@@ -167,8 +195,14 @@ describe("grimoireReporter", () => {
     const reporter = grimoireReporter({ root });
     const file = path.join(root, "src/a.spec.ts");
 
-    await expect(reporter.onTestRunEnd?.([testModule(file, [testCase("adds", 2, "passed")])], [], "passed")).resolves.toBeUndefined();
-    await reporter.onTestRunEnd?.([testModule(file, [testCase("adds", 2, "passed")])], [], "passed");
+    await expect(
+      reporter.onTestRunEnd?.([testModule(file, [testCase("adds", 2, "passed")])], [], "passed"),
+    ).resolves.toBeUndefined();
+    await reporter.onTestRunEnd?.(
+      [testModule(file, [testCase("adds", 2, "passed")])],
+      [],
+      "passed",
+    );
 
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]?.[0])).toContain("[grimoire]");

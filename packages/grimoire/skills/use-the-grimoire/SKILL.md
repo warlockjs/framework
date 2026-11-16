@@ -1,6 +1,6 @@
 ---
 name: use-the-grimoire
-description: 'Find the right files before changing a Warlock.js project by asking the Grimoire (experimental): `warlock scry` for a file, a route, a feature, a flow or the impact of a change, and the `grimoire/` folder for what the product does. Use at the start of every task, before searching the code.'
+description: "Find the right files before changing a Warlock.js project by asking the Grimoire (experimental): `warlock scry` for a file, a route, a feature, a flow or the impact of a change, and the `grimoire/` folder for what the product does. Use at the start of every task, before searching the code."
 ---
 
 # Use the Grimoire
@@ -10,13 +10,13 @@ The Grimoire is experimental: its file structure and commands may still change.
 `grimoire/` is the map of this project. Read it before you search the code: it tells you where
 things are, what a feature is meant to do, and what a change will touch.
 
-| Folder | Holds | Written by |
-| --- | --- | --- |
-| `grimoire/book/` | One entry per source file, plus routes and pages | Warlock (never edit) |
-| `grimoire/features/` | What the product does: features, flows, cases, criteria | You and other agents |
-| `grimoire/apps/` | Where users meet it: sites, mobile apps, pages, blocks | You and other agents |
-| `grimoire/tasks/` | Open and finished work | You and other agents |
-| `grimoire/releases/` | What each release shipped | You write the brief, Warlock collects the list |
+| Folder               | Holds                                                   | Written by                                     |
+| -------------------- | ------------------------------------------------------- | ---------------------------------------------- |
+| `grimoire/book/`     | One entry per source file, plus routes and pages        | Warlock (never edit)                           |
+| `grimoire/features/` | What the product does: features, flows, cases, criteria | You and other agents                           |
+| `grimoire/apps/`     | Where users meet it: sites, mobile apps, pages, blocks  | You and other agents                           |
+| `grimoire/tasks/`    | Open and finished work                                  | You and other agents                           |
+| `grimoire/releases/` | What each release shipped                               | You write the brief, Warlock collects the list |
 
 Files named `index.json`, `bookmap.json` or ending in `.bookmap.json` are Warlock's. A feature's
 `bookmap.json` says what the feature owns and borrows, and each flow's `*.bookmap.json` says which
@@ -68,13 +68,13 @@ in `grimoire/book/app/auth/controllers/login.controller.json`.
 
 ## Commands
 
-| Command | Does |
-| --- | --- |
-| `warlock grimoire build` | Builds or refreshes the book. `scry` and `check` do it when it is stale |
-| `warlock grimoire check` | Reports broken names, untested criteria, files with no owner. Exit 1 on an error |
-| `warlock grimoire release <release>` | Writes the collected list into `grimoire/releases/<release>.md` |
-| `warlock grimoire export [dir]` | Writes the book as a static site |
-| `warlock explain GR2001` | Explains a finding code |
+| Command                              | Does                                                                             |
+| ------------------------------------ | -------------------------------------------------------------------------------- |
+| `warlock grimoire build`             | Builds or refreshes the book. `scry` and `check` do it when it is stale          |
+| `warlock grimoire check`             | Reports broken names, untested criteria, files with no owner. Exit 1 on an error |
+| `warlock grimoire release <release>` | Writes the collected list into `grimoire/releases/<release>.md`                  |
+| `warlock grimoire export [dir]`      | Writes the book as a static site                                                 |
+| `warlock explain GR2001`             | Explains a finding code                                                          |
 
 Every finding has a code (`GR2001`) and a fix hint. A finding marked `(expected)` belongs to work
 that is still `proposed`; it does not fail the check.

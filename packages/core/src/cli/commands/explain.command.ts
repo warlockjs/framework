@@ -11,7 +11,8 @@ import { explainCommandAction } from "./explain/explain-command.action";
  */
 export const explainCommand = command({
   name: "explain [code-or-file]",
-  description: "Explain a source file and its routes/pages, or an error code (e.g. WL3001, or a package code such as GR2001)",
+  description:
+    "Explain a source file and its routes/pages, or an error code (e.g. WL3001, or a package code such as GR2001)",
   action: explainCommandAction,
   preAction: ({ args }) => {
     const requested = args[0]?.trim();

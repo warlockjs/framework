@@ -8,7 +8,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { matchApps } from "../apps";
 import { buildBook, writeBook } from "../book";
-import { annotationsFrom, buildCollectedFiles, writeCollectedFiles, type CollectedInput } from "../bookmap";
+import {
+  annotationsFrom,
+  buildCollectedFiles,
+  writeCollectedFiles,
+  type CollectedInput,
+} from "../bookmap";
 import type { BookAdapter } from "../contracts/adapter";
 import type { BuildBookOptions, WriteBookResult } from "../contracts/book";
 import type { GrimoireSnapshot, OpenGrimoireOptions } from "../contracts/snapshot";
@@ -74,7 +79,15 @@ export async function runGrimoire(
   const { proofs, findings: proofFindings } = await scanProofs(root, book.facts.tests);
   const results = await readTestResults(root);
   const testHashes = await testFileHashes(root, book.facts.tests, book.manifest.tests);
-  const input: CollectedInput = { written, facts: book.facts, ownership, apps, proofs, results, testHashes };
+  const input: CollectedInput = {
+    written,
+    facts: book.facts,
+    ownership,
+    apps,
+    proofs,
+    results,
+    testHashes,
+  };
   const collected = buildCollectedFiles(input);
   const annotations = annotationsFrom(input, collected, { tests: testHashes });
   const bookWrite = await writeBook(book, annotations);

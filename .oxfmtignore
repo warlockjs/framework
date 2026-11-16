@@ -17,6 +17,10 @@ docs/src/data/changelog.json
 packages/core/tests/fixtures/model-resources/typings/model-resources.d.ts
 tools/release/sources/**
 
+# Grimoire fixtures and golden files are byte-exact test data.
+packages/grimoire/tests/fixtures/**
+packages/grimoire/tests/golden/**
+
 # Templates retain their own generated-app toolchain and byte-format checks.
 packages/create-warlock/templates/**
 

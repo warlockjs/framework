@@ -88,11 +88,11 @@ Customers with no country now see new arrivals again, and orders can be paid lat
 
 ### Who writes what
 
-| Step | Who |
-| --- | --- |
-| Move the entries from `## Unreleased` under `## <release> (<yyyy-mm-dd>)` in each feature changelog | The agent |
-| Write the release file's front matter and brief | The agent |
-| `warlock grimoire release 1.4.1` | Warlock writes the collected list between the markers |
+| Step                                                                                                | Who                                                   |
+| --------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Move the entries from `## Unreleased` under `## <release> (<yyyy-mm-dd>)` in each feature changelog | The agent                                             |
+| Write the release file's front matter and brief                                                     | The agent                                             |
+| `warlock grimoire release 1.4.1`                                                                    | Warlock writes the collected list between the markers |
 
 Feature changelogs and the brief are never edited by Warlock. A spec of the package asserts that their bytes are
 unchanged after a release run.
@@ -107,13 +107,17 @@ The command collects only the entries the agent stamped with that release, and w
 
 ```md
 <!-- grimoire:collected:start -->
+
 ## Changes
 
 ### catalog
-- 2.1  fixed  new-arrivals: a customer with no country saw an empty list (AC-2)
+
+- 2.1 fixed new-arrivals: a customer with no country saw an empty list (AC-2)
 
 ### orders
-- 3.0  added  pay-later: customers can pay within 14 days
+
+- 3.0 added pay-later: customers can pay within 14 days
+
 <!-- grimoire:collected:end -->
 ```
 

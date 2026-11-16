@@ -26,18 +26,29 @@ describe("insertCliCommandEntry", () => {
 
   it("adds a line to a multi-line commands array and keeps the indentation", () => {
     const next = added(
-      ["defineConfig({", "  cli: {", "    commands: [", "      a(),", "    ],", "  },", "});", ""].join(
-        "\n",
-      ),
+      [
+        "defineConfig({",
+        "  cli: {",
+        "    commands: [",
+        "      a(),",
+        "    ],",
+        "  },",
+        "});",
+        "",
+      ].join("\n"),
     );
 
     expect(next).toContain("      registerGrimoireCommands(),\n      a(),");
   });
 
   it("adds commands to a cli block that has none", () => {
-    const next = added(["defineConfig({", "  cli: {", "    quiet: true,", "  },", "});"].join("\n"));
+    const next = added(
+      ["defineConfig({", "  cli: {", "    quiet: true,", "  },", "});"].join("\n"),
+    );
 
-    expect(next).toContain("  cli: {\n    commands: [registerGrimoireCommands()],\n    quiet: true,");
+    expect(next).toContain(
+      "  cli: {\n    commands: [registerGrimoireCommands()],\n    quiet: true,",
+    );
   });
 
   it("fills an empty cli block", () => {

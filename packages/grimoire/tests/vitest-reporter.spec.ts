@@ -7,8 +7,16 @@ import { readTestResults } from "../src/test-results";
 import { grimoireReporter } from "../src/vitest";
 
 // Runs the reporter in a tiny real Vitest run (Vitest's own node API) on a temp project.
-const PASSING = ["// @proves catalog/wishlist AC-1", 'it("adds", () => { expect(1).toBe(1); });', ""].join("\n");
-const FAILING = ["// @proves catalog/wishlist AC-2", 'it("removes", () => { expect(1).toBe(2); });', ""].join("\n");
+const PASSING = [
+  "// @proves catalog/wishlist AC-1",
+  'it("adds", () => { expect(1).toBe(1); });',
+  "",
+].join("\n");
+const FAILING = [
+  "// @proves catalog/wishlist AC-2",
+  'it("removes", () => { expect(1).toBe(2); });',
+  "",
+].join("\n");
 
 async function run(root: string, filters: string[]): Promise<void> {
   const vitest = await startVitest("test", filters, {
@@ -46,7 +54,9 @@ describe("grimoireReporter in a real run", () => {
       ["src/fail.spec.ts", "AC-2", "fail"],
       ["src/pass.spec.ts", "AC-1", "pass"],
     ]);
-    expect(first?.results.every((item) => item.line === 2 && item.testFileHash.length === 64)).toBe(true);
+    expect(first?.results.every((item) => item.line === 2 && item.testFileHash.length === 64)).toBe(
+      true,
+    );
 
     // A partial run of one file keeps the other file's result.
     await run(root, ["pass.spec"]);

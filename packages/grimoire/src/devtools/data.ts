@@ -86,7 +86,9 @@ export function summary(snapshot: GrimoireSnapshot): GrimoireSummary {
     features: snapshot.collected.featuresIndex,
     tasks: snapshot.collected.tasksIndex,
     counts: checkGrimoire(snapshot).counts,
-    written: [written.features, written.apps, written.tasks, written.releases].some((items) => items.length > 0),
+    written: [written.features, written.apps, written.tasks, written.releases].some(
+      (items) => items.length > 0,
+    ),
     book: {
       files: files.length,
       modules: new Set(files.map((file) => file.module)).size,
@@ -99,7 +101,9 @@ export function search(snapshot: GrimoireSnapshot, text: string, limit?: number)
   return ask<ScrySearchResult>(snapshot, {
     type: "search",
     text,
-    ...(limit !== undefined && Number.isFinite(limit) && limit > 0 ? { limit: Math.min(limit, 100) } : {}),
+    ...(limit !== undefined && Number.isFinite(limit) && limit > 0
+      ? { limit: Math.min(limit, 100) }
+      : {}),
   });
 }
 
@@ -111,16 +115,32 @@ export function impact(snapshot: GrimoireSnapshot, path: string | undefined): Sc
   return ask(snapshot, { type: "impact", file: required(path, "path") });
 }
 
-export function route(snapshot: GrimoireSnapshot, method: string | undefined, path: string | undefined): ScryRouteResult {
-  return ask(snapshot, { type: "route", method: required(method, "method"), path: required(path, "path") });
+export function route(
+  snapshot: GrimoireSnapshot,
+  method: string | undefined,
+  path: string | undefined,
+): ScryRouteResult {
+  return ask(snapshot, {
+    type: "route",
+    method: required(method, "method"),
+    path: required(path, "path"),
+  });
 }
 
 export function feature(snapshot: GrimoireSnapshot, id: string | undefined): ScryFeatureResult {
   return ask(snapshot, { type: "feature", feature: required(id, "feature") });
 }
 
-export function flow(snapshot: GrimoireSnapshot, featureId: string | undefined, flowId: string | undefined): ScryFlowResult {
-  return ask(snapshot, { type: "flow", feature: required(featureId, "feature"), flow: required(flowId, "flow") });
+export function flow(
+  snapshot: GrimoireSnapshot,
+  featureId: string | undefined,
+  flowId: string | undefined,
+): ScryFlowResult {
+  return ask(snapshot, {
+    type: "flow",
+    feature: required(featureId, "feature"),
+    flow: required(flowId, "flow"),
+  });
 }
 
 export function apps(snapshot: GrimoireSnapshot): GrimoireAppsAnswer {
@@ -138,7 +158,8 @@ export function apps(snapshot: GrimoireSnapshot): GrimoireAppsAnswer {
 function findApp(snapshot: GrimoireSnapshot, id: string | undefined): WrittenApp {
   const app = snapshot.written.apps.find((candidate) => candidate.id.value === id);
 
-  if (app === undefined) throw new GrimoirePanelError(404, `No app "${id ?? ""}" is written in grimoire/apps.`);
+  if (app === undefined)
+    throw new GrimoirePanelError(404, `No app "${id ?? ""}" is written in grimoire/apps.`);
 
   return app;
 }
@@ -150,12 +171,19 @@ export function findPage(app: WrittenApp, key: string): WrittenPage | undefined 
   );
 }
 
-export function page(snapshot: GrimoireSnapshot, appId: string | undefined, key: string | undefined): GrimoirePageAnswer {
+export function page(
+  snapshot: GrimoireSnapshot,
+  appId: string | undefined,
+  key: string | undefined,
+): GrimoirePageAnswer {
   const app = findApp(snapshot, appId);
   const written = findPage(app, required(key, "page"));
 
   if (written === undefined) {
-    throw new GrimoirePanelError(404, `App "${app.id.value}" has no page or screen "${key ?? ""}".`);
+    throw new GrimoirePanelError(
+      404,
+      `App "${app.id.value}" has no page or screen "${key ?? ""}".`,
+    );
   }
 
   const match = snapshot.apps[app.id.value];
@@ -163,7 +191,10 @@ export function page(snapshot: GrimoireSnapshot, appId: string | undefined, key:
   let book: BookPage | BookScreen | null = null;
 
   if (route !== null && match?.site) {
-    book = snapshot.book.facts.pages.find((candidate) => candidate.site === match.site?.id && candidate.route === route) ?? null;
+    book =
+      snapshot.book.facts.pages.find(
+        (candidate) => candidate.site === match.site?.id && candidate.route === route,
+      ) ?? null;
   } else if (route !== null && match?.mobile) {
     book = match.mobile.screens.find((screen) => screen.route === route) ?? null;
   }
@@ -172,7 +203,8 @@ export function page(snapshot: GrimoireSnapshot, appId: string | undefined, key:
 
   return {
     page: written,
-    layout: layoutId === null ? null : (app.layouts.find((layout) => layout.id === layoutId) ?? null),
+    layout:
+      layoutId === null ? null : (app.layouts.find((layout) => layout.id === layoutId) ?? null),
     book,
   };
 }
@@ -194,7 +226,8 @@ export function releases(snapshot: GrimoireSnapshot): GrimoireReleasesAnswer {
 export function release(snapshot: GrimoireSnapshot, id: string | undefined): WrittenRelease {
   const found = snapshot.written.releases.find((candidate) => candidate.release.value === id);
 
-  if (found === undefined) throw new GrimoirePanelError(404, `No release "${id ?? ""}" in grimoire/releases.`);
+  if (found === undefined)
+    throw new GrimoirePanelError(404, `No release "${id ?? ""}" in grimoire/releases.`);
 
   return found;
 }
@@ -221,7 +254,11 @@ export function graphOfFeature(snapshot: GrimoireSnapshot, id: string | undefine
   return graphOrNotFound(featureGraph(snapshot, target), `Feature "${target}"`);
 }
 
-export function graphOfPage(snapshot: GrimoireSnapshot, appId: string | undefined, key: string | undefined): GrimoireGraph {
+export function graphOfPage(
+  snapshot: GrimoireSnapshot,
+  appId: string | undefined,
+  key: string | undefined,
+): GrimoireGraph {
   const target = required(key, "page");
 
   return graphOrNotFound(pageGraph(snapshot, required(appId, "app"), target), `Page "${target}"`);

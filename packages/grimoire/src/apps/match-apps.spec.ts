@@ -22,7 +22,13 @@ function app(id: string, type: "site" | "mobile", root: string): WrittenApp {
 describe("matchApps", () => {
   it("matches sites and mobile apps by root, with either separator", () => {
     const client = { id: "client", root: "src/web/$sites/client", basePath: null };
-    const mobile = { id: "mobile", root: "mobile", routing: "files" as const, routesDir: "mobile/app", screens: [] };
+    const mobile = {
+      id: "mobile",
+      root: "mobile",
+      routing: "files" as const,
+      routesDir: "mobile/app",
+      screens: [],
+    };
 
     expect(
       matchApps(

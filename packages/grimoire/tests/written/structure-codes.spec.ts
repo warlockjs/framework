@@ -80,7 +80,12 @@ const CASES: Case[] = [
   {
     code: "GR1005",
     name: "a README key not in the template",
-    breakIt: (copy) => copy.replace("grimoire/features/orders/README.md", "id: orders\n", "id: orders\nowner: sam\n"),
+    breakIt: (copy) =>
+      copy.replace(
+        "grimoire/features/orders/README.md",
+        "id: orders\n",
+        "id: orders\nowner: sam\n",
+      ),
     file: "grimoire/features/orders/README.md",
     line: 3,
     subject: { feature: "orders" },
@@ -88,7 +93,8 @@ const CASES: Case[] = [
   {
     code: "GR1006",
     name: "a page without its title",
-    breakIt: (copy) => copy.replace("grimoire/apps/web-client/pages/home/README.md", "# Home\n", ""),
+    breakIt: (copy) =>
+      copy.replace("grimoire/apps/web-client/pages/home/README.md", "# Home\n", ""),
     file: "grimoire/apps/web-client/pages/home/README.md",
     line: 5,
     subject: { app: "web-client" },
@@ -96,7 +102,12 @@ const CASES: Case[] = [
   {
     code: "GR1007",
     name: "a README heading not in the template",
-    breakIt: (copy) => copy.replace("grimoire/features/auth/README.md", "## Flows", "## Notes\nfree text\n\n## Flows"),
+    breakIt: (copy) =>
+      copy.replace(
+        "grimoire/features/auth/README.md",
+        "## Flows",
+        "## Notes\nfree text\n\n## Flows",
+      ),
     file: "grimoire/features/auth/README.md",
     line: "## Notes",
     subject: { feature: "auth" },
@@ -128,7 +139,8 @@ const CASES: Case[] = [
   {
     code: "GR1011",
     name: "a case with one space before the answer",
-    breakIt: (copy) => copy.replace(LOGIN, "- invalid input   a missing", "- invalid input a missing"),
+    breakIt: (copy) =>
+      copy.replace(LOGIN, "- invalid input   a missing", "- invalid input a missing"),
     file: LOGIN,
     line: "- invalid input a missing",
     subject: LOGIN_SUBJECT,
@@ -161,7 +173,11 @@ const CASES: Case[] = [
     code: "GR1015",
     name: "a changelog entry with single spaces",
     breakIt: (copy) =>
-      copy.replace("grimoire/features/orders/CHANGELOG.md", "- 1.0  added     place-order", "- 1.0 added place-order"),
+      copy.replace(
+        "grimoire/features/orders/CHANGELOG.md",
+        "- 1.0  added     place-order",
+        "- 1.0 added place-order",
+      ),
     file: "grimoire/features/orders/CHANGELOG.md",
     line: "- 1.0 added",
     subject: { feature: "orders" },
@@ -177,7 +193,8 @@ const CASES: Case[] = [
   {
     code: "GR1017",
     name: "a release heading without parentheses",
-    breakIt: (copy) => copy.replace(AUTH_CHANGELOG, "## 1.0.0 (2026-10-01)", "## 1.0.0 - 2026-10-01"),
+    breakIt: (copy) =>
+      copy.replace(AUTH_CHANGELOG, "## 1.0.0 (2026-10-01)", "## 1.0.0 - 2026-10-01"),
     file: AUTH_CHANGELOG,
     line: "## 1.0.0",
     subject: { feature: "auth" },
@@ -185,7 +202,8 @@ const CASES: Case[] = [
   {
     code: "GR1018",
     name: "a blocks table with a wrong column",
-    breakIt: (copy) => copy.replace("grimoire/apps/web-admin/pages/orders/README.md", "Who sees it", "Audience   "),
+    breakIt: (copy) =>
+      copy.replace("grimoire/apps/web-admin/pages/orders/README.md", "Who sees it", "Audience   "),
     file: "grimoire/apps/web-admin/pages/orders/README.md",
     line: "| Block",
     subject: { app: "web-admin" },
@@ -210,7 +228,11 @@ const CASES: Case[] = [
     code: "GR1021",
     name: "an app folder without README.md",
     breakIt: (copy) =>
-      create(copy, "grimoire/apps/kiosk/layouts/main.md", "# Main\n\n## Blocks\n| Block | Flow | Who sees it | Changes with |\n| - | - | - | - |\n"),
+      create(
+        copy,
+        "grimoire/apps/kiosk/layouts/main.md",
+        "# Main\n\n## Blocks\n| Block | Flow | Who sees it | Changes with |\n| - | - | - | - |\n",
+      ),
     file: "grimoire/apps/kiosk/README.md",
     line: 1,
     subject: { app: "kiosk" },
@@ -233,14 +255,16 @@ const CASES: Case[] = [
   {
     code: "GR1024",
     name: "a release file without its end marker",
-    breakIt: (copy) => copy.replace("grimoire/releases/1.0.0.md", "<!-- grimoire:collected:end -->\n", ""),
+    breakIt: (copy) =>
+      copy.replace("grimoire/releases/1.0.0.md", "<!-- grimoire:collected:end -->\n", ""),
     file: "grimoire/releases/1.0.0.md",
     line: "<!-- grimoire:collected:start -->",
   },
   {
     code: "GR1025",
     name: "a changelog that is not UTF-8",
-    breakIt: (copy) => create(copy, AUTH_CHANGELOG, Uint8Array.from([0x23, 0x20, 0xc3, 0x28, 0x0a])),
+    breakIt: (copy) =>
+      create(copy, AUTH_CHANGELOG, Uint8Array.from([0x23, 0x20, 0xc3, 0x28, 0x0a])),
     file: AUTH_CHANGELOG,
     line: 1,
     subject: { feature: "auth" },
@@ -249,7 +273,11 @@ const CASES: Case[] = [
     code: "GR1026",
     name: "a README flow with no file",
     breakIt: (copy) =>
-      copy.replace(CATALOG_README, "- wishlist          save", "- reviews   customers review products\n- wishlist          save"),
+      copy.replace(
+        CATALOG_README,
+        "- wishlist          save",
+        "- reviews   customers review products\n- wishlist          save",
+      ),
     file: CATALOG_README,
     line: "- reviews",
     subject: { feature: "catalog", flow: "catalog/reviews" },
@@ -314,9 +342,9 @@ afterAll(() => copy?.remove());
 
 describe("structure codes", () => {
   it("has a case for every structure code in the catalog", () => {
-    const structure = GRIMOIRE_CODE_LIST.filter((definition) => definition.area === "structure").map(
-      (definition) => definition.code,
-    );
+    const structure = GRIMOIRE_CODE_LIST.filter(
+      (definition) => definition.area === "structure",
+    ).map((definition) => definition.code);
 
     expect(CASES.map((entry) => entry.code)).toEqual(structure);
   });
@@ -332,7 +360,10 @@ describe("structure codes", () => {
         const line =
           typeof entry.line === "number"
             ? entry.line
-            : copy.read(entry.file).split(/\r?\n/).findIndex((text) => text.includes(entry.line as string)) + 1;
+            : copy
+                .read(entry.file)
+                .split(/\r?\n/)
+                .findIndex((text) => text.includes(entry.line as string)) + 1;
         const found = findings.filter((finding) => finding.code === entry.code);
 
         expect(line).toBeGreaterThan(0);
@@ -371,7 +402,9 @@ describe("findings never throw and come sorted", () => {
       }
 
       const { findings } = await parseGrimoire(copy.root);
-      const keys = findings.map((finding) => `${finding.at?.file ?? ""}:${String(finding.at?.line ?? 0).padStart(6, "0")}`);
+      const keys = findings.map(
+        (finding) => `${finding.at?.file ?? ""}:${String(finding.at?.line ?? 0).padStart(6, "0")}`,
+      );
 
       expect(new Set(findings.map((finding) => finding.code)).size).toBeGreaterThan(15);
       expect(keys).toEqual([...keys].sort());

@@ -213,7 +213,9 @@ export function checkReleases(snapshot: GrimoireSnapshot): GrimoireFinding[] {
   // GR6001: a listed entry with no matching entry stamped with this release.
   for (const file of written.releases) {
     for (const listed of file.collected?.entries ?? []) {
-      const changelog = written.features.find((feature) => feature.id === listed.feature)?.changelog;
+      const changelog = written.features.find(
+        (feature) => feature.id === listed.feature,
+      )?.changelog;
       const stamped = (changelog?.entries ?? []).some(
         (entry) =>
           entry.release === file.release.value && entry.date !== null && sameEntry(listed, entry),

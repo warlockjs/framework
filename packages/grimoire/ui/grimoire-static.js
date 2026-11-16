@@ -6,7 +6,8 @@
  */
 
 const GRIMOIRE_STATIC_SVG = "http://www.w3.org/2000/svg";
-const GRIMOIRE_STATIC_NEEDS_APP = "This answer needs the running app. Open the Grimoire tab in devtools.";
+const GRIMOIRE_STATIC_NEEDS_APP =
+  "This answer needs the running app. Open the Grimoire tab in devtools.";
 
 /** The `api()` of the static page: `data.routes` by name, `data.files` by path, search over `data.search`. */
 function grimoireStaticApi(data) {
@@ -21,11 +22,7 @@ function grimoireStaticApi(data) {
   return async (path = "") => {
     const [pathname = "", query = ""] = path.split("?");
     const params = new URLSearchParams(query);
-    let name = pathname
-      .replace(/^\//, "")
-      .split("/")
-      .map(decode)
-      .join("/");
+    let name = pathname.replace(/^\//, "").split("/").map(decode).join("/");
 
     if (name === "search") {
       const text = (params.get("q") ?? "").trim().toLowerCase();
@@ -34,11 +31,26 @@ function grimoireStaticApi(data) {
       for (const item of data.search) {
         const id = item.id.toLowerCase();
         const detail = (item.detail ?? "").toLowerCase();
-        const score = id === text ? 4 : id.startsWith(text) ? 3 : id.includes(text) ? 2 : detail.includes(text) ? 1 : 0;
+        const score =
+          id === text
+            ? 4
+            : id.startsWith(text)
+              ? 3
+              : id.includes(text)
+                ? 2
+                : detail.includes(text)
+                  ? 1
+                  : 0;
         if (text && score) hits.push({ ...item, score });
       }
       hits.sort((left, right) => right.score - left.score || left.id.localeCompare(right.id));
-      return { type: "search", text, hits: hits.slice(0, limit), routes: data.routes.summary?.routes ?? "cached", notes: [] };
+      return {
+        type: "search",
+        text,
+        hits: hits.slice(0, limit),
+        routes: data.routes.summary?.routes ?? "cached",
+        notes: [],
+      };
     }
 
     if (name === "file" || name === "graph/file") {
@@ -74,7 +86,8 @@ function grimoireStaticContext(data, root, rerender) {
     for (const child of Array.isArray(children) ? children : [children]) node.append(child);
     return node;
   };
-  const el = (tag, attrs = {}, children = []) => build(document.createElement(tag), attrs, children);
+  const el = (tag, attrs = {}, children = []) =>
+    build(document.createElement(tag), attrs, children);
 
   return {
     id: "grimoire",
@@ -89,12 +102,14 @@ function grimoireStaticContext(data, root, rerender) {
     },
     refresh: rerender,
     el,
-    svg: (tag, attrs = {}, children = []) => build(document.createElementNS(GRIMOIRE_STATIC_SVG, tag), attrs, children),
+    svg: (tag, attrs = {}, children = []) =>
+      build(document.createElementNS(GRIMOIRE_STATIC_SVG, tag), attrs, children),
     empty: (message) => el("p", { class: "empty", text: message }),
   };
 }
 
-/** Render the view into `container` now and again when the hash changes. */
+/** Render the view into `container` now and again when the hash changes. Called from the exported page, which inlines this file. */
+// oxlint-disable-next-line eslint/no-unused-vars -- called by the inlined bootstrap line of the static export.
 function grimoireStaticMount(data, container, render) {
   let version = 0;
   async function show() {

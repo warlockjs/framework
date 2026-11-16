@@ -4,7 +4,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { fakePanelContext, type FakeNode } from "../../tests/support/fake-dom";
 
-const viewPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "ui", "grimoire-view.js");
+const viewPath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "ui",
+  "grimoire-view.js",
+);
 
 async function renderView(answers: Record<string, unknown>, route = "") {
   const { default: render } = await import(/* @vite-ignore */ pathToFileURL(viewPath).href);
@@ -26,7 +32,7 @@ const emptySummary = {
 };
 
 const location = { file: "grimoire/x.md", line: 3, column: null };
-const located = <Value,>(value: Value) => ({ value, at: location });
+const located = <Value>(value: Value) => ({ value, at: location });
 
 const flowAnswer = {
   type: "flow",
@@ -38,13 +44,35 @@ const flowAnswer = {
     status: located("shipped"),
     who: located("everyone"),
     heading: located("New arrivals"),
-    cases: [{ question: "not found", fixed: true, answer: "the global list", doesNotApply: false, at: location }],
+    cases: [
+      {
+        question: "not found",
+        fixed: true,
+        answer: "the global list",
+        doesNotApply: false,
+        at: location,
+      },
+    ],
     unknowns: [{ text: "is the limit 20 or 25?", at: location }],
   },
   bookmap: {
     steps: [
-      { index: 1, kind: "page", target: "/", found: true, entry: "src/pages/home.page.tsx", files: ["src/pages/home.page.tsx"] },
-      { index: 2, kind: "route", target: "GET /api/products/new-arrivals", found: true, entry: null, files: ["src/a.ts", "src/b.ts"] },
+      {
+        index: 1,
+        kind: "page",
+        target: "/",
+        found: true,
+        entry: "src/pages/home.page.tsx",
+        files: ["src/pages/home.page.tsx"],
+      },
+      {
+        index: 2,
+        kind: "route",
+        target: "GET /api/products/new-arrivals",
+        found: true,
+        entry: null,
+        files: ["src/a.ts", "src/b.ts"],
+      },
     ],
     criteria: [
       {
@@ -52,14 +80,46 @@ const flowAnswer = {
         app: null,
         text: "the newest products come first",
         status: "passing",
-        tests: [{ file: "e2e/new.spec.ts", line: 12, name: "orders products", result: "pass", stale: false }],
+        tests: [
+          {
+            file: "e2e/new.spec.ts",
+            line: 12,
+            name: "orders products",
+            result: "pass",
+            stale: false,
+          },
+        ],
       },
-      { id: "AC-2", app: "mobile", text: "the device country is used", status: "untested", tests: [] },
+      {
+        id: "AC-2",
+        app: "mobile",
+        text: "the device country is used",
+        status: "untested",
+        tests: [],
+      },
     ],
-    shownBy: [{ app: "web-client", type: "page", id: "home", block: "New arrivals", file: "grimoire/apps/web-client/pages/home/README.md" }],
+    shownBy: [
+      {
+        app: "web-client",
+        type: "page",
+        id: "home",
+        block: "New arrivals",
+        file: "grimoire/apps/web-client/pages/home/README.md",
+      },
+    ],
   },
   history: [
-    { feature: "catalog", version: located("2.1"), word: "fixed", flow: "new-arrivals", criteria: ["AC-2"], text: "country fallback", release: "5.2.0", date: "2026-10-01", at: location },
+    {
+      feature: "catalog",
+      version: located("2.1"),
+      word: "fixed",
+      flow: "new-arrivals",
+      criteria: ["AC-2"],
+      text: "country fallback",
+      release: "5.2.0",
+      date: "2026-10-01",
+      at: location,
+    },
   ],
   findings: [],
 };
@@ -90,7 +150,9 @@ describe("grimoire view: search", () => {
 
     expect(calls).toContain("search?q=new&limit=15");
 
-    const results = view.findAll((node) => node.attributes.class === "grimoire-results")[0] as FakeNode;
+    const results = view.findAll(
+      (node) => node.attributes.class === "grimoire-results",
+    )[0] as FakeNode;
 
     expect(results.links).toEqual([
       "#grimoire/flow/catalog/new-arrivals",
@@ -106,10 +168,18 @@ describe("grimoire view: search", () => {
   it("says when nothing matches and when the search fails", async () => {
     const { view } = await renderView({
       summary: emptySummary,
-      "search?q=zzz&limit=15": { type: "search", text: "zzz", routes: "cached", notes: [], hits: [] },
+      "search?q=zzz&limit=15": {
+        type: "search",
+        text: "zzz",
+        routes: "cached",
+        notes: [],
+        hits: [],
+      },
     });
     const input = view.find("input")[0] as FakeNode;
-    const results = view.findAll((node) => node.attributes.class === "grimoire-results")[0] as FakeNode;
+    const results = view.findAll(
+      (node) => node.attributes.class === "grimoire-results",
+    )[0] as FakeNode;
 
     input.fire("input", { target: { value: "zzz" } });
     await new Promise((resolve) => setTimeout(resolve, 400));
@@ -123,7 +193,10 @@ describe("grimoire view: search", () => {
 
 describe("grimoire view: flow", () => {
   it("shows steps, criteria with results, where it is shown and the history", async () => {
-    const { view } = await renderView({ "flows/catalog/new-arrivals": flowAnswer }, "flow/catalog/new-arrivals");
+    const { view } = await renderView(
+      { "flows/catalog/new-arrivals": flowAnswer },
+      "flow/catalog/new-arrivals",
+    );
     const text = view.text;
 
     expect(text).toContain("New arrivals (catalog/new-arrivals)");
@@ -164,12 +237,16 @@ describe("grimoire view: no features written (book only)", () => {
 
     expect(view.text).toContain("No features are written yet.");
     expect(view.text).toContain("12 files");
-    expect(view.links).toEqual(expect.arrayContaining(["#grimoire/modules", "#grimoire/check", "#grimoire/tasks"]));
+    expect(view.links).toEqual(
+      expect.arrayContaining(["#grimoire/modules", "#grimoire/check", "#grimoire/tasks"]),
+    );
     expect(view.find("input")).toHaveLength(1);
   });
 
   it("says when the book itself is empty", async () => {
-    const { view } = await renderView({ summary: { ...emptySummary, book: { files: 0, modules: 0, builtAt: "" } } });
+    const { view } = await renderView({
+      summary: { ...emptySummary, book: { files: 0, modules: 0, builtAt: "" } },
+    });
 
     expect(view.text).toContain("The book is empty. Run warlock grimoire build.");
   });
@@ -181,7 +258,19 @@ describe("grimoire view: no features written (book only)", () => {
         counts,
         features: {
           schemaVersion: 1,
-          features: [{ id: "auth", title: "Sign in", status: "shipped", version: "1.0", updated: "2026-11-01", apps: [], origin: null, flows: [{ id: "login", status: "shipped", since: "1.0" }], releases: [] }],
+          features: [
+            {
+              id: "auth",
+              title: "Sign in",
+              status: "shipped",
+              version: "1.0",
+              updated: "2026-11-01",
+              apps: [],
+              origin: null,
+              flows: [{ id: "login", status: "shipped", since: "1.0" }],
+              releases: [],
+            },
+          ],
         },
       },
     });
@@ -209,7 +298,14 @@ describe("grimoire view: graphs", () => {
       {
         "features/catalog": {
           type: "feature",
-          readme: { id: located("catalog"), title: located("Catalog"), status: located("shipped"), version: located("3.0"), updated: located("2026-11-01"), summary: "Browse products." },
+          readme: {
+            id: located("catalog"),
+            title: located("Catalog"),
+            status: located("shipped"),
+            version: located("3.0"),
+            updated: located("2026-11-01"),
+            summary: "Browse products.",
+          },
           flows: [{ id: "new-arrivals", status: "shipped", since: "2.0", heading: "New arrivals" }],
           bookmap: { own: ["a.ts"], borrowed: [], routes: [], pages: {}, unreached: [] },
           changes: [],
@@ -225,7 +321,11 @@ describe("grimoire view: graphs", () => {
     expect(svg.namespace).toBe("http://www.w3.org/2000/svg");
     expect(svg.find("circle")).toHaveLength(3);
     expect(svg.find("line")).toHaveLength(2);
-    expect(svg.links).toEqual(["#grimoire/feature/catalog", "#grimoire/flow/catalog/new-arrivals", "#grimoire/feature/auth"]);
+    expect(svg.links).toEqual([
+      "#grimoire/feature/catalog",
+      "#grimoire/flow/catalog/new-arrivals",
+      "#grimoire/feature/auth",
+    ]);
     expect(view.text).toContain("Browse products.");
   });
 

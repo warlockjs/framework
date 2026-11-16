@@ -1,6 +1,6 @@
 ---
 name: backfill-a-grimoire
-description: 'Write the Grimoire for a project that already has code but no `grimoire/` folder: build the book, propose features from the modules and routes, write them as inferred, and bring the owner the questions only they can answer. Use once per existing project, or when a large undescribed area is found.'
+description: "Write the Grimoire for a project that already has code but no `grimoire/` folder: build the book, propose features from the modules and routes, write them as inferred, and bring the owner the questions only they can answer. Use once per existing project, or when a large undescribed area is found."
 ---
 
 # Backfill a Grimoire
@@ -32,9 +32,9 @@ Start from the modules: a module is usually one feature. Then adjust.
 
 Write the proposal as a table for the owner **before** writing files:
 
-| Feature | Folders | Flows you see | Apps | Unsure about |
-| --- | --- | --- | --- | --- |
-| auth | src/app/auth | sign-up, login, reset-password | web-client, mobile | is phone login still used? |
+| Feature | Folders      | Flows you see                  | Apps               | Unsure about               |
+| ------- | ------------ | ------------------------------ | ------------------ | -------------------------- |
+| auth    | src/app/auth | sign-up, login, reset-password | web-client, mobile | is phone login still used? |
 
 Wait for the owner's answer on the list. Features are the frame for everything else; a wrong
 frame costs the most to fix.

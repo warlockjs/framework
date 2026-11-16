@@ -23,7 +23,9 @@ function runtimeSpecifiers(file: string): string[] {
 function resolve(from: string, specifier: string): string | undefined {
   const base = path.resolve(path.dirname(from), specifier);
 
-  return [`${base}.ts`, path.join(base, "index.ts")].find((file) => existsSync(file) && statSync(file).isFile());
+  return [`${base}.ts`, path.join(base, "index.ts")].find(
+    (file) => existsSync(file) && statSync(file).isFile(),
+  );
 }
 
 function reach(entry: string): { files: string[]; packages: string[] } {
@@ -50,7 +52,9 @@ function reach(entry: string): { files: string[]; packages: string[] } {
   }
 
   return {
-    files: [...seen].map((file) => path.relative(packageRoot, file).split(path.sep).join("/")).sort(),
+    files: [...seen]
+      .map((file) => path.relative(packageRoot, file).split(path.sep).join("/"))
+      .sort(),
     packages: [...packages].sort(),
   };
 }

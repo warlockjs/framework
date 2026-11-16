@@ -4,7 +4,7 @@ import * as m0 from "./home.setup";
 
 void [m0];
 
-const productLink = "/products/:id";
+const _productLink = "/products/:id";
 
 export default function Component() {
   return null;

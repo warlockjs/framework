@@ -465,3 +465,5 @@ On the direct `"openai"` provider a call carrying the hosted `web_search` tool i
 ## Context window
 
 The direct OpenAI provider reports `capabilities.contextWindow` for the gpt-3.5/4/4o/4.1/5.x/6 and o-series ids (400K for gpt-5.x and gpt-6, conservative); `openai.model({ name, contextWindow })` wins and is the only source for OpenAI-compatible endpoints.
+
+**Spent credit.** A response whose error `code` is `insufficient_quota`, `credit_balance_exhausted`, `billing_hard_limit_reached` or `billing_not_active`, or whose `type` is `insufficient_quota`, maps to `QuotaExceededError` (`PROVIDER_QUOTA_EXCEEDED`, not retryable) on any status, including 429. A plain 429 stays `ProviderRateLimitError`. The default fallback chain does not advance on spent credit; add `PROVIDER_QUOTA_EXCEEDED` through `alsoRetryOn`. DeepSeek, Groq, xAI and Mistral share this mapping.

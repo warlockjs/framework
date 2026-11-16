@@ -22,7 +22,9 @@ export function hashTestFile(content: string | Uint8Array): string {
 /** Read `grimoire/book/test-results.json`; `null` when absent or unreadable. */
 export async function readTestResults(root: string): Promise<TestResultsStore | null> {
   try {
-    const parsed: unknown = JSON.parse(await readFile(path.join(root, GRIMOIRE_PATHS.testResults), "utf8"));
+    const parsed: unknown = JSON.parse(
+      await readFile(path.join(root, GRIMOIRE_PATHS.testResults), "utf8"),
+    );
 
     if (!isStore(parsed)) return null;
 

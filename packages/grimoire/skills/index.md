@@ -1,5 +1,5 @@
 ---
-description: 'Grimoire (experimental), the project map for Warlock.js apps: `warlock scry` and `warlock grimoire build|check|release` over a `grimoire/` folder of generated book entries and agent-written features, flows, apps, tasks and releases. Topics: use the map before searching code, write a feature, record a change and release, describe sites and mobile screens, document a file, backfill an existing app. Use at the start of every task in a project that has `grimoire/`.'
+description: "Grimoire (experimental), the project map for Warlock.js apps: `warlock scry` and `warlock grimoire build|check|release` over a `grimoire/` folder of generated book entries and agent-written features, flows, apps, tasks and releases. Topics: use the map before searching code, write a feature, record a change and release, describe sites and mobile screens, document a file, backfill an existing app. Use at the start of every task in a project that has `grimoire/`."
 ---
 
 # @warlock.js/grimoire

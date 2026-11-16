@@ -2,7 +2,15 @@
  * The book builder over the `shop` fixture: golden files, freshness, the
  * route cache, incremental writes and removals, and both path separators.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
@@ -28,7 +36,10 @@ function shopAnnotations(facts: BookFacts = shopFacts): BookAnnotations {
   const flows: Record<string, string[]> = {
     "src/app/catalog/controllers/new-arrivals.controller.ts": ["catalog/new-arrivals"],
     "src/app/catalog/services/new-arrivals.service.ts": ["catalog/new-arrivals"],
-    "src/app/catalog/repositories/products.repository.ts": ["catalog/browse-products", "catalog/new-arrivals"],
+    "src/app/catalog/repositories/products.repository.ts": [
+      "catalog/browse-products",
+      "catalog/new-arrivals",
+    ],
     "src/app/orders/controllers/place-order.controller.ts": ["orders/place-order"],
   };
   const files: BookAnnotations["files"] = {};
@@ -36,7 +47,9 @@ function shopAnnotations(facts: BookFacts = shopFacts): BookAnnotations {
   for (const file of facts.files) {
     const feature = owner(file.file);
     const borrowers = new Set(
-      file.importedBy.map(owner).filter((value): value is string => value !== null && value !== feature),
+      file.importedBy
+        .map(owner)
+        .filter((value): value is string => value !== null && value !== feature),
     );
 
     files[file.file] = { feature, borrowedBy: [...borrowers], flows: flows[file.file] ?? [] };
@@ -70,7 +83,9 @@ const bookDir = (copy: FixtureCopy): string => path.join(copy.root, "grimoire", 
 
 /** The book files the goldens hold: everything except the manifest and the machine cache. */
 function goldenFiles(folder: string): string[] {
-  return filesUnder(folder).filter((file) => file !== "manifest.json" && !file.startsWith(".cache/"));
+  return filesUnder(folder).filter(
+    (file) => file !== "manifest.json" && !file.startsWith(".cache/"),
+  );
 }
 
 const copies: FixtureCopy[] = [];
@@ -153,14 +168,18 @@ describe("the book of the shop fixture", () => {
     });
     expect(Object.keys(manifest.files)).toHaveLength(shopFacts.files.length);
     expect(manifest.boot.collectedAt).toBe("2026-11-16T10:00:00.000Z");
-    expect(Object.keys(manifest.boot.inputs)).toContain("src/app/catalog/services/new-arrivals.service.ts");
+    expect(Object.keys(manifest.boot.inputs)).toContain(
+      "src/app/catalog/services/new-arrivals.service.ts",
+    );
     expect(manifest.boot.inputs["package.json"]).toBe("");
     expect(JSON.parse(copy.read("grimoire/book/.cache/facts.json")).facts.routes).toHaveLength(9);
   });
 
   it("computes in memory only when asked not to write", async () => {
     const copy = fixture();
-    const options = { routes: "fresh", now: fixedNow, write: false } as Parameters<typeof buildBook>[2];
+    const options = { routes: "fresh", now: fixedNow, write: false } as Parameters<
+      typeof buildBook
+    >[2];
     const result = await buildBook(copy.root, createShopAdapter(), options);
 
     expect(result.book.facts.files).toHaveLength(shopFacts.files.length);
@@ -234,7 +253,10 @@ describe("freshness", () => {
     const copy = fixture();
     await buildAndWrite(copy, createShopAdapter(), { routes: "fresh" });
 
-    copy.write("src/app/catalog/routes.ts", `${copy.read("src/app/catalog/routes.ts")}// touched\n`);
+    copy.write(
+      "src/app/catalog/routes.ts",
+      `${copy.read("src/app/catalog/routes.ts")}// touched\n`,
+    );
 
     const cached = createShopAdapter();
     const first = await buildBook(copy.root, cached, { routes: "cached", now: fixedNow });
@@ -270,11 +292,19 @@ describe("freshness", () => {
     const facts = structuredClone(shopFacts);
     const routesFile = facts.files.find((entry) => entry.file === "src/app/orders/routes.ts");
     routesFile?.imports.push({ specifier: "web/$sites/client/home.setup", file: added });
-    copy.write("src/app/orders/routes.ts", `${copy.read("src/app/orders/routes.ts")}// imports the setup file now\n`);
+    copy.write(
+      "src/app/orders/routes.ts",
+      `${copy.read("src/app/orders/routes.ts")}// imports the setup file now\n`,
+    );
 
-    expect((await buildBook(copy.root, createShopAdapter(facts), { routes: "cached" })).book.routes).toBe("stale");
+    expect(
+      (await buildBook(copy.root, createShopAdapter(facts), { routes: "cached" })).book.routes,
+    ).toBe("stale");
 
-    const refreshed = await buildBook(copy.root, createShopAdapter(facts), { routes: "fresh", now: fixedNow });
+    const refreshed = await buildBook(copy.root, createShopAdapter(facts), {
+      routes: "fresh",
+      now: fixedNow,
+    });
 
     expect(refreshed.book.routes).toBe("fresh");
     expect(Object.keys(refreshed.book.manifest.boot.inputs)).toContain(added);
@@ -342,7 +372,9 @@ describe("freshness", () => {
     const result = await buildAndWrite(copy, createShopAdapter(facts), { routes: "fresh" }, facts);
 
     expect(result.changed).toEqual([gone]);
-    expect(result.removed).toEqual(["grimoire/book/app/orders/notifications/order-shipped.notification.json"]);
+    expect(result.removed).toEqual([
+      "grimoire/book/app/orders/notifications/order-shipped.notification.json",
+    ]);
     expect(existsSync(path.join(bookDir(copy), "app", "orders", "notifications"))).toBe(false);
     expect(copy.read("grimoire/book/test-results.json")).toBe("{}\n");
     expect(copy.read("grimoire/book/site/index.html")).toBe("<!doctype html>\n");
@@ -359,7 +391,10 @@ describe("freshness", () => {
     const result = await buildAndWrite(copy, adapter, { routes: "fresh", force: true });
 
     expect(adapter.calls).toMatchObject({ files: 1, routes: 1, named: 1 });
-    expect(result.written).toEqual(["grimoire/book/app/auth/routes.json", "grimoire/book/app/catalog/routes.json"]);
+    expect(result.written).toEqual([
+      "grimoire/book/app/auth/routes.json",
+      "grimoire/book/app/catalog/routes.json",
+    ]);
     expectGolden(copy);
   });
 
@@ -386,7 +421,10 @@ describe("paths and safety", () => {
       file.file = win(file.file);
       file.module = win(file.module);
       file.importedBy = file.importedBy.map(win);
-      file.imports = file.imports.map((item) => ({ ...item, file: item.file === null ? null : win(item.file) }));
+      file.imports = file.imports.map((item) => ({
+        ...item,
+        file: item.file === null ? null : win(item.file),
+      }));
     }
 
     for (const route of facts.routes ?? []) {
@@ -399,19 +437,27 @@ describe("paths and safety", () => {
       page.setupFile = page.setupFile === null ? null : win(page.setupFile);
       page.layouts = page.layouts.map(win);
       page.loaders = page.loaders.map(win);
-      page.reachedFrom = page.reachedFrom?.map((link) => ({ ...link, from: win(link.from) })) ?? null;
+      page.reachedFrom =
+        page.reachedFrom?.map((link) => ({ ...link, from: win(link.from) })) ?? null;
     }
 
     for (const app of facts.mobile) {
       app.routesDir = app.routesDir === null ? null : win(app.routesDir);
-      app.screens = app.screens.map((screen) => ({ ...screen, file: win(screen.file), layouts: screen.layouts.map(win) }));
+      app.screens = app.screens.map((screen) => ({
+        ...screen,
+        file: win(screen.file),
+        layouts: screen.layouts.map(win),
+      }));
     }
 
     for (const site of facts.sites) site.root = win(site.root);
 
     facts.tests = facts.tests.map(win);
 
-    const adapter = { ...createShopAdapter(facts), sourceRoots: async () => ["src\\", ".\\mobile"] };
+    const adapter = {
+      ...createShopAdapter(facts),
+      sourceRoots: async () => ["src\\", ".\\mobile"],
+    };
     const result = await buildBook(copy.root, adapter, { routes: "fresh", now: fixedNow });
     await writeBook(result.book, shopAnnotations());
 
@@ -428,7 +474,11 @@ describe("paths and safety", () => {
       );
     const before = outside();
     const facts = structuredClone(shopFacts);
-    facts.files.push({ ...structuredClone(shopFacts.files[0]!), file: "../escape/x.ts", module: "../escape" });
+    facts.files.push({
+      ...structuredClone(shopFacts.files[0]!),
+      file: "../escape/x.ts",
+      module: "../escape",
+    });
 
     await buildAndWrite(copy, createShopAdapter(facts), { routes: "fresh" }, facts);
 
@@ -470,7 +520,8 @@ describe("a large project", () => {
         about: null,
         tags: {},
         exports: [],
-        imports: imported === null ? [] : [{ specifier: `./s${index + 1}.service`, file: imported }],
+        imports:
+          imported === null ? [] : [{ specifier: `./s${index + 1}.service`, file: imported }],
         importedBy: index === 0 ? [] : [`src/app/big/services/s${index - 1}.service.ts`],
         mobileApp: null,
       });
@@ -478,9 +529,13 @@ describe("a large project", () => {
 
     mkdirSync(path.join(copy.root, "src", "app", "big", "services"), { recursive: true });
 
-    for (const file of files) writeFileSync(path.join(copy.root, ...file.file.split("/")), `// ${file.file}\n`);
+    for (const file of files)
+      writeFileSync(path.join(copy.root, ...file.file.split("/")), `// ${file.file}\n`);
 
-    const facts: BookFacts = { ...structuredClone(shopFacts), files: [...structuredClone(shopFacts.files), ...files] };
+    const facts: BookFacts = {
+      ...structuredClone(shopFacts),
+      files: [...structuredClone(shopFacts.files), ...files],
+    };
     const first = await buildAndWrite(copy, createShopAdapter(facts), { routes: "fresh" }, facts);
 
     expect(first.written.length).toBeGreaterThan(count);

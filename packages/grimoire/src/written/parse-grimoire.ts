@@ -100,7 +100,8 @@ class Walker {
       else if (isFile) files.push(entry.name);
     }
 
-    const byName = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
+    const byName = (left: string, right: string): number =>
+      left < right ? -1 : left > right ? 1 : 0;
 
     return { files: files.sort(byName), dirs: dirs.sort(byName) };
   }
@@ -160,7 +161,11 @@ class Walker {
       }
 
       if (!inside.files.includes("README.md")) {
-        sink.report("GR1021", `The feature folder ${dir} has no README.md.`, lineAt(`${dir}/README.md`, 1));
+        sink.report(
+          "GR1021",
+          `The feature folder ${dir} has no README.md.`,
+          lineAt(`${dir}/README.md`, 1),
+        );
       }
 
       for (const sub of inside.dirs) {
@@ -172,7 +177,8 @@ class Walker {
           for (const name of flows.files) {
             const file = `${subDir}/${name}`;
 
-            if (name.endsWith(".md")) this.jobs.push({ type: "flow", file, feature, name: name.slice(0, -3) });
+            if (name.endsWith(".md"))
+              this.jobs.push({ type: "flow", file, feature, name: name.slice(0, -3) });
             else if (!name.endsWith(".bookmap.json")) this.unknown(file, sink);
           }
 
@@ -223,7 +229,11 @@ class Walker {
       }
 
       if (!hasReadme) {
-        sink.report("GR1021", `The app folder ${dir} has no README.md.`, lineAt(`${dir}/README.md`, 1));
+        sink.report(
+          "GR1021",
+          `The app folder ${dir} has no README.md.`,
+          lineAt(`${dir}/README.md`, 1),
+        );
       }
 
       for (const sub of inside.dirs) {
@@ -235,7 +245,8 @@ class Walker {
           for (const name of layouts.files) {
             const file = `${subDir}/${name}`;
 
-            if (name.endsWith(".md")) this.jobs.push({ type: "layout", file, app, id: name.slice(0, -3) });
+            if (name.endsWith(".md"))
+              this.jobs.push({ type: "layout", file, app, id: name.slice(0, -3) });
             else this.unknown(file, sink);
           }
 
@@ -249,7 +260,12 @@ class Walker {
     }
   }
 
-  private async walkPages(pagesDir: string, app: string, pageType: PageType, sink: FindingSink): Promise<void> {
+  private async walkPages(
+    pagesDir: string,
+    app: string,
+    pageType: PageType,
+    sink: FindingSink,
+  ): Promise<void> {
     const listing = await this.list(pagesDir);
 
     for (const name of listing.files) this.unknown(`${pagesDir}/${name}`, sink);
@@ -259,12 +275,17 @@ class Walker {
       const inside = await this.list(dir);
 
       for (const name of inside.files) {
-        if (name === "README.md") this.jobs.push({ type: "page", file: `${dir}/${name}`, app, pageType, id: page });
+        if (name === "README.md")
+          this.jobs.push({ type: "page", file: `${dir}/${name}`, app, pageType, id: page });
         else this.unknown(`${dir}/${name}`, sink);
       }
 
       if (!inside.files.includes("README.md")) {
-        sink.report("GR1021", `The ${pageType} folder ${dir} has no README.md.`, lineAt(`${dir}/README.md`, 1));
+        sink.report(
+          "GR1021",
+          `The ${pageType} folder ${dir} has no README.md.`,
+          lineAt(`${dir}/README.md`, 1),
+        );
       }
 
       for (const sub of inside.dirs) {
@@ -280,7 +301,8 @@ class Walker {
         for (const name of blocks.files) {
           const file = `${subDir}/${name}`;
 
-          if (name.endsWith(".md")) this.jobs.push({ type: "block", file, app, pageType, page, id: name.slice(0, -3) });
+          if (name.endsWith(".md"))
+            this.jobs.push({ type: "block", file, app, pageType, page, id: name.slice(0, -3) });
           else this.unknown(file, sink);
         }
 
@@ -312,7 +334,12 @@ class Walker {
     );
   }
 
-  private taskFiles(dir: string, names: readonly string[], folder: "open" | "done", month: string | null): void {
+  private taskFiles(
+    dir: string,
+    names: readonly string[],
+    folder: "open" | "done",
+    month: string | null,
+  ): void {
     for (const name of names) {
       const file = `${dir}/${name}`;
 
@@ -324,7 +351,11 @@ class Walker {
       const match = TASK_FILE.exec(name);
 
       if (!match) {
-        this.sink.report("GR1023", `The task file name ${name} is not T-<n>-<slug>.md.`, lineAt(file, 1));
+        this.sink.report(
+          "GR1023",
+          `The task file name ${name} is not T-<n>-<slug>.md.`,
+          lineAt(file, 1),
+        );
       }
 
       this.jobs.push({ type: "task", file, place: { folder, month, nameId: match?.[1] ?? null } });
@@ -467,7 +498,9 @@ export async function parseGrimoire(root: string): Promise<ParseGrimoireResult> 
   const walker = new Walker(absoluteRoot, sink);
   await walker.walk();
 
-  const texts = await Promise.all(walker.jobs.map((job) => readWritten(absoluteRoot, job.file, sinkFor(job, sink))));
+  const texts = await Promise.all(
+    walker.jobs.map((job) => readWritten(absoluteRoot, job.file, sinkFor(job, sink))),
+  );
   const hashed = walker.jobs
     .map((job, index) => ({ file: job.file, read: texts[index] }))
     .sort((left, right) => (left.file < right.file ? -1 : left.file > right.file ? 1 : 0));
@@ -486,7 +519,14 @@ export async function parseGrimoire(root: string): Promise<ParseGrimoireResult> 
   const features = new Map<string, WrittenFeature>(
     walker.features.map((id) => [
       id,
-      { id, dir: `${GRIMOIRE_DIR}/features/${id}`, readme: null, changelog: null, flows: [], versions: [] },
+      {
+        id,
+        dir: `${GRIMOIRE_DIR}/features/${id}`,
+        readme: null,
+        changelog: null,
+        flows: [],
+        versions: [],
+      },
     ]),
   );
   const appReadmes = new Map<string, { file: string; readme: AppReadme }>();
@@ -522,10 +562,14 @@ export async function parseGrimoire(root: string): Promise<ParseGrimoireResult> 
         return;
       }
       case "flow":
-        features.get(job.feature)?.flows.push(parseFlow(job.file, text, job.feature, job.name, fileSink));
+        features
+          .get(job.feature)
+          ?.flows.push(parseFlow(job.file, text, job.feature, job.name, fileSink));
         return;
       case "version":
-        features.get(job.feature)?.versions.push(parseVersionBrief(job.file, text, job.feature, job.major, fileSink));
+        features
+          .get(job.feature)
+          ?.versions.push(parseVersionBrief(job.file, text, job.feature, job.major, fileSink));
         return;
       case "app-readme":
         appReadmes.set(job.app, {
@@ -537,7 +581,11 @@ export async function parseGrimoire(root: string): Promise<ParseGrimoireResult> 
         push(layouts, job.app, parseLayout(job.file, text, job.app, job.id, fileSink));
         return;
       case "page":
-        push(pages, `${job.app}/${job.pageType}/${job.id}`, parsePage(job.file, text, job.app, job.pageType, job.id, fileSink));
+        push(
+          pages,
+          `${job.app}/${job.pageType}/${job.id}`,
+          parsePage(job.file, text, job.app, job.pageType, job.id, fileSink),
+        );
         return;
       case "block":
         push(
@@ -567,7 +615,9 @@ export async function parseGrimoire(root: string): Promise<ParseGrimoireResult> 
     const appPages = (type: PageType): WrittenPage[] =>
       [...pages.entries()]
         .filter(([key]) => key.startsWith(`${app.id}/${type}/`))
-        .map(([key, list]) => list.map((page) => ({ ...page, blockFiles: blockFiles.get(key) ?? [] })))
+        .map(([key, list]) =>
+          list.map((page) => ({ ...page, blockFiles: blockFiles.get(key) ?? [] })),
+        )
         .flat();
     const pageList = appPages("page");
     const screenList = appPages("screen");
@@ -576,7 +626,10 @@ export async function parseGrimoire(root: string): Promise<ParseGrimoireResult> 
       dir: app.dir,
       file: found?.file ?? null,
       id: found?.readme.id ?? missing,
-      type: found?.readme.type ?? { value: screenList.length > 0 ? "mobile" : "site", at: missing.at },
+      type: found?.readme.type ?? {
+        value: screenList.length > 0 ? "mobile" : "site",
+        at: missing.at,
+      },
       root: found?.readme.root ?? { value: "", at: missing.at },
       heading: found?.readme.heading ?? null,
       conditions: found?.readme.conditions ?? [],
@@ -587,14 +640,20 @@ export async function parseGrimoire(root: string): Promise<ParseGrimoireResult> 
   }
 
   duplicates(
-    written.apps.filter((app) => app.file !== null).map((app) => ({ id: app.id, subject: { app: app.id.value } })),
+    written.apps
+      .filter((app) => app.file !== null)
+      .map((app) => ({ id: app.id, subject: { app: app.id.value } })),
     "app",
     sink,
   );
 
-  tasks.sort((left, right) => taskNumber(left) - taskNumber(right) || (left.file < right.file ? -1 : 1));
+  tasks.sort(
+    (left, right) => taskNumber(left) - taskNumber(right) || (left.file < right.file ? -1 : 1),
+  );
   duplicates(
-    tasks.filter((task) => task.id.value !== "").map((task) => ({ id: task.id, subject: { task: task.id.value } })),
+    tasks
+      .filter((task) => task.id.value !== "")
+      .map((task) => ({ id: task.id, subject: { task: task.id.value } })),
     "task",
     sink,
   );
@@ -615,7 +674,11 @@ function linkFlows(feature: WrittenFeature, sink: FindingSink): void {
     if (!files.has(line.name)) {
       sink
         .scope({ flow: `${feature.id}/${line.name}` })
-        .report("GR1026", `The README lists the flow "${line.name}", which has no file flows/${line.name}.md.`, line.at);
+        .report(
+          "GR1026",
+          `The README lists the flow "${line.name}", which has no file flows/${line.name}.md.`,
+          line.at,
+        );
     }
   }
 
@@ -625,7 +688,11 @@ function linkFlows(feature: WrittenFeature, sink: FindingSink): void {
     if (!listed.has(name)) {
       sink
         .scope({ flow: flow.ref })
-        .report("GR1027", `The flow "${name}" is not listed under "## Flows" in the feature README.`, lineAt(flow.file, 1));
+        .report(
+          "GR1027",
+          `The flow "${name}" is not listed under "## Flows" in the feature README.`,
+          lineAt(flow.file, 1),
+        );
     }
   }
 }
@@ -642,7 +709,9 @@ function duplicates(
     const first = seen.get(item.id.value);
 
     if (first !== undefined) {
-      sink.scope(item.subject).report("GR1022", `The ${what} id ${item.id.value} is also used by ${first}.`, item.id.at);
+      sink
+        .scope(item.subject)
+        .report("GR1022", `The ${what} id ${item.id.value} is also used by ${first}.`, item.id.at);
       continue;
     }
 

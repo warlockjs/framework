@@ -83,7 +83,9 @@ beforeEach(() => {
 
   const bookFacts = facts(
     [
-      codeFile("src/app/catalog/routes.ts", ["src/app/catalog/list.controller.ts"], { type: "routes" }),
+      codeFile("src/app/catalog/routes.ts", ["src/app/catalog/list.controller.ts"], {
+        type: "routes",
+      }),
       codeFile("src/app/catalog/list.controller.ts"),
     ],
     {
@@ -103,10 +105,16 @@ beforeEach(() => {
           description: null,
         },
       ],
-      tests: ["src/app/catalog/a.test.ts", "src/app/catalog/b.test.ts", "src/app/catalog/gone.test.ts"],
+      tests: [
+        "src/app/catalog/a.test.ts",
+        "src/app/catalog/b.test.ts",
+        "src/app/catalog/gone.test.ts",
+      ],
     },
   );
-  const book: Pick<LoadedBook, "root" | "facts" | "routes"> & { manifest: { tests: Record<string, string> } } = {
+  const book: Pick<LoadedBook, "root" | "facts" | "routes"> & {
+    manifest: { tests: Record<string, string> };
+  } = {
     root,
     facts: bookFacts,
     routes: "cached",
@@ -143,7 +151,9 @@ describe("openGrimoire", () => {
       "src/app/catalog/list.controller.ts",
       "src/app/catalog/routes.ts",
     ]);
-    expect(snapshot.annotations.files["src/app/catalog/routes.ts"]?.flows).toEqual(["catalog/browse"]);
+    expect(snapshot.annotations.files["src/app/catalog/routes.ts"]?.flows).toEqual([
+      "catalog/browse",
+    ]);
   });
 
   it("takes test hashes from the manifest, else hashes the file, and leaves out a missing file", async () => {
@@ -152,7 +162,8 @@ describe("openGrimoire", () => {
     expect(snapshot.annotations.tests).toEqual({
       "src/app/catalog/a.test.ts": "from-manifest",
       // sha256 of "test"
-      "src/app/catalog/b.test.ts": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "src/app/catalog/b.test.ts":
+        "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
     });
   });
 

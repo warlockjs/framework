@@ -27,7 +27,8 @@ afterEach(() => {
 async function shopPanel(options: { written?: boolean } = {}) {
   copy = copyFixture();
 
-  if (options.written === false) rmSync(path.join(copy.root, "grimoire"), { recursive: true, force: true });
+  if (options.written === false)
+    rmSync(path.join(copy.root, "grimoire"), { recursive: true, force: true });
 
   await openGrimoire(copy.root, createShopAdapter(), { routes: "fresh" });
 
@@ -47,7 +48,11 @@ async function call(
 
   if (found === undefined) throw new Error(`no route ${route}`);
 
-  return found.handler({ params: request.params ?? {}, query: request.query ?? {}, body: undefined });
+  return found.handler({
+    params: request.params ?? {},
+    query: request.query ?? {},
+    body: undefined,
+  });
 }
 
 describe("the panel", () => {
@@ -60,7 +65,15 @@ describe("the panel", () => {
     expect(String(panel.view)).toMatch(/ui\/grimoire-view\.js$/);
     expect(Object.keys(panel.assets ?? {})).toEqual(["grimoire.css"]);
     expect(panel.routes?.map((route) => route.path)).toEqual(
-      expect.arrayContaining(["/summary", "/search", "/file", "/features/:feature", "/flows/:feature/:flow", "/check", "/graph/modules"]),
+      expect.arrayContaining([
+        "/summary",
+        "/search",
+        "/file",
+        "/features/:feature",
+        "/flows/:feature/:flow",
+        "/check",
+        "/graph/modules",
+      ]),
     );
     expect(readFileSync(new URL(panel.view), "utf8")).toContain("export default renderGrimoire;");
   });
@@ -69,24 +82,46 @@ describe("the panel", () => {
     const { panel, adapter } = await shopPanel();
     const summary = await call(panel, "/summary");
 
-    expect(summary.features.features.map((feature: { id: string }) => feature.id)).toEqual(["auth", "catalog", "orders"]);
+    expect(summary.features.features.map((feature: { id: string }) => feature.id)).toEqual([
+      "auth",
+      "catalog",
+      "orders",
+    ]);
     expect(summary.book.files).toBeGreaterThan(10);
-    expect(summary.counts).toEqual(expect.objectContaining({ errors: expect.any(Number), warnings: expect.any(Number) }));
-    expect((await call(panel, "/apps")).apps.map((app: { id: string }) => app.id).sort()).toEqual(["mobile", "web-admin", "web-client"]);
-    expect((await call(panel, "/tasks")).open.map((task: { id: string }) => task.id).sort()).toEqual(["T-014", "T-015"]);
-    expect((await call(panel, "/releases")).releases.map((release: { release: string }) => release.release)).toContain("1.0.0");
+    expect(summary.counts).toEqual(
+      expect.objectContaining({ errors: expect.any(Number), warnings: expect.any(Number) }),
+    );
+    expect((await call(panel, "/apps")).apps.map((app: { id: string }) => app.id).sort()).toEqual([
+      "mobile",
+      "web-admin",
+      "web-client",
+    ]);
+    expect(
+      (await call(panel, "/tasks")).open.map((task: { id: string }) => task.id).sort(),
+    ).toEqual(["T-014", "T-015"]);
+    expect(
+      (await call(panel, "/releases")).releases.map(
+        (release: { release: string }) => release.release,
+      ),
+    ).toContain("1.0.0");
     expect((await call(panel, "/check")).findings).toBeInstanceOf(Array);
     expect(adapter.calls.routes).toBe(0);
   });
 
   it("answers per-item questions through scry", async () => {
     const { panel } = await shopPanel();
-    const flow = await call(panel, "/flows/:feature/:flow", { params: { feature: "catalog", flow: "new-arrivals" } });
+    const flow = await call(panel, "/flows/:feature/:flow", {
+      params: { feature: "catalog", flow: "new-arrivals" },
+    });
     const feature = await call(panel, "/features/:feature", { params: { feature: "catalog" } });
     const search = await call(panel, "/search", { query: { q: "arrivals", limit: "5" } });
     const file = await call(panel, "/file", { query: { path: "src/app/catalog/routes.ts" } });
 
-    expect(flow.bookmap.criteria.map((criterion: { id: string }) => criterion.id)).toEqual(["AC-1", "AC-2", "AC-3"]);
+    expect(flow.bookmap.criteria.map((criterion: { id: string }) => criterion.id)).toEqual([
+      "AC-1",
+      "AC-2",
+      "AC-3",
+    ]);
     expect(feature.readme.id.value).toBe("catalog");
     expect(search.hits.length).toBeGreaterThan(0);
     expect(search.hits.length).toBeLessThanOrEqual(5);
@@ -96,10 +131,16 @@ describe("the panel", () => {
 
   it("answers a page with its layout and blocks, by id or by route", async () => {
     const { panel } = await shopPanel();
-    const byId = await call(panel, "/apps/:app/pages/:page", { params: { app: "web-client", page: "home" } });
-    const byRoute = await call(panel, "/apps/:app/pages/:page", { params: { app: "web-client", page: "/" } });
+    const byId = await call(panel, "/apps/:app/pages/:page", {
+      params: { app: "web-client", page: "home" },
+    });
+    const byRoute = await call(panel, "/apps/:app/pages/:page", {
+      params: { app: "web-client", page: "/" },
+    });
 
-    expect(byId.page.blocks.map((block: { block: string }) => block.block)).toContain("New arrivals");
+    expect(byId.page.blocks.map((block: { block: string }) => block.block)).toContain(
+      "New arrivals",
+    );
     expect(byRoute.page.id).toBe("home");
     expect(byId.layout.id).toBe("site");
   });
@@ -113,18 +154,24 @@ describe("the panel", () => {
       );
 
     expect(await status("/features/:feature", { params: { feature: "nope" } })).toBe(404);
-    expect(await status("/flows/:feature/:flow", { params: { feature: "catalog", flow: "nope" } })).toBe(404);
+    expect(
+      await status("/flows/:feature/:flow", { params: { feature: "catalog", flow: "nope" } }),
+    ).toBe(404);
     expect(await status("/file", { query: { path: "src/none.ts" } })).toBe(404);
     expect(await status("/file")).toBe(400);
     expect(await status("/releases/:release", { params: { release: "9.9.9" } })).toBe(404);
-    expect(await status("/apps/:app/pages/:page", { params: { app: "web-client", page: "nope" } })).toBe(404);
+    expect(
+      await status("/apps/:app/pages/:page", { params: { app: "web-client", page: "nope" } }),
+    ).toBe(404);
     expect(await status("/graph/file", { query: { path: "src/none.ts" } })).toBe(404);
   });
 
   it("returns small graphs: a file's neighbours, a feature, a page and module coupling", async () => {
     const { panel } = await shopPanel();
     const file = await call(panel, "/graph/file", { query: { path: "src/app/catalog/routes.ts" } });
-    const feature = await call(panel, "/graph/feature/:feature", { params: { feature: "catalog" } });
+    const feature = await call(panel, "/graph/feature/:feature", {
+      params: { feature: "catalog" },
+    });
     const page = await call(panel, "/graph/page", { query: { app: "web-client", page: "home" } });
     const modules = await call(panel, "/graph/modules");
 
@@ -139,13 +186,21 @@ describe("the panel", () => {
       }
     }
 
-    expect(file.nodes[0]).toEqual({ id: "file:src/app/catalog/routes.ts", label: "catalog/routes.ts", type: "center" });
+    expect(file.nodes[0]).toEqual({
+      id: "file:src/app/catalog/routes.ts",
+      label: "catalog/routes.ts",
+      type: "center",
+    });
     expect(file.edges.some((edge: { type: string }) => edge.type === "imports")).toBe(true);
     expect(feature.nodes.map((node: { id: string }) => node.id)).toEqual(
       expect.arrayContaining(["feature:catalog", "flow:catalog/new-arrivals"]),
     );
     expect(page.nodes.map((node: { id: string }) => node.id)).toEqual(
-      expect.arrayContaining(["page:web-client/home", "block:web-client/home/New arrivals", "flow:catalog/new-arrivals"]),
+      expect.arrayContaining([
+        "page:web-client/home",
+        "block:web-client/home/New arrivals",
+        "flow:catalog/new-arrivals",
+      ]),
     );
   });
 
@@ -155,7 +210,9 @@ describe("the panel", () => {
     expect((await call(panel, "/tasks")).open).toHaveLength(2);
     rmSync(path.join(root, "grimoire", "tasks", "open", "T-015-double-order.md"));
 
-    expect((await call(panel, "/tasks")).open.map((task: { id: string }) => task.id)).toEqual(["T-014"]);
+    expect((await call(panel, "/tasks")).open.map((task: { id: string }) => task.id)).toEqual([
+      "T-014",
+    ]);
   });
 });
 
@@ -172,14 +229,18 @@ describe("the panel with no features written (book only)", () => {
     expect((await call(panel, "/tasks")).open).toEqual([]);
     expect(search.hits.some((hit: { type: string }) => hit.type === "file")).toBe(true);
     expect((await call(panel, "/graph/modules")).nodes.length).toBeGreaterThan(1);
-    await expect(call(panel, "/features/:feature", { params: { feature: "catalog" } })).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      call(panel, "/features/:feature", { params: { feature: "catalog" } }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 });
 
 /** Run the exported page's inline module in a vm with a small document; returns the root node after rendering. */
 async function openExportedPage(html: string, hash = "") {
   const script = /<script type="module">([\s\S]*)<\/script>/.exec(html)?.[1] ?? "";
-  const json = /<script type="application\/json" id="grimoire-data">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? "";
+  const json =
+    /<script type="application\/json" id="grimoire-data">([\s\S]*?)<\/script>/.exec(html)?.[1] ??
+    "";
   const rootNode = new FakeNode("main");
   const helpers = fakeHelpers();
   const listeners: Record<string, (() => unknown)[]> = {};
@@ -198,7 +259,10 @@ async function openExportedPage(html: string, hash = "") {
       createElement: (tag: string) => helpers.el(tag),
       createElementNS: (_namespace: string, tag: string) => helpers.svg(tag),
     },
-    window: { addEventListener: (type: string, listener: () => unknown) => (listeners[type] ??= []).push(listener) },
+    window: {
+      addEventListener: (type: string, listener: () => unknown) =>
+        (listeners[type] ??= []).push(listener),
+    },
   });
 
   runInContext(`(async () => {${script.replace(/^\s*export .*$/gm, "")}})()`, context);
@@ -236,9 +300,22 @@ describe("exportGrimoireSite", () => {
     const data = JSON.parse(/id="grimoire-data">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? "{}");
 
     expect(Object.keys(data.routes)).toEqual(
-      expect.arrayContaining(["summary", "apps", "tasks", "releases", "check", "graph/modules", "features/catalog", "flows/catalog/new-arrivals", "graph/feature/catalog", "releases/1.0.0"]),
+      expect.arrayContaining([
+        "summary",
+        "apps",
+        "tasks",
+        "releases",
+        "check",
+        "graph/modules",
+        "features/catalog",
+        "flows/catalog/new-arrivals",
+        "graph/feature/catalog",
+        "releases/1.0.0",
+      ]),
     );
-    expect(data.search.map((item: { id: string }) => item.id)).toEqual(expect.arrayContaining(["catalog/new-arrivals", "T-014"]));
+    expect(data.search.map((item: { id: string }) => item.id)).toEqual(
+      expect.arrayContaining(["catalog/new-arrivals", "T-014"]),
+    );
     expect(Object.keys(data.files)).toContain("src/app/catalog/routes.ts");
     // The book writer leaves the folder alone on the next run.
     await openGrimoire(copy.root, createShopAdapter(), { routes: "cached" });

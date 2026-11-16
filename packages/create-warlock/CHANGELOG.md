@@ -4,6 +4,16 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.55.0
+
+### Added
+
+- New apps include Grimoire (experimental): the `@warlock.js/grimoire` dependency, `registerGrimoireCommands()` in `warlock.config.ts`, the generated-file lines in `.gitignore`, a Grimoire panel in the devtools config and a project map section in the agent guide. Grimoire is also offered as a feature in the picker and in `--features`.
+
+### Changed
+
+- The git step's spinner reads "Initializing git repository" while it runs, and "Git repository initialized!" when it finishes.
+
 ## 5.54.0 - 2026-11-16
 
 ### Added

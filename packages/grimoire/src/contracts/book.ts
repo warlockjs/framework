@@ -229,4 +229,3 @@ export type WriteBookResult = {
   /** Book files removed because their source is gone. */
   removed: string[];
 };
-

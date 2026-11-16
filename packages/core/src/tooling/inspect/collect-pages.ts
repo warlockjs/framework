@@ -103,7 +103,10 @@ export async function discoverGraphPages(
 
   const webConfig: unknown = baseConfig.get("web");
   const configuredSites =
-    sites ?? (typeof webConfig === "object" && webConfig !== null ? Reflect.get(webConfig, "sites") : undefined);
+    sites ??
+    (typeof webConfig === "object" && webConfig !== null
+      ? Reflect.get(webConfig, "sites")
+      : undefined);
 
   try {
     const graph = web.discoverPageGraph({
@@ -224,7 +227,9 @@ export function collectPages(
   const collected: InspectPage[] = [];
   const exports = files ? new Map(files.map((file) => [file.file, file.exports])) : undefined;
   const hasLoader = (file: string) =>
-    exports ? exports.get(relativeTo(cwd, file))?.includes("loader") === true : exportsName(file, "loader");
+    exports
+      ? exports.get(relativeTo(cwd, file))?.includes("loader") === true
+      : exportsName(file, "loader");
 
   if (graph) {
     for (const page of graph) {

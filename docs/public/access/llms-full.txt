@@ -404,6 +404,7 @@ class DirectResolver implements AccessResolver {
 
 ## Rules
 
+- **Opt out of the engine cache with `readonly cacheable = false`** when the sets are a cheap function of the loaded user (`DefaultAccessResolver` does): every check then reads the resolver, so a role change shows at once. Omitted, results are cached.
 - **Only fetch — never cache inside the resolver.** The engine caches per `(user, tenant)`; caching twice causes stale grants. Invalidate with `access.flush(user, tenant)` when your data changes.
 - Return plain `string[]`. Wildcards (`orders.*`, `*`) in the returned permissions are honored by the engine.
 - `resolveRoles` and `resolvePermissions` may read **different** sources — roles and permissions are independent axes (a role can be a pure label with permissions granted directly).

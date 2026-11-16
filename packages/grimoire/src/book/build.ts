@@ -52,7 +52,9 @@ export function grimoireVersion(): string {
   if (cachedVersion !== null) return cachedVersion;
 
   try {
-    const manifest = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
+    const manifest = JSON.parse(
+      readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+    ) as {
       version?: unknown;
     };
     cachedVersion = typeof manifest.version === "string" ? manifest.version : "0.0.0";
@@ -103,7 +105,10 @@ async function scanSourceRoots(
   try {
     files = await listFiles(root, sourceRoots);
   } catch (error) {
-    throw new GrimoireError("GR8001", `The source roots could not be read: ${(error as Error).message}`);
+    throw new GrimoireError(
+      "GR8001",
+      `The source roots could not be read: ${(error as Error).message}`,
+    );
   }
 
   let statMoved = false;
@@ -132,7 +137,8 @@ async function scanSourceRoots(
   const result: Scan["files"] = {};
 
   for (const state of states) {
-    if (state !== null) result[state.file] = { hash: state.hash, size: state.size, mtimeMs: state.mtimeMs };
+    if (state !== null)
+      result[state.file] = { hash: state.hash, size: state.size, mtimeMs: state.mtimeMs };
   }
 
   return { files: result, statMoved };
@@ -149,7 +155,8 @@ async function hashFiles(
     const scanned = scan[file];
 
     if (scanned !== undefined) return [file, scanned.hash] as const;
-    if (sourceRoots.some((folder) => folder === "." || isInsideFolder(file, folder))) return [file, ""] as const;
+    if (sourceRoots.some((folder) => folder === "." || isInsideFolder(file, folder)))
+      return [file, ""] as const;
 
     return [file, await hashIfExists(root, file)] as const;
   });
@@ -160,11 +167,17 @@ async function hashFiles(
 function sameRecord(left: Record<string, string>, right: Record<string, string>): boolean {
   const leftKeys = Object.keys(left);
 
-  return leftKeys.length === Object.keys(right).length && leftKeys.every((key) => right[key] === left[key]);
+  return (
+    leftKeys.length === Object.keys(right).length &&
+    leftKeys.every((key) => right[key] === left[key])
+  );
 }
 
 /** Source files added, changed or removed between two manifests, sorted. */
-function changedFiles(previous: Record<string, BookManifestFile>, current: Scan["files"]): string[] {
+function changedFiles(
+  previous: Record<string, BookManifestFile>,
+  current: Scan["files"],
+): string[] {
   const changed: string[] = [];
 
   for (const [file, state] of Object.entries(current)) {
@@ -191,7 +204,11 @@ export function defaultRouteInputs(files: readonly BookFile[]): string[] {
   const inputs = new Set(importClosure(fileGraph(files), routesFiles));
 
   for (const file of files) {
-    if (file.type === "config" || NAMED_FILE_TYPES.has(file.type) || /\.notification\.[^/]+$/.test(file.file)) {
+    if (
+      file.type === "config" ||
+      NAMED_FILE_TYPES.has(file.type) ||
+      /\.notification\.[^/]+$/.test(file.file)
+    ) {
       inputs.add(file.file);
     }
   }
@@ -203,8 +220,14 @@ export function defaultRouteInputs(files: readonly BookFile[]): string[] {
 }
 
 /** The route cache's input files: the adapter's list when it has one, else the default. */
-async function routeInputFiles(root: string, adapter: BookAdapter, files: readonly BookFile[]): Promise<string[]> {
-  return adapter.routeInputs ? (await adapter.routeInputs(root, files)).map(cleanPath) : defaultRouteInputs(files);
+async function routeInputFiles(
+  root: string,
+  adapter: BookAdapter,
+  files: readonly BookFile[],
+): Promise<string[]> {
+  return adapter.routeInputs
+    ? (await adapter.routeInputs(root, files)).map(cleanPath)
+    : defaultRouteInputs(files);
 }
 
 const hasBootFacts = (adapter: BookAdapter): boolean =>
@@ -236,7 +259,11 @@ function bootState(
   return sameRecord(boot.inputs, inputs) ? "fresh" : "stale";
 }
 
-async function writeStoredBook(root: string, manifest: BookManifest, facts: BookFacts | null): Promise<void> {
+async function writeStoredBook(
+  root: string,
+  manifest: BookManifest,
+  facts: BookFacts | null,
+): Promise<void> {
   if (facts !== null) {
     const cache: BookFactsCache = { schemaVersion: BOOK_SCHEMA_VERSION, facts };
     await writeBookFile(root, GRIMOIRE_PATHS.bookFactsCache, toJson(cache));
@@ -262,7 +289,9 @@ export async function buildBook(
   const now = options.now ?? (() => new Date());
   // `write: false` (passed by `openGrimoire({ write: false })`) computes in memory only.
   const write = options.write !== false;
-  const sourceRoots = [...new Set((await adapter.sourceRoots(projectRoot)).map(cleanFolder))].sort();
+  const sourceRoots = [
+    ...new Set((await adapter.sourceRoots(projectRoot)).map(cleanFolder)),
+  ].sort();
   const stored = await readStoredBook(projectRoot);
   const previousFiles = stored?.manifest.files ?? {};
   const scan = await scanSourceRoots(projectRoot, sourceRoots, previousFiles);
@@ -283,11 +312,21 @@ export async function buildBook(
       Object.entries(scan.files).every(([file, state]) => previousFiles[file]?.hash === state.hash);
     const sameTests =
       sameFiles &&
-      sameRecord(manifest.tests, await hashFiles(projectRoot, Object.keys(manifest.tests), scan.files, sourceRoots));
+      sameRecord(
+        manifest.tests,
+        await hashFiles(projectRoot, Object.keys(manifest.tests), scan.files, sourceRoots),
+      );
 
     if (sameTests) {
-      const inputs = await hashFiles(projectRoot, Object.keys(manifest.boot.inputs), scan.files, sourceRoots);
-      let routes: RouteFreshness = hasBootFacts(adapter) ? bootState(manifest.boot, facts.routes, inputs) : "missing";
+      const inputs = await hashFiles(
+        projectRoot,
+        Object.keys(manifest.boot.inputs),
+        scan.files,
+        sourceRoots,
+      );
+      let routes: RouteFreshness = hasBootFacts(adapter)
+        ? bootState(manifest.boot, facts.routes, inputs)
+        : "missing";
       let changedBook = false;
 
       if (mode === "fresh" && hasBootFacts(adapter) && routes !== "fresh") {
@@ -314,7 +353,11 @@ export async function buildBook(
         if (write) await writeStoredBook(projectRoot, manifest, changedBook ? facts : null);
       }
 
-      return { book: { root: projectRoot, manifest, facts, routes }, rebuilt: changedBook, changed: [] };
+      return {
+        book: { root: projectRoot, manifest, facts, routes },
+        rebuilt: changedBook,
+        changed: [],
+      };
     }
   }
 
@@ -325,7 +368,10 @@ export async function buildBook(
     files = normalizeFiles(await adapter.files(projectRoot));
   } catch (error) {
     if (error instanceof GrimoireError) throw error;
-    throw new GrimoireError("GR8001", `The source files could not be read: ${(error as Error).message}`);
+    throw new GrimoireError(
+      "GR8001",
+      `The source files could not be read: ${(error as Error).message}`,
+    );
   }
 
   let staticFacts: Omit<BookFacts, "files" | "routes" | "named">;
@@ -341,7 +387,10 @@ export async function buildBook(
     };
   } catch (error) {
     if (error instanceof GrimoireError) throw error;
-    throw new GrimoireError("GR8004", `Pages or screens could not be read: ${(error as Error).message}`);
+    throw new GrimoireError(
+      "GR8004",
+      `Pages or screens could not be read: ${(error as Error).message}`,
+    );
   }
 
   staticFacts.tests = [...new Set(staticFacts.tests)].sort();
@@ -358,7 +407,9 @@ export async function buildBook(
     routes: stored?.facts.routes ?? null,
     named: stored?.facts.named ?? [],
   };
-  let routes: RouteFreshness = hasBootFacts(adapter) ? bootState(previousBoot, bootFacts.routes, inputs) : "missing";
+  let routes: RouteFreshness = hasBootFacts(adapter)
+    ? bootState(previousBoot, bootFacts.routes, inputs)
+    : "missing";
 
   if (mode === "fresh" && hasBootFacts(adapter) && (routes !== "fresh" || options.force === true)) {
     bootFacts = await collectBootFacts(projectRoot, adapter);
@@ -375,7 +426,10 @@ export async function buildBook(
     builtAt: now().toISOString(),
     sourceRoots,
     files: Object.fromEntries(
-      Object.entries(scan.files).map(([file, state]) => [file, { ...state, entry: entries.get(file) ?? null }]),
+      Object.entries(scan.files).map(([file, state]) => [
+        file,
+        { ...state, entry: entries.get(file) ?? null },
+      ]),
     ),
     tests: await hashFiles(projectRoot, facts.tests, scan.files, sourceRoots),
     writtenHash: stored?.manifest.writtenHash ?? "",
@@ -384,7 +438,8 @@ export async function buildBook(
 
   // A forced build rewrites every entry: forget what `writeBook` wrote.
   if (write) {
-    if (options.force === true) await rm(absolutePath(projectRoot, WRITE_STATE_PATH), { force: true });
+    if (options.force === true)
+      await rm(absolutePath(projectRoot, WRITE_STATE_PATH), { force: true });
 
     await writeStoredBook(projectRoot, manifest, facts);
   }

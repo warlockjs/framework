@@ -51,7 +51,9 @@ describe("book paths", () => {
 
   it("handles both separators", () => {
     expect(toPosixPath("src\\app\\x.ts")).toBe("src/app/x.ts");
-    expect(bookEntryPath({ file: "src\\app\\catalog\\x.ts" })).toBe("grimoire/book/app/catalog/x.json");
+    expect(bookEntryPath({ file: "src\\app\\catalog\\x.ts" })).toBe(
+      "grimoire/book/app/catalog/x.json",
+    );
     expect(isInsideFolder("src\\app\\catalog\\x.ts", "src/app/catalog/")).toBe(true);
     expect(isInsideFolder("src/app/catalogue/x.ts", "src/app/catalog")).toBe(false);
     expect(projectPath("/project", "/project/src/app/x.ts")).toBe("src/app/x.ts");

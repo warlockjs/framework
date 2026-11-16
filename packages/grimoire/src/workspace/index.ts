@@ -14,7 +14,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { matchApps } from "../apps";
 import { buildBook, writeBook } from "../book";
-import { annotationsFrom, buildCollectedFiles, writeCollectedFiles, type CollectedInput } from "../bookmap";
+import {
+  annotationsFrom,
+  buildCollectedFiles,
+  writeCollectedFiles,
+  type CollectedInput,
+} from "../bookmap";
 import type { BookAdapter } from "../contracts/adapter";
 import type { BuildBookOptions } from "../contracts/book";
 import type { GrimoireSnapshot, OpenGrimoireOptions } from "../contracts/snapshot";
@@ -64,7 +69,9 @@ export async function openGrimoire(
   const write = options.write !== false;
   const { written, findings: structure } = await parseGrimoire(root);
 
-  const bookOptions: BuildBookOptions & { write?: boolean } = { routes: options.routes ?? "cached" };
+  const bookOptions: BuildBookOptions & { write?: boolean } = {
+    routes: options.routes ?? "cached",
+  };
 
   if (options.force !== undefined) bookOptions.force = options.force;
   if (options.now !== undefined) bookOptions.now = options.now;

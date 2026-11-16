@@ -6,11 +6,23 @@
  */
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { explainersOf, mcpToolsOf, type WarlockMcpContext, type WarlockMcpTool } from "@warlock.js/core";
+import {
+  explainersOf,
+  mcpToolsOf,
+  type WarlockMcpContext,
+  type WarlockMcpTool,
+} from "@warlock.js/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BookAdapter } from "../src/contracts/adapter";
 import { GRIMOIRE_MCP_TOOL_NAMES, createGrimoireMcpTools } from "../src/warlock/mcp-tools";
-import { needsBoot, runBuild, runCheck, runRelease, runScry, type CommandIO } from "../src/warlock/actions";
+import {
+  needsBoot,
+  runBuild,
+  runCheck,
+  runRelease,
+  runScry,
+  type CommandIO,
+} from "../src/warlock/actions";
 import { registerGrimoireCommands } from "../src/warlock";
 import { createShopAdapter } from "./fixtures/shop-facts";
 import { copyFixture, type FixtureCopy } from "./support/copy-fixture";
@@ -21,7 +33,12 @@ function capture(): Captured {
   const stdout: string[] = [];
   const stderr: string[] = [];
 
-  return { stdout, stderr, out: (line) => void stdout.push(line), err: (line) => void stderr.push(line) };
+  return {
+    stdout,
+    stderr,
+    out: (line) => void stdout.push(line),
+    err: (line) => void stderr.push(line),
+  };
 }
 
 const copies: FixtureCopy[] = [];
@@ -46,7 +63,9 @@ describe("warlock grimoire build", () => {
 
     expect(await runBuild({ root: copy.root, adapter, io })).toBe(0);
     expect(io.stdout[0]).toMatch(/^book {6}35 files \(\d+ written, 0 removed\), routes fresh$/);
-    expect(io.stdout[1]).toBe("features  3 (bookmaps written: 9)   tasks  2 open, 1 waiting, 1 done");
+    expect(io.stdout[1]).toBe(
+      "features  3 (bookmaps written: 9)   tasks  2 open, 1 waiting, 1 done",
+    );
     expect(adapter.calls.routes).toBe(1);
 
     const again = capture();
@@ -62,7 +81,12 @@ describe("warlock grimoire build", () => {
 
     await runBuild({ root: copy.root, adapter: createShopAdapter(), io }, { json: true });
 
-    expect(JSON.parse(io.stdout.join("\n"))).toMatchObject({ rebuilt: true, routes: "fresh", removed: [], site: null });
+    expect(JSON.parse(io.stdout.join("\n"))).toMatchObject({
+      rebuilt: true,
+      routes: "fresh",
+      removed: [],
+      site: null,
+    });
   });
 
   it("falls back to cached routes with a GR8002 warning when the app does not boot", async () => {
@@ -85,7 +109,12 @@ describe("warlock grimoire build", () => {
     const copy = fixture();
     const io = capture();
 
-    expect(await runBuild({ root: copy.root, adapter: createShopAdapter(), io }, { site: true, out: "public/grimoire" })).toBe(0);
+    expect(
+      await runBuild(
+        { root: copy.root, adapter: createShopAdapter(), io },
+        { site: true, out: "public/grimoire" },
+      ),
+    ).toBe(0);
     expect(io.stdout.at(-1)).toBe("site      public/grimoire/index.html");
     expect(existsSync(path.join(copy.root, "public", "grimoire", "index.html"))).toBe(true);
   });
@@ -111,7 +140,9 @@ describe("warlock grimoire check", () => {
 
     const io = capture();
 
-    expect(await runCheck({ root: copy.root, adapter: createShopAdapter(), io }, { json: true })).toBe(1);
+    expect(
+      await runCheck({ root: copy.root, adapter: createShopAdapter(), io }, { json: true }),
+    ).toBe(1);
 
     const report = JSON.parse(io.stdout.join("\n"));
 
@@ -125,16 +156,24 @@ describe("warlock grimoire release", () => {
     const copy = fixture();
     const io = capture();
 
-    expect(await runRelease({ root: copy.root, adapter: createShopAdapter(), io }, "1.0.0")).toBe(0);
-    expect(io.stdout[0]).toMatch(/^grimoire\/releases\/1\.0\.0\.md: 4 entries collected \(auth 1\.0 added, catalog 2\.0 added, catalog 1\.0 added, orders 1\.0 added\), file unchanged$/);
-    expect(io.stdout[1]).toMatch(/^note: 1 entry is still unreleased: catalog 2\.1\. To ship them in 1\.0\.0, move them under "## 1\.0\.0 \(2026-10-01\)"/);
+    expect(await runRelease({ root: copy.root, adapter: createShopAdapter(), io }, "1.0.0")).toBe(
+      0,
+    );
+    expect(io.stdout[0]).toMatch(
+      /^grimoire\/releases\/1\.0\.0\.md: 4 entries collected \(auth 1\.0 added, catalog 2\.0 added, catalog 1\.0 added, orders 1\.0 added\), file unchanged$/,
+    );
+    expect(io.stdout[1]).toMatch(
+      /^note: 1 entry is still unreleased: catalog 2\.1\. To ship them in 1\.0\.0, move them under "## 1\.0\.0 \(2026-10-01\)"/,
+    );
   });
 
   it("exits 1 with GR9005 when the release file is missing, and GR1024 for broken markers", async () => {
     const copy = fixture();
     const io = capture();
 
-    expect(await runRelease({ root: copy.root, adapter: createShopAdapter(), io }, "9.9.9")).toBe(1);
+    expect(await runRelease({ root: copy.root, adapter: createShopAdapter(), io }, "9.9.9")).toBe(
+      1,
+    );
     expect(io.stderr[0]).toMatch(/^GR9005 {2}/);
     expect(io.stderr[1]).toMatch(/^ {2}fix: Write `grimoire\/releases\/<release>\.md`/);
 
@@ -142,14 +181,20 @@ describe("warlock grimoire release", () => {
 
     const broken = capture();
 
-    expect(await runRelease({ root: copy.root, adapter: createShopAdapter(), io: broken }, "1.0.0")).toBe(1);
-    expect(broken.stderr[0]).toMatch(/^GR1024 {2}grimoire\/releases\/1\.0\.0\.md has broken collected-list markers/);
+    expect(
+      await runRelease({ root: copy.root, adapter: createShopAdapter(), io: broken }, "1.0.0"),
+    ).toBe(1);
+    expect(broken.stderr[0]).toMatch(
+      /^GR1024 {2}grimoire\/releases\/1\.0\.0\.md has broken collected-list markers/,
+    );
   });
 
   it("refuses a missing release name with GR9006", async () => {
     const io = capture();
 
-    expect(await runRelease({ root: fixture().root, adapter: createShopAdapter(), io }, undefined)).toBe(1);
+    expect(
+      await runRelease({ root: fixture().root, adapter: createShopAdapter(), io }, undefined),
+    ).toBe(1);
     expect(io.stderr[0]).toMatch(/^GR9006 {2}Pass the release name/);
   });
 });
@@ -162,19 +207,34 @@ describe("warlock scry", () => {
 
     await runBuild({ root: copy.root, adapter, io: capture() });
 
-    expect(await runScry({ root: copy.root, adapter, io }, ["src/app/catalog/services/new-arrivals.service.ts"])).toBe(0);
-    expect(io.stdout[0]).toBe("src/app/catalog/services/new-arrivals.service.ts  service  10 lines");
+    expect(
+      await runScry({ root: copy.root, adapter, io }, [
+        "src/app/catalog/services/new-arrivals.service.ts",
+      ]),
+    ).toBe(0);
+    expect(io.stdout[0]).toBe(
+      "src/app/catalog/services/new-arrivals.service.ts  service  10 lines",
+    );
 
     const json = capture();
 
-    expect(await runScry({ root: copy.root, adapter, io: json }, [], { flow: "catalog/new-arrivals", json: true })).toBe(0);
+    expect(
+      await runScry({ root: copy.root, adapter, io: json }, [], {
+        flow: "catalog/new-arrivals",
+        json: true,
+      }),
+    ).toBe(0);
     expect(JSON.parse(json.stdout.join("\n"))).toMatchObject({ type: "flow", routes: "fresh" });
   });
 
   it("exits 1 with the code, the message and the fix", async () => {
     const io = capture();
 
-    expect(await runScry({ root: fixture().root, adapter: createShopAdapter(), io }, [], { feature: "billing" })).toBe(1);
+    expect(
+      await runScry({ root: fixture().root, adapter: createShopAdapter(), io }, [], {
+        feature: "billing",
+      }),
+    ).toBe(1);
     expect(io.stderr[0]).toMatch(/^GR9003 {2}No feature has the id "billing"/);
     expect(io.stderr[1]).toMatch(/^ {2}fix: /);
   });
@@ -197,12 +257,20 @@ describe("warlock scry", () => {
     expect(adapter.calls.named).toBe(0);
 
     // A route question with no route facts reads them once, then never again.
-    expect(await runScry({ root: copy.root, adapter, io: capture() }, [], { route: "POST /api/orders" })).toBe(0);
-    expect(await runScry({ root: copy.root, adapter, io: capture() }, [], { route: "GET /api/products" })).toBe(0);
+    expect(
+      await runScry({ root: copy.root, adapter, io: capture() }, [], { route: "POST /api/orders" }),
+    ).toBe(0);
+    expect(
+      await runScry({ root: copy.root, adapter, io: capture() }, [], {
+        route: "GET /api/products",
+      }),
+    ).toBe(0);
     expect(adapter.calls.routes).toBe(1);
 
     copy.replace("src/app/orders/routes.ts", "\n", "\n// changed\n");
-    expect(await runScry({ root: copy.root, adapter, io: capture() }, ["src/app/orders/routes.ts"])).toBe(0);
+    expect(
+      await runScry({ root: copy.root, adapter, io: capture() }, ["src/app/orders/routes.ts"]),
+    ).toBe(0);
     expect(adapter.calls.routes).toBe(1);
   });
 });
@@ -280,16 +348,23 @@ describe("registerGrimoireCommands", () => {
 
 describe("Grimoire MCP tools", () => {
   function tools(root: string, adapter: BookAdapter): Map<string, WarlockMcpTool> {
-    const context = { cwd: root, inspect: async () => ({}) } as unknown as Pick<WarlockMcpContext, "cwd" | "inspect">;
+    const context = { cwd: root, inspect: async () => ({}) } as unknown as Pick<
+      WarlockMcpContext,
+      "cwd" | "inspect"
+    >;
 
-    return new Map(createGrimoireMcpTools(context, {}, async () => adapter).map((tool) => [tool.name, tool]));
+    return new Map(
+      createGrimoireMcpTools(context, {}, async () => adapter).map((tool) => [tool.name, tool]),
+    );
   }
 
   it("lists the tools in order; only grimoire_release writes", () => {
     const list = [...tools("/project", createShopAdapter()).values()];
 
     expect(list.map((tool) => tool.name)).toEqual([...GRIMOIRE_MCP_TOOL_NAMES]);
-    expect(list.filter((tool) => tool.writes).map((tool) => tool.name)).toEqual(["grimoire_release"]);
+    expect(list.filter((tool) => tool.writes).map((tool) => tool.name)).toEqual([
+      "grimoire_release",
+    ]);
   });
 
   it("answers with the JSON results and never boots for read tools", async () => {
@@ -298,19 +373,34 @@ describe("Grimoire MCP tools", () => {
     const byName = tools(copy.root, adapter);
     const run = (name: string, input: Record<string, unknown>) => byName.get(name)?.run(input);
 
-    expect(await run("grimoire_file", { file: "src/app/orders/routes.ts" })).toMatchObject({ type: "file" });
-    expect(await run("grimoire_impact", { file: "src/app/catalog/models/product.model.ts" })).toMatchObject({ type: "impact" });
+    expect(await run("grimoire_file", { file: "src/app/orders/routes.ts" })).toMatchObject({
+      type: "file",
+    });
+    expect(
+      await run("grimoire_impact", { file: "src/app/catalog/models/product.model.ts" }),
+    ).toMatchObject({ type: "impact" });
     expect(await run("grimoire_feature", { feature: "orders" })).toMatchObject({ type: "feature" });
-    expect(await run("grimoire_flow", { flow: "catalog/new-arrivals" })).toMatchObject({ type: "flow" });
-    expect(await run("grimoire_search", { text: "order", limit: 2 })).toMatchObject({ type: "search" });
+    expect(await run("grimoire_flow", { flow: "catalog/new-arrivals" })).toMatchObject({
+      type: "flow",
+    });
+    expect(await run("grimoire_search", { text: "order", limit: 2 })).toMatchObject({
+      type: "search",
+    });
     expect(await run("grimoire_check", {})).toMatchObject({ schemaVersion: 1, routes: "missing" });
     expect(adapter.calls.routes).toBe(0);
 
     expect(await run("grimoire_build", {})).toMatchObject({ routes: "fresh" });
     expect(adapter.calls.routes).toBe(1);
-    expect(await run("grimoire_route", { method: "post", path: "/api/orders" })).toMatchObject({ type: "route" });
-    expect(await run("grimoire_explain", { code: "GR9001" })).toMatchObject({ code: "GR9001", severity: "error" });
-    expect(await run("grimoire_release", { release: "1.0.0" })).toMatchObject({ file: "grimoire/releases/1.0.0.md" });
+    expect(await run("grimoire_route", { method: "post", path: "/api/orders" })).toMatchObject({
+      type: "route",
+    });
+    expect(await run("grimoire_explain", { code: "GR9001" })).toMatchObject({
+      code: "GR9001",
+      severity: "error",
+    });
+    expect(await run("grimoire_release", { release: "1.0.0" })).toMatchObject({
+      file: "grimoire/releases/1.0.0.md",
+    });
   });
 
   it("turns Grimoire errors into tool errors with the code and the fix", async () => {
@@ -319,6 +409,8 @@ describe("Grimoire MCP tools", () => {
     await expect(byName.get("grimoire_flow")?.run({ flow: "catalog/returns" })).rejects.toThrow(
       /^GR9004: No flow catalog\/returns\..* Fix: /,
     );
-    await expect(byName.get("grimoire_explain")?.run({ code: "GR0000" })).rejects.toThrow(/Unknown Grimoire code/);
+    await expect(byName.get("grimoire_explain")?.run({ code: "GR0000" })).rejects.toThrow(
+      /Unknown Grimoire code/,
+    );
   });
 });

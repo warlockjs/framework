@@ -47,14 +47,20 @@ async function loadAdapter(option: SnapshotSourceOptions["adapter"]): Promise<Bo
 }
 
 /** Create the source for the project at `root`. */
-export function createSnapshotSource(root: string, options: SnapshotSourceOptions = {}): SnapshotSource {
+export function createSnapshotSource(
+  root: string,
+  options: SnapshotSourceOptions = {},
+): SnapshotSource {
   const ttl = options.ttlMs ?? 2000;
   let cached: { snapshot: GrimoireSnapshot; at: number; stamp: number } | null = null;
   let opening: Promise<GrimoireSnapshot> | null = null;
 
   async function open(): Promise<GrimoireSnapshot> {
     const adapter = await loadAdapter(options.adapter);
-    const snapshot = await openGrimoire(root, adapter, { routes: "cached", write: options.write ?? false });
+    const snapshot = await openGrimoire(root, adapter, {
+      routes: "cached",
+      write: options.write ?? false,
+    });
 
     cached = { snapshot, at: Date.now(), stamp: await manifestStamp(root) };
 
@@ -65,7 +71,11 @@ export function createSnapshotSource(root: string, options: SnapshotSourceOption
     async get() {
       if (opening !== null) return opening;
 
-      if (cached !== null && Date.now() - cached.at < ttl && (await manifestStamp(root)) === cached.stamp) {
+      if (
+        cached !== null &&
+        Date.now() - cached.at < ttl &&
+        (await manifestStamp(root)) === cached.stamp
+      ) {
         return cached.snapshot;
       }
 

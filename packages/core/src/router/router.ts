@@ -2,7 +2,7 @@ import config from "@mongez/config";
 import type { FastifyHttpProxyOptions } from "@fastify/http-proxy";
 import { WarlockError } from "../errors/warlock-error";
 import type { FastifyStaticOptions } from "@fastify/static";
-import { ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
+import { type GenericObject, ltrim, merge, toCamelCase, trim } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -554,7 +554,9 @@ export class Router {
       $prefixStack: [...this.stacks.prefix],
       // Inject source file from stacks if set
       sourceFile: this.stacks.sourceFile || "",
-      ...(actionName !== undefined ? { $controller: controllerName ?? null, $action: actionName } : {}),
+      ...(actionName !== undefined
+        ? { $controller: controllerName ?? null, $action: actionName }
+        : {}),
     };
 
     const routes = this.routeReplacementTransaction?.routes ?? this.routes;

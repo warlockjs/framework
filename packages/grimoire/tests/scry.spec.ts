@@ -76,14 +76,19 @@ describe("scry over the shop fixture", () => {
 
     expect(result.type).toBe("impact");
     if (result.type !== "impact") return;
-    expect(result.importers.direct).toEqual(["src/app/catalog/repositories/products.repository.ts"]);
+    expect(result.importers.direct).toEqual([
+      "src/app/catalog/repositories/products.repository.ts",
+    ]);
     expect(result.routes.map((route) => `${route.method} ${route.path}`)).toEqual([
       "GET /api/products",
       "GET /api/products/new-arrivals",
       "GET /api/products/:id",
       "POST /api/orders",
     ]);
-    expect(result.pages.map((page) => `${page.app} ${page.route}`)).toEqual(["web-client /", "web-client /products/:id"]);
+    expect(result.pages.map((page) => `${page.app} ${page.route}`)).toEqual([
+      "web-client /",
+      "web-client /products/:id",
+    ]);
     expect(result.flows).toContain("orders/place-order");
     expect(result.features).toEqual([
       { id: "catalog", via: "owner" },
@@ -94,33 +99,48 @@ describe("scry over the shop fixture", () => {
   it("gives per-criterion test status in --flow", () => {
     const result = scry(snapshot, QUERIES.flow as ScryQuery);
 
-    expect(result.type === "flow" && result.bookmap.criteria.map((criterion) => criterion.status)).toEqual([
-      "not-run",
-      "not-run",
-      "no-test",
-    ]);
+    expect(
+      result.type === "flow" && result.bookmap.criteria.map((criterion) => criterion.status),
+    ).toEqual(["not-run", "not-run", "no-test"]);
     expect(formatScryResult(result)[1]).toMatch(/home\.page\.tsx \(\+5 files\)$/);
   });
 
   it("takes either separator and absolute paths", () => {
-    const relative = scry(snapshot, { type: "file", file: "src/app/catalog/services/new-arrivals.service.ts" });
+    const relative = scry(snapshot, {
+      type: "file",
+      file: "src/app/catalog/services/new-arrivals.service.ts",
+    });
 
-    expect(scry(snapshot, { type: "file", file: "src\\app\\catalog\\services\\new-arrivals.service.ts" })).toEqual(relative);
     expect(
-      scry(snapshot, { type: "file", file: path.join(copy.root, "src", "app", "catalog", "services", "new-arrivals.service.ts") }),
+      scry(snapshot, {
+        type: "file",
+        file: "src\\app\\catalog\\services\\new-arrivals.service.ts",
+      }),
+    ).toEqual(relative);
+    expect(
+      scry(snapshot, {
+        type: "file",
+        file: path.join(copy.root, "src", "app", "catalog", "services", "new-arrivals.service.ts"),
+      }),
     ).toEqual(relative);
   });
 
   it("throws GR9001-GR9004 with what failed and what to do", () => {
-    expect(codeOf(() => scry(snapshot, { type: "file", file: "src/nope.ts" }))).toMatch(/^GR9001 src\/nope\.ts is not in the book/);
+    expect(codeOf(() => scry(snapshot, { type: "file", file: "src/nope.ts" }))).toMatch(
+      /^GR9001 src\/nope\.ts is not in the book/,
+    );
     expect(codeOf(() => scry(snapshot, { type: "impact", file: "README.md" }))).toMatch(/^GR9001 /);
-    expect(codeOf(() => scry(snapshot, { type: "route", method: "DELETE", path: "/api/orders" }))).toMatch(
+    expect(
+      codeOf(() => scry(snapshot, { type: "route", method: "DELETE", path: "/api/orders" })),
+    ).toMatch(
       /^GR9002 No route matches DELETE \/api\/orders\. Routes on that path: POST \/api\/orders\.$/,
     );
     expect(codeOf(() => scry(snapshot, { type: "feature", feature: "billing" }))).toMatch(
       /^GR9003 .*Features: auth, catalog, orders\.$/,
     );
-    expect(codeOf(() => scry(snapshot, { type: "flow", feature: "catalog", flow: "returns" }))).toMatch(
+    expect(
+      codeOf(() => scry(snapshot, { type: "flow", feature: "catalog", flow: "returns" })),
+    ).toMatch(
       /^GR9004 No flow catalog\/returns\. Flows of catalog: browse-products, new-arrivals, wishlist\.$/,
     );
   });
@@ -140,7 +160,9 @@ describe("scry over the shop fixture", () => {
       "block web-client/home/new-arrivals",
     ]);
     expect(scry(snapshot, { type: "search", text: "zzz-nothing" })).toMatchObject({ hits: [] });
-    expect(formatScryResult(scry(snapshot, { type: "search", text: "zzz-nothing" }))).toEqual(['no match for "zzz-nothing"']);
+    expect(formatScryResult(scry(snapshot, { type: "search", text: "zzz-nothing" }))).toEqual([
+      'no match for "zzz-nothing"',
+    ]);
   });
 });
 

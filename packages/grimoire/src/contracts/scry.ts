@@ -7,11 +7,7 @@ import type { BookPage, BookRoute } from "./adapter";
 import type { BookEntry } from "./book";
 import type { FeatureBookmap, FlowBookmap, TaskSummary } from "./bookmap";
 import type { GrimoireFinding, RouteFreshness } from "./findings";
-import type {
-  WrittenChangelogEntry,
-  WrittenFeatureReadme,
-  WrittenFlow,
-} from "./written";
+import type { WrittenChangelogEntry, WrittenFeatureReadme, WrittenFlow } from "./written";
 
 export type ScryQuery =
   /** `warlock scry <file>` */
@@ -41,7 +37,8 @@ export type ScryFileResult = ScryNotes & {
   entry: BookEntry;
 };
 
-export type ScryImpactResult = ScryNotes & {
+// `routes` below lists the affected routes, so the route freshness is only in `notes`.
+export type ScryImpactResult = Omit<ScryNotes, "routes"> & {
   type: "impact";
   file: string;
   /** Files that import it, transitively, sorted; `direct` are the ones importing it directly. */
@@ -129,4 +126,3 @@ export type ScryResult =
   | ScryFeatureResult
   | ScryFlowResult
   | ScrySearchResult;
-

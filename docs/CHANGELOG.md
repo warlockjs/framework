@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.55.0
+
+### Added
+
+- A new Grimoire section with pages for the project book, `warlock grimoire` and `warlock scry`, the `GR` codes, the Vitest reporter, the devtools tab and the agent skills.
+- The MCP pages document `withMcpTools()` and `mcp.tools`.
+- The devtools pages document registering a dashboard tab with `panels` in `src/config/devtools.ts`.
+
+### Changed
+
+- The inspect pages document the new file roles, the file and route fields, and the page `setupFile` and `site` fields.
+- The CLI pages document `warlock explain` for package codes through `withExplainCodes()`, and `cli.commands` arrays.
+
 ## 5.34.0 - 2026-10-19
 
 ### Added

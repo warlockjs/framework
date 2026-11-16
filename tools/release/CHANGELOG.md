@@ -1,5 +1,11 @@
 ﻿# Changelog — release tooling
 
+## 5.55.0
+
+### Changed
+
+- The release family has 34 packages. `@warlock.js/grimoire` is a member, and the release gates cover it like the others.
+
 ## 5.34.3 - 2026-10-20
 
 ### Changed

@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -15,7 +23,15 @@ function featureMap(feature: string): FeatureBookmap {
 }
 
 function flowMap(feature: string, flow: string): FlowBookmap {
-  return { schemaVersion: 1, feature, flow, ref: `${feature}/${flow}`, steps: [], criteria: [], shownBy: [] };
+  return {
+    schemaVersion: 1,
+    feature,
+    flow,
+    ref: `${feature}/${flow}`,
+    steps: [],
+    criteria: [],
+    shownBy: [],
+  };
 }
 
 function collected(features: Record<string, string[]>): CollectedFiles {
@@ -62,7 +78,12 @@ describe("writeCollectedFiles", () => {
     expect(readFileSync(file("grimoire/features/catalog/bookmap.json"), "utf8")).toBe(
       `${JSON.stringify(featureMap("catalog"), null, 2)}\n`,
     );
-    expect(read("grimoire/tasks/index.json")).toEqual({ schemaVersion: 1, open: [], waiting: [], done: [] });
+    expect(read("grimoire/tasks/index.json")).toEqual({
+      schemaVersion: 1,
+      open: [],
+      waiting: [],
+      done: [],
+    });
   });
 
   it("rewrites nothing when nothing changed", async () => {
@@ -83,7 +104,9 @@ describe("writeCollectedFiles", () => {
 
     if (orders) orders.unreached = ["src/app/orders/dead.ts"];
 
-    expect((await writeCollectedFiles(root, next)).written).toEqual(["grimoire/features/orders/bookmap.json"]);
+    expect((await writeCollectedFiles(root, next)).written).toEqual([
+      "grimoire/features/orders/bookmap.json",
+    ]);
   });
 
   it("removes the book maps of a deleted flow and a deleted feature, and their emptied folders", async () => {
@@ -111,7 +134,9 @@ describe("writeCollectedFiles", () => {
     await writeCollectedFiles(root, collected({}));
 
     expect(readFileSync(file("grimoire/features/catalog/notes.json"), "utf8")).toBe("{}");
-    expect(readFileSync(file("grimoire/features/catalog/flows/browse.md"), "utf8")).toBe("agent file");
+    expect(readFileSync(file("grimoire/features/catalog/flows/browse.md"), "utf8")).toBe(
+      "agent file",
+    );
   });
 
   it("creates no grimoire folders for an empty project", async () => {

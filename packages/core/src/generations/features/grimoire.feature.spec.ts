@@ -52,12 +52,19 @@ describe("add grimoire", () => {
 
     const config = files.get("warlock.config.ts") ?? "";
 
-    expect(config.startsWith('import { registerGrimoireCommands } from "@warlock.js/grimoire/warlock";\n')).toBe(true);
+    expect(
+      config.startsWith(
+        'import { registerGrimoireCommands } from "@warlock.js/grimoire/warlock";\n',
+      ),
+    ).toBe(true);
     expect(config).toContain("registerGrimoireCommands(), registerJWTSecretGeneratorCommand()");
   });
 
   it("adds a cli block to a config without one", async () => {
-    files.set("warlock.config.ts", 'import { defineConfig } from "@warlock.js/core";\n\nexport default defineConfig({\n  build: {},\n});\n');
+    files.set(
+      "warlock.config.ts",
+      'import { defineConfig } from "@warlock.js/core";\n\nexport default defineConfig({\n  build: {},\n});\n',
+    );
 
     await grimoireFeature.onExecuting?.({} as never);
 

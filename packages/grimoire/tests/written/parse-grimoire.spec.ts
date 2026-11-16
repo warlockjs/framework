@@ -71,10 +71,14 @@ describe("parseGrimoire on the shop fixture", () => {
   it("matches the golden files", async () => {
     const { written } = await parseGrimoire(shopRoot);
 
-    await expect(json(written.features)).toMatchFileSnapshot("../golden/written/shop.features.json");
+    await expect(json(written.features)).toMatchFileSnapshot(
+      "../golden/written/shop.features.json",
+    );
     await expect(json(written.apps)).toMatchFileSnapshot("../golden/written/shop.apps.json");
     await expect(json(written.tasks)).toMatchFileSnapshot("../golden/written/shop.tasks.json");
-    await expect(json(written.releases)).toMatchFileSnapshot("../golden/written/shop.releases.json");
+    await expect(json(written.releases)).toMatchFileSnapshot(
+      "../golden/written/shop.releases.json",
+    );
   });
 
   it("reads the same project from CRLF files", async () => {

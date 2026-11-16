@@ -1,6 +1,6 @@
 ---
 name: document-a-file
-description: 'Write the one-sentence header and the public-export comments the Grimoire copies into its book, and tag a file with `@feature` when it lives outside its feature''s folders. Use whenever you create a source file or change what one is for.'
+description: "Write the one-sentence header and the public-export comments the Grimoire copies into its book, and tag a file with `@feature` when it lives outside its feature's folders. Use whenever you create a source file or change what one is for."
 ---
 
 # Document a file
@@ -25,11 +25,11 @@ export const NEW_ARRIVALS_LIMIT = 20;
 - Say what it is for, not what kind of file it is. The book already knows it is a service.
 - Change it when the file's purpose changes. A stale header misleads every reader after you.
 
-| Write | Not |
-| --- | --- |
-| `Creates a post for the signed-in author.` | `Controller for posts.` |
-| `Sends the order confirmation email.` | `This file contains the mail class.` |
-| `Decides the price a VIP customer pays.` | `Helper functions.` |
+| Write                                      | Not                                  |
+| ------------------------------------------ | ------------------------------------ |
+| `Creates a post for the signed-in author.` | `Controller for posts.`              |
+| `Sends the order confirmation email.`      | `This file contains the mail class.` |
+| `Decides the price a VIP customer pays.`   | `Helper functions.`                  |
 
 ## Public exports: one line each
 

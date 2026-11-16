@@ -30,7 +30,10 @@ function schemaProblem(schema: McpInputSchema): string | null {
       return `input property "${name}" needs a description`;
     }
 
-    if (property.type === "array" && (!isRecord(property.items) || property.items.type !== "string")) {
+    if (
+      property.type === "array" &&
+      (!isRecord(property.items) || property.items.type !== "string")
+    ) {
       return `input property "${name}" must be an array of strings (items: { type: "string" })`;
     }
   }

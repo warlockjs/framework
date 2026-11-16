@@ -39,10 +39,10 @@ runs, so `warlock.config.ts` stays fast to load.
 
 `registerGrimoireCommands(options)` and `createWarlockAdapter(options)` take:
 
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `mobile` | every top-level folder with `app.json` or `app.config.*` | Mobile apps in the repository: `{ root, id?, routing? }`. An app is file-routed when its `package.json` lists `expo-router` (screens come from its files), and code-navigated otherwise (you declare its screens in `grimoire/apps/<app>/screens/`). |
-| `inspect` | the `warlock inspect` boot pass | How the facts that need the app booted (routes, events, jobs) are read. |
+| Option    | Default                                                  | Meaning                                                                                                                                                                                                                                              |
+| --------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mobile`  | every top-level folder with `app.json` or `app.config.*` | Mobile apps in the repository: `{ root, id?, routing? }`. An app is file-routed when its `package.json` lists `expo-router` (screens come from its files), and code-navigated otherwise (you declare its screens in `grimoire/apps/<app>/screens/`). |
+| `inspect` | the `warlock inspect` boot pass                          | How the facts that need the app booted (routes, events, jobs) are read.                                                                                                                                                                              |
 
 ## When the app boots
 
@@ -261,31 +261,31 @@ GR9003  No feature has the id "billing". Features: auth, catalog, orders.
   fix: Use an id from `grimoire/features/`.
 ```
 
-| Code | When |
-| --- | --- |
+| Code     | When                                                                                               |
+| -------- | -------------------------------------------------------------------------------------------------- |
 | `GR9001` | The file is not in the book (not a code file under the source roots, or new since the last build). |
-| `GR9002` | No route matches, or there are no route facts yet. |
-| `GR9003` | No feature has that id. |
-| `GR9004` | No flow has that id. |
-| `GR9006` | The question is missing, asks two things at once, or has the wrong form. |
+| `GR9002` | No route matches, or there are no route facts yet.                                                 |
+| `GR9003` | No feature has that id.                                                                            |
+| `GR9004` | No flow has that id.                                                                               |
+| `GR9006` | The question is missing, asks two things at once, or has the wrong form.                           |
 
 ## MCP tools
 
 `warlock mcp` and `warlock dev --mcp` serve these tools next to the built-in ones. They answer with the same objects
 `--json` prints. The read tools never boot the app; they use the cached route facts.
 
-| Tool | Input | Answer | Writes |
-| --- | --- | --- | --- |
-| `grimoire_file` | `{ file }` | the file answer | no |
-| `grimoire_impact` | `{ file }` | the impact answer | no |
-| `grimoire_route` | `{ method, path }` | the route answer | no |
-| `grimoire_feature` | `{ feature }` | the feature answer | no |
-| `grimoire_flow` | `{ flow }` (`<feature>/<flow>`) | the flow answer | no |
-| `grimoire_search` | `{ text, limit? }` | the search answer | no |
-| `grimoire_check` | `{}` | the check report | no |
-| `grimoire_build` | `{ force? }` | `{ rebuilt, written, removed, routes }` | no |
-| `grimoire_release` | `{ release }` | the release file, its list and whether it changed | yes |
-| `grimoire_explain` | `{ code }` | the code's title, fix, skill and docs link | no |
+| Tool               | Input                           | Answer                                            | Writes |
+| ------------------ | ------------------------------- | ------------------------------------------------- | ------ |
+| `grimoire_file`    | `{ file }`                      | the file answer                                   | no     |
+| `grimoire_impact`  | `{ file }`                      | the impact answer                                 | no     |
+| `grimoire_route`   | `{ method, path }`              | the route answer                                  | no     |
+| `grimoire_feature` | `{ feature }`                   | the feature answer                                | no     |
+| `grimoire_flow`    | `{ flow }` (`<feature>/<flow>`) | the flow answer                                   | no     |
+| `grimoire_search`  | `{ text, limit? }`              | the search answer                                 | no     |
+| `grimoire_check`   | `{}`                            | the check report                                  | no     |
+| `grimoire_build`   | `{ force? }`                    | `{ rebuilt, written, removed, routes }`           | no     |
+| `grimoire_release` | `{ release }`                   | the release file, its list and whether it changed | yes    |
+| `grimoire_explain` | `{ code }`                      | the code's title, fix, skill and docs link        | no     |
 
 The read tools and `grimoire_build` may refresh the book, which is a git-ignored cache, so they do not count as
 writes. `grimoire_build` reads the routes again when they changed (under `warlock mcp` this boots the app once, the
@@ -320,7 +320,11 @@ import { openGrimoire, scry, formatScryResult } from "@warlock.js/grimoire";
 const root = process.cwd();
 const snapshot = await openGrimoire(root, createWarlockAdapter(), { routes: "cached" });
 
-console.log(formatScryResult(scry(snapshot, { type: "flow", feature: "catalog", flow: "new-arrivals" })).join("\n"));
+console.log(
+  formatScryResult(scry(snapshot, { type: "flow", feature: "catalog", flow: "new-arrivals" })).join(
+    "\n",
+  ),
+);
 console.log(await collectMobileFacts(root));
 ```
 

@@ -82,7 +82,9 @@ describe("the code catalog", () => {
       },
       hint: "Fix the method and path in the flow, or add the route in code.",
     });
-    expect(createFinding({ code: "GR3001", message: "x", severity: "error" }).severity).toBe("error");
+    expect(createFinding({ code: "GR3001", message: "x", severity: "error" }).severity).toBe(
+      "error",
+    );
     expect(() => createFinding({ code: "GR0001", message: "x" })).toThrow(/Unknown Grimoire code/);
   });
 

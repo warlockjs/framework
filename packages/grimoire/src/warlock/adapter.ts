@@ -11,7 +11,12 @@
 import { readdir } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
-import type { InspectFile, InspectReport, InspectRoute, InspectSection } from "@warlock.js/core/tooling";
+import type {
+  InspectFile,
+  InspectReport,
+  InspectRoute,
+  InspectSection,
+} from "@warlock.js/core/tooling";
 import type {
   BookAdapter,
   BookFile,
@@ -30,7 +35,10 @@ import { collectMobileFacts, type MobileAppOption } from "./mobile-facts";
  * the app once, the `warlock inspect` way (connectors boot, none starts).
  * `warlock mcp` passes its own, which shares the server's boot.
  */
-export type WarlockInspect = (root: string, sections: readonly InspectSection[]) => Promise<InspectReport>;
+export type WarlockInspect = (
+  root: string,
+  sections: readonly InspectSection[],
+) => Promise<InspectReport>;
 
 /** Options of `createWarlockAdapter()`. */
 export type WarlockAdapterOptions = {
@@ -88,7 +96,9 @@ function bootedInspect(): WarlockInspect {
     const booted = (await boot) as Awaited<ReturnType<typeof tooling.bootForInspect>>;
 
     if (!booted.context.booted) {
-      const failures = booted.context.moduleFailures.map((failure) => `${failure.file}: ${failure.message}`);
+      const failures = booted.context.moduleFailures.map(
+        (failure) => `${failure.file}: ${failure.message}`,
+      );
 
       throw new Error(
         `The app did not boot, so its routes could not be read${failures.length > 0 ? ` (${failures.join("; ")})` : ""}. Run warlock doctor to see why.`,
@@ -125,14 +135,23 @@ function toBookFile(file: InspectFile, mobile: readonly BookMobileApp[]): BookFi
 }
 
 /** The file that defines a route's handler: the controller's file for a tuple, else the file exporting the handler. */
-function handlerFileOf(route: InspectRoute, files: ReadonlyMap<string, BookFile>, pages: readonly BookPage[]): string | null {
+function handlerFileOf(
+  route: InspectRoute,
+  files: ReadonlyMap<string, BookFile>,
+  pages: readonly BookPage[],
+): string | null {
   if (route.isPage) {
     return pages.find((page) => page.route === route.path)?.file ?? null;
   }
 
   const exportsName = (file: string | null | undefined, name: string): boolean =>
-    file !== null && file !== undefined && files.get(file)?.exports.some((entry) => entry.name === name) === true;
-  const imported = route.sourceFile === null ? [] : (files.get(route.sourceFile)?.imports ?? []).map((entry) => entry.file);
+    file !== null &&
+    file !== undefined &&
+    files.get(file)?.exports.some((entry) => entry.name === name) === true;
+  const imported =
+    route.sourceFile === null
+      ? []
+      : (files.get(route.sourceFile)?.imports ?? []).map((entry) => entry.file);
   const name = route.controller ?? route.handler;
 
   if (!name || name === "anonymous") return null;
@@ -147,11 +166,17 @@ function handlerFileOf(route: InspectRoute, files: ReadonlyMap<string, BookFile>
   return anywhere.length === 1 ? (anywhere[0] ?? null) : null;
 }
 
-function toBookRoute(route: InspectRoute, files: ReadonlyMap<string, BookFile>, pages: readonly BookPage[]): BookRoute {
+function toBookRoute(
+  route: InspectRoute,
+  files: ReadonlyMap<string, BookFile>,
+  pages: readonly BookPage[],
+): BookRoute {
   const controller = route.controller ?? null;
   const action = route.action ?? null;
   const handler =
-    controller !== null && action !== null && !route.handler.includes(".") ? `${controller}.${action}` : route.handler;
+    controller !== null && action !== null && !route.handler.includes(".")
+      ? `${controller}.${action}`
+      : route.handler;
 
   return {
     method: route.method.toUpperCase(),
@@ -186,11 +211,15 @@ function siteFolders(root: string): Promise<string[]> {
 }
 
 /** `web.sites` from the loaded config, or `undefined` when `src/config/web.ts` is not loaded. */
-async function webSitesConfig(): Promise<Record<string, { basePath?: unknown } | undefined> | undefined> {
+async function webSitesConfig(): Promise<
+  Record<string, { basePath?: unknown } | undefined> | undefined
+> {
   const { config } = await import("@warlock.js/core");
   const sites: unknown = config.key("web.sites");
 
-  return typeof sites === "object" && sites !== null ? (sites as Record<string, { basePath?: unknown }>) : undefined;
+  return typeof sites === "object" && sites !== null
+    ? (sites as Record<string, { basePath?: unknown }>)
+    : undefined;
 }
 
 /** The adapter over `inspectApp()`, `collectFiles()` and the mobile app folders. */
@@ -236,20 +265,18 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
     // Pages come from the web page graph: files only, never a boot.
     const { inspectApp } = await import("@warlock.js/core/tooling");
     const report = await inspectApp({ cwd: root, sections: ["pages"] });
-    const found = (report.pages ?? []).map(
-      (page): BookPage => ({
-        site: page.site ?? "default",
-        route: page.path,
-        name: page.name,
-        file: toPosixPath(page.file),
-        setupFile: page.setupFile === null ? null : toPosixPath(page.setupFile),
-        layouts: page.layouts.map(toPosixPath),
-        loaders: page.loaders.map(toPosixPath),
-        actions: [...page.actions],
-        requires: page.guard === null ? [] : [page.guard],
-        reachedFrom: null,
-      }),
-    );
+    const found = (report.pages ?? []).map((page): BookPage => ({
+      site: page.site ?? "default",
+      route: page.path,
+      name: page.name,
+      file: toPosixPath(page.file),
+      setupFile: page.setupFile === null ? null : toPosixPath(page.setupFile),
+      layouts: page.layouts.map(toPosixPath),
+      loaders: page.loaders.map(toPosixPath),
+      actions: [...page.actions],
+      requires: page.guard === null ? [] : [page.guard],
+      reachedFrom: null,
+    }));
 
     lastPages = { root, pages: found };
 
@@ -267,7 +294,8 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
       const report = await inspect(root, ["routes"]);
       const known = new Map((await currentFiles(root)).map((file) => [file.file, file]));
       // Pages only name the file of a page route; a page problem is reported by `pages()` itself.
-      const sitePages = lastPages?.root === root ? lastPages.pages : await pages(root).catch(() => []);
+      const sitePages =
+        lastPages?.root === root ? lastPages.pages : await pages(root).catch(() => []);
 
       return (report.routes ?? []).map((route) => toBookRoute(route, known, sitePages));
     },
@@ -277,7 +305,8 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
       const ofType = (type: string) => known.filter((file) => file.type === type);
       const named: BookNamedThing[] = [];
 
-      for (const file of ofType("mail")) named.push({ type: "mail", name: stemOf(file.file, "mail"), file: file.file });
+      for (const file of ofType("mail"))
+        named.push({ type: "mail", name: stemOf(file.file, "mail"), file: file.file });
 
       const jobFiles = ofType("job");
       const jobs = report.jobs ?? [];
@@ -287,24 +316,35 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
           const file = jobFiles.find((item) => {
             const stem = stemOf(item.file, "job");
 
-            return job.name === stem || job.name.endsWith(`.${stem}`) || job.name.endsWith(`/${stem}`);
+            return (
+              job.name === stem || job.name.endsWith(`.${stem}`) || job.name.endsWith(`/${stem}`)
+            );
           });
 
           named.push({ type: "job", name: job.name, file: file?.file ?? null });
         }
       } else {
-        for (const file of jobFiles) named.push({ type: "job", name: stemOf(file.file, "job"), file: file.file });
+        for (const file of jobFiles)
+          named.push({ type: "job", name: stemOf(file.file, "job"), file: file.file });
       }
 
       for (const event of report.events ?? []) {
         const source = event.listeners[0]?.sourceFile;
 
-        named.push({ type: "event", name: event.event, file: source === undefined ? null : toPosixPath(source) });
+        named.push({
+          type: "event",
+          name: event.event,
+          file: source === undefined ? null : toPosixPath(source),
+        });
       }
 
       for (const file of known) {
         if (/\.notification\.[cm]?[jt]sx?$/.test(file.file)) {
-          named.push({ type: "notification", name: stemOf(file.file, "notification"), file: file.file });
+          named.push({
+            type: "notification",
+            name: stemOf(file.file, "notification"),
+            file: file.file,
+          });
         }
       }
 
@@ -319,7 +359,11 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
         return multi.map((id) => {
           const basePath: unknown = configured?.[id]?.basePath;
 
-          return { id, root: `src/web/$sites/${id}`, basePath: typeof basePath === "string" ? basePath : null };
+          return {
+            id,
+            root: `src/web/$sites/${id}`,
+            basePath: typeof basePath === "string" ? basePath : null,
+          };
         });
       }
 

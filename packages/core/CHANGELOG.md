@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.55.0
+
+### Added
+
+- `warlock inspect` files report `lines` (code files only), `about` (the file's header comment or `@fileoverview`), `tags` (header `@tag` values, such as `tags.feature`) and `exportDocs` (the first sentence of each export's JSDoc).
+- `warlock inspect` files take the roles `use-case`, `seed`, `request`, `mail`, `job`, `event` and `client`.
+- Inspect routes that use a controller tuple report `controller` and `action`. The `Route` type gains `$controller` and `$action`.
+- Inspect pages report `setupFile` and `site`. The page list is built from the web page graph.
+- `collectFiles()`, `fileRole()` and the `CollectFilesOptions` type are exported from `@warlock.js/core/tooling`. `collectFiles()` takes a `dirs` option to scan folders other than `src`.
+- `withMcpTools()` attaches the MCP tools a package registers to a command. `mcp.tools` in `warlock.config.ts` lists them too, and `startWarlockMcpServer()` takes the same list as `tools`.
+- A registered MCP tool is checked like a built-in one. A tool name that is already taken stops the server with a message that names the tool.
+- `cli.commands` accepts arrays of commands (`CLICommandEntry`), so one register function can return several commands.
+- `withExplainCodes()` lets a package answer `warlock explain <code>` for its own codes, without booting the app.
+- `warlock add grimoire` (experimental) installs `@warlock.js/grimoire`, registers its commands in `cli.commands`, adds the generated files to `.gitignore`, and adds the devtools panel and the Vitest reporter. Running it twice changes nothing.
+- `warlock add test` adds `grimoireReporter()` to the Vitest config it creates when the app uses Grimoire.
+
+### Changed
+
+- A file whose name ends in `.use-case.ts`, `.seed.ts`, `.request.ts`, `.mail.ts`, `.job.ts`, `.event.ts` or `.client.ts` gets its role from the suffix, even inside another folder. For example, `services/mail/welcome.mail.ts` is a `mail` file.
+- `warlock explain <code>` answers codes that a package registered with `withExplainCodes()` and reads only `warlock.config.ts`.
+
+### Fixed
+
+- The conventions skill names the use-case file `.use-case.ts`.
+- A file under a non-`src` `app/` folder, such as `mobile/app/products/x.tsx`, belongs to the module `mobile/app`.
+
 ## 5.54.0 - 2026-11-16
 
 ### Upgrading

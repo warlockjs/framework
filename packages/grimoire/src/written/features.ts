@@ -58,16 +58,21 @@ const STEP_ANY_KIND = new RegExp(String.raw`^(\d+)\.[ \t]+(\S.*?)${SEP}(\S.*)$`)
 const NUMBERED = /^(\d+)\.(?:[ \t]|$)/;
 const ROUTE_TARGET = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|ALL)[ \t]+(\/\S*)$/i;
 const AFFECTS_TARGET = /^([a-z0-9]+(?:-[a-z0-9]+)*)(?:\/([a-z0-9]+(?:-[a-z0-9]+)*))?$/;
-const CRITERION = new RegExp(String.raw`^[-*][ \t]+AC-(\d+)(?:[ \t]+\[([a-z0-9-]+)\])?${SEP}(\S.*)$`);
+const CRITERION = new RegExp(
+  String.raw`^[-*][ \t]+AC-(\d+)(?:[ \t]+\[([a-z0-9-]+)\])?${SEP}(\S.*)$`,
+);
 const CHANGELOG_ENTRY = new RegExp(String.raw`^[-*][ \t]+(\S+)${SEP}(\S+)${SEP}(\S.*)$`);
 const RELEASE_HEADING = /^##[ \t]+(\S+)[ \t]+\((.+)\)$/;
 const UNRELEASED_HEADING = /^##[ \t]+unreleased$/i;
 const FLOW_PREFIX = /^([a-z0-9-]+):[ \t]+(\S.*)$/;
 const CRITERIA_SUFFIX = /[ \t]*\((AC-\d+(?:[ \t]*,[ \t]*AC-\d+)*)\)$/;
-const FLOW_REF_IN_TEXT = /(?<![\w/-])([a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*)(?![\w/-])/g;
+const FLOW_REF_IN_TEXT =
+  /(?<![\w/-])([a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*)(?![\w/-])/g;
 
 function heading(document: WrittenDocument): WrittenFeatureReadme["heading"] {
-  return document.title ? { value: document.title.text, at: lineAt(document.file, document.title.line) } : null;
+  return document.title
+    ? { value: document.title.text, at: lineAt(document.file, document.title.line) }
+    : null;
 }
 
 /** GR1019 when a front matter id differs from the folder or file name it must equal. */
@@ -78,12 +83,20 @@ function sameAsName(
   sink: FindingSink,
 ): void {
   if (located.value !== "" && located.value !== name) {
-    sink.report("GR1019", `The ${what} ${JSON.stringify(located.value)} must equal its ${JSON.stringify(name)} name.`, located.at);
+    sink.report(
+      "GR1019",
+      `The ${what} ${JSON.stringify(located.value)} must equal its ${JSON.stringify(name)} name.`,
+      located.at,
+    );
   }
 }
 
 /** The text of a changelog entry: the flow prefix, the text and the trailing criteria. */
-export function splitEntryText(text: string): { flow: string | null; criteria: string[]; text: string } {
+export function splitEntryText(text: string): {
+  flow: string | null;
+  criteria: string[];
+  text: string;
+} {
   let rest = text.trim();
   let flow: string | null = null;
   let criteria: string[] = [];
@@ -107,11 +120,19 @@ export function splitEntryText(text: string): { flow: string | null; criteria: s
 // ── README ─────────────────────────────────────────────────────────────────
 
 /** `grimoire/features/<id>/README.md`. */
-export function parseFeatureReadme(file: string, text: string, folder: string, sink: FindingSink): WrittenFeatureReadme {
+export function parseFeatureReadme(
+  file: string,
+  text: string,
+  folder: string,
+  sink: FindingSink,
+): WrittenFeatureReadme {
   const document = readDocument(file, text, "required", sink);
   const fields = new FrontMatterReader(document, sink);
 
-  fields.onlyKeys(["id", "title", "status", "version", "updated", "apps", "folders", "origin"], "feature README");
+  fields.onlyKeys(
+    ["id", "title", "status", "version", "updated", "apps", "folders", "origin"],
+    "feature README",
+  );
 
   const id = fields.required("id", checks.id);
   sameAsName(id, folder, "feature id", sink);
@@ -136,11 +157,19 @@ export function parseFeatureReadme(file: string, text: string, folder: string, s
     relations: [],
   };
 
-  checkHeadings(document, { title: true, required: [], optional: ["Flows", "Affects and affected by"] }, sink);
+  checkHeadings(
+    document,
+    { title: true, required: [], optional: ["Flows", "Affects and affected by"] },
+    sink,
+  );
 
   for (const flow of readListLines(file, findSection(document, "flows")?.lines, "Flows", sink)) {
     if (!ID.test(flow.name)) {
-      sink.report("GR1028", `The Flows line names ${JSON.stringify(flow.name)}, which is not a flow id.`, flow.at);
+      sink.report(
+        "GR1028",
+        `The Flows line names ${JSON.stringify(flow.name)}, which is not a flow id.`,
+        flow.at,
+      );
       continue;
     }
 
@@ -163,7 +192,12 @@ export function parseFeatureReadme(file: string, text: string, folder: string, s
 // ── CHANGELOG ──────────────────────────────────────────────────────────────
 
 /** `grimoire/features/<feature>/CHANGELOG.md`. */
-export function parseChangelog(file: string, text: string, feature: string, sink: FindingSink): WrittenChangelog {
+export function parseChangelog(
+  file: string,
+  text: string,
+  feature: string,
+  sink: FindingSink,
+): WrittenChangelog {
   const document = readDocument(file, text, "none", sink);
 
   new FrontMatterReader(document, sink).onlyKeys([], "A changelog");
@@ -232,7 +266,11 @@ export function parseChangelog(file: string, text: string, feature: string, sink
     }
 
     if (!CHANGE_WORDS.includes(word as ChangeWord)) {
-      sink.report("GR1016", `The changelog word ${JSON.stringify(word)} is not one of ${CHANGE_WORDS.join(", ")}.`, at);
+      sink.report(
+        "GR1016",
+        `The changelog word ${JSON.stringify(word)} is not one of ${CHANGE_WORDS.join(", ")}.`,
+        at,
+      );
       continue;
     }
 
@@ -274,7 +312,11 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
 
     if (!numbered) {
       if (BULLET.test(line.text)) {
-        sink.report("GR1008", `The step ${JSON.stringify(line.text)} is a bullet; number steps \`1. <kind>   <name>\`.`, at);
+        sink.report(
+          "GR1008",
+          `The step ${JSON.stringify(line.text)} is a bullet; number steps \`1. <kind>   <name>\`.`,
+          at,
+        );
       }
 
       continue;
@@ -289,7 +331,11 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
       const kind = other?.[2] ?? "";
 
       if (other && !STEP_KINDS.includes(kind as StepKind)) {
-        sink.report("GR1009", `The step kind ${JSON.stringify(kind)} is not one of: ${STEP_KINDS.join(", ")}.`, at);
+        sink.report(
+          "GR1009",
+          `The step kind ${JSON.stringify(kind)} is not one of: ${STEP_KINDS.join(", ")}.`,
+          at,
+        );
       } else {
         sink.report(
           "GR1008",
@@ -310,7 +356,11 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
       const routeMatch = ROUTE_TARGET.exec(target);
 
       if (!routeMatch) {
-        sink.report("GR1008", `The route step ${JSON.stringify(target)} is not \`<METHOD> /path\`.`, at);
+        sink.report(
+          "GR1008",
+          `The route step ${JSON.stringify(target)} is not \`<METHOD> /path\`.`,
+          at,
+        );
         continue;
       }
 
@@ -321,7 +371,11 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
       const affectsMatch = AFFECTS_TARGET.exec(target);
 
       if (!affectsMatch) {
-        sink.report("GR1008", `The affects step ${JSON.stringify(target)} is not \`<feature>\` or \`<feature>/<flow>\`.`, at);
+        sink.report(
+          "GR1008",
+          `The affects step ${JSON.stringify(target)} is not \`<feature>\` or \`<feature>/<flow>\`.`,
+          at,
+        );
         continue;
       }
 
@@ -382,7 +436,11 @@ function parseCases(file: string, document: WrittenDocument, sink: FindingSink):
   return cases;
 }
 
-function parseCriteria(file: string, document: WrittenDocument, sink: FindingSink): WrittenCriterion[] {
+function parseCriteria(
+  file: string,
+  document: WrittenDocument,
+  sink: FindingSink,
+): WrittenCriterion[] {
   const criteria: WrittenCriterion[] = [];
   const seen = new Set<number>();
 
@@ -407,14 +465,26 @@ function parseCriteria(file: string, document: WrittenDocument, sink: FindingSin
     }
 
     seen.add(number);
-    criteria.push({ id: `AC-${number}`, number, app: match[2] ?? null, text: (match[3] ?? "").trim(), at });
+    criteria.push({
+      id: `AC-${number}`,
+      number,
+      app: match[2] ?? null,
+      text: (match[3] ?? "").trim(),
+      at,
+    });
   }
 
   return criteria;
 }
 
 /** `grimoire/features/<feature>/flows/<name>.md`. */
-export function parseFlow(file: string, text: string, feature: string, name: string, sink: FindingSink): WrittenFlow {
+export function parseFlow(
+  file: string,
+  text: string,
+  feature: string,
+  name: string,
+  sink: FindingSink,
+): WrittenFlow {
   const document = readDocument(file, text, "required", sink);
   const fields = new FrontMatterReader(document, sink);
 
@@ -443,21 +513,38 @@ export function parseFlow(file: string, text: string, feature: string, name: str
 
   checkHeadings(
     document,
-    { title: true, required: ["Steps", "Cases", "Acceptance criteria"], optional: ["Differs by app", "Not handled"] },
+    {
+      title: true,
+      required: ["Steps", "Cases", "Acceptance criteria"],
+      optional: ["Differs by app", "Not handled"],
+    },
     sink,
   );
 
   flow.steps = parseSteps(file, document, sink);
-  flow.differs = readListLines(file, findSection(document, "differs by app")?.lines, "Differs by app", sink);
+  flow.differs = readListLines(
+    file,
+    findSection(document, "differs by app")?.lines,
+    "Differs by app",
+    sink,
+  );
   flow.cases = parseCases(file, document, sink);
-  flow.notHandled = readListLines(file, findSection(document, "not handled")?.lines, "Not handled", sink);
+  flow.notHandled = readListLines(
+    file,
+    findSection(document, "not handled")?.lines,
+    "Not handled",
+    sink,
+  );
   flow.criteria = parseCriteria(file, document, sink);
 
   for (const line of document.body) {
     const trimmed = line.text.trim();
 
     if (!line.fenced && trimmed.startsWith("Unknown:")) {
-      flow.unknowns.push({ text: trimmed.slice("Unknown:".length).trim(), at: lineAt(file, line.line) });
+      flow.unknowns.push({
+        text: trimmed.slice("Unknown:".length).trim(),
+        at: lineAt(file, line.line),
+      });
     }
   }
 

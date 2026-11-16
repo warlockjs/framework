@@ -21,7 +21,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const webPackage = path.resolve(here, "../../web");
 
 const FILES: Record<string, string> = {
-  "package.json": JSON.stringify({ name: "mini-shop", version: "1.0.0", dependencies: { "@warlock.js/web": "*" } }),
+  "package.json": JSON.stringify({
+    name: "mini-shop",
+    version: "1.0.0",
+    dependencies: { "@warlock.js/web": "*" },
+  }),
   "src/app/orders/routes.ts": [
     "/** Registers the order routes. */",
     'import { router } from "@warlock.js/core";',
@@ -64,18 +68,28 @@ const FILES: Record<string, string> = {
     "}",
     "",
   ].join("\n"),
-  "src/app/orders/mails/order-confirmation.mail.ts": "/** The order confirmation mail. */\nexport function sendConfirmation() {\n  return true;\n}\n",
-  "src/app/orders/jobs/send-receipt.job.ts": "/** Sends the receipt. */\nexport const sendReceipt = {};\n",
-  "src/app/orders/notifications/order-shipped.notification.ts": "/** Tells the customer the order shipped. */\nexport const orderShipped = {};\n",
-  "src/app/orders/events/order-placed.event.ts": "/** Reacts to a placed order. */\nexport function onOrderPlaced() {}\n",
-  "src/app/orders/tests/orders.test.ts": 'import { listOrders } from "../controllers/list-orders.controller";\n\nlistOrders();\n',
+  "src/app/orders/mails/order-confirmation.mail.ts":
+    "/** The order confirmation mail. */\nexport function sendConfirmation() {\n  return true;\n}\n",
+  "src/app/orders/jobs/send-receipt.job.ts":
+    "/** Sends the receipt. */\nexport const sendReceipt = {};\n",
+  "src/app/orders/notifications/order-shipped.notification.ts":
+    "/** Tells the customer the order shipped. */\nexport const orderShipped = {};\n",
+  "src/app/orders/events/order-placed.event.ts":
+    "/** Reacts to a placed order. */\nexport function onOrderPlaced() {}\n",
+  "src/app/orders/tests/orders.test.ts":
+    'import { listOrders } from "../controllers/list-orders.controller";\n\nlistOrders();\n',
   "src/config/app.ts": "export default { name: 'mini' };\n",
   "src/web/$sites/client/root.tsx": "export default function Root() {\n  return null;\n}\n",
-  "src/web/$sites/client/home.page.tsx": "/** The home page. */\nexport default function Home() {\n  return null;\n}\n",
+  "src/web/$sites/client/home.page.tsx":
+    "/** The home page. */\nexport default function Home() {\n  return null;\n}\n",
   "src/web/$sites/admin/root.tsx": "export default function Root() {\n  return null;\n}\n",
-  "src/web/$sites/admin/orders.page.tsx": "/** The orders list for staff. */\nexport default function Orders() {\n  return null;\n}\n",
+  "src/web/$sites/admin/orders.page.tsx":
+    "/** The orders list for staff. */\nexport default function Orders() {\n  return null;\n}\n",
   "mobile/app.json": "{}\n",
-  "mobile/package.json": JSON.stringify({ name: "mini-mobile", dependencies: { "expo-router": "*" } }),
+  "mobile/package.json": JSON.stringify({
+    name: "mini-mobile",
+    dependencies: { "expo-router": "*" },
+  }),
   "mobile/app/_layout.tsx": "export default function Layout() {\n  return null;\n}\n",
   "mobile/app/index.tsx": [
     "/** The home screen. */",
@@ -103,7 +117,9 @@ function authGuard(): undefined {
   return undefined;
 }
 
-Object.defineProperty(authGuard, Symbol.for("warlock.auth"), { value: { sources: ["header"], userTypes: ["customer"] } });
+Object.defineProperty(authGuard, Symbol.for("warlock.auth"), {
+  value: { sources: ["header"], userTypes: ["customer"] },
+});
 
 const ROUTES = [
   {
@@ -118,10 +134,24 @@ const ROUTES = [
     $prefix: "/",
     $prefixStack: [],
   },
-  { method: "GET", path: "/orders", name: "orders.list", handler: listOrders, sourceFile: "src/app/orders/routes.ts", $prefix: "/", $prefixStack: [] },
+  {
+    method: "GET",
+    path: "/orders",
+    name: "orders.list",
+    handler: listOrders,
+    sourceFile: "src/app/orders/routes.ts",
+    $prefix: "/",
+    $prefixStack: [],
+  },
 ] as unknown as NonNullable<InspectOptions["routes"]>;
 
-const EVENTS = [{ event: "order.placed", name: "onOrderPlaced", sourceFile: "src/app/orders/events/order-placed.event.ts" }];
+const EVENTS = [
+  {
+    event: "order.placed",
+    name: "onOrderPlaced",
+    sourceFile: "src/app/orders/events/order-placed.event.ts",
+  },
+];
 
 let root: string;
 let booted: InspectSection[][];
@@ -175,7 +205,12 @@ describe("createWarlockAdapter over a real app", () => {
     expect(byFile.get("mobile/app/index.tsx")).toMatchObject({
       module: "mobile/app",
       mobileApp: "mobile",
-      imports: [{ specifier: "../../src/app/orders/controllers/list-orders.controller", file: "src/app/orders/controllers/list-orders.controller.ts" }],
+      imports: [
+        {
+          specifier: "../../src/app/orders/controllers/list-orders.controller",
+          file: "src/app/orders/controllers/list-orders.controller.ts",
+        },
+      ],
     });
     expect(byFile.get("src/app/orders/controllers/list-orders.controller.ts")?.importedBy).toEqual([
       "mobile/app/index.tsx",
@@ -188,7 +223,9 @@ describe("createWarlockAdapter over a real app", () => {
   it("reads routes from inspectApp with handler files resolved", async () => {
     const routes = await adapter.routes?.(root);
 
-    expect([...(routes ?? [])].sort((left, right) => left.method.localeCompare(right.method)).reverse()).toEqual([
+    expect(
+      [...(routes ?? [])].sort((left, right) => left.method.localeCompare(right.method)).reverse(),
+    ).toEqual([
       {
         method: "POST",
         path: "/orders",
@@ -219,23 +256,40 @@ describe("createWarlockAdapter over a real app", () => {
 
     expect(named).toEqual(
       expect.arrayContaining([
-        { type: "mail", name: "order-confirmation", file: "src/app/orders/mails/order-confirmation.mail.ts" },
+        {
+          type: "mail",
+          name: "order-confirmation",
+          file: "src/app/orders/mails/order-confirmation.mail.ts",
+        },
         { type: "job", name: "send-receipt", file: "src/app/orders/jobs/send-receipt.job.ts" },
-        { type: "event", name: "order.placed", file: "src/app/orders/events/order-placed.event.ts" },
-        { type: "notification", name: "order-shipped", file: "src/app/orders/notifications/order-shipped.notification.ts" },
+        {
+          type: "event",
+          name: "order.placed",
+          file: "src/app/orders/events/order-placed.event.ts",
+        },
+        {
+          type: "notification",
+          name: "order-shipped",
+          file: "src/app/orders/notifications/order-shipped.notification.ts",
+        },
       ]),
     );
     expect(named).toHaveLength(4);
   });
 
   it("refuses the pages of a multi-site app while src/config/web.ts is not loaded", async () => {
-    await expect(adapter.pages?.(root)).rejects.toThrow(/several sites .* need src\/config\/web\.ts/);
+    await expect(adapter.pages?.(root)).rejects.toThrow(
+      /several sites .* need src\/config\/web\.ts/,
+    );
   });
 
   it("reads sites, pages (no boot), mobile screens and tests", async () => {
     booted.length = 0;
     setConfig("web", {
-      sites: { client: { hosts: ["shop.test"] }, admin: { hosts: ["shop.test"], basePath: "/admin" } },
+      sites: {
+        client: { hosts: ["shop.test"] },
+        admin: { hosts: ["shop.test"], basePath: "/admin" },
+      },
     });
 
     expect(await adapter.sites?.(root)).toEqual([
@@ -255,10 +309,15 @@ describe("createWarlockAdapter over a real app", () => {
         root: "mobile",
         routing: "files",
         routesDir: "mobile/app",
-        screens: [{ route: "/", file: "mobile/app/index.tsx", layouts: ["mobile/app/_layout.tsx"] }],
+        screens: [
+          { route: "/", file: "mobile/app/index.tsx", layouts: ["mobile/app/_layout.tsx"] },
+        ],
       },
     ]);
-    expect(await adapter.tests?.(root)).toEqual(["e2e/checkout.e2e.ts", "src/app/orders/tests/orders.test.ts"]);
+    expect(await adapter.tests?.(root)).toEqual([
+      "e2e/checkout.e2e.ts",
+      "src/app/orders/tests/orders.test.ts",
+    ]);
     expect(booted).toEqual([]);
   });
 
@@ -268,7 +327,9 @@ describe("createWarlockAdapter over a real app", () => {
     const cached = await openGrimoire(root, adapter, { routes: "cached" });
 
     expect(cached.routes).toBe("missing");
-    expect(scry(cached, { type: "file", file: "src/app/orders/services/place-order.service.ts" })).toMatchObject({
+    expect(
+      scry(cached, { type: "file", file: "src/app/orders/services/place-order.service.ts" }),
+    ).toMatchObject({
       entry: { importedBy: ["src/app/orders/controllers/orders.controller.ts"] },
     });
     expect(booted).toEqual([]);

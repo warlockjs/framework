@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { command } from "./cli-command";
-import { explainersOf, explainRegisteredCode, withExplainCodes, type ExplainableCode } from "./explain-codes";
+import {
+  explainersOf,
+  explainRegisteredCode,
+  withExplainCodes,
+  type ExplainableCode,
+} from "./explain-codes";
 
 const answer = (code: string, title: string): ExplainableCode => ({
   code,

@@ -46,19 +46,28 @@ describe("insertVitestReporter", () => {
 
   it("appends to a multi-line list", () => {
     const result = insertVitestReporter(
-      ['test: {', '  reporters: [', '    "default",', '    new A(),', "  ],", "}"].join("\n"),
+      ["test: {", "  reporters: [", '    "default",', "    new A(),", "  ],", "}"].join("\n"),
       call,
     );
 
     expect(result.status === "added" && result.next).toBe(
-      ['test: {', '  reporters: [', '    "default",', '    new A(),', "    grimoireReporter(),", "  ],", "}"].join(
-        "\n",
-      ),
+      [
+        "test: {",
+        "  reporters: [",
+        '    "default",',
+        "    new A(),",
+        "    grimoireReporter(),",
+        "  ],",
+        "}",
+      ].join("\n"),
     );
   });
 
   it("adds a reporters list to a test block without one", () => {
-    const result = insertVitestReporter("export default defineConfig({\n  test: {\n    maxWorkers: 2,\n  },\n});\n", call);
+    const result = insertVitestReporter(
+      "export default defineConfig({\n  test: {\n    maxWorkers: 2,\n  },\n});\n",
+      call,
+    );
 
     expect(result.status === "added" && result.next).toContain(
       '  test: {\n    reporters: ["default", grimoireReporter()],\n    maxWorkers: 2,',

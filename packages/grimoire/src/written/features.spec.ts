@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { GrimoireFinding } from "../contracts/findings";
-import { parseChangelog, parseFeatureReadme, parseFlow, parseVersionBrief, splitEntryText } from "./features";
+import {
+  parseChangelog,
+  parseFeatureReadme,
+  parseFlow,
+  parseVersionBrief,
+  splitEntryText,
+} from "./features";
 import { FindingSink } from "./sink";
 
-function collect(): { sink: FindingSink; findings: GrimoireFinding[]; codes: () => [string, number | undefined][] } {
+function collect(): {
+  sink: FindingSink;
+  findings: GrimoireFinding[];
+  codes: () => [string, number | undefined][];
+} {
   const findings: GrimoireFinding[] = [];
 
   return {
@@ -15,7 +25,10 @@ function collect(): { sink: FindingSink; findings: GrimoireFinding[]; codes: () 
 
 const FLOW = "grimoire/features/catalog/flows/wishlist.md";
 
-function flowText(body: string[], frontMatter = ["id: wishlist", "since: 3.0", "status: proposed", "who: customer"]): string {
+function flowText(
+  body: string[],
+  frontMatter = ["id: wishlist", "since: 3.0", "status: proposed", "who: customer"],
+): string {
   return ["---", ...frontMatter, "---", "", "# Save", "", ...body].join("\n");
 }
 
@@ -142,7 +155,13 @@ describe("parseFlow", () => {
     expect(flow.notHandled.map((line) => line.name)).toEqual(["not found", "duplicate"]);
     expect(flow.unknowns).toEqual([{ text: "why?", at: { file: FLOW, line: 18, column: null } }]);
     expect(flow.criteria).toEqual([
-      { id: "AC-1", number: 1, app: "mobile", text: "one continued", at: { file: FLOW, line: 20, column: null } },
+      {
+        id: "AC-1",
+        number: 1,
+        app: "mobile",
+        text: "one continued",
+        at: { file: FLOW, line: 20, column: null },
+      },
     ]);
     expect(codes()).toEqual([
       ["GR1011", 13],
@@ -162,23 +181,32 @@ describe("parseFlow", () => {
     const { sink, findings } = collect();
     const flow = parseFlow(
       FLOW,
-      flowText(["## Steps", ...ALL_CASES, "## Acceptance criteria"], [
-        "id: wish-list",
-        "since: three",
-        "status: done",
-        "origin: guessed",
-        "owner: me",
-      ]),
+      flowText(
+        ["## Steps", ...ALL_CASES, "## Acceptance criteria"],
+        ["id: wish-list", "since: three", "status: done", "origin: guessed", "owner: me"],
+      ),
       "catalog",
       "wishlist",
       sink,
     );
 
     expect(findings.map((finding) => [finding.code, finding.at?.line, finding.message])).toEqual([
-      ["GR1005", 6, 'The front matter key "owner" is not part of the flow template (id, since, status, who, origin).'],
+      [
+        "GR1005",
+        6,
+        'The front matter key "owner" is not part of the flow template (id, since, status, who, origin).',
+      ],
       ["GR1019", 2, 'The flow id "wish-list" must equal its "wishlist" name.'],
-      ["GR1004", 3, 'The front matter key "since" is "three"; write a version as <whole>.<decimal>, like 2.1.'],
-      ["GR1004", 4, 'The front matter key "status" is "done"; use one of: proposed, building, shipped, retired.'],
+      [
+        "GR1004",
+        3,
+        'The front matter key "since" is "three"; write a version as <whole>.<decimal>, like 2.1.',
+      ],
+      [
+        "GR1004",
+        4,
+        'The front matter key "status" is "done"; use one of: proposed, building, shipped, retired.',
+      ],
       ["GR1003", 1, 'The front matter key "who" is missing.'],
       ["GR1004", 5, 'The front matter key "origin" is "guessed"; use one of: inferred, confirmed.'],
     ]);
@@ -216,7 +244,10 @@ describe("parseFeatureReadme", () => {
       sink,
     );
 
-    expect(readme.folders.map((folder) => folder.value)).toEqual(["src/app/catalog", "src/web/$sites/client/products"]);
+    expect(readme.folders.map((folder) => folder.value)).toEqual([
+      "src/app/catalog",
+      "src/web/$sites/client/products",
+    ]);
     expect(readme.flows.map((line) => line.name)).toEqual(["browse"]);
     expect(readme.relations[0]?.refs).toEqual(["orders/place-order", "auth/login"]);
     expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([["GR1028", 13]]);
@@ -278,11 +309,23 @@ describe("parseChangelog", () => {
     );
 
     expect(findings).toEqual([]);
-    expect(changelog.sections.map((section) => [section.release, section.date, section.at.line])).toEqual([
+    expect(
+      changelog.sections.map((section) => [section.release, section.date, section.at.line]),
+    ).toEqual([
       [null, null, 2],
       ["1.0.0", "2026-10-01", 6],
     ]);
-    expect(changelog.entries.map((entry) => [entry.version.value, entry.word, entry.flow, entry.criteria, entry.text, entry.release, entry.date])).toEqual([
+    expect(
+      changelog.entries.map((entry) => [
+        entry.version.value,
+        entry.word,
+        entry.flow,
+        entry.criteria,
+        entry.text,
+        entry.release,
+        entry.date,
+      ]),
+    ).toEqual([
       ["2.1", "fixed", "new-arrivals", ["AC-2", "AC-3"], "an empty list for some", null, null],
       ["1.0", "added", null, [], "described", "1.0.0", "2026-10-01"],
     ]);
@@ -325,15 +368,29 @@ describe("parseChangelog", () => {
 
 describe("splitEntryText", () => {
   it("splits the flow prefix and the trailing criteria", () => {
-    expect(splitEntryText("wishlist: saves (AC-1,AC-2)")).toEqual({ flow: "wishlist", criteria: ["AC-1", "AC-2"], text: "saves" });
-    expect(splitEntryText("Note: free text (see AC-1)")).toEqual({ flow: null, criteria: [], text: "Note: free text (see AC-1)" });
+    expect(splitEntryText("wishlist: saves (AC-1,AC-2)")).toEqual({
+      flow: "wishlist",
+      criteria: ["AC-1", "AC-2"],
+      text: "saves",
+    });
+    expect(splitEntryText("Note: free text (see AC-1)")).toEqual({
+      flow: null,
+      criteria: [],
+      text: "Note: free text (see AC-1)",
+    });
   });
 });
 
 describe("parseVersionBrief", () => {
   it("reads the title; front matter keys are reported as not in the template", () => {
     const { sink, findings } = collect();
-    const brief = parseVersionBrief("grimoire/features/catalog/versions/v3.md", "---\nid: v3\n---\n# Catalog 3.0\n", "catalog", 3, sink);
+    const brief = parseVersionBrief(
+      "grimoire/features/catalog/versions/v3.md",
+      "---\nid: v3\n---\n# Catalog 3.0\n",
+      "catalog",
+      3,
+      sink,
+    );
 
     expect(brief.heading?.value).toBe("Catalog 3.0");
     expect(brief.major).toBe(3);

@@ -64,7 +64,9 @@ function reach(entry: string): { files: string[]; bare: { file: string; specifie
   }
 
   return {
-    files: [...seen].map((file) => path.relative(packageRoot, file).split(path.sep).join("/")).sort(),
+    files: [...seen]
+      .map((file) => path.relative(packageRoot, file).split(path.sep).join("/"))
+      .sort(),
     bare,
   };
 }
@@ -82,7 +84,13 @@ describe("framework-neutral entries", () => {
           '// import { f } from "@warlock.js/core";',
         ].join("\n"),
       ),
-    ).toEqual(["./a", "@warlock.js/core", "./c", "@warlock.js/web/build", "@warlock.js/core/tooling"]);
+    ).toEqual([
+      "./a",
+      "@warlock.js/core",
+      "./c",
+      "@warlock.js/web/build",
+      "@warlock.js/core/tooling",
+    ]);
   });
 
   for (const entry of ["src/index.ts", "src/vitest/index.ts"]) {

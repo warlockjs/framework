@@ -37,7 +37,8 @@ export function copyFixture(source: string = shopRoot): FixtureCopy {
     replace(file, search, replacement) {
       const text = readFileSync(absolute(file), "utf8");
 
-      if (!text.includes(search)) throw new Error(`${file} does not contain ${JSON.stringify(search)}`);
+      if (!text.includes(search))
+        throw new Error(`${file} does not contain ${JSON.stringify(search)}`);
 
       writeFileSync(absolute(file), text.replace(search, replacement));
     },

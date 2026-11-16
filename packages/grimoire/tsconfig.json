@@ -8,7 +8,6 @@
     "moduleResolution": "Bundler",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "exactOptionalPropertyTypes": true,
     "noFallthroughCasesInSwitch": true,
     "isolatedModules": true,
     "outDir": "dist",

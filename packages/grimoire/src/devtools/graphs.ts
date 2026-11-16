@@ -114,8 +114,12 @@ export function featureGraph(snapshot: GrimoireSnapshot, feature: string): Grimo
   }
 
   for (const [other, ownership] of Object.entries(snapshot.ownership.features)) {
-    if (other !== feature && ownership.borrowed.some((file) => snapshot.ownership.files[file]?.owner === feature)) {
-      if (graph.node(`feature:${other}`, other, "feature")) graph.edge(`feature:${other}`, center, "borrows");
+    if (
+      other !== feature &&
+      ownership.borrowed.some((file) => snapshot.ownership.files[file]?.owner === feature)
+    ) {
+      if (graph.node(`feature:${other}`, other, "feature"))
+        graph.edge(`feature:${other}`, center, "borrows");
     }
   }
 
@@ -133,10 +137,17 @@ export function featureGraph(snapshot: GrimoireSnapshot, feature: string): Grimo
 }
 
 /** A page (or screen), its layout, its blocks and the flows the blocks show. `null` for an unknown page. */
-export function pageGraph(snapshot: GrimoireSnapshot, app: string, pageKey: string): GrimoireGraph | null {
+export function pageGraph(
+  snapshot: GrimoireSnapshot,
+  app: string,
+  pageKey: string,
+): GrimoireGraph | null {
   const written = snapshot.written.apps.find((candidate) => candidate.id.value === app);
   const page = [...(written?.pages ?? []), ...(written?.screens ?? [])].find(
-    (candidate) => candidate.id === pageKey || candidate.route?.value === pageKey || candidate.screen?.value === pageKey,
+    (candidate) =>
+      candidate.id === pageKey ||
+      candidate.route?.value === pageKey ||
+      candidate.screen?.value === pageKey,
   );
 
   if (written === undefined || page === undefined) return null;
@@ -147,7 +158,8 @@ export function pageGraph(snapshot: GrimoireSnapshot, app: string, pageKey: stri
   graph.node(center, page.heading?.value ?? page.id, "center");
 
   const layoutId = page.layout?.value ?? null;
-  const layout = layoutId === null ? undefined : written.layouts.find((candidate) => candidate.id === layoutId);
+  const layout =
+    layoutId === null ? undefined : written.layouts.find((candidate) => candidate.id === layoutId);
 
   if (layout !== undefined && graph.node(`layout:${app}/${layout.id}`, layout.id, "layout")) {
     graph.edge(`layout:${app}/${layout.id}`, center, "wraps");
@@ -198,16 +210,23 @@ export function moduleGraph(snapshot: GrimoireSnapshot): GrimoireGraph {
   }
 
   const modules = [...sizes.keys()]
-    .sort((left, right) => (degree.get(right) ?? 0) - (degree.get(left) ?? 0) || left.localeCompare(right))
+    .sort(
+      (left, right) =>
+        (degree.get(right) ?? 0) - (degree.get(left) ?? 0) || left.localeCompare(right),
+    )
     .slice(0, GRAPH_LIMIT);
   const graph = new GraphBuilder();
 
-  for (const module of modules) graph.node(`module:${module}`, `${module} (${sizes.get(module) ?? 0})`, "module");
+  for (const module of modules)
+    graph.node(`module:${module}`, `${module} (${sizes.get(module) ?? 0})`, "module");
 
-  for (const [key, weight] of [...weights.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+  for (const [key, weight] of [...weights.entries()].sort(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
     const [from, to] = key.split("\n");
 
-    if (from !== undefined && to !== undefined) graph.edge(`module:${from}`, `module:${to}`, "imports", weight);
+    if (from !== undefined && to !== undefined)
+      graph.edge(`module:${from}`, `module:${to}`, "imports", weight);
   }
 
   return graph.build();

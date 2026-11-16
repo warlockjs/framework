@@ -4,7 +4,7 @@
  *
  * Self-contained, package-agnostic projector. Derives the package name and
  * tagline from the sibling `package.json`, then reads every
- * root `skills/SKILL.md` and grouped topics to produce two artifacts:
+ * `skills/index.md`, root `skills/SKILL.md`, and topic skills to produce:
  *
  * - `llms.txt`      — header + a one-line index of every skill (its
  *                     `description` frontmatter). The llmstxt.org-style entry
@@ -84,8 +84,8 @@ function parseFrontmatter(text) {
 
 /**
  * Collect root and topic SKILL.md files. Returns entries sorted by folder
- * name for deterministic output. A root skill owns the whole skills directory;
- * otherwise direct subdirectories holding a SKILL.md are grouped topics.
+ * name for deterministic output. The package index is projected separately;
+ * only direct subdirectories holding a SKILL.md count as topics.
  */
 function collectSkills() {
   if (!existsSync(skillsDir)) {
@@ -137,6 +137,10 @@ function collectReferenceFiles(folderPath) {
 }
 
 const skills = collectSkills();
+const packageIndexPath = join(skillsDir, "index.md");
+const packageIndexText = existsSync(packageIndexPath)
+  ? readFileSync(packageIndexPath, "utf8")
+  : undefined;
 
 // --- llms.txt (index) ---
 const indexLines = [`# ${projectName}`, ``, `> Package: \`${packageName}\``, ``];
@@ -146,6 +150,13 @@ if (tagline) {
 }
 
 indexLines.push(`## Skills`, ``);
+
+if (packageIndexText !== undefined) {
+  const { meta } = parseFrontmatter(packageIndexText);
+  indexLines.push(
+    `- [Package orientation](${packageName}/skills/index.md): ${meta.description ?? "Package orientation"}`,
+  );
+}
 
 for (const skill of skills) {
   const { meta } = parseFrontmatter(readFileSync(skill.path, "utf8"));
@@ -167,6 +178,10 @@ const fullLines = [
   `> Generated artifact. Concatenates every SKILL.md and reference file under \`${packageName}/skills/\`. Re-run \`node scripts/generate-llms.mjs\` after any change.`,
   ``,
 ];
+
+if (packageIndexText !== undefined) {
+  fullLines.push(`## Package orientation`, ``, packageIndexText, ``);
+}
 
 for (const skill of skills) {
   fullLines.push(

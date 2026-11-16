@@ -51,7 +51,9 @@ describe("parseTask", () => {
     const { sink, findings } = collect();
     const task = parseTask(
       "grimoire/tasks/done/2026-11/T-10-fix.md",
-      ["---", "id: T-11", "type: task", "status: finished", "flow: Wish List", "---", "# Fix"].join("\n"),
+      ["---", "id: T-11", "type: task", "status: finished", "flow: Wish List", "---", "# Fix"].join(
+        "\n",
+      ),
       { folder: "done", month: "2026-11", nameId: "T-10" },
       sink,
     );
@@ -82,7 +84,16 @@ describe("parseTask", () => {
 });
 
 describe("parseRelease", () => {
-  const head = ["---", "release: 1.1.0", "date: 2026-11-20", "---", "", "# Release 1.1.0", "", "Customers see new arrivals again."];
+  const head = [
+    "---",
+    "release: 1.1.0",
+    "date: 2026-11-20",
+    "---",
+    "",
+    "# Release 1.1.0",
+    "",
+    "Customers see new arrivals again.",
+  ];
 
   it("reads the brief and no list before the release command ran", () => {
     const { sink, findings } = collect();
@@ -134,7 +145,14 @@ describe("parseRelease", () => {
     const { sink, findings } = collect();
     const release = parseRelease(
       RELEASE,
-      [...head, COLLECTED_START_MARKER, "## Changes", "", "No feature changes.", COLLECTED_END_MARKER].join("\n"),
+      [
+        ...head,
+        COLLECTED_START_MARKER,
+        "## Changes",
+        "",
+        "No feature changes.",
+        COLLECTED_END_MARKER,
+      ].join("\n"),
       "1.1.0",
       sink,
     );
@@ -147,7 +165,11 @@ describe("parseRelease", () => {
     ["no end marker", [COLLECTED_START_MARKER], 9],
     ["no start marker", [COLLECTED_END_MARKER], 9],
     ["the end before the start", [COLLECTED_END_MARKER, COLLECTED_START_MARKER], 9],
-    ["two lists", [COLLECTED_START_MARKER, COLLECTED_END_MARKER, COLLECTED_START_MARKER, COLLECTED_END_MARKER], 11],
+    [
+      "two lists",
+      [COLLECTED_START_MARKER, COLLECTED_END_MARKER, COLLECTED_START_MARKER, COLLECTED_END_MARKER],
+      11,
+    ],
   ])("reports %s as GR1024", (_name, markers, line) => {
     const { sink, findings } = collect();
     const release = parseRelease(RELEASE, [...head, ...markers].join("\n"), "1.1.0", sink);

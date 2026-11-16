@@ -42,7 +42,9 @@ const SEPARATOR_CELL = /^:?-+:?$/;
 const CONDITION_ITEM = /^([a-z][a-z0-9-]*(?::[a-z0-9-]+)?):[ \t]+(\S.*)$/;
 
 function heading(document: WrittenDocument): Located<string> | null {
-  return document.title ? { value: document.title.text, at: lineAt(document.file, document.title.line) } : null;
+  return document.title
+    ? { value: document.title.text, at: lineAt(document.file, document.title.line) }
+    : null;
 }
 
 /** The cells of a table row, with or without outer pipes; `\|` stays a pipe inside a cell. */
@@ -82,7 +84,10 @@ export function parseBlocksTable(
 
   const columns = tableCells(header.text).map(normalizeKey);
 
-  if (columns.length !== BLOCK_COLUMNS.length || columns.some((column, index) => column !== BLOCK_COLUMNS[index])) {
+  if (
+    columns.length !== BLOCK_COLUMNS.length ||
+    columns.some((column, index) => column !== BLOCK_COLUMNS[index])
+  ) {
     sink.report(
       "GR1018",
       `The Blocks table header is ${JSON.stringify(header.text.trim())}; use the columns Block | Flow | Who sees it | Changes with.`,
@@ -92,9 +97,13 @@ export function parseBlocksTable(
     return rows;
   }
 
-  const separatorCells = separator === undefined || separator.fenced ? [] : tableCells(separator.text);
+  const separatorCells =
+    separator === undefined || separator.fenced ? [] : tableCells(separator.text);
 
-  if (separatorCells.length !== BLOCK_COLUMNS.length || !separatorCells.every((cell) => SEPARATOR_CELL.test(cell))) {
+  if (
+    separatorCells.length !== BLOCK_COLUMNS.length ||
+    !separatorCells.every((cell) => SEPARATOR_CELL.test(cell))
+  ) {
     sink.report(
       "GR1018",
       "The Blocks table header is not followed by a separator row (`| --- | --- | --- | --- |`).",
@@ -125,12 +134,20 @@ export function parseBlocksTable(
     }
 
     if (!EMPTY_CELL.test(flow) && !FLOW_REF.test(flow)) {
-      sink.report("GR1018", `The Flow cell ${JSON.stringify(flow)} of block "${block}" is not <feature>/<flow> or —.`, at);
+      sink.report(
+        "GR1018",
+        `The Flow cell ${JSON.stringify(flow)} of block "${block}" is not <feature>/<flow> or —.`,
+        at,
+      );
       continue;
     }
 
     if (EMPTY_CELL.test(who)) {
-      sink.report("GR1018", `The "Who sees it" cell of block "${block}" is empty; write everyone or condition names.`, at);
+      sink.report(
+        "GR1018",
+        `The "Who sees it" cell of block "${block}" is empty; write everyone or condition names.`,
+        at,
+      );
       continue;
     }
 
@@ -182,7 +199,11 @@ export function parseAppReadme(
   const id = fields.required("id", checks.id);
 
   if (id.value !== "" && id.value !== folder) {
-    sink.report("GR1019", `The app id ${JSON.stringify(id.value)} must equal its folder name ${JSON.stringify(folder)}.`, id.at);
+    sink.report(
+      "GR1019",
+      `The app id ${JSON.stringify(id.value)} must equal its folder name ${JSON.stringify(folder)}.`,
+      id.at,
+    );
   }
 
   const root = fields.required("root", checks.folder);
@@ -199,7 +220,13 @@ export function parseAppReadme(
 }
 
 /** `grimoire/apps/<app>/layouts/<id>.md`. */
-export function parseLayout(file: string, text: string, app: string, id: string, sink: FindingSink): WrittenLayout {
+export function parseLayout(
+  file: string,
+  text: string,
+  app: string,
+  id: string,
+  sink: FindingSink,
+): WrittenLayout {
   const document = readDocument(file, text, "none", sink);
 
   new FrontMatterReader(document, sink).onlyKeys([], "A layout");
@@ -231,13 +258,22 @@ export function parsePage(
   fields.onlyKeys(type === "page" ? ["route", "layout"] : ["route", "screen", "layout"], type);
 
   const route = fields.scalar("route", { required: type === "page", check: checks.route });
-  const screen = type === "screen" ? fields.scalar("screen", { required: false, check: checks.name }) : null;
+  const screen =
+    type === "screen" ? fields.scalar("screen", { required: false, check: checks.name }) : null;
 
   if (type === "screen" && fields.present && route === null && screen === null) {
-    sink.report("GR1003", 'A screen needs the front matter key "route" (file-based routing) or "screen" (its name in code).', lineAt(file, 1));
+    sink.report(
+      "GR1003",
+      'A screen needs the front matter key "route" (file-based routing) or "screen" (its name in code).',
+      lineAt(file, 1),
+    );
   }
 
-  checkHeadings(document, { title: true, required: [], optional: ["Blocks", "Also reached from"] }, sink);
+  checkHeadings(
+    document,
+    { title: true, required: [], optional: ["Blocks", "Also reached from"] },
+    sink,
+  );
 
   const blocks = findSection(document, "blocks");
   const alsoReachedFrom: WrittenEntryPoint[] = readListLines(

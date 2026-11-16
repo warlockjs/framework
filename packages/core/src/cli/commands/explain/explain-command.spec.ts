@@ -12,9 +12,8 @@ vi.mock("../../../warlock-config/warlock-config.manager", () => ({ warlockConfig
 const { command } = await import("../../../commands/cli-command");
 const { withExplainCodes } = await import("../../../commands/explain-codes");
 const { explainCommand } = await import("../explain.command");
-const { explainCommandAction, formatRegisteredExplanation } = await import(
-  "./explain-command.action"
-);
+const { explainCommandAction, formatRegisteredExplanation } =
+  await import("./explain-command.action");
 
 const fix = {
   code: "GR2001",
@@ -57,7 +56,9 @@ describe("warlock explain for package codes", () => {
   it("prints the answer of a registered explainer without booting", async () => {
     await explainCommandAction(data("GR2001"));
 
-    expect(log.mock.calls.map(([line]) => String(line))).toContain("  Fix:      Repair the link.");
+    expect(log.mock.calls.map(([line]: unknown[]) => String(line))).toContain(
+      "  Fix:      Repair the link.",
+    );
     expect(bootForInspect).not.toHaveBeenCalled();
   });
 

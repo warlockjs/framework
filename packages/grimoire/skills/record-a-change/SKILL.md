@@ -1,6 +1,6 @@
 ---
 name: record-a-change
-description: 'Finish a change the Grimoire way: tie each test to the acceptance criterion it proves, reshape the feature README, add the changelog entry with the right version, move the task to done, run `warlock grimoire check`, and write the release brief. Use after building any change, including a bug fix.'
+description: "Finish a change the Grimoire way: tie each test to the acceptance criterion it proves, reshape the feature README, add the changelog entry with the right version, move the task to done, run `warlock grimoire check`, and write the release brief. Use after building any change, including a bug fix."
 ---
 
 # Record a change
@@ -40,16 +40,17 @@ this file; you write every line of it, including the release number and date whe
 
 ```md
 ## Unreleased
-- 2.1  fixed   new-arrivals: a customer with no country saw an empty list
-               instead of the global one (AC-2)
+
+- 2.1 fixed new-arrivals: a customer with no country saw an empty list
+  instead of the global one (AC-2)
 ```
 
-| The change | Version | Word |
-| --- | --- | --- |
-| A new flow or a new capability | next whole number (`3.0`) | `added` |
-| Behaviour of an existing flow changes | next decimal (`2.1`) | `changed` |
-| The code did not match the flow | next decimal (`2.1`) | `fixed` |
-| A flow is retired | next whole number | `removed` |
+| The change                            | Version                   | Word      |
+| ------------------------------------- | ------------------------- | --------- |
+| A new flow or a new capability        | next whole number (`3.0`) | `added`   |
+| Behaviour of an existing flow changes | next decimal (`2.1`)      | `changed` |
+| The code did not match the flow       | next decimal (`2.1`)      | `fixed`   |
+| A flow is retired                     | next whole number         | `removed` |
 
 One line per change, written for someone who uses the product. Name the flow, and the criterion
 when there is one. While the change is unreleased, write no date and no release number.
@@ -72,15 +73,15 @@ something is left open, open a new task for it; do not leave it only in the done
 npx warlock grimoire check
 ```
 
-| It reports | Do |
-| --- | --- |
-| A step names a route, page, mail or job that does not exist | Fix the name in the flow, or the code |
-| A criterion has no test | Write the test, or say in the task why not |
-| A test points at a criterion that does not exist | Fix the `@proves` line |
-| A file has no header, or no feature | `document-a-file` |
-| A file in the feature's folders that no flow reaches | Describe the behaviour in a flow, or delete dead code |
-| A README `updated` older than its newest changelog entry | Reshape the README |
-| A changelog version that does not fit the word (`added` with `2.1`) | Fix the version |
+| It reports                                                          | Do                                                    |
+| ------------------------------------------------------------------- | ----------------------------------------------------- |
+| A step names a route, page, mail or job that does not exist         | Fix the name in the flow, or the code                 |
+| A criterion has no test                                             | Write the test, or say in the task why not            |
+| A test points at a criterion that does not exist                    | Fix the `@proves` line                                |
+| A file has no header, or no feature                                 | `document-a-file`                                     |
+| A file in the feature's folders that no flow reaches                | Describe the behaviour in a flow, or delete dead code |
+| A README `updated` older than its newest changelog entry            | Reshape the README                                    |
+| A changelog version that does not fit the word (`added` with `2.1`) | Fix the version                                       |
 
 Fix every line it prints. Do not finish with problems you caused. Findings on a flow or feature
 with `status: proposed` print with `(expected)` and do not fail the check: leave them until the
@@ -97,8 +98,9 @@ Warlock does not edit your files at release. You do three things, in this order:
    ## Unreleased
 
    ## 1.4.1 (2026-11-20)
-   - 2.1  fixed   new-arrivals: a customer with no country saw an empty list
-                  instead of the global one (AC-2)
+
+   - 2.1 fixed new-arrivals: a customer with no country saw an empty list
+     instead of the global one (AC-2)
    ```
 
 2. **Write the release brief.** Create `grimoire/releases/1.4.1.md`:

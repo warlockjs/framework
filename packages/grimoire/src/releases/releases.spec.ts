@@ -58,7 +58,11 @@ function feature(id: string, entries: WrittenChangelogEntry[]): WrittenFeature {
   };
 }
 
-function releaseFile(release: string, brief = "The brief.", listed: WrittenRelease["collected"] = null): WrittenRelease {
+function releaseFile(
+  release: string,
+  brief = "The brief.",
+  listed: WrittenRelease["collected"] = null,
+): WrittenRelease {
   return {
     file: `grimoire/releases/${release}.md`,
     release: located(release),
@@ -69,7 +73,11 @@ function releaseFile(release: string, brief = "The brief.", listed: WrittenRelea
   };
 }
 
-function grimoire(root: string, features: WrittenFeature[], releases: WrittenRelease[]): WrittenGrimoire {
+function grimoire(
+  root: string,
+  features: WrittenFeature[],
+  releases: WrittenRelease[],
+): WrittenGrimoire {
   return { root, exists: true, features, apps: [], tasks: [], releases, hash: "" };
 }
 
@@ -80,9 +88,12 @@ const catalog = () =>
       criteria: ["AC-2", "AC-3"],
     }),
     entry("catalog", "2.2", "changed", "still being built", null),
-    entry("catalog", "2.0", "added", "customers see the newest products", "1.0.0", { flow: "new-arrivals" }),
+    entry("catalog", "2.0", "added", "customers see the newest products", "1.0.0", {
+      flow: "new-arrivals",
+    }),
   ]);
-const orders = () => feature("orders", [entry("orders", "3.0", "added", "pay later", "1.1.0", { flow: "pay-later" })]);
+const orders = () =>
+  feature("orders", [entry("orders", "3.0", "added", "pay later", "1.1.0", { flow: "pay-later" })]);
 
 describe("collectRelease", () => {
   it("collects only entries stamped with the release, sorted by feature then newest version", () => {
@@ -100,11 +111,17 @@ describe("collectRelease", () => {
   it("never collects entries still under Unreleased", () => {
     const written = grimoire("/p", [catalog()], [releaseFile("1.1.0")]);
 
-    expect(collectRelease(written, "1.1.0").entries.map((item) => item.text)).not.toContain("still being built");
+    expect(collectRelease(written, "1.1.0").entries.map((item) => item.text)).not.toContain(
+      "still being built",
+    );
   });
 
   it("collects an older release again without sweeping newer entries in", () => {
-    const written = grimoire("/p", [catalog(), orders()], [releaseFile("1.0.0"), releaseFile("1.1.0")]);
+    const written = grimoire(
+      "/p",
+      [catalog(), orders()],
+      [releaseFile("1.0.0"), releaseFile("1.1.0")],
+    );
 
     expect(collectRelease(written, "1.0.0").entries.map((item) => item.version)).toEqual(["2.0"]);
   });
@@ -161,12 +178,16 @@ describe("writeRelease", () => {
     mkdirSync(path.join(root, "grimoire/releases"), { recursive: true });
     mkdirSync(path.join(root, "grimoire/features/catalog"), { recursive: true });
     writeFileSync(path.join(root, "grimoire/releases/1.1.0.md"), releaseText);
-    writeFileSync(path.join(root, "grimoire/features/catalog/CHANGELOG.md"), "## Unreleased\n- 2.2  changed  x\n");
+    writeFileSync(
+      path.join(root, "grimoire/features/catalog/CHANGELOG.md"),
+      "## Unreleased\n- 2.2  changed  x\n",
+    );
 
     return { root, written: written(root) };
   }
 
-  const brief = "---\nrelease: 1.1.0\ndate: 2026-11-20\n---\n\n# Release 1.1.0\n\nThe agent's brief.\n";
+  const brief =
+    "---\nrelease: 1.1.0\ndate: 2026-11-20\n---\n\n# Release 1.1.0\n\nThe agent's brief.\n";
   const build = (root: string) => grimoire(root, [catalog(), orders()], [releaseFile("1.1.0")]);
 
   it("appends the markers and list after the brief, leaving the brief alone", async () => {
@@ -224,24 +245,31 @@ describe("writeRelease", () => {
 
     await writeRelease(root, written, "1.1.0");
 
-    expect(readFileSync(path.join(root, "grimoire/releases/1.1.0.md"), "utf8")).not.toMatch(/[^\r]\n/);
+    expect(readFileSync(path.join(root, "grimoire/releases/1.1.0.md"), "utf8")).not.toMatch(
+      /[^\r]\n/,
+    );
   });
 
   it("refuses when the release file does not exist", async () => {
     const { root } = project(brief, build);
 
-    await expect(writeRelease(root, grimoire(root, [], []), "1.1.0")).rejects.toThrow(/GR9005|does not exist/);
+    await expect(writeRelease(root, grimoire(root, [], []), "1.1.0")).rejects.toThrow(
+      /GR9005|does not exist/,
+    );
   });
 
   it("refuses broken markers (GR1024)", async () => {
     const { root, written } = project(`${brief}\n${COLLECTED_START_MARKER}\n`, build);
 
-    await expect(writeRelease(root, written, "1.1.0")).rejects.toThrow(/broken collected-list markers/);
+    await expect(writeRelease(root, written, "1.1.0")).rejects.toThrow(
+      /broken collected-list markers/,
+    );
   });
 });
 
 describe("checkReleases", () => {
-  const snapshotOf = (written: WrittenGrimoire) => ({ written, root: written.root }) as unknown as GrimoireSnapshot;
+  const snapshotOf = (written: WrittenGrimoire) =>
+    ({ written, root: written.root }) as unknown as GrimoireSnapshot;
   const listed = (version: string, text: string, flow: string | null = null) => ({
     feature: "catalog",
     version,
@@ -256,7 +284,14 @@ describe("checkReleases", () => {
   const older = releaseFile("1.0.0");
 
   it("passes when every listed entry is stamped", () => {
-    const written = grimoire("/p", [catalog()], [older, withList([listed("2.1", "a customer with no country saw an empty list", "new-arrivals")])]);
+    const written = grimoire(
+      "/p",
+      [catalog()],
+      [
+        older,
+        withList([listed("2.1", "a customer with no country saw an empty list", "new-arrivals")]),
+      ],
+    );
 
     expect(checkReleases(snapshotOf(written))).toEqual([]);
   });

@@ -38,7 +38,11 @@ export function countsForFeature(file: Pick<BookFile, "type">): boolean {
   return file.type !== "spec";
 }
 
-function decide(file: BookFile, features: Set<string>, folders: Map<string, string[]>): FileOwnership {
+function decide(
+  file: BookFile,
+  features: Set<string>,
+  folders: Map<string, string[]>,
+): FileOwnership {
   const result: FileOwnership = {
     file: file.file,
     owner: null,

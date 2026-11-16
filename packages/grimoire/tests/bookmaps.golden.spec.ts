@@ -5,7 +5,15 @@
  * `GRIMOIRE_UPDATE_GOLDEN=1 npx vitest run tests/bookmaps.golden.spec.ts`
  * and review the diff.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
@@ -33,7 +41,11 @@ function collectedFiles(root: string): string[] {
 
       if (statSync(absolute).isDirectory()) {
         if (name !== "book") walk(absolute);
-      } else if (name === "index.json" || name.endsWith(".bookmap.json") || name === "bookmap.json") {
+      } else if (
+        name === "index.json" ||
+        name.endsWith(".bookmap.json") ||
+        name === "bookmap.json"
+      ) {
         found.push(path.relative(root, absolute).split(path.sep).join("/"));
       }
     }
@@ -78,46 +90,80 @@ describe("book maps of the shop fixture", () => {
     }
 
     // The fixture is built so that every own file is reached and no file has two owners.
-    for (const map of Object.values(snapshot.collected.features)) expect(map.unreached, map.feature).toEqual([]);
-    expect(Object.values(snapshot.ownership.files).filter((file) => file.conflicts.length > 0)).toEqual([]);
+    for (const map of Object.values(snapshot.collected.features))
+      expect(map.unreached, map.feature).toEqual([]);
+    expect(
+      Object.values(snapshot.ownership.files).filter((file) => file.conflicts.length > 0),
+    ).toEqual([]);
   });
 
   it("rewrites nothing on a second run and calls no adapter method", async () => {
     copy = copyFixture();
     await openGrimoire(copy.root, createShopAdapter(), { routes: "fresh", now });
-    const before = collectedFiles(copy.root).map((file) => [file, statSync(path.join(copy?.root ?? "", file)).mtimeMs]);
+    const before = collectedFiles(copy.root).map((file) => [
+      file,
+      statSync(path.join(copy?.root ?? "", file)).mtimeMs,
+    ]);
     const adapter = createShopAdapter();
 
     await openGrimoire(copy.root, adapter, { routes: "fresh", now });
 
-    expect(collectedFiles(copy.root).map((file) => [file, statSync(path.join(copy?.root ?? "", file)).mtimeMs])).toEqual(before);
-    expect(adapter.calls.files + adapter.calls.routes + adapter.calls.pages + adapter.calls.named).toBe(0);
+    expect(
+      collectedFiles(copy.root).map((file) => [
+        file,
+        statSync(path.join(copy?.root ?? "", file)).mtimeMs,
+      ]),
+    ).toEqual(before);
+    expect(
+      adapter.calls.files + adapter.calls.routes + adapter.calls.pages + adapter.calls.named,
+    ).toBe(0);
   });
 
   it("removes the book map of a deleted flow and updates only what changed", async () => {
     copy = copyFixture();
     await openGrimoire(copy.root, createShopAdapter(), { routes: "fresh", now });
-    const flowsBefore = readFileSync(path.join(copy.root, "grimoire/features/catalog/flows/new-arrivals.bookmap.json"), "utf8");
+    const flowsBefore = readFileSync(
+      path.join(copy.root, "grimoire/features/catalog/flows/new-arrivals.bookmap.json"),
+      "utf8",
+    );
 
     rmSync(path.join(copy.root, "grimoire/features/catalog/flows/wishlist.md"));
-    copy.replace("grimoire/features/catalog/README.md", "- wishlist          save a product for later\n", "");
+    copy.replace(
+      "grimoire/features/catalog/README.md",
+      "- wishlist          save a product for later\n",
+      "",
+    );
 
     await openGrimoire(copy.root, createShopAdapter(), { routes: "fresh", now });
 
-    expect(existsSync(path.join(copy.root, "grimoire/features/catalog/flows/wishlist.bookmap.json"))).toBe(false);
-    expect(copy.read("grimoire/features/catalog/flows/new-arrivals.bookmap.json")).toBe(flowsBefore);
-    expect(JSON.parse(copy.read("grimoire/features/index.json")).features[1].flows.map((flow: { id: string }) => flow.id)).toEqual([
-      "browse-products",
-      "new-arrivals",
-    ]);
+    expect(
+      existsSync(path.join(copy.root, "grimoire/features/catalog/flows/wishlist.bookmap.json")),
+    ).toBe(false);
+    expect(copy.read("grimoire/features/catalog/flows/new-arrivals.bookmap.json")).toBe(
+      flowsBefore,
+    );
+    expect(
+      JSON.parse(copy.read("grimoire/features/index.json")).features[1].flows.map(
+        (flow: { id: string }) => flow.id,
+      ),
+    ).toEqual(["browse-products", "new-arrivals"]);
   });
 
   it("reports a file claimed by two features and a file with no owner", async () => {
     copy = copyFixture();
-    copy.replace("grimoire/features/orders/README.md", "folders: [src/app/orders]", "folders: [src/app/orders, src/app/catalog]");
+    copy.replace(
+      "grimoire/features/orders/README.md",
+      "folders: [src/app/orders]",
+      "folders: [src/app/orders, src/app/catalog]",
+    );
 
-    const snapshot = await openGrimoire(copy.root, createShopAdapter(), { routes: "fresh", now, write: false });
-    const repository = snapshot.ownership.files["src/app/catalog/repositories/products.repository.ts"];
+    const snapshot = await openGrimoire(copy.root, createShopAdapter(), {
+      routes: "fresh",
+      now,
+      write: false,
+    });
+    const repository =
+      snapshot.ownership.files["src/app/catalog/repositories/products.repository.ts"];
 
     expect(repository).toMatchObject({
       owner: null,
@@ -127,6 +173,9 @@ describe("book maps of the shop fixture", () => {
       ],
     });
     expect(snapshot.ownership.files["src/app/shared/utils/money.ts"]?.owner).toBeNull();
-    expect(snapshot.ownership.files["src/app/shared/jobs/delete-unverified.job.ts"]).toMatchObject({ owner: "auth", via: "tag" });
+    expect(snapshot.ownership.files["src/app/shared/jobs/delete-unverified.job.ts"]).toMatchObject({
+      owner: "auth",
+      via: "tag",
+    });
   });
 });

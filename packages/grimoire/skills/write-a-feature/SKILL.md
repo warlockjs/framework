@@ -1,6 +1,6 @@
 ---
 name: write-a-feature
-description: 'Describe a new feature, or a new version of one, in `grimoire/features/` before writing code: the task, the brief, the README front matter, each flow with its steps, cases and acceptance criteria. Use when the owner asks for something the product does not do yet.'
+description: "Describe a new feature, or a new version of one, in `grimoire/features/` before writing code: the task, the brief, the README front matter, each flow with its steps, cases and acceptance criteria. Use when the owner asks for something the product does not do yet."
 ---
 
 # Write a feature
@@ -65,10 +65,12 @@ folders: [src/app/catalog, src/web/$sites/client/products]
 Customers browse products, search them and see what is new.
 
 ## Flows
-- browse-products   list and filter products
-- wishlist          save a product for later
+
+- browse-products list and filter products
+- wishlist save a product for later
 
 ## Affects and affected by
+
 - affected by orders/place-order (lowers stock)
 ```
 
@@ -91,29 +93,33 @@ who: customer
 # Save a product to the wishlist
 
 ## Steps
-1. page           /products/:id
-2. route          POST /wishlist
-3. notification   wishlist-price-drop
-4. page           /wishlist
+
+1. page /products/:id
+2. route POST /wishlist
+3. notification wishlist-price-drop
+4. page /wishlist
 
 ## Differs by app
-- mobile   the save button is also on the product card in lists
+
+- mobile the save button is also on the product card in lists
 
 ## Cases
-- invalid input         a product id that is not an id → 422
-- not allowed           guest → sent to sign in, then back to the product
-- not found             the product does not exist → 404
-- duplicate             already saved → stays saved, no error
-- limits                at most 200 products
-- expiry                does not apply: saved products do not expire
-- double submit         two taps save once
-- outside service down  does not apply
+
+- invalid input a product id that is not an id → 422
+- not allowed guest → sent to sign in, then back to the product
+- not found the product does not exist → 404
+- duplicate already saved → stays saved, no error
+- limits at most 200 products
+- expiry does not apply: saved products do not expire
+- double submit two taps save once
+- outside service down does not apply
 
 ## Acceptance criteria
-- AC-1            a saved product appears on /wishlist
-- AC-2            saving twice keeps one entry
-- AC-3            a guest is sent to sign in and returns to the product
-- AC-4 [mobile]   the product card has a save button
+
+- AC-1 a saved product appears on /wishlist
+- AC-2 saving twice keeps one entry
+- AC-3 a guest is sent to sign in and returns to the product
+- AC-4 [mobile] the product card has a save button
 ```
 
 **Steps.** Each step has a kind and the name used in code: `page`, `route`, `mail`,

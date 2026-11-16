@@ -30,7 +30,9 @@ export function parseRouteText(text: string): { method: string; path: string } {
   const match = ROUTE.exec(text);
 
   if (!match || match[1] === undefined || match[2] === undefined) {
-    throw malformed(`route ${JSON.stringify(text)} is not "<METHOD> <path>"; pass it like "GET /api/products".`);
+    throw malformed(
+      `route ${JSON.stringify(text)} is not "<METHOD> <path>"; pass it like "GET /api/products".`,
+    );
   }
 
   return { method: match[1].toUpperCase(), path: match[2] };
@@ -40,8 +42,16 @@ export function parseRouteText(text: string): { method: string; path: string } {
 export function parseFlowText(text: string): { feature: string; flow: string } {
   const [feature, flow, ...rest] = text.trim().split("/");
 
-  if (feature === undefined || flow === undefined || rest.length > 0 || !ID.test(feature) || !ID.test(flow)) {
-    throw malformed(`flow ${JSON.stringify(text)} is not "<feature>/<flow>"; pass it like "catalog/new-arrivals".`);
+  if (
+    feature === undefined ||
+    flow === undefined ||
+    rest.length > 0 ||
+    !ID.test(feature) ||
+    !ID.test(flow)
+  ) {
+    throw malformed(
+      `flow ${JSON.stringify(text)} is not "<feature>/<flow>"; pass it like "catalog/new-arrivals".`,
+    );
   }
 
   return { feature, flow };
@@ -52,7 +62,9 @@ export function parseFeatureText(text: string): string {
   const feature = text.trim();
 
   if (!ID.test(feature)) {
-    throw malformed(`feature ${JSON.stringify(text)} is not a feature id; use the folder name under grimoire/features/.`);
+    throw malformed(
+      `feature ${JSON.stringify(text)} is not a feature id; use the folder name under grimoire/features/.`,
+    );
   }
 
   return feature;
@@ -78,10 +90,13 @@ export function parseScryQuery(
   args: readonly string[],
   options: Readonly<Record<string, string | boolean | number>>,
 ): ScryQuery {
-  const given = QUERY_OPTIONS.filter((name) => options[name] !== undefined && options[name] !== false);
+  const given = QUERY_OPTIONS.filter(
+    (name) => options[name] !== undefined && options[name] !== false,
+  );
   const files = args.filter((arg) => arg.trim() !== "");
 
-  if (given.length + (files.length > 0 ? 1 : 0) === 0) throw malformed(`Nothing to look up. Use: ${FORMS}.`);
+  if (given.length + (files.length > 0 ? 1 : 0) === 0)
+    throw malformed(`Nothing to look up. Use: ${FORMS}.`);
 
   if (files.length > 1 || given.length + (files.length > 0 ? 1 : 0) > 1) {
     const asked = [...(files.length > 0 ? ["<file>"] : []), ...given.map((name) => `--${name}`)];
@@ -94,7 +109,8 @@ export function parseScryQuery(
   const name = given[0];
   const value = name === undefined ? undefined : options[name];
 
-  if (name === undefined || value === undefined) throw malformed(`Nothing to look up. Use: ${FORMS}.`);
+  if (name === undefined || value === undefined)
+    throw malformed(`Nothing to look up. Use: ${FORMS}.`);
 
   const text = textOf(name, value);
 
@@ -110,7 +126,9 @@ export function parseScryQuery(
     case "search": {
       const limit = options.limit;
 
-      return limit === undefined ? { type: "search", text } : { type: "search", text, limit: parseLimit(limit) };
+      return limit === undefined
+        ? { type: "search", text }
+        : { type: "search", text, limit: parseLimit(limit) };
     }
   }
 }

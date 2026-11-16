@@ -9,11 +9,17 @@ import type { BookFile } from "../contracts/adapter";
 export type FileGraph = ReadonlyMap<string, Pick<BookFile, "file" | "imports" | "importedBy">>;
 
 /** Index files by path. */
-export function fileGraph(files: readonly Pick<BookFile, "file" | "imports" | "importedBy">[]): FileGraph {
+export function fileGraph(
+  files: readonly Pick<BookFile, "file" | "imports" | "importedBy">[],
+): FileGraph {
   return new Map(files.map((file) => [file.file, file]));
 }
 
-function walk(graph: FileGraph, start: readonly string[], next: (file: string) => string[]): string[] {
+function walk(
+  graph: FileGraph,
+  start: readonly string[],
+  next: (file: string) => string[],
+): string[] {
   const seen = new Set<string>();
   const pending = [...start];
 

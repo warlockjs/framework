@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.55.0
+
+### Added
+
+- Register your own dashboard tab with one line in `src/config/devtools.ts`: `panels: ["<package>/devtools"]`. A panel declares an id and a title, the data routes served under `/__warlock/api/<id>` and a browser view module. Every route and file sits behind the devtools guard.
+- The Processes tab uses the same panel registration, with no visible change.
+
 ## 5.53.0 - 2026-11-11
 
 ### Upgrading

@@ -3,7 +3,13 @@ import type { BookFacts, BookFile } from "../contracts/adapter";
 import type { BookAnnotations } from "../contracts/book";
 import { defaultRouteInputs } from "./build";
 import { normalizeFacts } from "./normalize";
-import { buildEntries, buildModuleSummaries, buildRoutesFile, renderBook, renderModuleSummary } from "./render";
+import {
+  buildEntries,
+  buildModuleSummaries,
+  buildRoutesFile,
+  renderBook,
+  renderModuleSummary,
+} from "./render";
 
 function file(input: Partial<BookFile> & Pick<BookFile, "file" | "module">): BookFile {
   return {
@@ -26,7 +32,10 @@ const facts: BookFacts = {
       module: "src/app/blog",
       type: "routes",
       imports: [
-        { specifier: "./controllers/posts.controller", file: "src/app/blog/controllers/posts.controller.ts" },
+        {
+          specifier: "./controllers/posts.controller",
+          file: "src/app/blog/controllers/posts.controller.ts",
+        },
         { specifier: "@warlock.js/core", file: null },
       ],
     }),
@@ -126,7 +135,11 @@ const annotations: BookAnnotations = {
   writtenHash: "w",
   tests: {},
   files: {
-    "src/app/blog/controllers/posts.controller.ts": { feature: "blog", borrowedBy: [], flows: ["blog/read", "blog/list"] },
+    "src/app/blog/controllers/posts.controller.ts": {
+      feature: "blog",
+      borrowedBy: [],
+      flows: ["blog/read", "blog/list"],
+    },
     "src/app/blog/routes.ts": { feature: "blog", borrowedBy: [], flows: [] },
     "src/app/shared/slug.ts": { feature: null, borrowedBy: ["web", "blog"], flows: [] },
   },
@@ -149,7 +162,9 @@ describe("book entries", () => {
       "@warlock.js/core",
       "dayjs",
     ]);
-    expect(entries.get("src/app/blog/controllers/posts.controller.ts")?.imports).toEqual(["src/app/shared/slug.ts"]);
+    expect(entries.get("src/app/blog/controllers/posts.controller.ts")?.imports).toEqual([
+      "src/app/shared/slug.ts",
+    ]);
   });
 
   it("takes feature, borrowers and flows from the annotations, sorted", () => {
@@ -157,18 +172,33 @@ describe("book entries", () => {
 
     expect(entry?.feature).toBeNull();
     expect(entry?.borrowedBy).toEqual(["blog", "web"]);
-    expect(entries.get("src/app/blog/controllers/posts.controller.ts")?.flows).toEqual(["blog/list", "blog/read"]);
-    expect(entries.get("src/config/app.ts")).toMatchObject({ feature: null, borrowedBy: [], flows: [] });
+    expect(entries.get("src/app/blog/controllers/posts.controller.ts")?.flows).toEqual([
+      "blog/list",
+      "blog/read",
+    ]);
+    expect(entries.get("src/config/app.ts")).toMatchObject({
+      feature: null,
+      borrowedBy: [],
+      flows: [],
+    });
   });
 
   it("links page, setup and layout files to their page, and screens to their app", () => {
-    expect(entries.get("src/web/home.page.tsx")?.pages).toEqual([{ site: "default", route: "/", via: "page" }]);
-    expect(entries.get("src/web/home.setup.ts")?.pages).toEqual([{ site: "default", route: "/", via: "setup" }]);
-    expect(entries.get("src/web/layout.tsx")?.pages).toEqual([{ site: "default", route: "/", via: "layout" }]);
+    expect(entries.get("src/web/home.page.tsx")?.pages).toEqual([
+      { site: "default", route: "/", via: "page" },
+    ]);
+    expect(entries.get("src/web/home.setup.ts")?.pages).toEqual([
+      { site: "default", route: "/", via: "setup" },
+    ]);
+    expect(entries.get("src/web/layout.tsx")?.pages).toEqual([
+      { site: "default", route: "/", via: "layout" },
+    ]);
     expect(entries.get("src/web/home.page.tsx")?.routes).toEqual([
       { method: "GET", path: "/", name: "home", via: "handles" },
     ]);
-    expect(entries.get("phone/app/index.tsx")?.screens).toEqual([{ app: "phone", route: "/", via: "screen" }]);
+    expect(entries.get("phone/app/index.tsx")?.screens).toEqual([
+      { app: "phone", route: "/", via: "screen" },
+    ]);
   });
 });
 
@@ -222,7 +252,12 @@ describe("module summaries", () => {
         module: "src/app/catalog",
         features: ["catalog", "orders"],
         files: [
-          { file: "src/app/catalog/controllers/x.controller.ts", type: "controller", lines: 10, about: "Answers x." },
+          {
+            file: "src/app/catalog/controllers/x.controller.ts",
+            type: "controller",
+            lines: 10,
+            about: "Answers x.",
+          },
           { file: "src/app/catalog/y.ts", type: "util", lines: 1, about: null },
         ],
         routes: [{ method: "GET", path: "/x", name: null }],
@@ -260,10 +295,15 @@ describe("module summaries", () => {
 
 describe("book paths of the rendered files", () => {
   it("never leaves grimoire/book/, even for a file outside the project", () => {
-    const outside = { ...facts, files: [...facts.files, file({ file: "../elsewhere/x.ts", module: "../elsewhere" })] };
+    const outside = {
+      ...facts,
+      files: [...facts.files, file({ file: "../elsewhere/x.ts", module: "../elsewhere" })],
+    };
     const paths = [...renderBook(outside, annotations).keys()];
 
-    expect(paths.every((bookPath) => bookPath.startsWith("grimoire/book/") && !bookPath.includes(".."))).toBe(true);
+    expect(
+      paths.every((bookPath) => bookPath.startsWith("grimoire/book/") && !bookPath.includes("..")),
+    ).toBe(true);
     expect(paths).toContain("grimoire/book/mobile/phone/app/index.json");
     expect(paths).toContain("grimoire/book/web/default.pages.json");
     expect(paths).toContain("grimoire/book/mobile/phone.screens.json");
@@ -277,7 +317,10 @@ describe("book paths of the rendered files", () => {
         ...entry,
         file: toWindows(entry.file),
         module: toWindows(entry.module),
-        imports: entry.imports.map((item) => ({ ...item, file: item.file === null ? null : toWindows(item.file) })),
+        imports: entry.imports.map((item) => ({
+          ...item,
+          file: item.file === null ? null : toWindows(item.file),
+        })),
         importedBy: entry.importedBy.map(toWindows),
       })),
       routes: (facts.routes ?? []).map((route) => ({
@@ -293,7 +336,9 @@ describe("book paths of the rendered files", () => {
       })),
     };
 
-    expect(renderBook(normalizeFacts(windows), annotations)).toEqual(renderBook(normalizeFacts(facts), annotations));
+    expect(renderBook(normalizeFacts(windows), annotations)).toEqual(
+      renderBook(normalizeFacts(facts), annotations),
+    );
   });
 });
 

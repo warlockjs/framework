@@ -37,7 +37,11 @@ export function insertCliCommandEntry(source: string, commandCall: string): Conn
     const commandsOpen = /\bcommands:\s*\[/.exec(body);
 
     if (commandsOpen) {
-      return insertIntoArray(source, bodyStart + commandsOpen.index + commandsOpen[0].length, commandCall);
+      return insertIntoArray(
+        source,
+        bodyStart + commandsOpen.index + commandsOpen[0].length,
+        commandCall,
+      );
     }
 
     if (body.trim() === "") {
@@ -80,7 +84,11 @@ export function insertCliCommandEntry(source: string, commandCall: string): Conn
 }
 
 /** Add `entry` after an opening bracket, using the same rules as connector arrays. */
-export function insertIntoArray(source: string, afterBracket: number, entry: string): ConnectorInsertion {
+export function insertIntoArray(
+  source: string,
+  afterBracket: number,
+  entry: string,
+): ConnectorInsertion {
   const closeOffset = source.slice(afterBracket).indexOf("]");
 
   if (closeOffset === -1) {

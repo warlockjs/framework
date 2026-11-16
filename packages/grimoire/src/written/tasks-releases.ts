@@ -17,7 +17,14 @@ import {
 import { FLOW_REF, FrontMatterReader, ID, TASK_ID, VERSION, checks } from "./fields";
 import { CHANGE_WORDS, splitEntryText } from "./features";
 import { BULLET } from "./lists";
-import { lineAt, logicalLines, normalizeKey, readDocument, textAfterTitle, type WrittenDocument } from "./markdown";
+import {
+  lineAt,
+  logicalLines,
+  normalizeKey,
+  readDocument,
+  textAfterTitle,
+  type WrittenDocument,
+} from "./markdown";
 import type { FindingSink } from "./sink";
 
 export const TASK_TYPES: readonly TaskType[] = ["bug", "feature", "decision", "chore"];
@@ -37,7 +44,9 @@ const LISTED_ENTRY = /^[-*][ \t]+(\S+)[ \t]+(\S+)[ \t]+(\S.*)$/;
 const FEATURE_HEADING = /^###[ \t]+(\S.*)$/;
 
 function heading(document: WrittenDocument): Located<string> | null {
-  return document.title ? { value: document.title.text, at: lineAt(document.file, document.title.line) } : null;
+  return document.title
+    ? { value: document.title.text, at: lineAt(document.file, document.title.line) }
+    : null;
 }
 
 /** Where a task file sits, from its path. */
@@ -49,21 +58,33 @@ export type TaskPlace = {
 };
 
 /** A task file. */
-export function parseTask(file: string, text: string, place: TaskPlace, sink: FindingSink): WrittenTask {
+export function parseTask(
+  file: string,
+  text: string,
+  place: TaskPlace,
+  sink: FindingSink,
+): WrittenTask {
   const document = readDocument(file, text, "required", sink);
   const fields = new FrontMatterReader(document, sink);
 
   fields.onlyKeys(["id", "type", "status", "feature", "flow", "apps", "shipped"], "task");
 
-  const id = fields.required("id", (value) => (TASK_ID.test(value) ? null : "write a task id as T-<number>"));
+  const id = fields.required("id", (value) =>
+    TASK_ID.test(value) ? null : "write a task id as T-<number>",
+  );
 
   if (place.nameId !== null && id.value !== "" && id.value !== place.nameId) {
-    sink.report("GR1019", `The task id ${JSON.stringify(id.value)} must equal ${JSON.stringify(place.nameId)} from its file name.`, id.at);
+    sink.report(
+      "GR1019",
+      `The task id ${JSON.stringify(id.value)} must equal ${JSON.stringify(place.nameId)} from its file name.`,
+      id.at,
+    );
   }
 
   const shipped = fields.scalar("shipped", {
     required: place.folder === "done",
-    check: (value) => (SHIPPED.test(value) ? null : "write it as <feature> <version>, like catalog 2.1"),
+    check: (value) =>
+      SHIPPED.test(value) ? null : "write it as <feature> <version>, like catalog 2.1",
   });
   const shippedMatch = shipped ? SHIPPED.exec(shipped.value) : null;
 
@@ -76,13 +97,17 @@ export function parseTask(file: string, text: string, place: TaskPlace, sink: Fi
     feature: fields.scalar("feature", { required: false, check: checks.id }),
     flow: fields.scalar("flow", {
       required: false,
-      check: (value) => (ID.test(value) || FLOW_REF.test(value) ? null : "write a flow id, or <feature>/<flow>"),
+      check: (value) =>
+        ID.test(value) || FLOW_REF.test(value) ? null : "write a flow id, or <feature>/<flow>",
     }),
     apps: fields.list("apps", { required: false, check: checks.id }),
     status: fields.oneOf("status", TASK_STATUSES, place.folder === "done" ? "done" : "open"),
     shipped:
       shipped && shippedMatch
-        ? { value: { feature: shippedMatch[1] ?? "", version: shippedMatch[2] ?? "" }, at: shipped.at }
+        ? {
+            value: { feature: shippedMatch[1] ?? "", version: shippedMatch[2] ?? "" },
+            at: shipped.at,
+          }
         : null,
     heading: heading(document),
     fields: [],
@@ -99,14 +124,20 @@ export function parseTask(file: string, text: string, place: TaskPlace, sink: Fi
 
     task.fields.push({ key, value, at: lineAt(file, line.line) });
 
-    if (task.decisionNeeded === null && normalizeKey(key) === "decision needed") task.decisionNeeded = value;
+    if (task.decisionNeeded === null && normalizeKey(key) === "decision needed")
+      task.decisionNeeded = value;
   }
 
   return task;
 }
 
 /** A release file: the agent's brief, then the list Warlock collects between the markers. */
-export function parseRelease(file: string, text: string, name: string, sink: FindingSink): WrittenRelease {
+export function parseRelease(
+  file: string,
+  text: string,
+  name: string,
+  sink: FindingSink,
+): WrittenRelease {
   const document = readDocument(file, text, "required", sink);
   const fields = new FrontMatterReader(document, sink);
 
@@ -115,17 +146,27 @@ export function parseRelease(file: string, text: string, name: string, sink: Fin
   const release = fields.required("release", checks.name);
 
   if (release.value !== "" && release.value !== name) {
-    sink.report("GR1019", `The release ${JSON.stringify(release.value)} must equal the file name ${JSON.stringify(name)}.`, release.at);
+    sink.report(
+      "GR1019",
+      `The release ${JSON.stringify(release.value)} must equal the file name ${JSON.stringify(name)}.`,
+      release.at,
+    );
   }
 
   const date = fields.required("date", checks.date);
 
   if (document.title === null) {
-    sink.report("GR1006", "The file has no `# ` title heading.", lineAt(file, document.bodyStartLine));
+    sink.report(
+      "GR1006",
+      "The file has no `# ` title heading.",
+      lineAt(file, document.bodyStartLine),
+    );
   }
 
   const markers = document.body.filter(
-    (line) => !line.fenced && (line.text.trim() === COLLECTED_START_MARKER || line.text.trim() === COLLECTED_END_MARKER),
+    (line) =>
+      !line.fenced &&
+      (line.text.trim() === COLLECTED_START_MARKER || line.text.trim() === COLLECTED_END_MARKER),
   );
   const starts = markers.filter((line) => line.text.trim() === COLLECTED_START_MARKER);
   const ends = markers.filter((line) => line.text.trim() === COLLECTED_END_MARKER);
@@ -146,7 +187,11 @@ export function parseRelease(file: string, text: string, name: string, sink: Fin
               : null;
 
     if (problem !== null || start === undefined || end === undefined) {
-      sink.report("GR1024", `The release file ${problem?.[0] ?? "has broken markers"}.`, lineAt(file, problem?.[1] ?? 1));
+      sink.report(
+        "GR1024",
+        `The release file ${problem?.[0] ?? "has broken markers"}.`,
+        lineAt(file, problem?.[1] ?? 1),
+      );
     } else {
       collected = {
         start: lineAt(file, start.line),
@@ -170,7 +215,11 @@ export function parseRelease(file: string, text: string, name: string, sink: Fin
   };
 }
 
-function readCollected(file: string, lines: WrittenDocument["body"], sink: FindingSink): WrittenReleaseListed[] {
+function readCollected(
+  file: string,
+  lines: WrittenDocument["body"],
+  sink: FindingSink,
+): WrittenReleaseListed[] {
   const entries: WrittenReleaseListed[] = [];
   let feature: string | null = null;
 
@@ -201,7 +250,11 @@ function readCollected(file: string, lines: WrittenDocument["body"], sink: Findi
     }
 
     if (!CHANGE_WORDS.includes(word as ChangeWord)) {
-      sink.report("GR1016", `The collected word ${JSON.stringify(word)} is not one of ${CHANGE_WORDS.join(", ")}.`, at);
+      sink.report(
+        "GR1016",
+        `The collected word ${JSON.stringify(word)} is not one of ${CHANGE_WORDS.join(", ")}.`,
+        at,
+      );
       continue;
     }
 

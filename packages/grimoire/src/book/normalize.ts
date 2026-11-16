@@ -16,7 +16,9 @@ import { toPosixPath } from "../paths";
 
 /** A project-relative POSIX path. */
 export function cleanPath(file: string): string {
-  return toPosixPath(file).replace(/^(?:\.\/)+/, "").replace(/\/+$/, "");
+  return toPosixPath(file)
+    .replace(/^(?:\.\/)+/, "")
+    .replace(/\/+$/, "");
 }
 
 function cleanNullable(file: string | null): string | null {

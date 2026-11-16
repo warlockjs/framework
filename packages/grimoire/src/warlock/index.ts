@@ -17,4 +17,8 @@
  */
 export { createWarlockAdapter, type WarlockAdapterOptions, type WarlockInspect } from "./adapter";
 export { registerGrimoireCommands } from "./commands";
-export { collectMobileFacts, type CollectMobileFactsOptions, type MobileAppOption } from "./mobile-facts";
+export {
+  collectMobileFacts,
+  type CollectMobileFactsOptions,
+  type MobileAppOption,
+} from "./mobile-facts";

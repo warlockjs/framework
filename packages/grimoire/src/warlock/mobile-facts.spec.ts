@@ -10,7 +10,12 @@ describe("collectMobileFacts", () => {
   it("lists file-based screens: groups, params, layouts, platform files, no special files", async () => {
     const [app] = await collectMobileFacts(path.join(fixtures, "apps-expo"));
 
-    expect(app).toMatchObject({ id: "mobile", root: "mobile", routing: "files", routesDir: "mobile/app" });
+    expect(app).toMatchObject({
+      id: "mobile",
+      root: "mobile",
+      routing: "files",
+      routesDir: "mobile/app",
+    });
     expect(app?.screens.map((screen) => [screen.route, screen.file])).toEqual([
       ["/", "mobile/app/(tabs)/index.tsx"],
       ["/[...missing]", "mobile/app/[...missing].tsx"],
@@ -23,7 +28,9 @@ describe("collectMobileFacts", () => {
 
   it("gives each screen its layouts, outermost first", async () => {
     const [app] = await collectMobileFacts(path.join(fixtures, "apps-expo"));
-    const byRoute = Object.fromEntries((app?.screens ?? []).map((screen) => [screen.route, screen.layouts]));
+    const byRoute = Object.fromEntries(
+      (app?.screens ?? []).map((screen) => [screen.route, screen.layouts]),
+    );
 
     expect(byRoute["/"]).toEqual(["mobile/app/_layout.tsx", "mobile/app/(tabs)/_layout.tsx"]);
     expect(byRoute["/settings"]).toEqual(["mobile/app/_layout.tsx"]);
@@ -36,14 +43,19 @@ describe("collectMobileFacts", () => {
   });
 
   it("finds the shop fixture's file-routed app", async () => {
-    const [app] = await collectMobileFacts(shop, { mobile: [{ root: "mobile", routing: "files" }] });
+    const [app] = await collectMobileFacts(shop, {
+      mobile: [{ root: "mobile", routing: "files" }],
+    });
 
     expect(app?.screens.map((screen) => screen.route)).toEqual(["/", "/products/[id]"]);
   });
 
   it("honours explicit options, an id and an unknown folder", async () => {
     const apps = await collectMobileFacts(path.join(fixtures, "apps-expo"), {
-      mobile: [{ root: "./mobile/", id: "phone", routing: "files" }, { root: "nope", routing: "files" }],
+      mobile: [
+        { root: "./mobile/", id: "phone", routing: "files" },
+        { root: "nope", routing: "files" },
+      ],
     });
 
     expect(apps.map((app) => [app.id, app.root, app.routesDir, app.screens.length])).toEqual([

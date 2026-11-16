@@ -54,7 +54,9 @@ function bookFile(snapshot: GrimoireSnapshot, file: string): BookFile {
   const found = snapshot.book.facts.files.find((item) => item.file === file);
 
   if (!found) {
-    const roots = [...new Set(snapshot.book.facts.files.map((item) => item.file.split("/")[0] ?? ""))]
+    const roots = [
+      ...new Set(snapshot.book.facts.files.map((item) => item.file.split("/")[0] ?? "")),
+    ]
       .filter((root) => root !== "")
       .sort(byText);
 
@@ -99,7 +101,11 @@ function packagesOf(file: BookFile): string[] {
 function entryOf(snapshot: GrimoireSnapshot, file: BookFile): BookEntry {
   const facts = snapshot.book.facts;
   const annotation = snapshot.annotations.files[file.file];
-  const routeRef = (route: BookRoute) => ({ method: route.method, path: route.path, name: route.name });
+  const routeRef = (route: BookRoute) => ({
+    method: route.method,
+    path: route.path,
+    name: route.name,
+  });
   const routes = facts.routes ?? [];
 
   return {
@@ -114,27 +120,53 @@ function entryOf(snapshot: GrimoireSnapshot, file: BookFile): BookEntry {
     flows: sortedUnique(annotation?.flows ?? []),
     exports: file.exports.map((entry) => ({ name: entry.name, about: entry.about })),
     packages: packagesOf(file),
-    imports: sortedUnique(file.imports.flatMap((entry) => (entry.file === null ? [] : [entry.file]))),
+    imports: sortedUnique(
+      file.imports.flatMap((entry) => (entry.file === null ? [] : [entry.file])),
+    ),
     importedBy: sortedUnique(file.importedBy),
     routes: [
-      ...routes.filter((route) => route.sourceFile === file.file).map((route) => ({ ...routeRef(route), via: "registers" as const })),
-      ...routes.filter((route) => route.handlerFile === file.file).map((route) => ({ ...routeRef(route), via: "handles" as const })),
+      ...routes
+        .filter((route) => route.sourceFile === file.file)
+        .map((route) => ({ ...routeRef(route), via: "registers" as const })),
+      ...routes
+        .filter((route) => route.handlerFile === file.file)
+        .map((route) => ({ ...routeRef(route), via: "handles" as const })),
     ],
     pages: facts.pages
       .flatMap((page) => [
-        ...(page.file === file.file ? [{ site: page.site, route: page.route, via: "page" as const }] : []),
-        ...(page.setupFile === file.file ? [{ site: page.site, route: page.route, via: "setup" as const }] : []),
-        ...(page.layouts.includes(file.file) ? [{ site: page.site, route: page.route, via: "layout" as const }] : []),
+        ...(page.file === file.file
+          ? [{ site: page.site, route: page.route, via: "page" as const }]
+          : []),
+        ...(page.setupFile === file.file
+          ? [{ site: page.site, route: page.route, via: "setup" as const }]
+          : []),
+        ...(page.layouts.includes(file.file)
+          ? [{ site: page.site, route: page.route, via: "layout" as const }]
+          : []),
       ])
-      .sort((left, right) => byText(left.site, right.site) || byText(left.route, right.route) || byText(left.via, right.via)),
+      .sort(
+        (left, right) =>
+          byText(left.site, right.site) ||
+          byText(left.route, right.route) ||
+          byText(left.via, right.via),
+      ),
     screens: facts.mobile
       .flatMap((app) =>
         app.screens.flatMap((screen) => [
-          ...(screen.file === file.file ? [{ app: app.id, route: screen.route, via: "screen" as const }] : []),
-          ...(screen.layouts.includes(file.file) ? [{ app: app.id, route: screen.route, via: "layout" as const }] : []),
+          ...(screen.file === file.file
+            ? [{ app: app.id, route: screen.route, via: "screen" as const }]
+            : []),
+          ...(screen.layouts.includes(file.file)
+            ? [{ app: app.id, route: screen.route, via: "layout" as const }]
+            : []),
         ]),
       )
-      .sort((left, right) => byText(left.app, right.app) || byText(left.route, right.route) || byText(left.via, right.via)),
+      .sort(
+        (left, right) =>
+          byText(left.app, right.app) ||
+          byText(left.route, right.route) ||
+          byText(left.via, right.via),
+      ),
   };
 }
 
@@ -148,7 +180,8 @@ function bookEntryOf(snapshot: GrimoireSnapshot, file: string): string | null {
 
       return {
         file: item.file,
-        mobileApp: item.mobileApp === null || root === undefined ? null : { id: item.mobileApp, root },
+        mobileApp:
+          item.mobileApp === null || root === undefined ? null : { id: item.mobileApp, root },
       };
     }),
   );
@@ -157,7 +190,10 @@ function bookEntryOf(snapshot: GrimoireSnapshot, file: string): string | null {
   return entry === undefined || entry.split("/").includes("..") ? null : entry;
 }
 
-function scryFile(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type: "file" }>): ScryFileAnswer {
+function scryFile(
+  snapshot: GrimoireSnapshot,
+  query: Extract<ScryQuery, { type: "file" }>,
+): ScryFileAnswer {
   const file = bookFile(snapshot, fileOf(snapshot, query.file));
 
   return {
@@ -172,7 +208,10 @@ function flowBookmaps(snapshot: GrimoireSnapshot): FlowBookmap[] {
   return Object.values(snapshot.collected.flows).sort((left, right) => byText(left.ref, right.ref));
 }
 
-function scryImpact(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type: "impact" }>): ScryImpactResult {
+function scryImpact(
+  snapshot: GrimoireSnapshot,
+  query: Extract<ScryQuery, { type: "impact" }>,
+): ScryImpactResult {
   const facts = snapshot.book.facts;
   const target = bookFile(snapshot, fileOf(snapshot, query.file));
   const graph = fileGraph(facts.files);
@@ -181,7 +220,9 @@ function scryImpact(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type
   const routes = (facts.routes ?? []).filter(
     (route) =>
       !route.isPage &&
-      (route.handlerFile !== null ? reach.has(route.handlerFile) : route.sourceFile !== null && reach.has(route.sourceFile)),
+      (route.handlerFile !== null
+        ? reach.has(route.handlerFile)
+        : route.sourceFile !== null && reach.has(route.sourceFile)),
   );
   const pages: ScryPageRef[] = [
     ...facts.pages
@@ -191,11 +232,23 @@ function scryImpact(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type
           (page.setupFile !== null && reach.has(page.setupFile)) ||
           page.layouts.some((layout) => reach.has(layout)),
       )
-      .map((page) => ({ app: siteApp(snapshot, page.site), route: page.route, file: page.file, type: "page" as const })),
+      .map((page) => ({
+        app: siteApp(snapshot, page.site),
+        route: page.route,
+        file: page.file,
+        type: "page" as const,
+      })),
     ...facts.mobile.flatMap((app) =>
       app.screens
-        .filter((screen) => reach.has(screen.file) || screen.layouts.some((layout) => reach.has(layout)))
-        .map((screen) => ({ app: mobileApp(snapshot, app.id), route: screen.route, file: screen.file, type: "screen" as const })),
+        .filter(
+          (screen) => reach.has(screen.file) || screen.layouts.some((layout) => reach.has(layout)),
+        )
+        .map((screen) => ({
+          app: mobileApp(snapshot, app.id),
+          route: screen.route,
+          file: screen.file,
+          type: "screen" as const,
+        })),
     ),
   ];
   const flows = flowBookmaps(snapshot)
@@ -208,7 +261,9 @@ function scryImpact(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type
     ...importers.flatMap((file) => {
       const ownerOf = ownership[file]?.owner;
 
-      return ownerOf === undefined || ownerOf === null || facts.files.find((item) => item.file === file)?.type === "spec"
+      return ownerOf === undefined ||
+        ownerOf === null ||
+        facts.files.find((item) => item.file === file)?.type === "spec"
         ? []
         : [ownerOf];
     }),
@@ -217,7 +272,8 @@ function scryImpact(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type
   const flowSet = new Set(flows);
   const tests = sortedUnique([
     ...importers.filter(
-      (file) => testFiles.has(file) || facts.files.find((item) => item.file === file)?.type === "spec",
+      (file) =>
+        testFiles.has(file) || facts.files.find((item) => item.file === file)?.type === "spec",
     ),
     ...snapshot.proofs.filter((proof) => flowSet.has(proof.ref)).map((proof) => proof.at.file),
   ]);
@@ -227,7 +283,12 @@ function scryImpact(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type
     ...notesOf(snapshot, true),
     file: target.file,
     importers: { direct: sortedUnique(target.importedBy), all: importers },
-    routes: routes.map((route) => ({ method: route.method, path: route.path, name: route.name, handlerFile: route.handlerFile })),
+    routes: routes.map((route) => ({
+      method: route.method,
+      path: route.path,
+      name: route.name,
+      handlerFile: route.handlerFile,
+    })),
     pages,
     flows,
     features: [
@@ -239,13 +300,20 @@ function scryImpact(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type
 }
 
 /** Whether a registered route answers `METHOD path` (`ALL` on either side matches any method). */
-function routeMatches(route: Pick<BookRoute, "method" | "path">, method: string, path: string): boolean {
+function routeMatches(
+  route: Pick<BookRoute, "method" | "path">,
+  method: string,
+  path: string,
+): boolean {
   const methodMatches = route.method === method || route.method === "ALL" || method === "ALL";
 
   return methodMatches && normalizeRoutePath(route.path) === normalizeRoutePath(path);
 }
 
-function scryRoute(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type: "route" }>): ScryRouteResult {
+function scryRoute(
+  snapshot: GrimoireSnapshot,
+  query: Extract<ScryQuery, { type: "route" }>,
+): ScryRouteResult {
   const facts = snapshot.book.facts;
   const method = query.method.toUpperCase();
   const asked = `${method} ${query.path}`;
@@ -277,13 +345,20 @@ function scryRoute(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type:
   const steps = snapshot.written.features.flatMap((feature) =>
     feature.flows.flatMap((flow) =>
       flow.steps
-        .filter((step) => step.kind === "route" && step.route !== null && routeMatches(route, step.route.method, step.route.path))
+        .filter(
+          (step) =>
+            step.kind === "route" &&
+            step.route !== null &&
+            routeMatches(route, step.route.method, step.route.path),
+        )
         .map((step) => ({ flow: flow.ref, index: step.index })),
     ),
   );
   const page = route.isPage
     ? (facts.pages.find((item) => item.file === route.handlerFile) ??
-      facts.pages.find((item) => normalizeRoutePath(item.route) === normalizeRoutePath(route.path)) ??
+      facts.pages.find(
+        (item) => normalizeRoutePath(item.route) === normalizeRoutePath(route.path),
+      ) ??
       null)
     : null;
 
@@ -302,7 +377,10 @@ function writtenFeature(snapshot: GrimoireSnapshot, id: string): WrittenFeature 
 
   if (!feature) {
     const known = snapshot.written.features.map((item) => item.id).sort(byText);
-    const list = known.length > 0 ? ` Features: ${known.join(", ")}.` : " The project has no grimoire/features/ folder yet.";
+    const list =
+      known.length > 0
+        ? ` Features: ${known.join(", ")}.`
+        : " The project has no grimoire/features/ folder yet.";
 
     throw new GrimoireError("GR9003", `No feature has the id ${JSON.stringify(id)}.${list}`);
   }
@@ -310,15 +388,29 @@ function writtenFeature(snapshot: GrimoireSnapshot, id: string): WrittenFeature 
   return feature;
 }
 
-function findingsFor(snapshot: GrimoireSnapshot, match: (finding: GrimoireFinding) => boolean): GrimoireFinding[] {
+function findingsFor(
+  snapshot: GrimoireSnapshot,
+  match: (finding: GrimoireFinding) => boolean,
+): GrimoireFinding[] {
   return checkGrimoire(snapshot).findings.filter(match);
 }
 
 function emptyFeatureBookmap(feature: string): FeatureBookmap {
-  return { schemaVersion: BOOK_SCHEMA_VERSION, feature, own: [], borrowed: [], routes: [], pages: {}, unreached: [] };
+  return {
+    schemaVersion: BOOK_SCHEMA_VERSION,
+    feature,
+    own: [],
+    borrowed: [],
+    routes: [],
+    pages: {},
+    unreached: [],
+  };
 }
 
-function scryFeature(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type: "feature" }>): ScryFeatureResult {
+function scryFeature(
+  snapshot: GrimoireSnapshot,
+  query: Extract<ScryQuery, { type: "feature" }>,
+): ScryFeatureResult {
   const feature = writtenFeature(snapshot, query.feature);
 
   if (feature.readme === null) {
@@ -345,25 +437,34 @@ function scryFeature(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { typ
     tasks: snapshot.collected.tasksIndex.open.filter((task) => task.feature === feature.id),
     findings: findingsFor(
       snapshot,
-      (finding) => finding.subject.feature === feature.id || (finding.subject.flow ?? "").startsWith(`${feature.id}/`),
+      (finding) =>
+        finding.subject.feature === feature.id ||
+        (finding.subject.flow ?? "").startsWith(`${feature.id}/`),
     ),
   };
 }
 
-function scryFlow(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type: "flow" }>): ScryFlowResult {
+function scryFlow(
+  snapshot: GrimoireSnapshot,
+  query: Extract<ScryQuery, { type: "flow" }>,
+): ScryFlowResult {
   const feature = writtenFeature(snapshot, query.feature);
   const flow: WrittenFlow | undefined = feature.flows.find((item) => item.id.value === query.flow);
 
   if (!flow) {
     const known = feature.flows.map((item) => item.id.value).sort(byText);
-    const list = known.length > 0 ? ` Flows of ${feature.id}: ${known.join(", ")}.` : ` ${feature.id} has no flows yet.`;
+    const list =
+      known.length > 0
+        ? ` Flows of ${feature.id}: ${known.join(", ")}.`
+        : ` ${feature.id} has no flows yet.`;
 
     throw new GrimoireError("GR9004", `No flow ${feature.id}/${query.flow}.${list}`);
   }
 
   const bookmap =
-    Object.values(snapshot.collected.flows).find((item) => item.feature === feature.id && item.flow === flow.id.value) ??
-    snapshot.collected.flows[flow.ref];
+    Object.values(snapshot.collected.flows).find(
+      (item) => item.feature === feature.id && item.flow === flow.id.value,
+    ) ?? snapshot.collected.flows[flow.ref];
 
   if (!bookmap) {
     throw new GrimoireError(
@@ -384,7 +485,17 @@ function scryFlow(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type: 
 
 // ── Search ─────────────────────────────────────────────────────────────────
 
-const TYPE_ORDER: readonly ScryHitType[] = ["feature", "flow", "block", "page", "screen", "route", "file", "export", "task"];
+const TYPE_ORDER: readonly ScryHitType[] = [
+  "feature",
+  "flow",
+  "block",
+  "page",
+  "screen",
+  "route",
+  "file",
+  "export",
+  "task",
+];
 
 /** Lower-case words: `catalog/new-arrivals.service.ts` → `catalog new arrivals service ts`. */
 function words(text: string): string {
@@ -426,24 +537,40 @@ function candidates(snapshot: GrimoireSnapshot): Candidate[] {
 
     for (const layout of app.layouts) {
       for (const row of layout.blocks) {
-        list.push({ type: "block", id: `${appId}/${layout.id}/${slug(row.block)}`, detail: row.flow ?? row.block });
+        list.push({
+          type: "block",
+          id: `${appId}/${layout.id}/${slug(row.block)}`,
+          detail: row.flow ?? row.block,
+        });
       }
     }
 
     for (const page of [...app.pages, ...app.screens]) {
       for (const row of page.blocks) {
-        list.push({ type: "block", id: `${appId}/${page.id}/${slug(row.block)}`, detail: row.flow ?? row.block });
+        list.push({
+          type: "block",
+          id: `${appId}/${page.id}/${slug(row.block)}`,
+          detail: row.flow ?? row.block,
+        });
       }
     }
   }
 
   for (const page of facts.pages) {
-    list.push({ type: "page", id: `${siteApp(snapshot, page.site)} ${page.route}`, detail: page.file });
+    list.push({
+      type: "page",
+      id: `${siteApp(snapshot, page.site)} ${page.route}`,
+      detail: page.file,
+    });
   }
 
   for (const app of facts.mobile) {
     for (const screen of app.screens) {
-      list.push({ type: "screen", id: `${mobileApp(snapshot, app.id)} ${screen.route}`, detail: screen.file });
+      list.push({
+        type: "screen",
+        id: `${mobileApp(snapshot, app.id)} ${screen.route}`,
+        detail: screen.file,
+      });
     }
   }
 
@@ -463,7 +590,10 @@ function candidates(snapshot: GrimoireSnapshot): Candidate[] {
     }
   }
 
-  for (const task of [...snapshot.collected.tasksIndex.open, ...snapshot.collected.tasksIndex.done]) {
+  for (const task of [
+    ...snapshot.collected.tasksIndex.open,
+    ...snapshot.collected.tasksIndex.done,
+  ]) {
     list.push({ type: "task", id: task.id, detail: task.title });
   }
 
@@ -472,7 +602,9 @@ function candidates(snapshot: GrimoireSnapshot): Candidate[] {
 
 /** Score of a candidate for the query words, or 0 when a word is missing. */
 function scoreOf(candidate: Candidate, query: string, tokens: readonly string[]): number {
-  const id = words(candidate.type === "export" ? (candidate.id.split("#")[1] ?? candidate.id) : candidate.id);
+  const id = words(
+    candidate.type === "export" ? (candidate.id.split("#")[1] ?? candidate.id) : candidate.id,
+  );
   const last = words(lastSegment(candidate.id));
   const all = `${id} ${words(candidate.detail ?? "")}`;
 
@@ -484,12 +616,18 @@ function scoreOf(candidate: Candidate, query: string, tokens: readonly string[])
   return 1;
 }
 
-function scrySearch(snapshot: GrimoireSnapshot, query: Extract<ScryQuery, { type: "search" }>): ScrySearchResult {
+function scrySearch(
+  snapshot: GrimoireSnapshot,
+  query: Extract<ScryQuery, { type: "search" }>,
+): ScrySearchResult {
   const text = words(query.text);
   const tokens = text.split(" ").filter((token) => token !== "");
 
   if (tokens.length === 0) {
-    throw new GrimoireError("GR9006", `Search text ${JSON.stringify(query.text)} has no letters or digits; pass a word to look for.`);
+    throw new GrimoireError(
+      "GR9006",
+      `Search text ${JSON.stringify(query.text)} has no letters or digits; pass a word to look for.`,
+    );
   }
 
   const seen = new Set<string>();

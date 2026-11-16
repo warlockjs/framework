@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
-import type { TaskStatus, WrittenFeature, WrittenGrimoire, WrittenTask } from "../contracts/written";
+import type {
+  TaskStatus,
+  WrittenFeature,
+  WrittenGrimoire,
+  WrittenTask,
+} from "../contracts/written";
 import { checkTasks } from "./index";
 
 const at = (file: string, line = 1) => ({ file, line, column: null });
@@ -70,7 +75,15 @@ describe("checkTasks", () => {
   });
 
   function run(tasks: WrittenTask[], root = "/nowhere") {
-    const written = { root, exists: true, features: [catalog], apps: [], tasks, releases: [], hash: "" } as WrittenGrimoire;
+    const written = {
+      root,
+      exists: true,
+      features: [catalog],
+      apps: [],
+      tasks,
+      releases: [],
+      hash: "",
+    } as WrittenGrimoire;
 
     return checkTasks({ written, root } as unknown as GrimoireSnapshot);
   }
@@ -91,15 +104,21 @@ describe("checkTasks", () => {
   it("GR7002: unknown flow, a full reference, and a flow with no feature", () => {
     expect(codes([task("T-1", { flow: located("nope", "t.md", 4) })])).toEqual(["GR7002"]);
     expect(codes([task("T-2", { flow: located("catalog/nope", "t.md", 4) })])).toEqual(["GR7002"]);
-    expect(codes([task("T-3", { feature: null, flow: located("wishlist", "t.md", 4) })])).toEqual(["GR7002"]);
-    expect(codes([task("T-4", { feature: null, flow: located("catalog/wishlist", "t.md", 4) })])).toEqual([]);
+    expect(codes([task("T-3", { feature: null, flow: located("wishlist", "t.md", 4) })])).toEqual([
+      "GR7002",
+    ]);
+    expect(
+      codes([task("T-4", { feature: null, flow: located("catalog/wishlist", "t.md", 4) })]),
+    ).toEqual([]);
   });
 
   it("GR7003: a done task needs status done and shipped; an open task cannot be done", () => {
     const done = { folder: "done" as const, month: "2026-11" };
 
     expect(codes([task("T-1", done)])).toEqual(["GR7003"]);
-    expect(codes([task("T-2", { ...done, status: located<TaskStatus>("done", "t.md") })])).toEqual(["GR7003"]);
+    expect(codes([task("T-2", { ...done, status: located<TaskStatus>("done", "t.md") })])).toEqual([
+      "GR7003",
+    ]);
     expect(
       codes([
         task("T-3", {
@@ -109,7 +128,9 @@ describe("checkTasks", () => {
         }),
       ]),
     ).toEqual([]);
-    expect(codes([task("T-4", { status: located<TaskStatus>("done", "t.md") })])).toEqual(["GR7003"]);
+    expect(codes([task("T-4", { status: located<TaskStatus>("done", "t.md") })])).toEqual([
+      "GR7003",
+    ]);
   });
 
   it("GR7004: shipped version not in the changelog", () => {
@@ -119,7 +140,11 @@ describe("checkTasks", () => {
       status: located<TaskStatus>("done", "t.md"),
     };
 
-    expect(codes([task("T-1", { ...done, shipped: located({ feature: "catalog", version: "9.9" }, "t.md") })])).toEqual(["GR7004"]);
+    expect(
+      codes([
+        task("T-1", { ...done, shipped: located({ feature: "catalog", version: "9.9" }, "t.md") }),
+      ]),
+    ).toEqual(["GR7004"]);
   });
 
   it("GR7005: a brief that does not exist, and one that does", () => {
@@ -131,7 +156,9 @@ describe("checkTasks", () => {
 
     const brief = (value: string) => ({ fields: [{ key: "Brief", value, at: at("t.md", 7) }] });
 
-    expect(codes([task("T-1", brief("features/catalog/versions/v4.md"))], root)).toEqual(["GR7005"]);
+    expect(codes([task("T-1", brief("features/catalog/versions/v4.md"))], root)).toEqual([
+      "GR7005",
+    ]);
     expect(codes([task("T-2", brief("features/catalog/versions/v3.md"))], root)).toEqual([]);
   });
 });

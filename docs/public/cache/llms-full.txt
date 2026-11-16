@@ -288,6 +288,7 @@ const user = await cache.remember("user.1", "1h", async () => db.users.find(1));
 - Don't run `cache.similar()` against memory drivers in production with large datasets — O(N) brute force.
 - Don't auto-migrate the `pg` table from app code. The driver exposes `driver.schema()` returning DDL.
 - Don't switch embedders without re-embedding the entire vector index.
+- `has(key)` uses the driver `exists()` (no value read) and emits `hit` / `miss` with the key only, without `value`.
 
 
 ## configure-pg-cache  `@warlock.js/cache/skills/configure-pg-cache/SKILL.md`
@@ -514,6 +515,8 @@ await cache.set("k", v); // no TTL — driver default
 await cache.set("k", v, 3600); // seconds
 await cache.set("k", v, undefined); // same as no TTL
 ```
+
+- `ttlJitter: <percent>` spreads the TTL by up to that many percent either way per write (`{ ttl: "1h", ttlJitter: 10 }` expires in 54-66 minutes) so entries written together do not expire together; ignored for `expiresAt` / `Infinity`; also accepted by `remember()` and `swr()` options. `applyTtlJitter(ttl, percent, expiresAt?)` is the helper that computes it.
 
 
 ## handle-cache-errors  `@warlock.js/cache/skills/handle-cache-errors/SKILL.md`
@@ -1491,6 +1494,7 @@ await chat.set("messages.10", msg); // chats.<id>.messages.10, 30d, user.<userId
 await chat.set("draft", d, { ttl: "1h" }); // per-call ttl wins
 await chat.tags(["unread"]).set("ping", p); // tags merge: user.<userId> + unread
 await chat.clear(); // sugar for removeNamespace
+const keys = await cache.listKeys("chats.7"); // live keys under a prefix, ready for get() / remove(); optional on custom drivers
 ```
 
 Scopes are pure views — same connection, same driver, no extra state. Per-call options always win over scope defaults; tags merge additively.
@@ -1658,6 +1662,7 @@ See the `configure-pg-cache` topic.
 - Don't mix vector dimensions in the same driver — re-embed when models change.
 - Don't expect `similar()` to surface a missing vector (`set` without the `vector` option). Plain KV entries stay out of the similarity index.
 - Don't use `topK: 0` or negative — `pg` rejects with `CacheConfigurationError`; memory drivers return `[]` but it's a code smell.
+- `filter: ({ key, value }) => boolean` runs before `threshold` / `topK`, so `topK` counts in-scope entries only (one query). Honoured by the memory, LRU and memory-extended drivers; `pg` ignores it, so re-check hits when you need a guarantee. A `cache.namespace()` scope passes its prefix as the filter.
 
 
 ## use-cache-structures  `@warlock.js/cache/skills/use-cache-structures/SKILL.md`
@@ -2197,3 +2202,4 @@ await feed.swr("home", { freshTtl: "30s", staleTtl: "10m", tags: ["computed"] },
 - Don't pick `freshTtl` to be the _same_ as `staleTtl` thinking it disables the stale window — that throws. Pick a tight `freshTtl` and wider `staleTtl` that reflects how stale your product can tolerate being.
 - Don't ignore `error` events. A persistent stream of refresh failures means upstream is broken and the cache is masking it.
 - Don't reach for SWR on the null driver — it caches nothing, so SWR always blocks.
+- `failSafe: true` makes a stale-window caller wait for the refresh (callers of one key share it) and return the stale value when the callback throws; the failure is logged and emitted as an `error` event. Default (off): stale value at once, refresh in the background.

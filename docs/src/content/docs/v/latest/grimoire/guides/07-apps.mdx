@@ -26,9 +26,10 @@ root: src/web/$sites/client
 # The shop website
 
 ## Conditions
-- guest      not signed in
-- customer   signed in
-- vip        customer with the vip membership
+
+- guest not signed in
+- customer signed in
+- vip customer with the vip membership
 ```
 
 - `type` is `site` or `mobile`.
@@ -55,6 +56,7 @@ layout: site
 One product with its price, stock and the order button.
 
 ## Blocks
+
 | Block        | Flow                    | Who sees it | Changes with      |
 | ------------ | ----------------------- | ----------- | ----------------- |
 | Details      | catalog/browse-products | everyone    | vip: member price |
@@ -62,15 +64,16 @@ One product with its price, stock and the order button.
 | Sign in hint | —                       | guest       | —                 |
 
 ## Also reached from
-- mail   order-confirmation
+
+- mail order-confirmation
 ```
 
-| Column | Meaning |
-| --- | --- |
-| Block | The name of the block on the page. |
-| Flow | The `<feature>/<flow>` the block shows, or `—` when it belongs to no flow (a header). |
-| Who sees it | `everyone`, or condition names of the app. |
-| Changes with | `—`, or items separated by `;`. An item is `<condition>: <text>` or free text. |
+| Column       | Meaning                                                                               |
+| ------------ | ------------------------------------------------------------------------------------- |
+| Block        | The name of the block on the page.                                                    |
+| Flow         | The `<feature>/<flow>` the block shows, or `—` when it belongs to no flow (a header). |
+| Who sees it  | `everyone`, or condition names of the app.                                            |
+| Changes with | `—`, or items separated by `;`. An item is `<condition>: <text>` or free text.        |
 
 `route` is the route of the page in its site. A page whose route is not in the site any more is reported.
 
@@ -106,7 +109,8 @@ link in an email:
 
 ```md
 ## Also reached from
-- mail   order-confirmation
+
+- mail order-confirmation
 ```
 
 Kinds `mail`, `notification`, `page` and `screen` are checked against the code; other kinds are free text.
@@ -115,17 +119,17 @@ Kinds `mail`, `notification`, `page` and `screen` are checked against the code; 
 
 The check reports these. Each code is described on the [check page](../04-check/).
 
-| Code | Severity | Meaning |
-| --- | --- | --- |
-| `GR5001` | error | A block row or block file points to a flow that does not exist. |
-| `GR5002` | error | A condition is used in a block but not declared in the app README. |
-| `GR5003` | error | A page's route is not a page of its site. |
-| `GR5004` | error | A page names a layout with no file. |
-| `GR5005` | error | An app's `root` matches no site or mobile app. |
-| `GR5006` | error | A screen has no route, or its route is not a screen of a file-routed app. |
-| `GR5007` | warning | A block file has no row in its page's Blocks table. |
-| `GR5008` | error | An entry point in Also reached from names no mail, notification, page or screen. |
-| `GR5009` | warning | A site or mobile app has no folder in `grimoire/apps` (only once the folder has apps). |
+| Code     | Severity | Meaning                                                                                |
+| -------- | -------- | -------------------------------------------------------------------------------------- |
+| `GR5001` | error    | A block row or block file points to a flow that does not exist.                        |
+| `GR5002` | error    | A condition is used in a block but not declared in the app README.                     |
+| `GR5003` | error    | A page's route is not a page of its site.                                              |
+| `GR5004` | error    | A page names a layout with no file.                                                    |
+| `GR5005` | error    | An app's `root` matches no site or mobile app.                                         |
+| `GR5006` | error    | A screen has no route, or its route is not a screen of a file-routed app.              |
+| `GR5007` | warning  | A block file has no row in its page's Blocks table.                                    |
+| `GR5008` | error    | An entry point in Also reached from names no mail, notification, page or screen.       |
+| `GR5009` | warning  | A site or mobile app has no folder in `grimoire/apps` (only once the folder has apps). |
 
 A finding about a block or page fills its flow, so a proposed flow's findings are shown as expected.
 A flow or feature that names an app with no folder is `GR2008`.

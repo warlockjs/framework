@@ -29,10 +29,9 @@ const lines = (file: string): number =>
 
 describe("the shop fixture", () => {
   it("lists every code file under its source roots, and only those", () => {
-    expect(shopFacts.files.map((file) => file.file).sort()).toEqual([
-      ...codeFilesUnder("mobile"),
-      ...codeFilesUnder("src"),
-    ].sort());
+    expect(shopFacts.files.map((file) => file.file).sort()).toEqual(
+      [...codeFilesUnder("mobile"), ...codeFilesUnder("src")].sort(),
+    );
   });
 
   it("matches each file's lines, header sentence and tags", () => {
@@ -66,8 +65,15 @@ describe("the shop fixture", () => {
   it("points routes, pages, screens, named things and tests at real files", () => {
     const paths = [
       ...(shopFacts.routes ?? []).flatMap((route) => [route.sourceFile, route.handlerFile]),
-      ...shopFacts.pages.flatMap((page) => [page.file, page.setupFile, ...page.layouts, ...page.loaders]),
-      ...shopFacts.mobile.flatMap((app) => app.screens.flatMap((screen) => [screen.file, ...screen.layouts])),
+      ...shopFacts.pages.flatMap((page) => [
+        page.file,
+        page.setupFile,
+        ...page.layouts,
+        ...page.loaders,
+      ]),
+      ...shopFacts.mobile.flatMap((app) =>
+        app.screens.flatMap((screen) => [screen.file, ...screen.layouts]),
+      ),
       ...shopFacts.named.map((thing) => thing.file),
       ...shopFacts.tests,
       ...shopFacts.sites.map((site) => site.root),
@@ -108,11 +114,17 @@ describe("copyFixture", () => {
     const copy = copyFixture();
 
     try {
-      copy.replace("grimoire/features/orders/flows/place-order.md", "POST /api/orders", "POST /api/order");
-      expect(copy.read("grimoire/features/orders/flows/place-order.md")).toContain("POST /api/order\n");
-      expect(readFileSync(path.join(shopRoot, "grimoire/features/orders/flows/place-order.md"), "utf8")).toContain(
+      copy.replace(
+        "grimoire/features/orders/flows/place-order.md",
         "POST /api/orders",
+        "POST /api/order",
       );
+      expect(copy.read("grimoire/features/orders/flows/place-order.md")).toContain(
+        "POST /api/order\n",
+      );
+      expect(
+        readFileSync(path.join(shopRoot, "grimoire/features/orders/flows/place-order.md"), "utf8"),
+      ).toContain("POST /api/orders");
     } finally {
       copy.remove();
     }

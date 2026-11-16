@@ -45,7 +45,9 @@ export function entryPathsFor(facts: Pick<BookFacts, "files" | "mobile">): Map<s
       return {
         file: file.file,
         mobileApp:
-          file.mobileApp === null || mobileRoot === undefined ? null : { id: file.mobileApp, root: mobileRoot },
+          file.mobileApp === null || mobileRoot === undefined
+            ? null
+            : { id: file.mobileApp, root: mobileRoot },
       };
     }),
   );
@@ -92,28 +94,44 @@ function groupBy<T>(items: Iterable<readonly [string | null, T]>): Map<string, T
   return groups;
 }
 
+type PageUse = {
+  readonly site: string;
+  readonly route: string;
+  readonly via: "page" | "setup" | "layout";
+};
+type ScreenUse = {
+  readonly app: string;
+  readonly route: string;
+  readonly via: "screen" | "layout";
+};
+
 const NO_ANNOTATION = { feature: null, borrowedBy: [], flows: [] } as const;
 
 /** The entry of every code file, by source file. */
-export function buildEntries(facts: BookFacts, annotations: BookAnnotations): Map<string, BookEntry> {
+export function buildEntries(
+  facts: BookFacts,
+  annotations: BookAnnotations,
+): Map<string, BookEntry> {
   const routes = facts.routes ?? [];
   const registered = groupBy(routes.map((route) => [route.sourceFile, route] as const));
   const handled = groupBy(routes.map((route) => [route.handlerFile, route] as const));
-  const pages = groupBy(
-    facts.pages.flatMap((page) => [
+  const pages = groupBy<PageUse>(
+    facts.pages.flatMap((page): (readonly [string | null, PageUse])[] => [
       [page.file, { site: page.site, route: page.route, via: "page" as const }] as const,
       [page.setupFile, { site: page.site, route: page.route, via: "setup" as const }] as const,
       ...page.layouts.map(
-        (layout) => [layout, { site: page.site, route: page.route, via: "layout" as const }] as const,
+        (layout) =>
+          [layout, { site: page.site, route: page.route, via: "layout" as const }] as const,
       ),
     ]),
   );
-  const screens = groupBy(
+  const screens = groupBy<ScreenUse>(
     facts.mobile.flatMap((app) =>
-      app.screens.flatMap((screen) => [
+      app.screens.flatMap((screen): (readonly [string | null, ScreenUse])[] => [
         [screen.file, { app: app.id, route: screen.route, via: "screen" as const }] as const,
         ...screen.layouts.map(
-          (layout) => [layout, { app: app.id, route: screen.route, via: "layout" as const }] as const,
+          (layout) =>
+            [layout, { app: app.id, route: screen.route, via: "layout" as const }] as const,
         ),
       ]),
     ),
@@ -123,8 +141,14 @@ export function buildEntries(facts: BookFacts, annotations: BookAnnotations): Ma
   for (const file of facts.files) {
     const annotation = annotations.files[file.file] ?? NO_ANNOTATION;
     const fileRoutes: BookEntry["routes"] = [
-      ...(registered.get(file.file) ?? []).map((route) => ({ ...routeRef(route), via: "registers" as const })),
-      ...(handled.get(file.file) ?? []).map((route) => ({ ...routeRef(route), via: "handles" as const })),
+      ...(registered.get(file.file) ?? []).map((route) => ({
+        ...routeRef(route),
+        via: "registers" as const,
+      })),
+      ...(handled.get(file.file) ?? []).map((route) => ({
+        ...routeRef(route),
+        via: "handles" as const,
+      })),
     ];
 
     entries.set(file.file, {
@@ -145,10 +169,16 @@ export function buildEntries(facts: BookFacts, annotations: BookAnnotations): Ma
       importedBy: [...new Set(file.importedBy)].sort(byText),
       routes: fileRoutes,
       pages: (pages.get(file.file) ?? []).sort(
-        (left, right) => byText(left.site, right.site) || byText(left.route, right.route) || byText(left.via, right.via),
+        (left, right) =>
+          byText(left.site, right.site) ||
+          byText(left.route, right.route) ||
+          byText(left.via, right.via),
       ),
       screens: (screens.get(file.file) ?? []).sort(
-        (left, right) => byText(left.app, right.app) || byText(left.route, right.route) || byText(left.via, right.via),
+        (left, right) =>
+          byText(left.app, right.app) ||
+          byText(left.route, right.route) ||
+          byText(left.via, right.via),
       ),
     });
   }
@@ -178,7 +208,10 @@ export function buildRoutesFile(facts: BookFacts): BookRoutesFile | null {
 }
 
 /** One `BookModuleSummary` per `module` value of the code files, sorted by module. */
-export function buildModuleSummaries(facts: BookFacts, annotations: BookAnnotations): BookModuleSummary[] {
+export function buildModuleSummaries(
+  facts: BookFacts,
+  annotations: BookAnnotations,
+): BookModuleSummary[] {
   const moduleOf = new Map(facts.files.map((file) => [file.file, file.module]));
   const byModule = groupBy(facts.files.map((file) => [file.module, file] as const));
   const routesByModule = groupBy(
@@ -248,7 +281,9 @@ export function renderModuleSummary(summary: BookModuleSummary): string {
         ? path.posix.relative(summary.module, file.file)
         : file.file;
 
-      out.push(`- ${[relative, file.type, ...(file.about === null ? [] : [file.about])].join("  ")}`);
+      out.push(
+        `- ${[relative, file.type, ...(file.about === null ? [] : [file.about])].join("  ")}`,
+      );
     }
   }
 

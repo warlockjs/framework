@@ -54,13 +54,17 @@ export function createGrimoireMcpTools(
     adapter ??=
       adapterFor?.() ??
       import("./adapter").then(({ createWarlockAdapter }) =>
-        createWarlockAdapter({ ...options, inspect: (_root, sections) => context.inspect(sections) }),
+        createWarlockAdapter({
+          ...options,
+          inspect: (_root, sections) => context.inspect(sections),
+        }),
       );
 
     return adapter;
   };
 
-  const ask = (query: (input: Record<string, unknown>) => Promise<ScryQuery> | ScryQuery) =>
+  const ask =
+    (query: (input: Record<string, unknown>) => Promise<ScryQuery> | ScryQuery) =>
     async (input: Record<string, unknown>): Promise<unknown> => {
       try {
         const { answer } = await import("./actions");
@@ -78,7 +82,10 @@ export function createGrimoireMcpTools(
       name: "grimoire_file",
       description:
         "One source file from the Grimoire book: header sentence, owning feature and borrowers, flows that reach it, exports, imports, importers, routes, pages. Read-only; reads cached route facts and never boots the app.",
-      input: inputSchema({ file: { type: "string", description: "Project-relative path (either separator)." } }, ["file"]),
+      input: inputSchema(
+        { file: { type: "string", description: "Project-relative path (either separator)." } },
+        ["file"],
+      ),
       writes: false,
       run: ask((input) => ({ type: "file", file: text(input, "file") })),
     },
@@ -86,7 +93,10 @@ export function createGrimoireMcpTools(
       name: "grimoire_impact",
       description:
         "What a change to a file reaches: importers (direct and all), API routes, pages and screens, flows, features (owner and borrowers) and tests. Read-only.",
-      input: inputSchema({ file: { type: "string", description: "Project-relative path of the file to change." } }, ["file"]),
+      input: inputSchema(
+        { file: { type: "string", description: "Project-relative path of the file to change." } },
+        ["file"],
+      ),
       writes: false,
       run: ask((input) => ({ type: "impact", file: text(input, "file") })),
     },
@@ -105,14 +115,22 @@ export function createGrimoireMcpTools(
       run: ask(async (input) => {
         const { parseRouteText } = await scryParts();
 
-        return { type: "route", ...parseRouteText(`${text(input, "method")} ${text(input, "path")}`) };
+        return {
+          type: "route",
+          ...parseRouteText(`${text(input, "method")} ${text(input, "path")}`),
+        };
       }),
     },
     {
       name: "grimoire_feature",
       description:
         "One feature: README, flows with status, its book map (own, borrowed and unreached files, routes, pages), recent changes, open tasks and its check findings. Read-only.",
-      input: inputSchema({ feature: { type: "string", description: "Feature id (folder under grimoire/features/)." } }, ["feature"]),
+      input: inputSchema(
+        {
+          feature: { type: "string", description: "Feature id (folder under grimoire/features/)." },
+        },
+        ["feature"],
+      ),
       writes: false,
       run: ask(async (input) => {
         const { parseFeatureText } = await scryParts();
@@ -124,7 +142,10 @@ export function createGrimoireMcpTools(
       name: "grimoire_flow",
       description:
         "One flow: steps with the files behind each, cases, criteria with their tests and last results (pass, fail, stale, not run, no test), where it is shown, history and findings. Read-only.",
-      input: inputSchema({ flow: { type: "string", description: "<feature>/<flow>, like catalog/new-arrivals." } }, ["flow"]),
+      input: inputSchema(
+        { flow: { type: "string", description: "<feature>/<flow>, like catalog/new-arrivals." } },
+        ["flow"],
+      ),
       writes: false,
       run: ask(async (input) => {
         const { parseFlowText } = await scryParts();
@@ -160,7 +181,10 @@ export function createGrimoireMcpTools(
       writes: false,
       run: async () => {
         try {
-          const [{ openGrimoire }, { checkGrimoire }] = await Promise.all([import("../workspace"), import("../check")]);
+          const [{ openGrimoire }, { checkGrimoire }] = await Promise.all([
+            import("../workspace"),
+            import("../check"),
+          ]);
 
           return checkGrimoire(await openGrimoire(root, await loadAdapter(), { routes: "cached" }));
         } catch (error) {
@@ -207,15 +231,24 @@ export function createGrimoireMcpTools(
       name: "grimoire_release",
       description:
         "Write the collected list of a release into grimoire/releases/<release>.md (between its markers; the agent writes the brief and stamps the changelog entries first). Writes a project file.",
-      input: inputSchema({ release: { type: "string", description: "Release name, like 1.1.0." } }, ["release"]),
+      input: inputSchema(
+        { release: { type: "string", description: "Release name, like 1.1.0." } },
+        ["release"],
+      ),
       writes: true,
       run: async (input) => {
         try {
-          const [{ parseGrimoire }, { writeRelease }] = await Promise.all([import("../written"), import("../releases")]);
+          const [{ parseGrimoire }, { writeRelease }] = await Promise.all([
+            import("../written"),
+            import("../releases"),
+          ]);
           const release = text(input, "release").trim();
 
           if (release === "" || /[\\/]/.test(release)) {
-            throw new GrimoireError("GR9006", `Pass a release name like 1.1.0 (got ${JSON.stringify(release)}).`);
+            throw new GrimoireError(
+              "GR9006",
+              `Pass a release name like 1.1.0 (got ${JSON.stringify(release)}).`,
+            );
           }
 
           return await writeRelease(root, (await parseGrimoire(root)).written, release);
@@ -226,8 +259,11 @@ export function createGrimoireMcpTools(
     },
     {
       name: "grimoire_explain",
-      description: "What a Grimoire code (GR1001…GR9006) means, what to do, the skill that explains it and its docs link. Read-only.",
-      input: inputSchema({ code: { type: "string", description: "The code, like GR2001." } }, ["code"]),
+      description:
+        "What a Grimoire code (GR1001…GR9006) means, what to do, the skill that explains it and its docs link. Read-only.",
+      input: inputSchema({ code: { type: "string", description: "The code, like GR2001." } }, [
+        "code",
+      ]),
       writes: false,
       run: async (input) => {
         const definition = explainGrimoireCode(text(input, "code"));

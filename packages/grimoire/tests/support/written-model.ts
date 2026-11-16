@@ -25,7 +25,11 @@ export function located<T>(value: T, file?: string): Located<T> {
 }
 
 /** A code file with the given imports (importers are filled by {@link facts}). */
-export function codeFile(file: string, imports: string[] = [], extra: Partial<BookFile> = {}): BookFile {
+export function codeFile(
+  file: string,
+  imports: string[] = [],
+  extra: Partial<BookFile> = {},
+): BookFile {
   return {
     file,
     module: file.split("/").slice(0, 3).join("/"),
@@ -164,10 +168,22 @@ export function feature(input: FeatureInput): WrittenFeature {
 }
 
 export function row(block: string, flowRef: string | null): WrittenBlockRow {
-  return { block, flow: flowRef, who: { everyone: true, conditions: [] }, changesWith: [], at: at() };
+  return {
+    block,
+    flow: flowRef,
+    who: { everyone: true, conditions: [] },
+    changesWith: [],
+    at: at(),
+  };
 }
 
-export function page(app: string, id: string, route: string, blocks: WrittenBlockRow[], type: "page" | "screen" = "page"): WrittenPage {
+export function page(
+  app: string,
+  id: string,
+  route: string,
+  blocks: WrittenBlockRow[],
+  type: "page" | "screen" = "page",
+): WrittenPage {
   const file = `grimoire/apps/${app}/${type}s/${id}/README.md`;
 
   return {
@@ -186,7 +202,12 @@ export function page(app: string, id: string, route: string, blocks: WrittenBloc
   };
 }
 
-export function app(id: string, type: "site" | "mobile", root: string, parts: Partial<Pick<WrittenApp, "layouts" | "pages" | "screens">> = {}): WrittenApp {
+export function app(
+  id: string,
+  type: "site" | "mobile",
+  root: string,
+  parts: Partial<Pick<WrittenApp, "layouts" | "pages" | "screens">> = {},
+): WrittenApp {
   const file = `grimoire/apps/${id}/README.md`;
 
   return {
@@ -207,9 +228,14 @@ export function task(
   id: string,
   folder: "open" | "done",
   status: WrittenTask["status"]["value"],
-  extra: { decisionNeeded?: string; shipped?: { feature: string; version: string }; feature?: string } = {},
+  extra: {
+    decisionNeeded?: string;
+    shipped?: { feature: string; version: string };
+    feature?: string;
+  } = {},
 ): WrittenTask {
-  const file = folder === "open" ? `grimoire/tasks/open/${id}-x.md` : `grimoire/tasks/done/2026-11/${id}-x.md`;
+  const file =
+    folder === "open" ? `grimoire/tasks/open/${id}-x.md` : `grimoire/tasks/done/2026-11/${id}-x.md`;
 
   return {
     file,
@@ -228,7 +254,9 @@ export function task(
   };
 }
 
-export function written(parts: Partial<Pick<WrittenGrimoire, "features" | "apps" | "tasks">> = {}): WrittenGrimoire {
+export function written(
+  parts: Partial<Pick<WrittenGrimoire, "features" | "apps" | "tasks">> = {},
+): WrittenGrimoire {
   return {
     root: "/project",
     exists: true,

@@ -57,7 +57,9 @@ function one(query: GrimoirePanelRequest["query"], name: string): string | undef
 }
 
 /** Build the panel for the app at `root`. */
-export async function grimoireDevtoolsPanel(context: GrimoirePanelContext): Promise<GrimoireDevtoolsPanel> {
+export async function grimoireDevtoolsPanel(
+  context: GrimoirePanelContext,
+): Promise<GrimoireDevtoolsPanel> {
   const source = createSnapshotSource(context.root, {
     ...(context.adapter === undefined ? {} : { adapter: context.adapter }),
     ...(context.ttlMs === undefined ? {} : { ttlMs: context.ttlMs }),
@@ -79,16 +81,31 @@ export async function grimoireDevtoolsPanel(context: GrimoirePanelContext): Prom
         handler: answer((snapshot, { query }) => {
           const limit = Number(one(query, "limit"));
 
-          return data.search(snapshot, one(query, "q") ?? "", Number.isFinite(limit) && limit > 0 ? limit : undefined);
+          return data.search(
+            snapshot,
+            one(query, "q") ?? "",
+            Number.isFinite(limit) && limit > 0 ? limit : undefined,
+          );
         }),
       },
-      { path: "/file", handler: answer((snapshot, { query }) => data.file(snapshot, one(query, "path"))) },
-      { path: "/impact", handler: answer((snapshot, { query }) => data.impact(snapshot, one(query, "path"))) },
+      {
+        path: "/file",
+        handler: answer((snapshot, { query }) => data.file(snapshot, one(query, "path"))),
+      },
+      {
+        path: "/impact",
+        handler: answer((snapshot, { query }) => data.impact(snapshot, one(query, "path"))),
+      },
       {
         path: "/route",
-        handler: answer((snapshot, { query }) => data.route(snapshot, one(query, "method"), one(query, "path"))),
+        handler: answer((snapshot, { query }) =>
+          data.route(snapshot, one(query, "method"), one(query, "path")),
+        ),
       },
-      { path: "/features/:feature", handler: answer((snapshot, { params }) => data.feature(snapshot, params.feature)) },
+      {
+        path: "/features/:feature",
+        handler: answer((snapshot, { params }) => data.feature(snapshot, params.feature)),
+      },
       {
         path: "/flows/:feature/:flow",
         handler: answer((snapshot, { params }) => data.flow(snapshot, params.feature, params.flow)),
@@ -100,16 +117,24 @@ export async function grimoireDevtoolsPanel(context: GrimoirePanelContext): Prom
       },
       { path: "/tasks", handler: answer((snapshot) => data.tasks(snapshot)) },
       { path: "/releases", handler: answer((snapshot) => data.releases(snapshot)) },
-      { path: "/releases/:release", handler: answer((snapshot, { params }) => data.release(snapshot, params.release)) },
+      {
+        path: "/releases/:release",
+        handler: answer((snapshot, { params }) => data.release(snapshot, params.release)),
+      },
       { path: "/check", handler: answer((snapshot) => data.check(snapshot)) },
-      { path: "/graph/file", handler: answer((snapshot, { query }) => data.graphOfFile(snapshot, one(query, "path"))) },
+      {
+        path: "/graph/file",
+        handler: answer((snapshot, { query }) => data.graphOfFile(snapshot, one(query, "path"))),
+      },
       {
         path: "/graph/feature/:feature",
         handler: answer((snapshot, { params }) => data.graphOfFeature(snapshot, params.feature)),
       },
       {
         path: "/graph/page",
-        handler: answer((snapshot, { query }) => data.graphOfPage(snapshot, one(query, "app"), one(query, "page"))),
+        handler: answer((snapshot, { query }) =>
+          data.graphOfPage(snapshot, one(query, "app"), one(query, "page")),
+        ),
       },
       { path: "/graph/modules", handler: answer((snapshot) => data.graphOfModules(snapshot)) },
     ],

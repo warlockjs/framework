@@ -17,7 +17,10 @@ vi.mock("node:fs/promises", async (importOriginal) => {
     readFile: (async (file: Parameters<typeof original.readFile>[0], ...rest: unknown[]) => {
       reads.push(String(file));
 
-      return (original.readFile as unknown as (...args: unknown[]) => Promise<unknown>)(file, ...rest);
+      return (original.readFile as unknown as (...args: unknown[]) => Promise<unknown>)(
+        file,
+        ...rest,
+      );
     }) as unknown as typeof original.readFile,
   };
 });
@@ -29,7 +32,9 @@ describe("parseGrimoire reads", () => {
     reads.length = 0;
     await parseGrimoire(messyRoot);
 
-    const relative = reads.map((file) => path.relative(messyRoot, file).split(path.sep).join("/")).sort();
+    const relative = reads
+      .map((file) => path.relative(messyRoot, file).split(path.sep).join("/"))
+      .sort();
 
     expect(relative).toEqual([
       "grimoire/apps/site/README.md",

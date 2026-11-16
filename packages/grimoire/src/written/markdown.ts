@@ -103,7 +103,11 @@ export function readDocument(
     }
 
     if (fields === null && result.errors.length === 0 && frontMatter === "required") {
-      sink.report("GR1001", "The file has no front matter; it must start with a `---` line.", lineAt(file, 1));
+      sink.report(
+        "GR1001",
+        "The file has no front matter; it must start with a `---` line.",
+        lineAt(file, 1),
+      );
     }
   }
 
@@ -125,7 +129,8 @@ export function readDocument(
 
     const heading = HEADING.exec(text);
 
-    if (heading) headings.push({ level: (heading[1] ?? "").length, text: (heading[2] ?? "").trim(), line });
+    if (heading)
+      headings.push({ level: (heading[1] ?? "").length, text: (heading[2] ?? "").trim(), line });
   }
 
   const sections: Section[] = [];
@@ -147,7 +152,12 @@ export function readDocument(
       }
 
       if (heading.level === 2) {
-        current = { title: heading.text, key: normalizeKey(heading.text), line: heading.line, lines: [] };
+        current = {
+          title: heading.text,
+          key: normalizeKey(heading.text),
+          line: heading.line,
+          lines: [],
+        };
         sections.push(current);
         continue;
       }
@@ -156,7 +166,15 @@ export function readDocument(
     current?.lines.push(bodyLine);
   }
 
-  return { file, raw, fields, body, title, sections, bodyStartLine: Math.min(firstBodyLine, raw.length) || 1 };
+  return {
+    file,
+    raw,
+    fields,
+    body,
+    title,
+    sections,
+    bodyStartLine: Math.min(firstBodyLine, raw.length) || 1,
+  };
 }
 
 /** The first section with this (normalised) title. */
@@ -269,7 +287,9 @@ export function textAfterTitle(document: WrittenDocument, endLine?: number): str
   const from = document.title?.line ?? 0;
 
   return document.body
-    .filter((bodyLine) => bodyLine.line > from && (endLine === undefined || bodyLine.line < endLine))
+    .filter(
+      (bodyLine) => bodyLine.line > from && (endLine === undefined || bodyLine.line < endLine),
+    )
     .map((bodyLine) => bodyLine.text)
     .join("\n")
     .trim();

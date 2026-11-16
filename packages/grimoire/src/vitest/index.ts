@@ -14,7 +14,12 @@
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { ProofLine, ProofResult, TestOutcome, TestResultsStore } from "../contracts/test-results";
+import type {
+  ProofLine,
+  ProofResult,
+  TestOutcome,
+  TestResultsStore,
+} from "../contracts/test-results";
 import { toPosixPath } from "../paths";
 import { scanProofsInText } from "../proves";
 import { hashTestFile, mergeTestResults, readTestResults, writeTestResults } from "../test-results";
@@ -49,7 +54,11 @@ type ReportedModule = {
 
 type VitestContext = { config?: { root?: string; includeTaskLocation?: boolean } };
 
-const OUTCOMES: Record<string, TestOutcome | undefined> = { passed: "pass", failed: "fail", skipped: "skip" };
+const OUTCOMES: Record<string, TestOutcome | undefined> = {
+  passed: "pass",
+  failed: "fail",
+  skipped: "skip",
+};
 
 /** Create the reporter. */
 export function grimoireReporter(options: GrimoireReporterOptions = {}): GrimoireReporter {

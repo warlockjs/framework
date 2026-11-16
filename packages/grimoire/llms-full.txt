@@ -1,0 +1,803 @@
+# Warlock Grimoire — full skills
+
+> Package: `@warlock.js/grimoire`
+
+> Generated artifact. Concatenates every SKILL.md and reference file under `@warlock.js/grimoire/skills/`. Re-run `node scripts/generate-llms.mjs` after any change.
+
+## Package orientation
+
+---
+description: 'Grimoire (experimental), the project map for Warlock.js apps: `warlock scry` and `warlock grimoire build|check|release` over a `grimoire/` folder of generated book entries and agent-written features, flows, apps, tasks and releases. Topics: use the map before searching code, write a feature, record a change and release, describe sites and mobile screens, document a file, backfill an existing app. Use at the start of every task in a project that has `grimoire/`.'
+---
+
+# @warlock.js/grimoire
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+`grimoire/` is the map of a Warlock.js project. Warlock writes the **book** (one entry per source file, the routes, the pages and the mobile screens, in `grimoire/book/`, not in git). Agents write what the product does (`grimoire/features/`), where users meet it (`grimoire/apps/`), the work (`grimoire/tasks/`) and the releases (`grimoire/releases/`). Warlock never edits a file an agent wrote.
+
+## The 80% path
+
+1. Before searching the code, ask the map: `use-the-grimoire.md`.
+2. A new behaviour starts as a task, a brief, a feature README and a flow, before code: `write-a-feature.md`.
+3. After the change, tie tests to criteria, reshape the README, add the changelog entry, close the task, run the check, and at release time stamp the changelogs and write the brief: `record-a-change.md`.
+4. Pages, blocks, conditions and mobile screens: `describe-an-app.md`.
+5. The header and export comments the book copies from a file: `document-a-file.md`.
+6. A project with code but no `grimoire/` folder: `backfill-a-grimoire.md`.
+
+## Conventions and pitfalls
+
+- Never edit `grimoire/book/`, `index.json`, `bookmap.json` or `*.bookmap.json`.
+- You write release numbers and dates into changelogs and the release brief; `warlock grimoire release` only writes the collected list.
+- A finding marked `(expected)` belongs to `proposed` work and does not fail `warlock grimoire check`.
+- Mobile screens are listed from file names only with file-based routing; declare them when navigation is in code.
+- Do not invent intent: write `Unknown:` and ask the owner.
+
+
+## backfill-a-grimoire  `@warlock.js/grimoire/skills/backfill-a-grimoire/SKILL.md`
+
+---
+name: backfill-a-grimoire
+description: 'Write the Grimoire for a project that already has code but no `grimoire/` folder: build the book, propose features from the modules and routes, write them as inferred, and bring the owner the questions only they can answer. Use once per existing project, or when a large undescribed area is found.'
+---
+
+# Backfill a Grimoire
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+The code exists; the description does not. You will infer intent from code, and inference can be
+plausible and wrong. So everything you write here is marked **inferred** until the owner confirms
+it, and you bring them questions instead of guessing.
+
+## 1. Build the book
+
+```bash
+npx warlock grimoire build
+```
+
+It needs no writing. Read the module summaries (`grimoire/book/app/<module>/index.md`), the
+route list (`grimoire/book/app/routes.json`) and each site's page list.
+
+## 2. Propose the features
+
+Start from the modules: a module is usually one feature. Then adjust.
+
+- Two modules that cannot be described without each other → one feature with both `folders`.
+- A module that does two unrelated things → two features; tag the files of the smaller one.
+- Plumbing (config, shared utilities, the base layout) → no feature.
+- Mail, notifications, search: the machinery is a feature; each mail or notification belongs to
+  the feature that sends it.
+
+Write the proposal as a table for the owner **before** writing files:
+
+| Feature | Folders | Flows you see | Apps | Unsure about |
+| --- | --- | --- | --- | --- |
+| auth | src/app/auth | sign-up, login, reset-password | web-client, mobile | is phone login still used? |
+
+Wait for the owner's answer on the list. Features are the frame for everything else; a wrong
+frame costs the most to fix.
+
+## 3. Write each feature as inferred
+
+Follow `write-a-feature` for the shapes, with these differences:
+
+```md
+---
+id: auth
+status: shipped
+origin: inferred
+version: 1.0
+---
+```
+
+- `origin: inferred` on the README and on each flow. The owner changes it to `confirmed`.
+- Start every feature at `1.0`. Do not reconstruct history; the changelog gets one line under `## Unreleased`:
+  `- 1.0  added  described from the existing code`.
+- **Steps:** take them from the routes and pages, in the order a user meets them.
+- **Cases:** write only the cases the code handles. For a question the code does not handle
+  (a double submit, an expired code), do not write a case. List it under `## Not handled` so
+  the owner sees the gap.
+- **Criteria:** one per case. Tag the existing tests with `@proves` where a test clearly proves
+  one. Do not write new tests during a backfill.
+- **Intent you cannot see:** write `Unknown: why does a VIP skip the stock check?` in the flow.
+  Never invent a reason.
+
+## 4. Describe the apps
+
+One folder per site and mobile app (`describe-an-app`). Declare the conditions you find in the
+code (roles, permissions, membership checks). Write page files only for pages that combine
+several features or change with the user. When the mobile app defines navigation in code, declare
+its screens yourself; they are listed from file names only with file-based routing.
+
+## 5. Check and hand over
+
+```bash
+npx warlock grimoire check
+```
+
+Fix what it reports about your own files. A backfilled project reports many warnings (criteria with
+no test, files with no header); fix errors first and list the warnings for the owner. Then give the owner one list:
+
+- features and flows written, all inferred;
+- every `Unknown:` and `Not handled` line, as questions;
+- files that belong to no feature;
+- files inside a feature that no flow reaches (undescribed behaviour or dead code);
+- criteria with no test.
+
+Open one task per question that needs a decision. Do not fix code during a backfill; open a task
+for each bug you notice.
+
+## Size
+
+Work one feature at a time and finish it before starting the next. A large project takes several
+sessions; the task list says where you stopped.
+
+
+## describe-an-app  `@warlock.js/grimoire/skills/describe-an-app/SKILL.md`
+
+---
+name: describe-an-app
+description: 'Describe where users meet the product in `grimoire/apps/`: one folder per site or mobile app, its named conditions (guest, customer, membership, preferences), shared layouts, and the pages or screens whose blocks point to feature flows. Use when adding a page, a screen or a block, or when what a page shows depends on who is looking.'
+---
+
+# Describe an app
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+Features say what the product does. Apps say where a user sees it. One folder per site or mobile
+app:
+
+```
+grimoire/apps/
+  web-client/
+    README.md              the app and its conditions
+    layouts/site.md        blocks every page of this layout shares
+    pages/home/README.md   purpose, layout, blocks
+    pages/home/blocks/new-arrivals.md   only when the block has page-specific detail
+  web-admin/
+  mobile/
+    screens/home/README.md      declared by you when navigation is in code
+```
+
+Write a file only when it says something the code or a feature flow does not already say. A page
+with one purpose, no variation and no blocks from other features needs no file.
+
+## The app README
+
+```md
+---
+id: web-client
+type: site
+root: src/web/$sites/client
+---
+
+# The shop website
+
+## Conditions
+- guest               not signed in
+- customer            signed in
+- vip                 customer with the vip membership
+- pref:personalised   the customer left personalised content on
+```
+
+Every page and block of this app uses these names and no others. Add a condition here before
+using it. Name roles and permissions exactly as the access configuration does, so they can be
+checked.
+
+A mobile app in the same repository is one more app: `type: mobile`, `root: mobile`.
+
+## Mobile screens
+
+How a screen gets into the book depends on how the app navigates:
+
+| The mobile app | Screens come from | You write |
+| --- | --- | --- |
+| File-based routing (Expo Router) | The route file names under its `app` folder (`collectMobileFacts`) | A screen file only when it says something the route does not |
+| Navigation defined in code | Nowhere: the book cannot read it | One file per screen you describe, in `grimoire/apps/<app>/screens/<screen>/README.md` |
+
+A declared screen has a `route` (or a `screen` name) in its front matter:
+
+```md
+---
+screen: order-tracking
+---
+
+# Order tracking
+
+## Blocks
+| Block         | Flow                | Who sees it | Changes with |
+| ------------- | ------------------- | ----------- | ------------ |
+| Courier stage | orders/track-order  | customer    | —            |
+```
+
+When the app uses file-based routing, `warlock grimoire check` reports a screen whose route has no
+file. When navigation is in code, declare every screen a flow names; the check cannot verify it.
+
+## A page or screen
+
+```md
+---
+route: /
+layout: site
+---
+
+# Home
+
+The first page a visitor sees.
+
+## Blocks
+| Block             | Flow                     | Who sees it | Changes with            |
+| ----------------- | ------------------------ | ----------- | ----------------------- |
+| Featured products | catalog/browse-products  | everyone    | vip: member prices      |
+| New arrivals      | catalog/new-arrivals     | everyone    | the customer's country  |
+| Recent orders     | orders/place-order       | customer    | —                       |
+```
+
+- **One row per part of the page**, not one description per kind of user. Three roles and two
+  preferences are a few rows, not six pages.
+- **Flow** is `feature/flow`. The rule for what the block shows lives there. Do not restate it.
+- **Who sees it** and **Changes with** use the app's condition names.
+- Do not list blocks that come from the layout.
+
+## A layout
+
+`layouts/site.md` has the same Blocks table for what every page of that layout shares (header,
+cart count, notifications bell, footer). Write it once; pages inherit it.
+
+## A block file
+
+Only when the block has something to say about this page in particular:
+
+```md
+---
+flow: catalog/new-arrivals
+---
+
+# New arrivals on the home page
+
+- position   second row, under Featured products
+- shows      a grid of up to 20 products
+- on phones  one row that scrolls sideways
+```
+
+## Where a difference between apps goes
+
+| The difference | Goes in |
+| --- | --- |
+| What the user gets (mobile uses the device location) | The flow, under `## Differs by app` |
+| How it looks or where it sits (a row on mobile, a grid on web) | That app's block file |
+
+## How a page is reached, and what it requires
+
+Do not write these. The book lists how a page is reached (links and redirects it can read) and
+what it requires (middleware and permissions). Write an entry point yourself only when the book
+cannot see it, such as a link in an email:
+
+```md
+## Also reached from
+- mail   order-confirmation
+```
+
+## Check
+
+```bash
+npx warlock grimoire check
+```
+
+It reports a block that points to a flow that does not exist, a condition that is not declared in
+the app README, a page whose route is gone, a screen with no route (file-based apps), and a
+feature that lists an app with no folder here. Its codes are `GR5001` to `GR5009`;
+`npx warlock explain GR5003` describes one.
+
+
+## document-a-file  `@warlock.js/grimoire/skills/document-a-file/SKILL.md`
+
+---
+name: document-a-file
+description: 'Write the one-sentence header and the public-export comments the Grimoire copies into its book, and tag a file with `@feature` when it lives outside its feature''s folders. Use whenever you create a source file or change what one is for.'
+---
+
+# Document a file
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+Warlock copies two things from each source file into the book: the sentence at the top, and the
+comment above each public export. They are the only words in the book that you write, and they
+are what another agent reads to decide whether to open the file.
+
+## The header: one sentence, first thing in the file
+
+Say why the file exists, from the product's side.
+
+```ts
+/** Lists the newest products sold in the customer's country. */
+
+export const NEW_ARRIVALS_LIMIT = 20;
+```
+
+- One sentence. If you need two, the file probably does two things.
+- Say what it is for, not what kind of file it is. The book already knows it is a service.
+- Change it when the file's purpose changes. A stale header misleads every reader after you.
+
+| Write | Not |
+| --- | --- |
+| `Creates a post for the signed-in author.` | `Controller for posts.` |
+| `Sends the order confirmation email.` | `This file contains the mail class.` |
+| `Decides the price a VIP customer pays.` | `Helper functions.` |
+
+## Public exports: one line each
+
+```ts
+/** Returns up to 20 products, newest first. */
+export async function listNewArrivals(country?: string) {
+  // …
+}
+```
+
+- Comment only what other files import. Private helpers need no comment.
+- Say what the caller gets or what happens. Do not repeat the name ("Lists new arrivals").
+- Put limits and units in the line when they exist ("up to 20", "in minutes").
+
+## The feature tag: only for exceptions
+
+A file belongs to the feature whose `folders` contain it. Add a tag only when the file lives
+somewhere else:
+
+```ts
+/**
+ * Deletes accounts that were never verified, seven days after sign-up.
+ * @feature auth
+ */
+```
+
+One feature per file. A file used by several features still has one owner; the book lists the
+others as borrowing it. Do not tag shared plumbing (config, generic utilities, the base layout).
+
+## Check your work
+
+```bash
+npx warlock scry src/app/catalog/services/new-arrivals.service.ts
+```
+
+The `about` line and each export's line should read well on their own, without the code beside
+them. `npx warlock grimoire check` reports a file with no header and a file with no feature.
+
+## Do not
+
+- Do not write a comment on every function, field or parameter.
+- Do not describe the implementation ("uses a loop to…").
+- Do not copy the flow's text into the file. The flow lives in `grimoire/features/`.
+
+
+## record-a-change  `@warlock.js/grimoire/skills/record-a-change/SKILL.md`
+
+---
+name: record-a-change
+description: 'Finish a change the Grimoire way: tie each test to the acceptance criterion it proves, reshape the feature README, add the changelog entry with the right version, move the task to done, run `warlock grimoire check`, and write the release brief. Use after building any change, including a bug fix.'
+---
+
+# Record a change
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+A change is finished when the code, the tests and the description agree. Do these in order.
+
+## 1. Tie tests to criteria
+
+Put a line above each test that proves a criterion:
+
+```ts
+// @proves catalog/new-arrivals AC-2
+it("returns the global list when the customer has no country", async () => {
+  // …
+});
+```
+
+- End-to-end tests prove a flow's steps. Unit tests prove a business rule ("a reset code expires
+  after 10 minutes").
+- One test may prove one criterion. If it needs two tags, split the test.
+- A bug fix gets a test that fails without the fix. If no criterion covers the bug, the flow was
+  missing a case: add the case and the criterion first.
+
+## 2. Reshape the README and the flow
+
+Edit them so they describe the feature **as it is now**, as if it had always been this way. Do
+not append "Update:" notes; history goes in the changelog. Set `updated` to today and `version`
+to the new version. Set a flow's `status` to `shipped` once its code and tests exist.
+
+## 3. Add the changelog entry
+
+`grimoire/features/catalog/CHANGELOG.md`, newest first, under `## Unreleased`. Warlock never edits
+this file; you write every line of it, including the release number and date when the release ships
+(step 6):
+
+```md
+## Unreleased
+- 2.1  fixed   new-arrivals: a customer with no country saw an empty list
+               instead of the global one (AC-2)
+```
+
+| The change | Version | Word |
+| --- | --- | --- |
+| A new flow or a new capability | next whole number (`3.0`) | `added` |
+| Behaviour of an existing flow changes | next decimal (`2.1`) | `changed` |
+| The code did not match the flow | next decimal (`2.1`) | `fixed` |
+| A flow is retired | next whole number | `removed` |
+
+One line per change, written for someone who uses the product. Name the flow, and the criterion
+when there is one. While the change is unreleased, write no date and no release number.
+
+## 4. Close the task
+
+Move the file from `grimoire/tasks/open/` to `grimoire/tasks/done/<yyyy-mm>/` and set:
+
+```md
+status: done
+shipped: catalog 2.1
+```
+
+Add two lines: how it was verified (which tests, which criteria) and anything left open. If
+something is left open, open a new task for it; do not leave it only in the done file.
+
+## 5. Check
+
+```bash
+npx warlock grimoire check
+```
+
+| It reports | Do |
+| --- | --- |
+| A step names a route, page, mail or job that does not exist | Fix the name in the flow, or the code |
+| A criterion has no test | Write the test, or say in the task why not |
+| A test points at a criterion that does not exist | Fix the `@proves` line |
+| A file has no header, or no feature | `document-a-file` |
+| A file in the feature's folders that no flow reaches | Describe the behaviour in a flow, or delete dead code |
+| A README `updated` older than its newest changelog entry | Reshape the README |
+| A changelog version that does not fit the word (`added` with `2.1`) | Fix the version |
+
+Fix every line it prints. Do not finish with problems you caused. Findings on a flow or feature
+with `status: proposed` print with `(expected)` and do not fail the check: leave them until the
+code exists.
+
+## 6. At release time
+
+Warlock does not edit your files at release. You do three things, in this order:
+
+1. **Stamp the changelogs.** In each feature that changed, move the `## Unreleased` entries under a
+   heading with the release number and date:
+
+   ```md
+   ## Unreleased
+
+   ## 1.4.1 (2026-11-20)
+   - 2.1  fixed   new-arrivals: a customer with no country saw an empty list
+                  instead of the global one (AC-2)
+   ```
+
+2. **Write the release brief.** Create `grimoire/releases/1.4.1.md`:
+
+   ```md
+   ---
+   release: 1.4.1
+   date: 2026-11-20
+   ---
+
+   # Release 1.4.1
+
+   Customers with no country on their account see new arrivals again.
+   ```
+
+   Two or three sentences on what the release means to users.
+
+3. **Collect the list.**
+
+   ```bash
+   npx warlock grimoire release 1.4.1
+   ```
+
+   It writes the entries you stamped with that release between the markers under your brief, and
+   changes nothing else. It also says how many entries are still unreleased. Do not write that list
+   yourself, and run the command again after any change to a changelog: the result is the same
+   every time.
+
+`npx warlock grimoire check` reports a listed entry that has no changelog entry stamped with that
+release and date, and a release section with no release file.
+
+## Report to the owner
+
+Say what changed in plain words, the feature version, which criteria are proven, what the check
+reported, and what is left open with its task id.
+
+
+## use-the-grimoire  `@warlock.js/grimoire/skills/use-the-grimoire/SKILL.md`
+
+---
+name: use-the-grimoire
+description: 'Find the right files before changing a Warlock.js project by asking the Grimoire (experimental): `warlock scry` for a file, a route, a feature, a flow or the impact of a change, and the `grimoire/` folder for what the product does. Use at the start of every task, before searching the code.'
+---
+
+# Use the Grimoire
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+`grimoire/` is the map of this project. Read it before you search the code: it tells you where
+things are, what a feature is meant to do, and what a change will touch.
+
+| Folder | Holds | Written by |
+| --- | --- | --- |
+| `grimoire/book/` | One entry per source file, plus routes and pages | Warlock (never edit) |
+| `grimoire/features/` | What the product does: features, flows, cases, criteria | You and other agents |
+| `grimoire/apps/` | Where users meet it: sites, mobile apps, pages, blocks | You and other agents |
+| `grimoire/tasks/` | Open and finished work | You and other agents |
+| `grimoire/releases/` | What each release shipped | You write the brief, Warlock collects the list |
+
+Files named `index.json`, `bookmap.json` or ending in `.bookmap.json` are Warlock's. A feature's
+`bookmap.json` says what the feature owns and borrows, and each flow's `*.bookmap.json` says which
+files sit behind each step and which tests prove each criterion. They are rebuilt on demand and are
+not in git. Never edit them; change the code or the written files and they follow. Warlock never
+edits a file you wrote either.
+
+## Start of every task
+
+1. Find the feature and flow the task is about.
+
+   ```bash
+   npx warlock scry --search "new arrivals"
+   ```
+
+   ```text
+   flow     catalog/new-arrivals          New arrivals
+   block    web-client/home/new-arrivals  catalog/new-arrivals
+   route    GET /api/products/new-arrivals
+   file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
+   ```
+
+2. Read the feature's `README.md`, then the flow file. They say what the behaviour should be.
+3. Ask for the flow's book map. It lists the files behind each step, the tests that prove each
+   criterion and the pages that show the flow.
+
+   ```bash
+   npx warlock scry --flow catalog/new-arrivals
+   ```
+
+4. Read only those files. Do not read a whole module to find one function.
+
+## Questions the book answers
+
+```bash
+npx warlock scry src/app/catalog/services/new-arrivals.service.ts   # what is this file?
+npx warlock scry --impact src/app/catalog/models/product.model.ts   # what breaks if I change it?
+npx warlock scry --route "POST /api/orders"                         # what is behind this URL?
+npx warlock scry --feature catalog                                  # the whole feature
+npx warlock scry --flow catalog/new-arrivals                        # one flow, step by step
+```
+
+Add `--json` for machine-readable output. `--impact` lists API routes, pages, flows and features,
+including features that only borrow the file. Read the flows it names and run their tests after
+your change.
+
+A file's entry is also at a fixed path: `src/app/auth/controllers/login.controller.ts` is described
+in `grimoire/book/app/auth/controllers/login.controller.json`.
+
+## Commands
+
+| Command | Does |
+| --- | --- |
+| `warlock grimoire build` | Builds or refreshes the book. `scry` and `check` do it when it is stale |
+| `warlock grimoire check` | Reports broken names, untested criteria, files with no owner. Exit 1 on an error |
+| `warlock grimoire release <release>` | Writes the collected list into `grimoire/releases/<release>.md` |
+| `warlock grimoire export [dir]` | Writes the book as a static site |
+| `warlock explain GR2001` | Explains a finding code |
+
+Every finding has a code (`GR2001`) and a fix hint. A finding marked `(expected)` belongs to work
+that is still `proposed`; it does not fail the check.
+
+## What to trust
+
+- **Exports, imports, importers, routes, middleware, pages:** read from the code. Trust them.
+- **Files behind a route:** every file the handler can reach through imports. It is not the exact
+  call path; open the handler to see which ones it really uses.
+- **Reached from:** only links and redirects written as plain values. `unknown` means look.
+- **Written files:** they say what should happen. When the code disagrees with a flow, do not
+  pick one silently. Say which is wrong, and fix it or ask the owner.
+
+## When there is nothing to find
+
+- No flow matches the task: the behaviour is undescribed. Describe it first with
+  `write-a-feature`, then change the code.
+- The command says the book is missing or stale: it rebuilds on its own. If it reports problems,
+  read them; `npx warlock grimoire check` prints the same list.
+- The project has code but no `grimoire/` folder: use `backfill-a-grimoire`.
+
+## See also
+
+`write-a-feature`, `record-a-change`, `describe-an-app`, `document-a-file`, `backfill-a-grimoire`.
+
+## From code
+
+The same answers are available as functions, for tools that build on the Grimoire.
+
+From `@warlock.js/grimoire` (no dependency on core or web):
+
+- `openGrimoire` loads everything once (it runs `parseGrimoire`, `buildBook`, `matchApps`,
+  `resolveOwnership`, `scanProofs`, `readTestResults`, `buildCollectedFiles`, then `writeBook`
+  and `writeCollectedFiles`), and returns a snapshot.
+- `scry` answers a query from the snapshot; `formatScryResult` prints it; `parseScryQuery` reads
+  CLI arguments into a query.
+- `checkGrimoire` runs every rule; `formatCheckReport` prints the report. Each finding has a code
+  from `GRIMOIRE_CODES` (also `GRIMOIRE_CODE_LIST`); `explainGrimoireCode`, `isGrimoireCode` and
+  `grimoireCodeDocsUrl` (based on `GRIMOIRE_CODES_DOCS_URL`) describe it, and rules build
+  findings with `createFinding`. Commands throw `GrimoireError` with a code.
+- `collectRelease`, `renderCollectedList` and `writeRelease` gather the changelog entries of a
+  release between `COLLECTED_START_MARKER` and `COLLECTED_END_MARKER`.
+- `scanProofs` and `scanProofsInText` read `// @proves` lines; `criterionStatus` turns test
+  results into a criterion's status; `CASE_QUESTIONS` lists the questions every flow answers.
+- Helpers: `loadBook`, `readFrontMatter`, `fileGraph`, `importClosure`, `importerClosure`,
+  `bookEntryPath`, `bookEntryPaths`, `toPosixPath`, `GRIMOIRE_DIR`, `GRIMOIRE_PATHS`,
+  `GRIMOIRE_IGNORE_RULES` (the `.gitignore` lines) and `BOOK_SCHEMA_VERSION`.
+
+From `@warlock.js/grimoire/warlock` (needs `@warlock.js/core`): `registerGrimoireCommands` returns
+the `grimoire` and `scry` commands for `cli.commands` in `warlock.config.ts`;
+`createWarlockAdapter` builds the adapter that feeds the book from the inspect report;
+`collectMobileFacts` lists mobile screens from Expo Router file names.
+
+From `@warlock.js/grimoire/vitest`: `grimoireReporter` records the last result of every test marked
+`// @proves` into `grimoire/book/test-results.json`. Add it to the Vitest `reporters` list.
+
+From `@warlock.js/grimoire/devtools`: `grimoireDevtoolsPanel` (the default export) is the Grimoire
+tab for `@warlock.js/devtools`, listed in `panels` of `src/config/devtools.ts`;
+`exportGrimoireSite` writes the same view as a static site.
+
+
+## write-a-feature  `@warlock.js/grimoire/skills/write-a-feature/SKILL.md`
+
+---
+name: write-a-feature
+description: 'Describe a new feature, or a new version of one, in `grimoire/features/` before writing code: the task, the brief, the README front matter, each flow with its steps, cases and acceptance criteria. Use when the owner asks for something the product does not do yet.'
+---
+
+# Write a feature
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+Describe the behaviour first, then build it. The description is the brief the owner approves and
+the thing your tests will prove.
+
+## Is it a feature, a flow, or a change?
+
+- **A feature** is something a user or another system can do, named from their side (`auth`,
+  `catalog`, `orders`). It has roughly two to ten flows.
+- **A flow** is one path through it (`sign-up`, `google-login`, `new-arrivals`).
+- **A new capability** in an existing feature is a new whole-number version (`2.0`) with its
+  own brief. **A small change or a fix** is a decimal (`2.1`) and needs no brief: go to
+  `record-a-change`.
+- A notification, mail or job belongs to the feature whose business reason creates it. "Your
+  order shipped" belongs to `orders`, not to `notifications`.
+
+## 1. Open a task
+
+`grimoire/tasks/open/T-014-wishlist.md`:
+
+```md
+---
+id: T-014
+type: feature
+feature: catalog
+apps: [web-client, mobile]
+status: waiting for approval
+---
+
+# Let customers save products to a wishlist
+
+- Asked by: the owner, 2026-11-16
+- Why: customers ask to keep products for later
+- Brief: features/catalog/versions/v3.md
+- Decision needed: one wishlist per customer, or several named lists?
+```
+
+## 2. Write the brief
+
+`grimoire/features/catalog/versions/v3.md`: why, what changes (which flows are new or changed),
+and what is out of scope. Keep it to one screen.
+
+## 3. Write or update the feature README
+
+```md
+---
+id: catalog
+title: Product catalog
+status: proposed
+version: 3.0
+updated: 2026-11-16
+apps: [web-client, mobile]
+folders: [src/app/catalog, src/web/$sites/client/products]
+---
+
+# Product catalog
+
+Customers browse products, search them and see what is new.
+
+## Flows
+- browse-products   list and filter products
+- wishlist          save a product for later
+
+## Affects and affected by
+- affected by orders/place-order (lowers stock)
+```
+
+`id` never changes. `folders` are the folders whose files belong to this feature. `apps` must
+exist under `grimoire/apps/`. A feature whose folders hold no file yet is fine while it is
+`proposed`.
+
+## 4. Write each flow
+
+`grimoire/features/catalog/flows/wishlist.md`:
+
+```md
+---
+id: wishlist
+since: 3.0
+status: proposed
+who: customer
+---
+
+# Save a product to the wishlist
+
+## Steps
+1. page           /products/:id
+2. route          POST /wishlist
+3. notification   wishlist-price-drop
+4. page           /wishlist
+
+## Differs by app
+- mobile   the save button is also on the product card in lists
+
+## Cases
+- invalid input         a product id that is not an id → 422
+- not allowed           guest → sent to sign in, then back to the product
+- not found             the product does not exist → 404
+- duplicate             already saved → stays saved, no error
+- limits                at most 200 products
+- expiry                does not apply: saved products do not expire
+- double submit         two taps save once
+- outside service down  does not apply
+
+## Acceptance criteria
+- AC-1            a saved product appears on /wishlist
+- AC-2            saving twice keeps one entry
+- AC-3            a guest is sent to sign in and returns to the product
+- AC-4 [mobile]   the product card has a save button
+```
+
+**Steps.** Each step has a kind and the name used in code: `page`, `route`, `mail`,
+`notification`, `job`, `event`, `outside service`. Use `affects` for an effect on another
+feature (`affects   catalog/stock`). Warlock checks every name exists.
+
+**Cases.** Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
+expiry, double submit, outside service down), each with a case or "does not apply" and the
+reason. A flow that skips one gets a finding. Do not invent cases beyond the questions unless the owner described one.
+
+**Criteria.** One per case that changes what the user gets. Number them `AC-1`, `AC-2`, … and
+never renumber. Scope one to an app with `[app-id]`.
+
+**App differences.** What the user gets differs → here, under the app's name. How it looks or
+where it sits → the app's block file (`describe-an-app`).
+
+## 5. Stop for approval
+
+For a new feature or a whole-number version, stop here. Tell the owner the task id and the brief
+path, list the decisions you need, and wait. Do not write code first.
+
+## 6. Check
+
+```bash
+npx warlock grimoire check
+```
+
+Until the code exists it reports the routes and pages you named as missing. Findings on a flow or
+feature with `status: proposed` print with `(expected)` and do not fail the check; everything else
+it reports must be fixed.
+
+Then build, and follow `record-a-change`.
+
+

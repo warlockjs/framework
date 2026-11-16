@@ -36,7 +36,8 @@ export type CommandContext = {
 
 type Options = Readonly<Record<string, string | boolean | number>>;
 
-const plural = (count: number, word: string, many = `${word}s`): string => `${count} ${count === 1 ? word : many}`;
+const plural = (count: number, word: string, many = `${word}s`): string =>
+  `${count} ${count === 1 ? word : many}`;
 
 /** Print a Grimoire error the way every command does, and return exit code 1. */
 export function reportError(io: CommandIO, error: unknown): number {
@@ -113,7 +114,11 @@ async function routesFiles(root: string, dir = "src"): Promise<string[]> {
     const file = `${dir}/${entry.name}`;
 
     if (entry.isDirectory()) found.push(...(await routesFiles(root, file)));
-    else if (BOOT_INPUT.test(entry.name) || (file.startsWith("src/config/") && /\.[cm]?[jt]sx?$/.test(entry.name))) found.push(file);
+    else if (
+      BOOT_INPUT.test(entry.name) ||
+      (file.startsWith("src/config/") && /\.[cm]?[jt]sx?$/.test(entry.name))
+    )
+      found.push(file);
   }
 
   return found;
@@ -144,8 +149,8 @@ export async function needsBoot(root: string, force: boolean): Promise<boolean> 
 /** Whether the app has several sites, whose page routes need `src/config/web.ts` loaded. */
 export async function isMultiSite(root: string): Promise<boolean> {
   try {
-    return (await readdir(path.join(root, "src", "web", "$sites"), { withFileTypes: true })).some((entry) =>
-      entry.isDirectory(),
+    return (await readdir(path.join(root, "src", "web", "$sites"), { withFileTypes: true })).some(
+      (entry) => entry.isDirectory(),
     );
   } catch {
     return false;
@@ -158,7 +163,11 @@ function buildSummary(run: GrimoireRun): { book: string; collected: string } {
   const bookmaps = run.collected.written.filter((file) => file.endsWith("bookmap.json")).length;
   const nothing =
     !run.rebuilt &&
-    run.book.written.length + run.book.removed.length + run.collected.written.length + run.collected.removed.length === 0;
+    run.book.written.length +
+      run.book.removed.length +
+      run.collected.written.length +
+      run.collected.removed.length ===
+      0;
   const book = nothing
     ? "book      up to date"
     : `book      ${plural(snapshot.book.facts.files.length, "file")} (${run.book.written.length} written, ${run.book.removed.length} removed), routes ${snapshot.routes}`;
@@ -223,7 +232,10 @@ export async function runBuild(context: CommandContext, options: Options = {}): 
 }
 
 /** Add a boot problem to a check report as an unexpected warning. */
-function withProblem(report: GrimoireCheckReport, problem: GrimoireFinding | null): GrimoireCheckReport {
+function withProblem(
+  report: GrimoireCheckReport,
+  problem: GrimoireFinding | null,
+): GrimoireCheckReport {
   if (problem === null) return report;
 
   const firstExpected = report.findings.findIndex((finding) => finding.expected);
@@ -231,7 +243,11 @@ function withProblem(report: GrimoireCheckReport, problem: GrimoireFinding | nul
 
   findings.splice(firstExpected === -1 ? findings.length : firstExpected, 0, problem);
 
-  return { ...report, findings, counts: { ...report.counts, warnings: report.counts.warnings + 1 } };
+  return {
+    ...report,
+    findings,
+    counts: { ...report.counts, warnings: report.counts.warnings + 1 },
+  };
 }
 
 /** `warlock grimoire check [--json]`: exit 1 only when the report is not ok. */
@@ -254,7 +270,11 @@ export async function runCheck(context: CommandContext, options: Options = {}): 
 }
 
 /** `warlock grimoire release <release> [--json]`. */
-export async function runRelease(context: CommandContext, release: string | undefined, options: Options = {}): Promise<number> {
+export async function runRelease(
+  context: CommandContext,
+  release: string | undefined,
+  options: Options = {},
+): Promise<number> {
   const { root, io } = context;
 
   try {
@@ -276,7 +296,9 @@ export async function runRelease(context: CommandContext, release: string | unde
     }
 
     const entries = outcome.collection.entries;
-    const listed = entries.map((entry) => `${entry.feature} ${entry.version} ${entry.word}`).join(", ");
+    const listed = entries
+      .map((entry) => `${entry.feature} ${entry.version} ${entry.word}`)
+      .join(", ");
 
     io.out(
       `${outcome.file}: ${plural(entries.length, "entry", "entries")} collected${
@@ -302,19 +324,32 @@ export async function runRelease(context: CommandContext, release: string | unde
 }
 
 /** Open the snapshot for a scry question: cached routes, fresh once when a route question finds none. */
-async function openForScry(root: string, adapter: BookAdapter, query: ScryQuery): Promise<GrimoireSnapshot> {
-  const routes: "fresh" | "cached" = query.type === "route" && !(await hasRouteFacts(root)) ? "fresh" : "cached";
+async function openForScry(
+  root: string,
+  adapter: BookAdapter,
+  query: ScryQuery,
+): Promise<GrimoireSnapshot> {
+  const routes: "fresh" | "cached" =
+    query.type === "route" && !(await hasRouteFacts(root)) ? "fresh" : "cached";
 
   return openGrimoire(root, adapter, { routes });
 }
 
 /** Answer a parsed query (shared by the CLI and the MCP tools). */
-export async function answer(root: string, adapter: BookAdapter, query: ScryQuery): Promise<ScryResult> {
+export async function answer(
+  root: string,
+  adapter: BookAdapter,
+  query: ScryQuery,
+): Promise<ScryResult> {
   return scry(await openForScry(root, adapter, query), query);
 }
 
 /** `warlock scry <file> | --impact … | --route … | --feature … | --flow … | --search … [--limit n] [--json]`. */
-export async function runScry(context: CommandContext, args: readonly string[], options: Options = {}): Promise<number> {
+export async function runScry(
+  context: CommandContext,
+  args: readonly string[],
+  options: Options = {},
+): Promise<number> {
   const { root, adapter, io } = context;
 
   try {

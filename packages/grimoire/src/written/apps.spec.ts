@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { GrimoireFinding } from "../contracts/findings";
-import { parseAppReadme, parseBlockFile, parseBlocksTable, parseLayout, parsePage, tableCells } from "./apps";
+import {
+  parseAppReadme,
+  parseBlockFile,
+  parseBlocksTable,
+  parseLayout,
+  parsePage,
+  tableCells,
+} from "./apps";
 import { readDocument } from "./markdown";
 import { FindingSink } from "./sink";
 
@@ -76,14 +83,18 @@ describe("parseBlocksTable", () => {
   it.each([
     ["no table", ["just text"], 1],
     ["a wrong header", ["| Block | Flow | Who |", "|---|---|---|"], 2],
-    ["no separator row", ["| Block | Flow | Who sees it | Changes with |", "| a | — | everyone | — |"], 3],
+    [
+      "no separator row",
+      ["| Block | Flow | Who sees it | Changes with |", "| a | — | everyone | — |"],
+      3,
+    ],
   ])("reports %s as GR1018", (_name, rows, line) => {
     const { sink, findings } = collect();
 
     expect(parseBlocksTable(PAGE, table(rows), sink)).toEqual([]);
-    expect(findings.map((finding) => [finding.code, finding.at?.line, finding.subject.app])).toEqual([
-      ["GR1018", line, "web-client"],
-    ]);
+    expect(
+      findings.map((finding) => [finding.code, finding.at?.line, finding.subject.app]),
+    ).toEqual([["GR1018", line, "web-client"]]);
   });
 
   it("reports bad rows as GR1018 and keeps the good ones", () => {
@@ -132,7 +143,13 @@ describe("parseAppReadme", () => {
 
   it("reports a wrong type, an id that is not the folder name and a missing Conditions heading", () => {
     const { sink, findings } = collect();
-    const app = parseAppReadme(README, "---\nid: client\ntype: web\nroot: src/web\n---\n# Site\n", "web-client", "mobile", sink);
+    const app = parseAppReadme(
+      README,
+      "---\nid: client\ntype: web\nroot: src/web\n---\n# Site\n",
+      "web-client",
+      "mobile",
+      sink,
+    );
 
     expect(app.type.value).toBe("mobile");
     expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([
@@ -146,7 +163,13 @@ describe("parseAppReadme", () => {
 describe("parseLayout, parsePage and parseBlockFile", () => {
   it("reads a layout's blocks and requires its Blocks heading", () => {
     const { sink, findings } = collect();
-    const layout = parseLayout("grimoire/apps/web-client/layouts/site.md", "# Site\n## Blocks\n", "web-client", "site", sink);
+    const layout = parseLayout(
+      "grimoire/apps/web-client/layouts/site.md",
+      "# Site\n## Blocks\n",
+      "web-client",
+      "site",
+      sink,
+    );
 
     expect(layout.blocks).toEqual([]);
     expect(findings.map((finding) => finding.code)).toEqual(["GR1018"]);
@@ -166,7 +189,9 @@ describe("parseLayout, parsePage and parseBlockFile", () => {
     expect(page.route?.value).toBe("/");
     expect(page.layout?.value).toBe("site");
     expect(page.purpose).toBe("The first page.");
-    expect(page.alsoReachedFrom).toEqual([{ kind: "mail", name: "order-confirmation", at: { file: PAGE, line: 8, column: null } }]);
+    expect(page.alsoReachedFrom).toEqual([
+      { kind: "mail", name: "order-confirmation", at: { file: PAGE, line: 8, column: null } },
+    ]);
     expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([["GR1028", 9]]);
   });
 
@@ -174,8 +199,22 @@ describe("parseLayout, parsePage and parseBlockFile", () => {
     const { sink, findings } = collect();
 
     parsePage(PAGE, "---\nlayout: site\n---\n# Home\n", "web-client", "page", "home", sink);
-    parsePage("grimoire/apps/mobile/screens/home/README.md", "---\nlayout: site\n---\n# Home\n", "mobile", "screen", "home", sink);
-    const screen = parsePage("grimoire/apps/mobile/screens/cart/README.md", "---\nscreen: Cart\n---\n# Cart\n", "mobile", "screen", "cart", sink);
+    parsePage(
+      "grimoire/apps/mobile/screens/home/README.md",
+      "---\nlayout: site\n---\n# Home\n",
+      "mobile",
+      "screen",
+      "home",
+      sink,
+    );
+    const screen = parsePage(
+      "grimoire/apps/mobile/screens/cart/README.md",
+      "---\nscreen: Cart\n---\n# Cart\n",
+      "mobile",
+      "screen",
+      "cart",
+      sink,
+    );
 
     expect(screen.screen?.value).toBe("Cart");
     expect(findings.map((finding) => [finding.code, finding.at?.file])).toEqual([
@@ -195,7 +234,9 @@ describe("parseLayout, parsePage and parseBlockFile", () => {
       sink,
     );
 
-    expect(block.details.map((detail) => [detail.name, detail.text])).toEqual([["position", "second row"]]);
+    expect(block.details.map((detail) => [detail.name, detail.text])).toEqual([
+      ["position", "second row"],
+    ]);
     expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([["GR1004", 2]]);
   });
 });

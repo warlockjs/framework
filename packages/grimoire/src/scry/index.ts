@@ -11,5 +11,11 @@
  *   flows, blocks and tasks.
  */
 export { formatScryResult } from "./format";
-export { parseFeatureText, parseFlowText, parseLimit, parseRouteText, parseScryQuery } from "./parse";
+export {
+  parseFeatureText,
+  parseFlowText,
+  parseLimit,
+  parseRouteText,
+  parseScryQuery,
+} from "./parse";
 export { scry, type ScryFileAnswer } from "./query";

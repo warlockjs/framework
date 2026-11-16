@@ -5,7 +5,17 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, type Dirent } from "node:fs";
-import { mkdir, readdir, readFile, rename, rm, rmdir, stat, unlink, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  rmdir,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { GRIMOIRE_PATHS, toPosixPath } from "../paths";
@@ -50,7 +60,9 @@ export function hashText(text: string): string {
 /** sha256 (hex) of a file's bytes; large files are streamed. */
 export async function hashFile(absolute: string, size: number): Promise<string> {
   if (size <= READ_WHOLE_LIMIT) {
-    return createHash("sha256").update(await readFile(absolute)).digest("hex");
+    return createHash("sha256")
+      .update(await readFile(absolute))
+      .digest("hex");
   }
 
   const hash = createHash("sha256");
@@ -154,7 +166,9 @@ export function isInsideBook(bookPath: string): boolean {
 /** The absolute path of a book file; throws for a path outside `grimoire/book/`. */
 export function bookFile(root: string, bookPath: string): string {
   if (!isInsideBook(bookPath)) {
-    throw new Error(`Grimoire refused to touch ${bookPath}: it is outside ${GRIMOIRE_PATHS.book}/.`);
+    throw new Error(
+      `Grimoire refused to touch ${bookPath}: it is outside ${GRIMOIRE_PATHS.book}/.`,
+    );
   }
 
   return path.join(root, ...bookPath.split("/"));
@@ -165,7 +179,11 @@ export function bookFile(root: string, bookPath: string): string {
  * it, which is then renamed over the target, so a reader sees the old file or
  * the new one, never half of one.
  */
-export async function writeBookFile(root: string, bookPath: string, content: string): Promise<void> {
+export async function writeBookFile(
+  root: string,
+  bookPath: string,
+  content: string,
+): Promise<void> {
   const target = bookFile(root, bookPath);
   const temporary = `${target}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
 

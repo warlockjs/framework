@@ -32,7 +32,9 @@ function pageSubject(page: WrittenPage): Subject {
 
 /** A route as the router and the page graph compare it: `[id]` and `:id` are one parameter. */
 function normalizeRoute(route: string): string {
-  const withSlash = toPosixPath(route.trim()).replace(/\[\.\.\.(\w+)\]/g, ":$1*").replace(/\[(\w+)\]/g, ":$1");
+  const withSlash = toPosixPath(route.trim())
+    .replace(/\[\.\.\.(\w+)\]/g, ":$1*")
+    .replace(/\[(\w+)\]/g, ":$1");
   const trimmed = withSlash.replace(/\/+$/, "");
 
   return trimmed === "" ? "/" : trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
@@ -166,9 +168,13 @@ export function checkApps(snapshot: GrimoireSnapshot): GrimoireFinding[] {
       continue;
     }
 
+    if (!match) continue;
+
     if (match.site) {
       const routes = new Set(
-        facts.pages.filter((item) => item.site === match.site?.id).map((item) => normalizeRoute(item.route)),
+        facts.pages
+          .filter((item) => item.site === match.site?.id)
+          .map((item) => normalizeRoute(item.route)),
       );
 
       for (const page of app.pages) {
@@ -240,7 +246,8 @@ function checkReached(
         site !== null &&
         facts.pages.some(
           (item) =>
-            item.site === site.id && (normalizeRoute(item.route) === wanted || item.name === entry.name),
+            item.site === site.id &&
+            (normalizeRoute(item.route) === wanted || item.name === entry.name),
         );
     } else if (entry.kind === "screen") {
       const wanted = normalizeRoute(entry.name);

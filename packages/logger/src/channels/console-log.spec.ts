@@ -1,4 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The colour library reads its mode once, when it is first imported. Pin it off so the
+// spec sees the same output with and without `CI=true`.
+vi.hoisted(() => {
+  process.env.NO_COLOR = "1";
+});
+
 import type { LoggingData } from "../types";
 import { ConsoleLog } from "./console-log";
 

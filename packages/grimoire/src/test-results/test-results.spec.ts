@@ -45,7 +45,10 @@ describe("mergeTestResults", () => {
   });
 
   it("keeps the results of files the run did not cover", () => {
-    const old = store([result({ testFile: "src/a.spec.ts" }), result({ testFile: "src/b.spec.ts", criterion: "AC-2" })]);
+    const old = store([
+      result({ testFile: "src/a.spec.ts" }),
+      result({ testFile: "src/b.spec.ts", criterion: "AC-2" }),
+    ]);
     const merged = mergeTestResults(old, [result({ outcome: "fail" })], ["src/a.spec.ts"], NOW);
 
     expect(merged.results.map((item) => [item.testFile, item.outcome])).toEqual([
@@ -70,7 +73,12 @@ describe("mergeTestResults", () => {
   it("does not change its input and orders results the same way every time", () => {
     const old = store([result({ testFile: "src/z.spec.ts" })]);
     const copy = structuredClone(old);
-    const merged = mergeTestResults(old, [result({ testFile: "src/a.spec.ts" })], ["src/a.spec.ts"], NOW);
+    const merged = mergeTestResults(
+      old,
+      [result({ testFile: "src/a.spec.ts" })],
+      ["src/a.spec.ts"],
+      NOW,
+    );
 
     expect(old).toEqual(copy);
     expect(merged.results.map((item) => item.testFile)).toEqual(["src/a.spec.ts", "src/z.spec.ts"]);
@@ -95,7 +103,10 @@ describe("read and write", () => {
     await writeFile(path.join(root, "grimoire/book/test-results.json"), "{nope");
     expect(await readTestResults(root)).toBeNull();
 
-    await writeFile(path.join(root, "grimoire/book/test-results.json"), JSON.stringify({ hello: 1 }));
+    await writeFile(
+      path.join(root, "grimoire/book/test-results.json"),
+      JSON.stringify({ hello: 1 }),
+    );
     expect(await readTestResults(root)).toBeNull();
   });
 
@@ -106,7 +117,9 @@ describe("read and write", () => {
 
     expect(await readTestResults(root)).toEqual(value);
     expect(await readdir(path.join(root, "grimoire/book"))).toEqual(["test-results.json"]);
-    expect((await readFile(path.join(root, "grimoire/book/test-results.json"), "utf8")).endsWith("\n")).toBe(true);
+    expect(
+      (await readFile(path.join(root, "grimoire/book/test-results.json"), "utf8")).endsWith("\n"),
+    ).toBe(true);
   });
 });
 
@@ -153,7 +166,9 @@ describe("checkTestResults", () => {
   });
 
   it("reports a failing proven test as GR4006 error", () => {
-    const [finding] = checkTestResults(snapshot(store([result({ outcome: "fail", testFileHash: hash })])));
+    const [finding] = checkTestResults(
+      snapshot(store([result({ outcome: "fail", testFileHash: hash })])),
+    );
 
     expect(finding?.code).toBe("GR4006");
     expect(finding?.severity).toBe("error");
@@ -170,13 +185,15 @@ describe("checkTestResults", () => {
 
   it("reports a proof with no result, or a skipped one, as GR4008", () => {
     expect(checkTestResults(snapshot(store([])))[0]?.code).toBe("GR4008");
-    expect(checkTestResults(snapshot(store([result({ outcome: "skip", testFileHash: hash })])))[0]?.code).toBe(
-      "GR4008",
-    );
+    expect(
+      checkTestResults(snapshot(store([result({ outcome: "skip", testFileHash: hash })])))[0]?.code,
+    ).toBe("GR4008");
   });
 
   it("marks findings of a proposed flow as expected", () => {
-    const [finding] = checkTestResults(snapshot(store([result({ outcome: "fail", testFileHash: hash })]), "proposed"));
+    const [finding] = checkTestResults(
+      snapshot(store([result({ outcome: "fail", testFileHash: hash })]), "proposed"),
+    );
 
     expect(finding?.expected).toBe(true);
   });

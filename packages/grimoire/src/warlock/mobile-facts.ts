@@ -25,7 +25,15 @@ export type CollectMobileFactsOptions = {
 
 const CODE_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx"];
 const PLATFORM_SUFFIX = /\.(web|native|ios|android)$/;
-const IGNORED_FOLDERS = new Set(["node_modules", ".git", ".expo", "dist", "build", "android", "ios"]);
+const IGNORED_FOLDERS = new Set([
+  "node_modules",
+  ".git",
+  ".expo",
+  "dist",
+  "build",
+  "android",
+  "ios",
+]);
 
 async function exists(file: string): Promise<boolean> {
   try {
@@ -41,7 +49,9 @@ async function readJson(file: string): Promise<Record<string, unknown> | null> {
   try {
     const parsed: unknown = JSON.parse(await fs.readFile(file, "utf8"));
 
-    return parsed !== null && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+    return parsed !== null && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
@@ -53,7 +63,9 @@ function hasDependency(manifest: Record<string, unknown> | null, name: string): 
   return ["dependencies", "devDependencies", "peerDependencies"].some((key) => {
     const group = manifest[key];
 
-    return group !== null && typeof group === "object" && name in (group as Record<string, unknown>);
+    return (
+      group !== null && typeof group === "object" && name in (group as Record<string, unknown>)
+    );
   });
 }
 
@@ -71,7 +83,8 @@ async function discover(root: string): Promise<MobileAppOption[]> {
   const found: MobileAppOption[] = [];
 
   for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith(".") || IGNORED_FOLDERS.has(entry.name)) continue;
+    if (!entry.isDirectory() || entry.name.startsWith(".") || IGNORED_FOLDERS.has(entry.name))
+      continue;
 
     const dir = path.join(root, entry.name);
 
@@ -79,7 +92,10 @@ async function discover(root: string): Promise<MobileAppOption[]> {
 
     const manifest = await readJson(path.join(dir, "package.json"));
 
-    found.push({ root: entry.name, routing: hasDependency(manifest, "expo-router") ? "files" : "code" });
+    found.push({
+      root: entry.name,
+      routing: hasDependency(manifest, "expo-router") ? "files" : "code",
+    });
   }
 
   return found.sort((left, right) => left.root.localeCompare(right.root));
@@ -102,8 +118,6 @@ async function walk(dir: string, base = ""): Promise<string[]> {
 
   return files;
 }
-
-type RouteFile = { relative: string; route: string };
 
 /**
  * The route of a file under the routes folder, or `null` when it is not a
@@ -173,10 +187,16 @@ async function screensOf(root: string, routesDir: string): Promise<BookScreen[]>
     if (seen.has(stem)) continue;
 
     seen.add(stem);
-    screens.push({ route, file: `${routesDir}/${relative}`, layouts: layoutsOf(relative, layouts) });
+    screens.push({
+      route,
+      file: `${routesDir}/${relative}`,
+      layouts: layoutsOf(relative, layouts),
+    });
   }
 
-  return screens.sort((left, right) => left.route.localeCompare(right.route) || left.file.localeCompare(right.file));
+  return screens.sort(
+    (left, right) => left.route.localeCompare(right.route) || left.file.localeCompare(right.file),
+  );
 }
 
 /**

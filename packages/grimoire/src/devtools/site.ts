@@ -80,25 +80,41 @@ export function buildSiteData(snapshot: GrimoireSnapshot) {
         if (graph !== null) routes[`graph/page/${appId}/${key}`] = graph;
       }
 
-      if (route !== null) search.push({ type: page.type, id: `${appId} ${route}`, detail: page.heading?.value ?? null });
+      if (route !== null)
+        search.push({
+          type: page.type,
+          id: `${appId} ${route}`,
+          detail: page.heading?.value ?? null,
+        });
 
       for (const block of page.blockFiles) {
-        search.push({ type: "block", id: `${appId}/${page.id}/${block.id}`, detail: block.flow?.value ?? null });
+        search.push({
+          type: "block",
+          id: `${appId}/${page.id}/${block.id}`,
+          detail: block.flow?.value ?? null,
+        });
       }
     }
   }
 
   for (const found of snapshot.book.facts.routes ?? []) {
-    search.push({ type: "route", id: `${found.method} ${found.path}`, detail: found.description ?? found.handler });
+    search.push({
+      type: "route",
+      id: `${found.method} ${found.path}`,
+      detail: found.description ?? found.handler,
+    });
   }
 
-  for (const task of snapshot.collected.tasksIndex.open.concat(snapshot.collected.tasksIndex.done)) {
+  for (const task of snapshot.collected.tasksIndex.open.concat(
+    snapshot.collected.tasksIndex.done,
+  )) {
     search.push({ type: "task", id: task.id, detail: task.title });
   }
 
   const files: Record<string, { result: unknown; graph: unknown }> = {};
   const ranked = [...snapshot.book.facts.files].sort(
-    (left, right) => right.importedBy.length - left.importedBy.length || left.file.localeCompare(right.file),
+    (left, right) =>
+      right.importedBy.length - left.importedBy.length || left.file.localeCompare(right.file),
   );
 
   for (const [index, file] of ranked.entries()) {
@@ -137,7 +153,8 @@ function attempt<Value>(answer: () => Value): Value | undefined {
 export function inlineView(source: string): string {
   const marker = "export default renderGrimoire;";
 
-  if (!source.includes(marker)) throw new Error("grimoire-view.js must end with `export default renderGrimoire;`.");
+  if (!source.includes(marker))
+    throw new Error("grimoire-view.js must end with `export default renderGrimoire;`.");
 
   return source.replace(marker, "");
 }
@@ -153,7 +170,10 @@ main{max-width:1100px;margin:0 auto;padding:16px}
 `;
 
 /** The `index.html` text. */
-export function renderSiteHtml(siteData: unknown, sources: { view: string; loader: string; css: string }): string {
+export function renderSiteHtml(
+  siteData: unknown,
+  sources: { view: string; loader: string; css: string },
+): string {
   const json = inlineJson(siteData);
   const script = inlineCode(
     `${inlineView(sources.view)}\n${sources.loader}\ngrimoireStaticMount(JSON.parse(document.getElementById("grimoire-data").textContent), document.getElementById("grimoire-root"), renderGrimoire);\n`,
@@ -187,15 +207,30 @@ export function renderSiteHtml(siteData: unknown, sources: { view: string; loade
  * @param root Absolute project root.
  * @returns The output folder, project-relative.
  */
-export async function exportGrimoireSite(root: string, options: ExportGrimoireSiteOptions = {}): Promise<string> {
-  const outDir = (options.outDir ?? GRIMOIRE_PATHS.staticSite).split("\\").join("/").replace(/\/+$/, "");
+export async function exportGrimoireSite(
+  root: string,
+  options: ExportGrimoireSiteOptions = {},
+): Promise<string> {
+  const outDir = (options.outDir ?? GRIMOIRE_PATHS.staticSite)
+    .split("\\")
+    .join("/")
+    .replace(/\/+$/, "");
   const snapshot =
     options.snapshot ??
-    (await createSnapshotSource(root, options.adapter === undefined ? {} : { adapter: options.adapter }).get());
+    (await createSnapshotSource(
+      root,
+      options.adapter === undefined ? {} : { adapter: options.adapter },
+    ).get());
   const [view, loader, css] = await Promise.all(
-    ["grimoire-view.js", "grimoire-static.js", "grimoire.css"].map((name) => readFile(path.join(uiFolder, name), "utf8")),
+    ["grimoire-view.js", "grimoire-static.js", "grimoire.css"].map((name) =>
+      readFile(path.join(uiFolder, name), "utf8"),
+    ),
   );
-  const html = renderSiteHtml(buildSiteData(snapshot), { view: view ?? "", loader: loader ?? "", css: css ?? "" });
+  const html = renderSiteHtml(buildSiteData(snapshot), {
+    view: view ?? "",
+    loader: loader ?? "",
+    css: css ?? "",
+  });
   const absolute = path.resolve(root, ...outDir.split("/"));
 
   await mkdir(absolute, { recursive: true });

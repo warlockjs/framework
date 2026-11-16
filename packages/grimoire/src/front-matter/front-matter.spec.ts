@@ -48,7 +48,9 @@ describe("readFrontMatter", () => {
   });
 
   it("reports an unclosed block, a bad line and a duplicate key as GR1002 with the line", () => {
-    expect(readFrontMatter("---\nid: x\n", FILE).errors.map((error) => error.at?.line)).toEqual([1]);
+    expect(readFrontMatter("---\nid: x\n", FILE).errors.map((error) => error.at?.line)).toEqual([
+      1,
+    ]);
 
     const result = readFrontMatter("﻿---\nid: x\nnot a pair\nid: y\n---\n", FILE);
 

@@ -23,7 +23,9 @@ async function registerCommands(): Promise<void> {
     `  export default defineConfig({ cli: { commands: [registerGrimoireCommands()] } });`;
 
   if (!(await fileExistsAsync(configPath))) {
-    console.log(`${colors.yellowBright("warlock.config.ts")} not found — add this yourself:\n${manual}`);
+    console.log(
+      `${colors.yellowBright("warlock.config.ts")} not found — add this yourself:\n${manual}`,
+    );
 
     return;
   }
@@ -32,7 +34,9 @@ async function registerCommands(): Promise<void> {
   const insertion = insertCliCommandEntry(current, "registerGrimoireCommands()");
 
   if (insertion.status === "already-present") {
-    console.log(`${colors.yellowBright("registerGrimoireCommands")} already registered, skipping...`);
+    console.log(
+      `${colors.yellowBright("registerGrimoireCommands")} already registered, skipping...`,
+    );
 
     return;
   }
@@ -72,7 +76,10 @@ async function mountDevtoolsPanel(): Promise<void> {
     return;
   }
 
-  const insertion = insertDevtoolsPanel(await getFileAsync(configPath), "@warlock.js/grimoire/devtools");
+  const insertion = insertDevtoolsPanel(
+    await getFileAsync(configPath),
+    "@warlock.js/grimoire/devtools",
+  );
 
   if (insertion.status === "added") {
     await putFileAsync(configPath, insertion.next);

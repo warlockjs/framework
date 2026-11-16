@@ -32,8 +32,12 @@ describe("add test — Grimoire reporter in the generated vite.config.ts", () =>
 
     await testFeature.onExecuting?.({} as never);
 
-    expect(viteConfig()).toContain('reporters: ["default", new TestSetupReporter(), grimoireReporter()]');
-    expect(viteConfig()).toContain('import { grimoireReporter } from "@warlock.js/grimoire/vitest";');
+    expect(viteConfig()).toContain(
+      'reporters: ["default", new TestSetupReporter(), grimoireReporter()]',
+    );
+    expect(viteConfig()).toContain(
+      'import { grimoireReporter } from "@warlock.js/grimoire/vitest";',
+    );
   });
 
   it("leaves the reporter out when the app does not use Grimoire", async () => {

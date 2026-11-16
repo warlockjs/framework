@@ -1,6 +1,6 @@
 ---
 name: describe-an-app
-description: 'Describe where users meet the product in `grimoire/apps/`: one folder per site or mobile app, its named conditions (guest, customer, membership, preferences), shared layouts, and the pages or screens whose blocks point to feature flows. Use when adding a page, a screen or a block, or when what a page shows depends on who is looking.'
+description: "Describe where users meet the product in `grimoire/apps/`: one folder per site or mobile app, its named conditions (guest, customer, membership, preferences), shared layouts, and the pages or screens whose blocks point to feature flows. Use when adding a page, a screen or a block, or when what a page shows depends on who is looking."
 ---
 
 # Describe an app
@@ -37,10 +37,11 @@ root: src/web/$sites/client
 # The shop website
 
 ## Conditions
-- guest               not signed in
-- customer            signed in
-- vip                 customer with the vip membership
-- pref:personalised   the customer left personalised content on
+
+- guest not signed in
+- customer signed in
+- vip customer with the vip membership
+- pref:personalised the customer left personalised content on
 ```
 
 Every page and block of this app uses these names and no others. Add a condition here before
@@ -53,10 +54,10 @@ A mobile app in the same repository is one more app: `type: mobile`, `root: mobi
 
 How a screen gets into the book depends on how the app navigates:
 
-| The mobile app | Screens come from | You write |
-| --- | --- | --- |
-| File-based routing (Expo Router) | The route file names under its `app` folder (`collectMobileFacts`) | A screen file only when it says something the route does not |
-| Navigation defined in code | Nowhere: the book cannot read it | One file per screen you describe, in `grimoire/apps/<app>/screens/<screen>/README.md` |
+| The mobile app                   | Screens come from                                                  | You write                                                                             |
+| -------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| File-based routing (Expo Router) | The route file names under its `app` folder (`collectMobileFacts`) | A screen file only when it says something the route does not                          |
+| Navigation defined in code       | Nowhere: the book cannot read it                                   | One file per screen you describe, in `grimoire/apps/<app>/screens/<screen>/README.md` |
 
 A declared screen has a `route` (or a `screen` name) in its front matter:
 
@@ -68,9 +69,10 @@ screen: order-tracking
 # Order tracking
 
 ## Blocks
-| Block         | Flow                | Who sees it | Changes with |
-| ------------- | ------------------- | ----------- | ------------ |
-| Courier stage | orders/track-order  | customer    | —            |
+
+| Block         | Flow               | Who sees it | Changes with |
+| ------------- | ------------------ | ----------- | ------------ |
+| Courier stage | orders/track-order | customer    | —            |
 ```
 
 When the app uses file-based routing, `warlock grimoire check` reports a screen whose route has no
@@ -89,11 +91,12 @@ layout: site
 The first page a visitor sees.
 
 ## Blocks
-| Block             | Flow                     | Who sees it | Changes with            |
-| ----------------- | ------------------------ | ----------- | ----------------------- |
-| Featured products | catalog/browse-products  | everyone    | vip: member prices      |
-| New arrivals      | catalog/new-arrivals     | everyone    | the customer's country  |
-| Recent orders     | orders/place-order       | customer    | —                       |
+
+| Block             | Flow                    | Who sees it | Changes with           |
+| ----------------- | ----------------------- | ----------- | ---------------------- |
+| Featured products | catalog/browse-products | everyone    | vip: member prices     |
+| New arrivals      | catalog/new-arrivals    | everyone    | the customer's country |
+| Recent orders     | orders/place-order      | customer    | —                      |
 ```
 
 - **One row per part of the page**, not one description per kind of user. Three roles and two
@@ -118,17 +121,17 @@ flow: catalog/new-arrivals
 
 # New arrivals on the home page
 
-- position   second row, under Featured products
-- shows      a grid of up to 20 products
-- on phones  one row that scrolls sideways
+- position second row, under Featured products
+- shows a grid of up to 20 products
+- on phones one row that scrolls sideways
 ```
 
 ## Where a difference between apps goes
 
-| The difference | Goes in |
-| --- | --- |
-| What the user gets (mobile uses the device location) | The flow, under `## Differs by app` |
-| How it looks or where it sits (a row on mobile, a grid on web) | That app's block file |
+| The difference                                                 | Goes in                             |
+| -------------------------------------------------------------- | ----------------------------------- |
+| What the user gets (mobile uses the device location)           | The flow, under `## Differs by app` |
+| How it looks or where it sits (a row on mobile, a grid on web) | That app's block file               |
 
 ## How a page is reached, and what it requires
 
@@ -138,7 +141,8 @@ cannot see it, such as a link in an email:
 
 ```md
 ## Also reached from
-- mail   order-confirmation
+
+- mail order-confirmation
 ```
 
 ## Check

@@ -30,7 +30,8 @@ export class FakeNode {
 
   public append(...items: (FakeNode | string)[]): void {
     for (const item of items) {
-      if (typeof item === "object" && !(item instanceof FakeNode)) throw new Error("append() takes nodes or strings");
+      if (typeof item === "object" && !(item instanceof FakeNode))
+        throw new Error("append() takes nodes or strings");
       this.children.push(item);
     }
   }
@@ -72,11 +73,13 @@ function build(node: FakeNode, attrs: Record<string, unknown>, children: unknown
 
     if (key === "class") node.setAttribute("class", String(value));
     else if (key === "text") node.textContent = String(value);
-    else if (key.startsWith("on")) node.addEventListener(key.slice(2), value as (event: unknown) => void);
+    else if (key.startsWith("on"))
+      node.addEventListener(key.slice(2), value as (event: unknown) => void);
     else node.setAttribute(key, String(value));
   }
 
-  for (const child of Array.isArray(children) ? children : [children]) node.append(child as FakeNode | string);
+  for (const child of Array.isArray(children) ? children : [children])
+    node.append(child as FakeNode | string);
 
   return node;
 }

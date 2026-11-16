@@ -62,17 +62,17 @@ check refreshes them when the routes files changed (`routes: fresh`).
 
 ## What it checks
 
-| Area | It reports | Codes |
-| --- | --- | --- |
-| Written files | a file that does not follow its template | `GR1001`–`GR1028` |
-| Steps | a route, page, mail, notification, job, event or flow that does not exist | `GR2001`–`GR2007` |
-| App names | a feature, flow, criterion or task naming an app with no folder, or one its feature does not list | `GR2008`, `GR2009` |
-| References | a changelog entry or README relation naming a flow or criterion that does not exist | `GR2010`–`GR2012` |
-| Source files | no header sentence, no feature, two owners, a wrong `@feature` tag or folder, a file no flow reaches | `GR3001`–`GR3006` |
-| Tests | a criterion with no test, a `@proves` line that names nothing or has the wrong form, failed or old results | `GR4001`–`GR4008` |
-| Apps | blocks, conditions, pages, layouts and screens that point at nothing | `GR5001`–`GR5009` |
-| Versions | the README version or date out of step with the changelog, a release that does not match | `GR6001`–`GR6008` |
-| Tasks | a task naming a feature or flow that does not exist, or in the wrong folder | `GR7001`–`GR7005` |
+| Area          | It reports                                                                                                 | Codes              |
+| ------------- | ---------------------------------------------------------------------------------------------------------- | ------------------ |
+| Written files | a file that does not follow its template                                                                   | `GR1001`–`GR1028`  |
+| Steps         | a route, page, mail, notification, job, event or flow that does not exist                                  | `GR2001`–`GR2007`  |
+| App names     | a feature, flow, criterion or task naming an app with no folder, or one its feature does not list          | `GR2008`, `GR2009` |
+| References    | a changelog entry or README relation naming a flow or criterion that does not exist                        | `GR2010`–`GR2012`  |
+| Source files  | no header sentence, no feature, two owners, a wrong `@feature` tag or folder, a file no flow reaches       | `GR3001`–`GR3006`  |
+| Tests         | a criterion with no test, a `@proves` line that names nothing or has the wrong form, failed or old results | `GR4001`–`GR4008`  |
+| Apps          | blocks, conditions, pages, layouts and screens that point at nothing                                       | `GR5001`–`GR5009`  |
+| Versions      | the README version or date out of step with the changelog, a release that does not match                   | `GR6001`–`GR6008`  |
+| Tasks         | a task naming a feature or flow that does not exist, or in the wrong folder                                | `GR7001`–`GR7005`  |
 
 Steps and criteria of a `retired` flow are not looked up: its code is gone on purpose.
 

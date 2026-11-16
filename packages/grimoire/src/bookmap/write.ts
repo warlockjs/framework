@@ -45,7 +45,8 @@ async function existingBookmaps(root: string): Promise<string[]> {
     const featureDir = path.join(featuresDir, feature.name);
 
     for (const entry of await listDir(featureDir)) {
-      if (!entry.directory && entry.name === "bookmap.json") found.push(featureBookmapPath(feature.name));
+      if (!entry.directory && entry.name === "bookmap.json")
+        found.push(featureBookmapPath(feature.name));
     }
 
     for (const entry of await listDir(path.join(featureDir, "flows"))) {

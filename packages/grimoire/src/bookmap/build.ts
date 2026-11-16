@@ -16,7 +16,12 @@ import type {
 } from "../contracts/bookmap";
 import type { AppMatch } from "../contracts/snapshot";
 import type { ProofLine, ProofResult, TestResultsStore } from "../contracts/test-results";
-import type { WrittenFeature, WrittenFlow, WrittenGrimoire, WrittenTask } from "../contracts/written";
+import type {
+  WrittenFeature,
+  WrittenFlow,
+  WrittenGrimoire,
+  WrittenTask,
+} from "../contracts/written";
 import { fileGraph } from "../graph";
 import { toPosixPath } from "../paths";
 import { criterionStatus } from "../test-results";
@@ -56,7 +61,9 @@ function resultFor(
 ): ProofResult | null {
   const file = toPosixPath(proof.at.file);
   const sameProof = (result: ProofResult): boolean =>
-    result.feature === proof.feature && result.flow === proof.flow && result.criterion === proof.criterion;
+    result.feature === proof.feature &&
+    result.flow === proof.flow &&
+    result.criterion === proof.criterion;
   const inFile = results.filter((result) => toPosixPath(result.testFile) === file);
   const atLine = inFile.filter((result) => result.line === line);
   const byLine = atLine.find(sameProof) ?? atLine[0];
@@ -79,18 +86,24 @@ function resultFor(
 function flowCriteria(flow: WrittenFlow, input: CollectedInput): FlowBookmapCriterion[] {
   const results = input.results?.results ?? [];
   const claimedLines = new Set(
-    input.proofs.flatMap((proof) => (proof.test === null ? [] : [`${toPosixPath(proof.at.file)}:${proof.test.line}`])),
+    input.proofs.flatMap((proof) =>
+      proof.test === null ? [] : [`${toPosixPath(proof.at.file)}:${proof.test.line}`],
+    ),
   );
 
   return flow.criteria.map((criterion) => {
     const tests = input.proofs
-      .filter((proof) => proof.ref === flow.ref && proof.criterion === criterion.id && proof.test !== null)
+      .filter(
+        (proof) =>
+          proof.ref === flow.ref && proof.criterion === criterion.id && proof.test !== null,
+      )
       .map((proof) => {
         const line = proof.test?.line ?? proof.at.line;
         const file = toPosixPath(proof.at.file);
         const result = resultFor(proof, line, results, claimedLines);
         const currentHash = input.testHashes[file];
-        const stale = result !== null && currentHash !== undefined && result.testFileHash !== currentHash;
+        const stale =
+          result !== null && currentHash !== undefined && result.testFileHash !== currentHash;
 
         return {
           file,
@@ -121,7 +134,13 @@ function shownBy(flow: WrittenFlow, written: WrittenGrimoire): FlowBookmap["show
     for (const layout of app.layouts) {
       for (const row of layout.blocks) {
         if (row.flow === flow.ref) {
-          shown.push({ app: appId, type: "layout", id: layout.id, block: row.block, file: layout.file });
+          shown.push({
+            app: appId,
+            type: "layout",
+            id: layout.id,
+            block: row.block,
+            file: layout.file,
+          });
         }
       }
     }
@@ -129,7 +148,13 @@ function shownBy(flow: WrittenFlow, written: WrittenGrimoire): FlowBookmap["show
     for (const page of [...app.pages, ...app.screens]) {
       for (const row of page.blocks) {
         if (row.flow === flow.ref) {
-          shown.push({ app: appId, type: page.type, id: page.id, block: row.block, file: page.file });
+          shown.push({
+            app: appId,
+            type: page.type,
+            id: page.id,
+            block: row.block,
+            file: page.file,
+          });
         }
       }
     }
@@ -138,7 +163,12 @@ function shownBy(flow: WrittenFlow, written: WrittenGrimoire): FlowBookmap["show
   return shown;
 }
 
-function flowBookmap(feature: WrittenFeature, flow: WrittenFlow, input: CollectedInput, context: StepContext): FlowBookmap {
+function flowBookmap(
+  feature: WrittenFeature,
+  flow: WrittenFlow,
+  input: CollectedInput,
+  context: StepContext,
+): FlowBookmap {
   return {
     schemaVersion: BOOK_SCHEMA_VERSION,
     feature: feature.id,
@@ -162,11 +192,15 @@ function featureBookmap(
   const own = ownership.features[feature.id]?.own ?? [];
   const ownSet = new Set(own);
 
-  const borrowed: FeatureBookmap["borrowed"] = (ownership.features[feature.id]?.borrowed ?? []).map((file) => ({
-    file,
-    owner: ownership.files[file]?.owner ?? null,
-    by: own.filter((ownFile) => byPath.get(ownFile)?.imports.some((entry) => entry.file === file) ?? false),
-  }));
+  const borrowed: FeatureBookmap["borrowed"] = (ownership.features[feature.id]?.borrowed ?? []).map(
+    (file) => ({
+      file,
+      owner: ownership.files[file]?.owner ?? null,
+      by: own.filter(
+        (ownFile) => byPath.get(ownFile)?.imports.some((entry) => entry.file === file) ?? false,
+      ),
+    }),
+  );
 
   const routes: FeatureBookmap["routes"] = [];
 
@@ -180,7 +214,8 @@ function featureBookmap(
           ? route.sourceFile
           : null;
 
-    if (file !== null) routes.push({ method: route.method, path: route.path, name: route.name, file });
+    if (file !== null)
+      routes.push({ method: route.method, path: route.path, name: route.name, file });
   }
 
   const pages: FeatureBookmap["pages"] = {};
@@ -192,19 +227,29 @@ function featureBookmap(
 
   for (const match of Object.values(input.apps)) {
     if (match.site && !appOfSite.has(match.site.id)) appOfSite.set(match.site.id, match.app);
-    if (match.mobile && !appOfMobile.has(match.mobile.id)) appOfMobile.set(match.mobile.id, match.app);
+    if (match.mobile && !appOfMobile.has(match.mobile.id))
+      appOfMobile.set(match.mobile.id, match.app);
   }
 
   for (const page of facts.pages) {
     const owned = ownSet.has(page.file) || (page.setupFile !== null && ownSet.has(page.setupFile));
 
-    if (owned) add(appOfSite.get(page.site) ?? page.site, { route: page.route, file: page.file, type: "page" });
+    if (owned)
+      add(appOfSite.get(page.site) ?? page.site, {
+        route: page.route,
+        file: page.file,
+        type: "page",
+      });
   }
 
   for (const mobile of facts.mobile) {
     for (const screen of mobile.screens) {
       if (ownSet.has(screen.file)) {
-        add(appOfMobile.get(mobile.id) ?? mobile.id, { route: screen.route, file: screen.file, type: "screen" });
+        add(appOfMobile.get(mobile.id) ?? mobile.id, {
+          route: screen.route,
+          file: screen.file,
+          type: "screen",
+        });
       }
     }
   }
@@ -242,7 +287,9 @@ function compareVersions(left: string, right: string): number {
 function featuresIndex(written: WrittenGrimoire): FeaturesIndex {
   const features: FeaturesIndex["features"] = [];
 
-  for (const feature of [...written.features].sort((left, right) => left.id.localeCompare(right.id))) {
+  for (const feature of [...written.features].sort((left, right) =>
+    left.id.localeCompare(right.id),
+  )) {
     const readme = feature.readme;
 
     if (readme === null) continue;
@@ -274,7 +321,8 @@ function featuresIndex(written: WrittenGrimoire): FeaturesIndex {
         since: flow.since.value,
       })),
       releases: [...releases.values()].sort(
-        (left, right) => right.date.localeCompare(left.date) || compareVersions(right.version, left.version),
+        (left, right) =>
+          right.date.localeCompare(left.date) || compareVersions(right.version, left.version),
       ),
     });
   }
@@ -298,7 +346,9 @@ function taskSummary(task: WrittenTask): TaskSummary {
     flow: task.flow?.value ?? null,
     apps: task.apps.map((app) => app.value),
     file: task.file,
-    shipped: task.shipped ? { feature: task.shipped.value.feature, version: task.shipped.value.version } : null,
+    shipped: task.shipped
+      ? { feature: task.shipped.value.feature, version: task.shipped.value.version }
+      : null,
     decisionNeeded: task.decisionNeeded,
   };
 }
@@ -306,14 +356,17 @@ function taskSummary(task: WrittenTask): TaskSummary {
 function tasksIndex(written: WrittenGrimoire): TasksIndex {
   const sorted = [...written.tasks].sort(
     (left, right) =>
-      taskNumber(left.id.value) - taskNumber(right.id.value) || left.id.value.localeCompare(right.id.value),
+      taskNumber(left.id.value) - taskNumber(right.id.value) ||
+      left.id.value.localeCompare(right.id.value),
   );
   const open = sorted.filter((task) => task.folder === "open").map(taskSummary);
 
   return {
     schemaVersion: BOOK_SCHEMA_VERSION,
     open,
-    waiting: open.filter((task) => task.status === "waiting for approval" || task.decisionNeeded !== null),
+    waiting: open.filter(
+      (task) => task.status === "waiting for approval" || task.decisionNeeded !== null,
+    ),
     done: sorted.filter((task) => task.folder === "done").map(taskSummary),
   };
 }
@@ -332,7 +385,9 @@ export function buildCollectedFiles(input: CollectedInput): CollectedFiles {
   const features: CollectedFiles["features"] = {};
   const flows: CollectedFiles["flows"] = {};
 
-  for (const feature of [...input.written.features].sort((left, right) => left.id.localeCompare(right.id))) {
+  for (const feature of [...input.written.features].sort((left, right) =>
+    left.id.localeCompare(right.id),
+  )) {
     const maps = feature.flows.map((flow) => flowBookmap(feature, flow, input, context));
 
     for (const map of maps) flows[map.ref] = map;

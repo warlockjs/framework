@@ -84,9 +84,7 @@ export function readFrontMatter(text: string, file: string): FrontMatterResult {
   const lines = text.replace(/^﻿/, "").split(/\r?\n/);
   const errors: GrimoireFinding[] = [];
   const fail = (line: number, message: string): void => {
-    errors.push(
-      createFinding({ code: "GR1002", message, at: { file, line, column: null } }),
-    );
+    errors.push(createFinding({ code: "GR1002", message, at: { file, line, column: null } }));
   };
 
   if (lines[0] === undefined || !FENCE.test(lines[0])) {
@@ -168,7 +166,10 @@ export function frontMatterString(
 }
 
 /** A field's value as a list; a scalar becomes a one-item list. `[]` when absent. */
-export function frontMatterList(fields: Map<string, FrontMatterField> | null, key: string): string[] {
+export function frontMatterList(
+  fields: Map<string, FrontMatterField> | null,
+  key: string,
+): string[] {
   const field = fields?.get(key);
 
   if (!field) return [];

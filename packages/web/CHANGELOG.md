@@ -2,6 +2,12 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.55.0
+
+### Added
+
+- `@warlock.js/web/build` exports `discoverPageGraph()`, `layoutChainFor()` and the page-graph types.
+
 ## 5.54.0 - 2026-11-16
 
 ### Upgrading

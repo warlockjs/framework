@@ -47,8 +47,8 @@ The reporter works with Vitest 5. It turns on Vitest's `includeTaskLocation` opt
 its `@proves` line by position. If you run Vitest in a way that ignores that option, the reporter falls back to the
 test name.
 
-| Option | Default | Meaning |
-| --- | --- | --- |
+| Option | Default                                  | Meaning                              |
+| ------ | ---------------------------------------- | ------------------------------------ |
 | `root` | Vitest's `root`, else the current folder | Project root that holds `grimoire/`. |
 
 At the end of each run the reporter writes `grimoire/book/test-results.json` once, atomically. It never fails the
@@ -68,13 +68,13 @@ For each proving test: the feature, flow and criterion, the test file, the full 
 
 ## Criterion status
 
-| Status | Meaning |
-| --- | --- |
-| `pass` | Every proving test passed, and the test files have not changed since. |
-| `fail` | A proving test failed in its last run. |
-| `stale` | No test failed, but a result is older than its test file (the file changed after the run). |
-| `not-run` | A proving test has no result, or was skipped. |
-| `no-test` | No `@proves` line names the criterion. |
+| Status    | Meaning                                                                                    |
+| --------- | ------------------------------------------------------------------------------------------ |
+| `pass`    | Every proving test passed, and the test files have not changed since.                      |
+| `fail`    | A proving test failed in its last run.                                                     |
+| `stale`   | No test failed, but a result is older than its test file (the file changed after the run). |
+| `not-run` | A proving test has no result, or was skipped.                                              |
+| `no-test` | No `@proves` line names the criterion.                                                     |
 
 Book maps, `warlock scry --flow` and the devtools tab show these statuses.
 
@@ -82,10 +82,10 @@ Book maps, `warlock scry --flow` and the devtools tab show these statuses.
 
 `warlock grimoire check` reads the results. It reports nothing until a run has written them.
 
-| Code | Severity | Meaning |
-| --- | --- | --- |
-| `GR4006` | error | A test proving a criterion failed in its last run. |
-| `GR4007` | warning | A criterion's result is older than its test file. Run the tests again. |
-| `GR4008` | warning | A criterion's test did not run (or was skipped) in the last run. |
+| Code     | Severity | Meaning                                                                |
+| -------- | -------- | ---------------------------------------------------------------------- |
+| `GR4006` | error    | A test proving a criterion failed in its last run.                     |
+| `GR4007` | warning  | A criterion's result is older than its test file. Run the tests again. |
+| `GR4008` | warning  | A criterion's test did not run (or was skipped) in the last run.       |
 
 Findings of a flow whose status is `proposed` are shown as expected and never fail the check.

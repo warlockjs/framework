@@ -27,13 +27,13 @@ page modules.
 
 ## Exports
 
-| Export                                         | What it gives you                                                                                  |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `discoverPageGraph(options)`                   | The pages and locale files found under `src`.                                                      |
-| `layoutChainFor(pageFile, webRoot)`            | The `layout.tsx` files from the web root down to the page's folder, outermost first.               |
-| `DiscoveredRoutablePage`                       | A page: `routeName`, `routePath`, `pageFile`, `setupFile`, `layouts`, `layoutSetupFiles`, `site`.  |
-| `DiscoveredPage`, `DiscoveredPageGraph`        | The union of page kinds (page, error, forbidden) and the graph result.                             |
-| `DiscoverPagesOptions`                         | `appRoot`, `srcDir` and `sites`.                                                                   |
+| Export                                  | What it gives you                                                                                 |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `discoverPageGraph(options)`            | The pages and locale files found under `src`.                                                     |
+| `layoutChainFor(pageFile, webRoot)`     | The `layout.tsx` files from the web root down to the page's folder, outermost first.              |
+| `DiscoveredRoutablePage`                | A page: `routeName`, `routePath`, `pageFile`, `setupFile`, `layouts`, `layoutSetupFiles`, `site`. |
+| `DiscoveredPage`, `DiscoveredPageGraph` | The union of page kinds (page, error, forbidden) and the graph result.                            |
+| `DiscoverPagesOptions`                  | `appRoot`, `srcDir` and `sites`.                                                                  |
 
 Pass `sites` (your `web.sites` config) for a multi-site app. Each page then
 carries the `site` key of the folder it lives in. Without `sites`, `site` is

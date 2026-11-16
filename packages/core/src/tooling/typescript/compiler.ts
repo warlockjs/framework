@@ -70,7 +70,7 @@ export function nativePath(file: string): string {
   const normalized = path.normalize(file);
 
   return /^[a-z]:/.test(normalized)
-    ? normalized[0].toUpperCase() + normalized.slice(1)
+    ? normalized.charAt(0).toUpperCase() + normalized.slice(1)
     : normalized;
 }
 

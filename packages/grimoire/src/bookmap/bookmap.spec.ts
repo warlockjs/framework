@@ -13,9 +13,20 @@ import {
   task,
   written as buildWritten,
 } from "../../tests/support/written-model";
-import { annotationsFrom, buildCollectedFiles, normalizeRoutePath, type CollectedInput } from "./index";
+import {
+  annotationsFrom,
+  buildCollectedFiles,
+  normalizeRoutePath,
+  type CollectedInput,
+} from "./index";
 
-function route(method: string, path: string, handlerFile: string | null, sourceFile: string | null, isPage = false): BookRoute {
+function route(
+  method: string,
+  path: string,
+  handlerFile: string | null,
+  sourceFile: string | null,
+  isPage = false,
+): BookRoute {
   return {
     method,
     path,
@@ -32,7 +43,13 @@ function route(method: string, path: string, handlerFile: string | null, sourceF
   };
 }
 
-function proof(ref: string, criterion: string, file: string, line: number | null, name = "a test"): ProofLine {
+function proof(
+  ref: string,
+  criterion: string,
+  file: string,
+  line: number | null,
+  name = "a test",
+): ProofLine {
   const [feature = "", flow = ""] = ref.split("/");
 
   return {
@@ -45,7 +62,14 @@ function proof(ref: string, criterion: string, file: string, line: number | null
   };
 }
 
-function result(ref: string, criterion: string, testFile: string, line: number, outcome: ProofResult["outcome"], hash = "h1"): ProofResult {
+function result(
+  ref: string,
+  criterion: string,
+  testFile: string,
+  line: number,
+  outcome: ProofResult["outcome"],
+  hash = "h1",
+): ProofResult {
   const [feature = "", flow = ""] = ref.split("/");
 
   return {
@@ -63,27 +87,58 @@ function result(ref: string, criterion: string, testFile: string, line: number, 
 }
 
 /** A small shop: catalog and orders, a client site and a mobile app. */
-function world(overrides: { facts?: Partial<BookFacts>; proofs?: ProofLine[]; results?: TestResultsStore | null } = {}): CollectedInput {
+function world(
+  overrides: {
+    facts?: Partial<BookFacts>;
+    proofs?: ProofLine[];
+    results?: TestResultsStore | null;
+  } = {},
+): CollectedInput {
   const facts = buildFacts(
     [
-      codeFile("src/app/catalog/routes.ts", ["src/app/catalog/list.controller.ts"], { type: "routes" }),
-      codeFile("src/app/catalog/list.controller.ts", ["src/app/catalog/repo.ts"], { type: "controller" }),
+      codeFile("src/app/catalog/routes.ts", ["src/app/catalog/list.controller.ts"], {
+        type: "routes",
+      }),
+      codeFile("src/app/catalog/list.controller.ts", ["src/app/catalog/repo.ts"], {
+        type: "controller",
+      }),
       codeFile("src/app/catalog/repo.ts", ["src/app/shared/money.ts"]),
       codeFile("src/app/catalog/dead.ts"),
       codeFile("src/app/catalog/tests/list.test.ts", ["src/app/catalog/repo.ts"], { type: "spec" }),
-      codeFile("src/app/orders/routes.ts", ["src/app/orders/place.controller.ts"], { type: "routes" }),
-      codeFile("src/app/orders/place.controller.ts", ["src/app/catalog/repo.ts", "src/app/orders/confirm.mail.ts"]),
+      codeFile("src/app/orders/routes.ts", ["src/app/orders/place.controller.ts"], {
+        type: "routes",
+      }),
+      codeFile("src/app/orders/place.controller.ts", [
+        "src/app/catalog/repo.ts",
+        "src/app/orders/confirm.mail.ts",
+      ]),
       codeFile("src/app/orders/confirm.mail.ts", [], { type: "mail" }),
       codeFile("src/app/shared/money.ts"),
-      codeFile("src/web/$sites/client/products/show.page.tsx", ["src/web/$sites/client/products/show.setup.ts"], { type: "page" }),
-      codeFile("src/web/$sites/client/products/show.setup.ts", ["src/app/catalog/repo.ts"], { type: "setup" }),
+      codeFile(
+        "src/web/$sites/client/products/show.page.tsx",
+        ["src/web/$sites/client/products/show.setup.ts"],
+        { type: "page" },
+      ),
+      codeFile("src/web/$sites/client/products/show.setup.ts", ["src/app/catalog/repo.ts"], {
+        type: "setup",
+      }),
       codeFile("src/web/$sites/client/layout.tsx", [], { type: "layout" }),
       codeFile("mobile/app/products/[id].tsx", [], { type: "component", mobileApp: "mobile" }),
     ],
     {
       routes: [
-        route("GET", "/api/products", "src/app/catalog/list.controller.ts", "src/app/catalog/routes.ts"),
-        route("POST", "/api/orders", "src/app/orders/place.controller.ts", "src/app/orders/routes.ts"),
+        route(
+          "GET",
+          "/api/products",
+          "src/app/catalog/list.controller.ts",
+          "src/app/catalog/routes.ts",
+        ),
+        route(
+          "POST",
+          "/api/orders",
+          "src/app/orders/place.controller.ts",
+          "src/app/orders/routes.ts",
+        ),
         route("GET", "/products/:id", "src/web/$sites/client/products/show.page.tsx", null, true),
       ],
       sites: [{ id: "client", root: "src/web/$sites/client", basePath: null }],
@@ -107,7 +162,9 @@ function world(overrides: { facts?: Partial<BookFacts>; proofs?: ProofLine[]; re
           root: "mobile",
           routing: "files",
           routesDir: "mobile/app",
-          screens: [{ route: "/products/[id]/", file: "mobile/app/products/[id].tsx", layouts: [] }],
+          screens: [
+            { route: "/products/[id]/", file: "mobile/app/products/[id].tsx", layouts: [] },
+          ],
         },
       ],
       named: [{ type: "mail", name: "order-confirmation", file: "src/app/orders/confirm.mail.ts" }],
@@ -157,7 +214,9 @@ function world(overrides: { facts?: Partial<BookFacts>; proofs?: ProofLine[]; re
     ],
     apps: [
       app("mobile", "mobile", "mobile", {
-        screens: [page("mobile", "product", "/products/[id]", [row("Details", "catalog/browse")], "screen")],
+        screens: [
+          page("mobile", "product", "/products/[id]", [row("Details", "catalog/browse")], "screen"),
+        ],
       }),
       app("web-client", "site", "src/web/$sites/client", {
         layouts: [
@@ -169,7 +228,12 @@ function world(overrides: { facts?: Partial<BookFacts>; proofs?: ProofLine[]; re
             blocks: [row("Cart count", "orders/place"), row("Header", null)],
           },
         ],
-        pages: [page("web-client", "product", "/products/:id", [row("Details", "catalog/browse"), row("Order", "orders/place")])],
+        pages: [
+          page("web-client", "product", "/products/:id", [
+            row("Details", "catalog/browse"),
+            row("Order", "orders/place"),
+          ]),
+        ],
       }),
     ],
     tasks: [
@@ -265,17 +329,25 @@ describe("buildCollectedFiles: flow book maps", () => {
   });
 
   it("leaves route steps unknown when there are no route facts", () => {
-    const steps = buildCollectedFiles(world({ facts: { routes: null } })).flows["orders/place"]?.steps ?? [];
+    const steps =
+      buildCollectedFiles(world({ facts: { routes: null } })).flows["orders/place"]?.steps ?? [];
 
     expect(steps[0]).toMatchObject({ found: null, entry: null, files: [] });
   });
 
   it("matches a route registered for ALL methods", () => {
     const steps =
-      buildCollectedFiles(world({ facts: { routes: [route("ALL", "/api/orders", null, "src/app/orders/routes.ts")] } }))
-        .flows["orders/place"]?.steps ?? [];
+      buildCollectedFiles(
+        world({
+          facts: { routes: [route("ALL", "/api/orders", null, "src/app/orders/routes.ts")] },
+        }),
+      ).flows["orders/place"]?.steps ?? [];
 
-    expect(steps[0]).toMatchObject({ found: true, entry: "src/app/orders/routes.ts", files: ["src/app/orders/routes.ts"] });
+    expect(steps[0]).toMatchObject({
+      found: true,
+      entry: "src/app/orders/routes.ts",
+      files: ["src/app/orders/routes.ts"],
+    });
   });
 
   it("gives each criterion its tests and status from the results store", () => {
@@ -335,23 +407,41 @@ describe("buildCollectedFiles: flow book maps", () => {
   it("marks every criterion not run or no test when no results exist", () => {
     const file = "src/app/catalog/tests/list.test.ts";
     const criteria =
-      buildCollectedFiles(world({ proofs: [proof("catalog/browse", "AC-1", file, 10)] })).flows["catalog/browse"]
-        ?.criteria ?? [];
+      buildCollectedFiles(world({ proofs: [proof("catalog/browse", "AC-1", file, 10)] })).flows[
+        "catalog/browse"
+      ]?.criteria ?? [];
 
-    expect(criteria.map((criterion) => criterion.status)).toEqual(["not-run", "no-test", "no-test"]);
+    expect(criteria.map((criterion) => criterion.status)).toEqual([
+      "not-run",
+      "no-test",
+      "no-test",
+    ]);
   });
 
   it("lists the layout, page and screen rows that show the flow", () => {
     const collected = buildCollectedFiles(world());
 
     expect(collected.flows["catalog/browse"]?.shownBy).toEqual([
-      { app: "mobile", type: "screen", id: "product", block: "Details", file: "grimoire/apps/mobile/screens/product/README.md" },
-      { app: "web-client", type: "page", id: "product", block: "Details", file: "grimoire/apps/web-client/pages/product/README.md" },
+      {
+        app: "mobile",
+        type: "screen",
+        id: "product",
+        block: "Details",
+        file: "grimoire/apps/mobile/screens/product/README.md",
+      },
+      {
+        app: "web-client",
+        type: "page",
+        id: "product",
+        block: "Details",
+        file: "grimoire/apps/web-client/pages/product/README.md",
+      },
     ]);
-    expect(collected.flows["orders/place"]?.shownBy.map((shown) => `${shown.type}:${shown.id}:${shown.block}`)).toEqual([
-      "layout:site:Cart count",
-      "page:product:Order",
-    ]);
+    expect(
+      collected.flows["orders/place"]?.shownBy.map(
+        (shown) => `${shown.type}:${shown.id}:${shown.block}`,
+      ),
+    ).toEqual(["layout:site:Cart count", "page:product:Order"]);
   });
 });
 
@@ -371,14 +461,31 @@ describe("buildCollectedFiles: feature book maps", () => {
         "src/web/$sites/client/products/show.setup.ts",
       ],
       borrowed: [{ file: "src/app/shared/money.ts", owner: null, by: ["src/app/catalog/repo.ts"] }],
-      routes: [{ method: "GET", path: "/api/products", name: null, file: "src/app/catalog/list.controller.ts" }],
+      routes: [
+        {
+          method: "GET",
+          path: "/api/products",
+          name: null,
+          file: "src/app/catalog/list.controller.ts",
+        },
+      ],
       pages: {
-        "web-client": [{ route: "/products/:id", file: "src/web/$sites/client/products/show.page.tsx", type: "page" }],
+        "web-client": [
+          {
+            route: "/products/:id",
+            file: "src/web/$sites/client/products/show.page.tsx",
+            type: "page",
+          },
+        ],
       },
       unreached: ["src/app/catalog/dead.ts"],
     });
     expect(collected.features.orders?.borrowed).toEqual([
-      { file: "src/app/catalog/repo.ts", owner: "catalog", by: ["src/app/orders/place.controller.ts"] },
+      {
+        file: "src/app/catalog/repo.ts",
+        owner: "catalog",
+        by: ["src/app/orders/place.controller.ts"],
+      },
     ]);
   });
 
@@ -386,7 +493,9 @@ describe("buildCollectedFiles: feature book maps", () => {
     const input = world();
     input.apps = {};
 
-    expect(Object.keys(buildCollectedFiles(input).features.catalog?.pages ?? {})).toEqual(["client"]);
+    expect(Object.keys(buildCollectedFiles(input).features.catalog?.pages ?? {})).toEqual([
+      "client",
+    ]);
   });
 });
 
@@ -446,7 +555,9 @@ describe("buildCollectedFiles: indexes", () => {
 describe("annotationsFrom", () => {
   it("gives each file its owner, borrowers and the flows that reach it", () => {
     const input = world();
-    const annotations = annotationsFrom(input, buildCollectedFiles(input), { tests: { "a.test.ts": "x" } });
+    const annotations = annotationsFrom(input, buildCollectedFiles(input), {
+      tests: { "a.test.ts": "x" },
+    });
 
     expect(annotations.writtenHash).toBe("written-hash");
     expect(annotations.tests).toEqual({ "a.test.ts": "x" });
@@ -455,7 +566,11 @@ describe("annotationsFrom", () => {
       borrowedBy: ["orders"],
       flows: ["catalog/browse", "orders/place"],
     });
-    expect(annotations.files["src/app/catalog/dead.ts"]).toEqual({ feature: "catalog", borrowedBy: [], flows: [] });
+    expect(annotations.files["src/app/catalog/dead.ts"]).toEqual({
+      feature: "catalog",
+      borrowedBy: [],
+      flows: [],
+    });
     expect(Object.keys(annotations.files)).toHaveLength(input.facts.files.length);
   });
 });
