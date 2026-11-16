@@ -1,4 +1,21 @@
 {
+  "5.55.0": {
+    "publishedAt": "2026-11-16T22:40:50.794Z",
+    "matrix": "none",
+    "headline": "Grimoire, a project map for AI agents and developers (experimental), plus public extension points for MCP tools, devtools panels and package error codes.",
+    "highlights": [
+      "`@warlock.js/grimoire` writes a book of the code from the inspect report and reads the features, flows, apps, tasks and releases agents write under `grimoire/`; new apps have it on by default and `warlock add grimoire` wires existing ones.",
+      "`warlock grimoire check` reports, read-only, every written name that points at nothing, untested criteria, unowned files and changelog drift, each with a `GR` code that `warlock explain` describes.",
+      "`warlock scry` answers a file, the impact of a change, a route, a feature, a flow or a search, and the same questions are served as MCP tools.",
+      "A Vitest reporter ties `// @proves <feature>/<flow> AC-n` tests to acceptance criteria, and a devtools tab shows features, flows, pages, tasks and the check report, with a static export.",
+      "Packages and apps can register MCP tools (`withMcpTools`, `mcp.tools`), devtools panels (`panels: [...]`) and error codes for `warlock explain` (`withExplainCodes`); `cli.commands` accepts nested arrays.",
+      "The inspect report adds line counts, header sentences and tags, export comments, seven file roles, controller and action on routes, and setup file and site on pages."
+    ],
+    "upgradeNotes": [
+      "Apps upgrading from 5.53 or earlier need `@mongez/http` ^3.5.2 and `@mongez/localization` ^3.6.0, and web apps `@mongez/react-form` ^4.1.0.",
+      "Grimoire is experimental: the structure of the written files may still change before it is marked stable."
+    ]
+  },
   "5.54.0": {
     "publishedAt": "2026-11-16T16:00:38.046Z",
     "matrix": "none",

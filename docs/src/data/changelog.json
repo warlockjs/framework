@@ -94,6 +94,10 @@
       "slug": "fs"
     },
     {
+      "name": "@warlock.js/grimoire",
+      "slug": "grimoire"
+    },
+    {
       "name": "@warlock.js/herald",
       "slug": "herald"
     },
@@ -135,6 +139,339 @@
     }
   ],
   "releases": [
+    {
+      "version": "5.55.0",
+      "id": "v5-55-0",
+      "date": "November 16, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Grimoire, a project map for AI agents and developers (experimental), plus public extension points for MCP tools, devtools panels and package error codes.",
+      "highlights": [
+        "<code>@warlock.js/grimoire</code> writes a book of the code from the inspect report and reads the features, flows, apps, tasks and releases agents write under <code>grimoire/</code>; new apps have it on by default and <code>warlock add grimoire</code> wires existing ones.",
+        "<code>warlock grimoire check</code> reports, read-only, every written name that points at nothing, untested criteria, unowned files and changelog drift, each with a <code>GR</code> code that <code>warlock explain</code> describes.",
+        "<code>warlock scry</code> answers a file, the impact of a change, a route, a feature, a flow or a search, and the same questions are served as MCP tools.",
+        "A Vitest reporter ties <code>// @proves &lt;feature&gt;/&lt;flow&gt; AC-n</code> tests to acceptance criteria, and a devtools tab shows features, flows, pages, tasks and the check report, with a static export.",
+        "Packages and apps can register MCP tools (<code>withMcpTools</code>, <code>mcp.tools</code>), devtools panels (<code>panels: [...]</code>) and error codes for <code>warlock explain</code> (<code>withExplainCodes</code>); <code>cli.commands</code> accepts nested arrays.",
+        "The inspect report adds line counts, header sentences and tags, export comments, seven file roles, controller and action on routes, and setup file and site on pages."
+      ],
+      "upgradeNotes": [
+        "Apps upgrading from 5.53 or earlier need <code>@mongez/http</code> ^3.5.2 and <code>@mongez/localization</code> ^3.6.0, and web apps <code>@mongez/react-form</code> ^4.1.0.",
+        "Grimoire is experimental: the structure of the written files may still change before it is marked stable."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.55.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/grimoire",
+          "slug": "grimoire",
+          "total": 38,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 38
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>parseGrimoire(root)</code> reads every agent-written file under <code>grimoire/</code>: features, changelogs, flows, version briefs, apps, layouts, pages, screens, blocks, tasks and releases. It keeps the file and line of each value, and reports a broken structure as a <code>GR1001</code>–<code>GR1028</code> finding instead of throwing. CRLF files, <code>*</code> bullets, tabs, tables without outer pipes and lists a Markdown formatter has collapsed to one space are read too. Written files are read a few at a time, and a task <code>Brief:</code> outside <code>grimoire/</code> is reported and never looked up."
+            },
+            {
+              "type": "Added",
+              "html": "<code>buildBook()</code> writes the book to <code>grimoire/book/</code>: one JSON entry per source file, an <code>index.md</code> summary per module, <code>app/routes.json</code>, the page list of each site and the screen list of each mobile app."
+            },
+            {
+              "type": "Added",
+              "html": "<code>buildBook()</code> hashes a source file only when its size or modification time changed. A run with no changes calls no adapter and writes nothing."
+            },
+            {
+              "type": "Added",
+              "html": "<code>buildBook()</code> caches route facts. It reads the routes again only when a routes file, something it imports, a config file or a mail, job, event or notification file changes, or when called with <code>routes: \"fresh\"</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>buildBook()</code> writes each file atomically (book maps and indexes too), rewrites only the entries that changed and removes the entries of deleted files."
+            },
+            {
+              "type": "Added",
+              "html": "<code>loadBook()</code> reads the book without an adapter."
+            },
+            {
+              "type": "Added",
+              "html": "<code>features/&lt;feature&gt;/bookmap.json</code> lists the files a feature owns, the files it borrows, its routes, its pages per app and the files no flow reaches."
+            },
+            {
+              "type": "Added",
+              "html": "<code>flows/&lt;flow&gt;.bookmap.json</code> lists the files behind each step, each criterion's tests with their last result, and the blocks that show the flow."
+            },
+            {
+              "type": "Added",
+              "html": "<code>features/index.json</code> and <code>tasks/index.json</code> are rewritten only when their content changes."
+            },
+            {
+              "type": "Added",
+              "html": "<code>openGrimoire()</code> loads the whole book in one call. Pass <code>write: false</code> to compute it in memory."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock grimoire check</code> reports names that point at nothing (routes, pages, mails, jobs, events, notifications, flows, apps and criteria), source files without a header or a feature (a <code>@feature</code> tag may have text after the id, and a <code>folders</code> entry may start with <code>./</code>), files no flow reaches, criteria without a test, <code>@proves</code> lines that name nothing, and README versions and dates that differ from the changelog."
+            },
+            {
+              "type": "Added",
+              "html": "Findings on proposed work show as expected and never fail the check. Every <code>GR</code> code is listed in the docs."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock grimoire build</code> (with <code>--force</code>, and <code>--site [--out]</code> for a static site) writes the book. <code>--out</code> must be a folder inside the project, not the project folder itself (<code>GR9006</code>). Route steps in the check match like <code>warlock scry --route</code>: <code>:id</code> and <code>[id]</code> are the same, a trailing <code>/</code> is ignored and the method may be in any case. The build summary counts open and waiting tasks separately."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock grimoire check</code> exits with 1 only on unexpected errors. The text shows every error, and for each code with more than five warnings the first five and a count; <code>--all</code> lists every finding and <code>--json</code> is always complete. <code>build</code> and <code>check</code> end with the book state and the time, after the app's own boot output."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock scry --impact</code> counts each list in its heading and stops a long list at 20 lines with \"… and N more\"; <code>--all</code> prints every line and <code>--json</code> stays complete."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock scry --search</code> ranks exact name or path, prefix, whole word, substring, header sentence and fuzzy matches in that order, then by type."
+            },
+            {
+              "type": "Added",
+              "html": "The book and its freshness fingerprint cover code files only (plus <code>package.json</code> and config files for the route cache); images, fonts and certificates are not listed."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock grimoire release &lt;version&gt;</code> writes the changelog entries stamped with that version between the markers of <code>grimoire/releases/&lt;version&gt;.md</code>. It never changes a feature changelog or a version brief, and refuses a release file with two collected lists."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock scry</code> answers file, impact, route, feature, flow and search questions, with per-criterion test status for a flow. A file answer has the same <code>packages</code> as its book entry, and its JSON includes <code>bookEntry</code>. It prints compact text, or JSON with <code>--json</code>."
+            },
+            {
+              "type": "Added",
+              "html": "The <code>grimoire_*</code> MCP tools answer the same questions as <code>warlock scry</code>."
+            },
+            {
+              "type": "Added",
+              "html": "File questions never boot the app. <code>build</code> and <code>check</code> read the routes again only when they changed."
+            },
+            {
+              "type": "Added",
+              "html": "<code>registerGrimoireCommands()</code> registers the commands. Add it to <code>cli: { commands: [...] }</code> in <code>warlock.config.ts</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock explain GR2001</code> describes any Grimoire code."
+            },
+            {
+              "type": "Added",
+              "html": "<code>createWarlockAdapter()</code> builds the book from the facts of <code>warlock inspect</code>. For a mobile app it reads only the source folders, not <code>android/</code>, <code>ios/</code> or build output, and the manifest records the installed <code>@warlock.js/core</code> version, so a core upgrade rebuilds the book. Mobile screens are listed in the same order on every machine."
+            },
+            {
+              "type": "Added",
+              "html": "Task and release checks report the problems in <code>GR6001</code>–<code>GR6003</code> and <code>GR7001</code>–<code>GR7005</code>."
+            },
+            {
+              "type": "Added",
+              "html": "The apps check (<code>GR5001</code>–<code>GR5009</code>) covers blocks, conditions, pages, layouts, screens, entry points, uncovered sites and mobile apps."
+            },
+            {
+              "type": "Added",
+              "html": "Mobile screens are read from the Expo Router file names. When a mobile app defines its navigation in code, the agent declares its screens in <code>grimoire/apps/&lt;app&gt;/screens/</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>@warlock.js/grimoire/vitest</code> exports a Vitest reporter. It records the last result (pass, fail or skipped) of every test marked <code>// @proves &lt;feature&gt;/&lt;flow&gt; AC-n</code> in <code>grimoire/book/test-results.json</code>, and merges the results of partial runs, keeping the results of test files that had not started when a run stopped. Proof lines are read from a few test files at a time."
+            },
+            {
+              "type": "Added",
+              "html": "The reporter marks a result older than its test file as stale. <code>warlock grimoire check</code> reports failing (<code>GR4006</code>), stale (<code>GR4007</code>) and not-run (<code>GR4008</code>) criteria."
+            },
+            {
+              "type": "Added",
+              "html": "A Grimoire tab for the devtools dashboard, registered with <code>panels: [\"@warlock.js/grimoire/devtools\"]</code>. It has one search box across flows, blocks, routes, files and tasks, and views for features, flows, pages, tasks, releases and the check report. It also shows small graphs of a file, a feature, a page and module coupling. It keeps the generated book up to date from the cached routes, never boots the app and never changes an agent-written file; requests that arrive together share one load, and a slow open is reused for a while. A task waiting for approval is listed only under \"Waiting for approval\"."
+            },
+            {
+              "type": "Added",
+              "html": "<code>exportGrimoireSite()</code> writes the same tab as one static <code>index.html</code> for people without the app running. It accepts an absolute <code>outDir</code>, and the page does not contain the project's absolute path."
+            },
+            {
+              "type": "Added",
+              "html": "Six agent skills (<code>use-the-grimoire</code>, <code>write-a-feature</code>, <code>record-a-change</code>, <code>describe-an-app</code>, <code>document-a-file</code> and <code>backfill-a-grimoire</code>), a skills index, and a README that describes the install and which files Grimoire owns."
+            },
+            {
+              "type": "Added",
+              "html": "A flow can name a mail by any <code>*.mail.ts</code> or <code>*.email.ts</code> file, or a file in a <code>mails/</code> or <code>emails/</code> folder. A <code>job</code> step can name a queue job (<code>defineJob()</code>), a scheduled task or a <code>*.job.ts</code> file, and <code>warlock scry --search</code> finds mails and jobs by name."
+            },
+            {
+              "type": "Added",
+              "html": "A page step can name its app, <code>page   /support [web-admin]</code>, for pages that share a path on two sites or a site and a mobile app. The step looks only in that app; an unknown app is <code>GR2008</code> and an app the feature does not list is <code>GR2009</code>."
+            },
+            {
+              "type": "Added",
+              "html": "A feature <code>folders</code> entry with a code-file extension owns that one file. It wins over a folder of another feature, and a missing file is <code>GR3005</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>origin: inferred</code> or <code>confirmed</code> is allowed on an app README, a layout, a page and a screen, as on features and flows."
+            },
+            {
+              "type": "Added",
+              "html": "<code>GR1004</code> lists the allowed task statuses, and the skills name <code>waiting for approval</code> as the status of a task that needs the owner's answer."
+            },
+            {
+              "type": "Added",
+              "html": "The <code>backfill-a-grimoire</code> skill says where the changelog line goes, how to write a case the code answers by doing nothing, what starts a flow, and that \"does not apply\" lines in read-only flows are expected. <code>describe-an-app</code> says that \"Who sees it\" is checked and \"Changes with\" is free text."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 15,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 11
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock inspect</code> files report <code>lines</code> (code files only), <code>about</code> (the file's header comment or <code>@fileoverview</code>), <code>tags</code> (header <code>@tag</code> values, such as <code>tags.feature</code>) and <code>exportDocs</code> (the first sentence of each export's JSDoc)."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock inspect</code> files take the roles <code>use-case</code>, <code>seed</code>, <code>request</code>, <code>mail</code>, <code>job</code>, <code>event</code> and <code>client</code>. A <code>*.email.ts</code> file and a file in an <code>emails/</code> folder get the role <code>mail</code>. A module named after one of these words (<code>events</code>, <code>jobs</code>, ...) keeps the roles of its own folders."
+            },
+            {
+              "type": "Added",
+              "html": "Inspect routes that use a controller tuple report <code>controller</code> and <code>action</code>. The <code>Route</code> type gains <code>$controller</code> and <code>$action</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Inspect pages report <code>setupFile</code> and <code>site</code>. The page list is built from the web page graph."
+            },
+            {
+              "type": "Added",
+              "html": "<code>collectFiles()</code>, <code>fileRole()</code> and the <code>CollectFilesOptions</code> type are exported from <code>@warlock.js/core/tooling</code>. <code>collectFiles()</code> takes a <code>dirs</code> option to scan folders other than <code>src</code>; it skips <code>node_modules</code> and hidden folders."
+            },
+            {
+              "type": "Added",
+              "html": "<code>withMcpTools()</code> attaches the MCP tools a package registers to a command. <code>mcp.tools</code> in <code>warlock.config.ts</code> lists them too, and <code>startWarlockMcpServer()</code> takes the same list as <code>tools</code>."
+            },
+            {
+              "type": "Added",
+              "html": "A registered MCP tool is checked like a built-in one. A tool name that is already taken stops the server with a message that names the tool."
+            },
+            {
+              "type": "Added",
+              "html": "<code>cli.commands</code> accepts arrays of commands (<code>CLICommandEntry</code>), so one register function can return several commands."
+            },
+            {
+              "type": "Added",
+              "html": "<code>withExplainCodes()</code> lets a package answer <code>warlock explain &lt;code&gt;</code> for its own codes, without booting the app."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock add grimoire</code> (experimental) installs <code>@warlock.js/grimoire</code>, registers its commands in <code>cli.commands</code> of <code>warlock.config.ts</code>, adds the generated files to <code>.gitignore</code>, adds the devtools panel to <code>src/config/devtools.ts</code> when <code>@warlock.js/devtools</code> is a dependency of the app (otherwise it prints that the tab needs <code>warlock add devtools</code>) and, when the app has a <code>vite.config.ts</code>, the Vitest reporter. Comments and strings in those files are skipped. It edits the root <code>test</code> object of the exported Vitest config and the exported devtools settings object only when they are written as literals. When <code>cli</code>, <code>commands</code>, <code>reporters</code> or <code>panels</code> is set from a variable, a function or a <code>projects</code> factory, it changes nothing there and prints the line to add and where (for example, add <code>grimoireReporter()</code> to <code>test.reporters</code> of the root config). Running it twice changes nothing."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock add test</code> adds <code>grimoireReporter()</code> to the Vitest config it creates when the app uses Grimoire."
+            },
+            {
+              "type": "Changed",
+              "html": "A file whose name ends in <code>.use-case.ts</code>, <code>.seed.ts</code>, <code>.request.ts</code>, <code>.mail.ts</code>, <code>.job.ts</code>, <code>.event.ts</code> or <code>.client.ts</code> gets its role from the suffix, even inside another folder. For example, <code>services/mail/welcome.mail.ts</code> is a <code>mail</code> file."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock explain &lt;code&gt;</code> answers codes that a package registered with <code>withExplainCodes()</code> and reads only <code>warlock.config.ts</code>. Codes are matched in any case, and a <code>warlock.config.ts</code> that fails to load is named in the error."
+            },
+            {
+              "type": "Fixed",
+              "html": "The conventions skill names the use-case file <code>.use-case.ts</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "A file under a non-<code>src</code> <code>app/</code> folder, such as <code>mobile/app/products/x.tsx</code>, belongs to the module <code>mobile/app</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Register your own dashboard tab with one line in <code>src/config/devtools.ts</code>: <code>panels: [\"&lt;package&gt;/devtools\"]</code>. A panel declares an id and a title, the data routes served under <code>/__warlock/api/&lt;id&gt;</code> and a browser view module. Every route and file sits behind the devtools guard. A package entry resolves from the app root, also when the package only has an <code>import</code> condition in <code>exports</code>. A panel that lists the same method and path twice is left out with a message, a <code>panels</code> option that is not a list is reported once, and Back from a panel view returns to its first view."
+            },
+            {
+              "type": "Added",
+              "html": "The Processes tab uses the same panel registration, with no visible change."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "New apps include Grimoire (experimental): the <code>@warlock.js/grimoire</code> dependency, <code>registerGrimoireCommands()</code> in <code>warlock.config.ts</code>, the generated-file lines in <code>.gitignore</code>, a Grimoire panel in the devtools config and a project map section in the agent guide. Grimoire is also offered as a feature in the picker and in <code>--features</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The git step's spinner reads \"Initializing git repository\" while it runs, and \"Git repository initialized!\" when it finishes."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>@warlock.js/web/build</code> exports <code>discoverPageGraph()</code>, <code>layoutChainFor()</code> and the page-graph types."
+            }
+          ]
+        }
+      ]
+    },
     {
       "version": "5.54.0",
       "id": "v5-54-0",
