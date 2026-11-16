@@ -2,6 +2,275 @@
 
 Open work for the framework repository. Finished entries move to `tasks.completed.md` (newest first).
 
+## Owner decisions waiting
+
+- **T-137 Grimoire open points**: experimental or stable label in 5.55.0; who writes the release number and date into
+  feature changelogs; how mobile screens are listed when navigation is defined in code. See T-137.
+
+## 5.55.0: Grimoire
+
+Owner decision of 2026-11-16: Grimoire ships **complete in one release, 5.55.0**. Everything in this section is in
+scope for that release. Out of scope: using the package outside Warlock.js (the standalone `grimoire` binary and the
+generic book), other frameworks, and features that span several repositories.
+
+**What it is.** `@warlock.js/grimoire` is a project map for AI agents and developers. Warlock writes a generated
+**book** of what is in the code; AI agents write what the product does (**features**, **flows**), where users meet it
+(**apps**), and the work (**tasks**, **releases**), all under a visible `grimoire/` folder in the app. The written
+files point into the book by name, and a read-only check reports any name that no longer exists. Agents ask through
+`warlock scry` and MCP tools; developers browse a devtools tab.
+
+**Rules that apply to every task below.**
+
+- Warlock writes only the book and collected files (`index.json`, `*.bookmap.json`); they are ignored by git and
+  rebuilt when sources change. It reads the agent-written files and never edits them.
+- The book is a projection of the existing inspect report (`inspectApp()` in `@warlock.js/core/tooling`): never a
+  second parser.
+- One package, `packages/grimoire`: the root entry must not import `@warlock.js/core` or `@warlock.js/web`; everything
+  Warlock-specific lives behind the adapter contract in the `@warlock.js/grimoire/warlock` entry.
+- Registered through `cli.commands` in `warlock.config.ts`; on by default in new apps.
+- The agreed layout, file templates and wording rules are in the local working files on the build server (not in
+  git): `findings/6.0/PLAN-GRIMOIRE.md` (plan and workstreams), `findings/6.0/GRIMOIRE-DESIGN.md` (agreed design) and
+  `findings/6.0/skills/` (six draft skills whose templates are the fixed structure of the written files). Read them
+  before starting.
+
+**Order.** T-121 to T-126 first and in parallel; then T-127 to T-129; then T-130 to T-135; then T-136, one
+verification pass, one review, and the release.
+
+### T-121 [feature] Inspect report: line counts, header sentence, export comments, more file roles, controller on routes
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: the book is built from the inspect report, which today lacks what an agent reads first. Add to each
+  file: its line count, the sentence in the comment at the top of the file, and the first sentence of the comment above
+  each export. Add the file roles `use-case`, `seed`, `request`, `mail`, `job`, `event` and `client`. For a route
+  registered as a controller tuple, keep the controller class and action name on the route record (today the handler
+  is a bound function and the class is lost). Fix the conventions skill, which says `.usecase.ts` while the generator
+  writes `.use-case.ts`.
+- Evidence (as of 5.54.0): `packages/core/src/tooling/inspect/collect-files.ts:33` (`fileRole`), `:87`
+  (`collectFiles`); `packages/core/src/tooling/inspect/inspect-report.types.ts:300` (`InspectFile`), `:81`
+  (`InspectRoute`); `packages/core/src/router/router.ts:454` (`add`), `packages/core/src/router/types.ts:480` (`Route`);
+  `packages/core/skills/warlock-conventions/SKILL.md:98-113`.
+- Acceptance: new fields in the report and its JSON schema (schema version bumped), specs, docs, skill, changelog;
+  existing consumers of the report unchanged.
+- Status: open.
+
+### T-122 [feature] MCP server: let packages and the app register tools
+
+- Source: owner decision of 2026-11-16 (accepted as public API).
+- What and why: the tool list of `warlock mcp` is fixed, so a package cannot add its tools. Add a registration point:
+  a `tools` option on the server start function and a list the `mcp` command and `warlock dev --mcp` read (from the
+  Warlock config or from registered commands' packages). The first user is Grimoire (T-130).
+- Evidence: `packages/core/src/tooling/mcp/mcp-tools.ts:358` (`createWarlockMcpTools`, fixed list), `:66`
+  (`WarlockMcpTool`); `packages/core/src/tooling/mcp/start-mcp-server.ts:160` (`startWarlockMcpServer`, no tools
+  option); `packages/core/src/cli/commands/mcp.command.ts`; `packages/core/src/dev-server/dev-agent-tooling.ts:159`.
+- Acceptance: a spec registers an extra tool and calls it over the server; a tool that writes still respects
+  `--allow-writes`; docs, skill, changelog.
+- Status: open.
+
+### T-123 [feature] Devtools: registered panels instead of hard-coded tabs
+
+- Source: owner decision of 2026-11-16 (accepted as public API).
+- What and why: devtools tabs, data routes and views are hard-coded, so a package cannot add one. Add a panel
+  registration (a data route under the guarded scope, a tab, a view module) and move the Processes panel onto it as
+  the first user. The Grimoire tab (T-134) is the second.
+- Evidence: `packages/devtools/src/devtools-connector.ts:66`, `:97-107` (sources wired by hand);
+  `packages/devtools/src/server/index.ts` (`mountDevtoolsRoutes`), `src/server/types.ts`; `packages/devtools/ui/index.html`
+  and `ui/app.js` (`render()`); `packages/devtools/src/process-panel.ts` (the closest precedent).
+- Acceptance: the Processes panel works unchanged through the new registration; a spec registers a test panel; the
+  devtools guard (loopback host, origin, no proxy headers) covers registered routes; docs, skill, changelog.
+- Status: open.
+
+### T-124 [feature] Pages report: setup file, site and full layout chain
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: the inspect report's pages have no setup file and no site, and compute the layout chain with a rule
+  that differs from the web build's. Export page-graph discovery from `@warlock.js/web/build` and build the report's
+  pages from it, so both agree.
+- Evidence: `packages/web/src/build/discover-pages.ts:989` (`discoverPageGraph`), `:89` (`DiscoveredRoutablePage`),
+  `:648` (`layoutChainFor`); `packages/web/src/build/index.ts` (not exported today);
+  `packages/core/src/tooling/inspect/collect-pages.ts:54` (`layoutChainOf`), `:130`.
+- Acceptance: a multi-site fixture reports each page with its setup file, site and outermost-first layout chain,
+  equal to what the build uses; specs, docs, changelog.
+- Status: open.
+
+### T-125 [feature] Grimoire package: skeleton, family wiring, adapter contract
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: create `packages/grimoire` with a framework-neutral root entry and a `warlock` subpath entry, and add
+  it to the family: `pnpm-workspace.yaml`; `tools/release/pkgist.config.ts` (family entry with the subpath in
+  `entries`); `tools/release/scripts/warlock-family.ts` (`WARLOCK_FAMILY_SIZE` 33 to 34) and the `FAMILY_NAMES` list
+  in its spec; `tools/release/scripts/local-registry-gate.ts`; the three allowance files at 0; the docs sidebar
+  (`docs/astro.config.mjs`), `docs/scripts/generate-site-llms.mjs`, `docs/src/content/docs/packages.mdx`; the Windows
+  workflow matrix (the package handles paths). Define the adapter contract: files, routes, pages, and the named things
+  a flow step may point at (mail, job, event, notification).
+- Evidence: the last new package is the model: commit `81fae4dcb` (`@warlock.js/process`) and the files it touched.
+- Acceptance: a spec fails if the root entry imports `@warlock.js/core` or `@warlock.js/web`; the release-tool specs and
+  the feature-parity check pass with 34 packages; typecheck, strictness, skill-coverage and snippet gates green.
+- Status: open.
+
+### T-126 [feature] Grimoire: the written files and their parser
+
+- Source: owner request and design sessions of 2026-11-16; the templates in the draft skills are the fixed structure.
+- What and why: define and parse every agent-written file. Feature `README.md` (front matter: `id`, `title`,
+  `status`, `version`, `updated`, `apps`, `folders`, optional `origin`), `CHANGELOG.md` (entries with version, word
+  `added|changed|fixed|removed`, release and date once stamped), `flows/<flow>.md` (front matter `id`, `since`,
+  `status`, `who`; sections Steps, Differs by app, Cases, Acceptance criteria), `versions/<v>.md` (brief); app
+  `README.md` (conditions), `layouts/*.md`, `pages/<page>/README.md` (blocks table), `blocks/*.md`; task files
+  (front matter `id`, `type`, `feature`, `flow`, `apps`, `status`, `shipped`); release files (front matter `release`,
+  `date`, the agent's brief, then the collected list). Step kinds: `page`, `route`, `mail`, `notification`, `job`,
+  `event`, `outside service`, `affects`. Criteria are `AC-n`, optionally scoped `[app-id]`. A flow is referred to as
+  `<feature>/<flow>`.
+- Acceptance: a published structure page in the docs; every malformed case gives a located message with a stable
+  code; golden-file specs over a fixture project.
+- Depends on: T-125.
+- Status: open.
+
+### T-127 [feature] Grimoire book: builder, freshness, per-file mirror
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: write `grimoire/book/` from the adapter's facts: one JSON entry per source file at the same path as
+  the source (`src/app/auth/controllers/login.controller.ts` → `grimoire/book/app/auth/controllers/login.controller.json`)
+  with type, lines, about, feature, flows, exports, packages, imports, imported-by and routes; an `index.md` summary
+  per module; `book/app/routes.json` (per module, method and path); a page list per site. Keep a fingerprint of source
+  hashes; rebuild only changed entries; cache route facts and refresh them only when a routes file or something it
+  imports changes (route registration loads the app). Every command checks the book exists and is fresh first.
+- Acceptance: golden files on the fixture; a no-change run does no work; file-only questions never boot the app;
+  paths compared with both separators (Windows job).
+- Depends on: T-121, T-124, T-125.
+- Status: open.
+
+### T-128 [feature] Grimoire: ownership, book maps and collected indexes
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: work out which files a feature owns (its `folders`, plus a `@feature` tag in a file header for a file
+  that lives elsewhere; one owner per file) and which it borrows (imports from another feature). Write
+  `features/<feature>/bookmap.json` (own, borrowed, routes, pages per app, files no flow reaches),
+  `flows/<flow>.bookmap.json` (files behind each step, tests per criterion, blocks that show the flow),
+  `features/index.json` (id, version, updated, status, apps) and `tasks/index.json` (open, done, waiting for the
+  owner). Dates come from changelog entries.
+- Acceptance: golden files on the fixture; a file with two owners or none is reported; indexes rebuilt incrementally.
+- Depends on: T-126, T-127.
+- Status: open.
+
+### T-129 [feature] Grimoire check: the read-only report
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: `warlock grimoire check` reads everything and edits nothing. It reports, each with a stable code that
+  `warlock explain` describes: a step naming a route, page, mail, job, event or notification that does not exist; a
+  flow or feature naming an app with no folder; a block pointing to a missing flow; a condition not declared in the
+  app; a criterion with no test and a test pointing at a missing criterion (tests are tied by a comment line
+  `// @proves <feature>/<flow> AC-n`); a file with no header sentence or no feature; a file inside a feature's folders
+  that no flow reaches; a README `updated` older than its newest changelog entry; a structure error from T-126.
+  Findings for a feature or flow whose status is `proposed` are shown as expected, not as problems.
+- Acceptance: one spec per rule, failing and passing; exit code 1 only on problems; `--json`; docs page listing every
+  code.
+- Depends on: T-126, T-127, T-128.
+- Status: open.
+
+### T-130 [feature] Grimoire commands, Warlock adapter and MCP tools
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: the Warlock adapter (facts from `inspectApp()`; named mails, jobs, events and notifications from
+  their registries or folders) and `registerGrimoireCommands()` for `warlock.config.ts`. Commands:
+  `warlock grimoire build`, `warlock grimoire check`, `warlock grimoire release <version>`, and `warlock scry` with
+  `<file>`, `--impact <file>`, `--route "<METHOD path>"`, `--feature <id>`, `--flow <feature>/<flow>` and
+  `--search "<text>"` (fuzzy over paths, export names, header sentences, routes, flows, blocks, tasks). Output is
+  compact text by default and `--json` on request. The same questions as MCP tools (uses T-122).
+- Acceptance: specs per command on the fixture; `--impact` lists routes, pages, flows and features including
+  borrowers; commands that need only files do not boot the app; docs, skill, changelog.
+- Depends on: T-122, T-127, T-128, T-129.
+- Status: open.
+
+### T-131 [feature] Grimoire tasks and releases
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: `grimoire/tasks/open/` and `grimoire/tasks/done/<yyyy-mm>/`, one file per task, and
+  `grimoire/releases/<version>.md`. `warlock grimoire release <version>` collects the unreleased changelog entries of
+  every feature into the release file under the agent's brief (committed, since it is history). Document how an app
+  that keeps a single tasks file moves to the folder.
+- Acceptance: specs for collection and for re-running a release (no duplicates); the stamping behaviour follows the
+  owner's decision in T-137.
+- Depends on: T-126, T-130.
+- Status: open.
+
+### T-132 [feature] Grimoire apps: sites, mobile apps, pages and blocks
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: `grimoire/apps/<app>/` for each site and each mobile app in the repository: the app's named
+  conditions (guest, roles, membership, preferences), layouts written once, pages with a blocks table (flow, who sees
+  it, changes with), block files only for page-specific detail. A feature lists the apps it touches; a flow may have
+  a "Differs by app" section. The book lists how a page is reached and what it requires. For a mobile app in the same
+  repository the book mirrors its folder (file facts) and lists screens from file-based routing; otherwise screens are
+  declared (see T-137).
+- Acceptance: fixture with two sites and a mobile folder; every app rule of T-129 has a spec.
+- Depends on: T-126, T-127.
+- Status: open.
+
+### T-133 [feature] Grimoire: test results per criterion
+
+- Source: owner request of 2026-11-16 (the whole package in one release).
+- What and why: knowing a test exists is not knowing it passes. Add a test reporter that records, per
+  `// @proves` line, the last result, and show pass, fail or not run per criterion in `scry --flow`, the flow book
+  map and the devtools tab.
+- Evidence: the framework's test command and its Vitest setup (`packages/core/src/tests`).
+- Acceptance: a failing proven test shows its criterion as failing; results older than the test file are shown as
+  stale; specs, docs.
+- Depends on: T-128, T-130.
+- Status: open.
+
+### T-134 [feature] Devtools: the Grimoire tab
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: a tab registered through T-123. One search box across flows, blocks, routes, files and tasks; views
+  for a book entry, a feature, a flow (steps, criteria with results, where it is shown, book map, history), an app
+  page (blocks), tasks, releases and the check report. Small graphs only: a file's neighbours, a feature and its
+  neighbours, a page and its blocks, module coupling. A static export for people without the app running.
+- Acceptance: UI specs in the devtools style; works with no features written (book only); the devtools guard applies.
+- Depends on: T-123, T-128, T-129.
+- Status: open.
+
+### T-135 [feature] Scaffold, skills and docs for Grimoire
+
+- Source: owner decision of 2026-11-16 (on by default in new apps).
+- What and why: `warlock add grimoire` (core feature map and create-warlock feature list, kept in parity), a helper
+  that inserts a command into `cli.commands` of an existing `warlock.config.ts`, the registration in the template
+  config, ignore rules for the generated files, a line in the template's agent guide, and the six skills in
+  `packages/grimoire/skills` (`use-the-grimoire`, `document-a-file`, `write-a-feature`, `record-a-change`,
+  `describe-an-app`, `backfill-a-grimoire`). A docs section for the package. Reword the scaffolder's spinner text that
+  already says "Initializing grimoire (git)".
+- Evidence: `packages/core/src/generations/features/index.ts:50` (`featuresMap`),
+  `packages/core/src/generations/features/shared/insert-connector-entry.ts:34` (the only config-editing helper),
+  `packages/create-warlock/src/features/features-map.ts`, `packages/create-warlock/templates/warlock/warlock.config.ts`,
+  `packages/create-warlock/src/ui/spinners.ts:13-14`, `tools/release/scripts/check-feature-parity.ts`.
+- Acceptance: a fresh scaffold builds a book and passes `warlock grimoire check` with no written files; the scaffold
+  workflow's variants stay green; skill-coverage and snippet gates green.
+- Depends on: T-125, T-130.
+- Status: open.
+
+### T-136 [chore] Pilot and measurement before publishing 5.55.0
+
+- Source: owner decision of 2026-11-16 (pilot on the owner's chosen application).
+- What and why: install the packed 5.55.0 into a copy of the pilot application, build its book, backfill its
+  features with the `backfill-a-grimoire` skill (features marked inferred), and fix what the pilot shows in the
+  package and the skills. Then run ten real tasks twice with the same model, with and without Grimoire, recording
+  tokens in and out, tool calls, wall time, tests passing and reviewer findings.
+- Acceptance: the pilot's `warlock grimoire check` is clean or its remaining findings are real; the measured numbers
+  are in the release summary as measured, whatever they are.
+- Depends on: T-121 to T-135.
+- Status: open.
+
+### T-137 [decision] Grimoire: three open points
+
+- Source: design sessions of 2026-11-16.
+- Decisions needed:
+  1. Label in 5.55.0. Options: (a) experimental, so the written-file structure can still change after the pilot, and
+     stable in 6.0; (b) stable from 5.55.0. Recommendation: (a).
+  2. Who writes the release number and date into feature changelog entries. Options: (a) the `release` command (the
+     one place Warlock would edit an agent-written file); (b) the agent, with the check reporting a mismatch.
+     Recommendation: (b), which keeps "Warlock never edits".
+  3. Mobile screens when navigation is defined in code, not by files. Options: (a) declared by the agent in the app's
+     folder; (b) not listed in 5.55.0. Recommendation: (a).
+- Status: open. T-131 and T-132 follow the recommendation unless the owner says otherwise.
+
 ## Tasks
 
 Ordered by value: security first, then performance, then features and bugs. Line numbers are as of 5.53.0; entries
@@ -173,4 +442,3 @@ T-100 and later are checked against 5.53.1.
 - Acceptance: the cause is named (file-watch latency on Windows, a missed update, or the wait itself); the test passes in
   20 consecutive Windows runs, or waits on the update event instead of a fixed timeout.
 - Status: open.
-
