@@ -84,7 +84,11 @@ function pageStep(
   const entries: string[] = [];
   const files = new Set<string>();
 
-  for (const appId of feature.readme?.apps.map((app) => app.value) ?? []) {
+  // `page /support [web-admin]` looks in that app only; without a scope, in the feature's apps.
+  const appIds =
+    step.app === null ? (feature.readme?.apps.map((app) => app.value) ?? []) : [step.app];
+
+  for (const appId of appIds) {
     const match = apps[appId];
 
     if (!match) continue;
@@ -176,5 +180,7 @@ export function resolveStep(
   else if (step.type === "affects") match = affectsStep(step, context.written);
   else match = { found: null, entry: null, files: [] };
 
-  return { index: step.index, type: step.type, target: step.target, ...match };
+  const target = step.app === null ? step.target : `${step.target} [${step.app}]`;
+
+  return { index: step.index, type: step.type, target, ...match };
 }

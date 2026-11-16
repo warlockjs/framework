@@ -50,6 +50,8 @@ export function fileRole(file: string): string {
   for (const role of NAMED_ROLES) {
     if (stem.endsWith(`.${role}`)) return role;
   }
+  // Apps that call their mails `*.email.ts` get the same role.
+  if (stem.endsWith(".email")) return "mail";
   for (const role of ["routes", "page", "setup", "layout", "root"]) {
     if (stem === role || stem.endsWith(`.${role}`)) return role;
   }
@@ -80,6 +82,7 @@ export function fileRole(file: string): string {
   ]) {
     if (
       stem.endsWith(`.${role}`) ||
+      (role === "mail" && innerFolders.includes("emails")) ||
       (NAMED_ROLES.has(role) ? innerFolders : folders).includes(
         role === "repository" ? "repositories" : `${role}s`,
       )

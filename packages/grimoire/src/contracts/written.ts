@@ -50,7 +50,7 @@ export type WrittenFeatureReadme = {
   updated: Located<string>;
   /** App ids under `grimoire/apps/`. */
   apps: Located<string>[];
-  /** Project-relative folders whose files the feature owns. */
+  /** Project-relative folders whose files the feature owns; an entry with a code-file extension names one file. */
   folders: Located<string>[];
   origin: Located<WrittenOrigin> | null;
   /** The `# Heading`. */
@@ -123,6 +123,11 @@ export type WrittenStep = {
   type: StepType;
   /** The name as written (`POST /wishlist`, `/products/:id`, `order-confirmation`, `catalog/stock`). */
   target: string;
+  /**
+   * For a page step written `/support [web-admin]`: the app the page is in
+   * (the target is then the path alone). `null` for every other step.
+   */
+  app: string | null;
   /** For a route step: the uppercase method and the path. */
   route: { method: string; path: string } | null;
   /** For an affects step: the feature and, when given, the flow. */
@@ -247,6 +252,8 @@ export type WrittenLayout = {
   app: string;
   /** The file name without `.md`. */
   id: string;
+  /** Front matter `origin`, when given. */
+  origin: Located<WrittenOrigin> | null;
   heading: Located<string> | null;
   blocks: WrittenBlockRow[];
 };
@@ -288,6 +295,8 @@ export type WrittenPage = {
   screen: Located<string> | null;
   /** Front matter `layout`: a file in the app's `layouts/`. */
   layout: Located<string> | null;
+  /** Front matter `origin`, when given. */
+  origin: Located<WrittenOrigin> | null;
   heading: Located<string> | null;
   /** The paragraph under the heading, or `null`. */
   purpose: string | null;
@@ -307,6 +316,8 @@ export type WrittenApp = {
   type: Located<"site" | "mobile">;
   /** Project-relative root of the site or mobile app (`src/web/$sites/client`, `mobile`). */
   root: Located<string>;
+  /** Front matter `origin`, when given. */
+  origin: Located<WrittenOrigin> | null;
   heading: Located<string> | null;
   /** `## Conditions`: `- <name>   <meaning>`. */
   conditions: WrittenListLine[];

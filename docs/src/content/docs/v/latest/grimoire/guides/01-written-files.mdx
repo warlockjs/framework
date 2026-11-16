@@ -117,16 +117,16 @@ Customers browse products, see what is new in their country, and will save produ
 - affected by orders/place-order (lowers stock)
 ```
 
-| Key       | Required | Value                                                             |
-| --------- | -------- | ----------------------------------------------------------------- |
-| `id`      | yes      | an id, equal to the folder name                                   |
-| `title`   | yes      | free text                                                         |
-| `status`  | yes      | `proposed`, `building`, `shipped` or `retired`                    |
-| `version` | yes      | the feature version                                               |
-| `updated` | yes      | the date the README last changed                                  |
-| `apps`    | yes      | app ids under `grimoire/apps/` (may be empty)                     |
-| `folders` | yes      | the folders whose files belong to the feature (may be empty)      |
-| `origin`  | no       | `inferred` (described from the code) or `confirmed` (the default) |
+| Key       | Required | Value                                                                  |
+| --------- | -------- | ---------------------------------------------------------------------- |
+| `id`      | yes      | an id, equal to the folder name                                        |
+| `title`   | yes      | free text                                                              |
+| `status`  | yes      | `proposed`, `building`, `shipped` or `retired`                         |
+| `version` | yes      | the feature version                                                    |
+| `updated` | yes      | the date the README last changed                                       |
+| `apps`    | yes      | app ids under `grimoire/apps/` (may be empty)                          |
+| `folders` | yes      | the folders and single files that belong to the feature (may be empty) |
+| `origin`  | no       | `inferred` (described from the code) or `confirmed` (the default)      |
 
 Headings: the `# ` title is required. `## Flows` and `## Affects and affected by` are optional.
 
@@ -227,18 +227,30 @@ kind (`GR1008`), and an optional note after `—` or `--`:
 3. route GET /api/products/:id — the page loads it through its setup file
 ```
 
-| Kind              | The name is                                                                         | Example                   |
-| ----------------- | ----------------------------------------------------------------------------------- | ------------------------- |
-| `page`            | the route path of a page or screen                                                  | `/products/:id`           |
-| `route`           | `<METHOD> /path`; the method is one of `GET POST PUT PATCH DELETE HEAD OPTIONS ALL` | `POST /api/orders`        |
-| `mail`            | the mail's name in code                                                             | `order-confirmation`      |
-| `notification`    | the notification's name in code                                                     | `order-shipped`           |
-| `job`             | the job's name in code                                                              | `send-receipt`            |
-| `event`           | the event's name in code                                                            | `order.placed`            |
-| `outside service` | free text naming the service                                                        | `payment gateway`         |
-| `affects`         | another feature, or `<feature>/<flow>`                                              | `catalog/browse-products` |
+| Kind              | The name is                                                                                      | Example                   |
+| ----------------- | ------------------------------------------------------------------------------------------------ | ------------------------- |
+| `page`            | the route path of a page or screen, and optionally its app in brackets                           | `/products/:id`           |
+| `route`           | `<METHOD> /path`; the method is one of `GET POST PUT PATCH DELETE HEAD OPTIONS ALL`              | `POST /api/orders`        |
+| `mail`            | the mail's name in code (a `*.mail.ts` or `*.email.ts` file, or a file in `mails/` or `emails/`) | `order-confirmation`      |
+| `notification`    | the notification's name in code                                                                  | `order-shipped`           |
+| `job`             | the job's name in code: a `defineJob()` name, a scheduled task's name, or a `*.job.ts` file      | `send-receipt`            |
+| `event`           | the event's name in code                                                                         | `order.placed`            |
+| `outside service` | free text naming the service                                                                     | `payment gateway`         |
+| `affects`         | another feature, or `<feature>/<flow>`                                                           | `catalog/browse-products` |
 
 Any other kind is `GR1009`.
+
+**A page on several apps.** When two sites (or a site and the mobile app) have a page with the same path, write the
+app after the path in brackets, the way a criterion names its app. The step then looks in that app only, for a site
+page or for a screen of a mobile app:
+
+```md
+2. page /support [web-admin]
+```
+
+Without the brackets, a page step looks in the apps its feature lists. A bracket that names an app with no folder in
+`grimoire/apps` is `GR2008`; one that names an app the feature does not list is `GR2009`; a path the app has no page
+for is `GR2002`.
 
 A `route` or `page` name matches the code with params written either way (`:id` or `[id]`) and a trailing `/`
 ignored; a route's method matches whatever its case, and `ALL` matches any method.
@@ -291,11 +303,12 @@ root: src/web/$sites/client
 - pref:personalised the customer left personalised content on
 ```
 
-| Key    | Required | Value                                                              |
-| ------ | -------- | ------------------------------------------------------------------ |
-| `id`   | yes      | an id, equal to the folder name                                    |
-| `type` | yes      | `site` or `mobile`                                                 |
-| `root` | yes      | the folder of the site or mobile app, relative to the project root |
+| Key      | Required | Value                                                              |
+| -------- | -------- | ------------------------------------------------------------------ |
+| `id`     | yes      | an id, equal to the folder name                                    |
+| `type`   | yes      | `site` or `mobile`                                                 |
+| `root`   | yes      | the folder of the site or mobile app, relative to the project root |
+| `origin` | no       | `inferred` (described from the code) or `confirmed`                |
 
 Headings: `## Conditions` is required. Each condition is `- <name>   <meaning>`. Pages and blocks of this app use
 only these names.
@@ -318,16 +331,18 @@ Layouts, pages and screens describe their parts in a `## Blocks` table:
   pipes are optional. Text before the table is allowed; the table ends at the first line without a `|`.
 - **Block**: the name of the part. Required.
 - **Flow**: `<feature>/<flow>`, or `—` (or `-`, or empty) when the part shows no flow.
-- **Who sees it**: `everyone`, or condition names separated by `,`.
-- **Changes with**: items separated by `;`. An item `<condition>: <text>` names a condition; any other item is free
-  text. `—` means nothing changes.
+- **Who sees it**: `everyone`, or condition names separated by `,`. Each name is checked against the app's
+  conditions (`GR5002`).
+- **Changes with**: items separated by `;`. It is free text and is not checked against the
+  conditions; an item may start with a condition name (`vip: member prices`) to say what that condition changes. `—` means nothing changes.
 - A `|` inside a cell is written `\|`.
 
 Any other shape is `GR1018`.
 
 ### `apps/<app>/layouts/<layout>.md`
 
-No front matter. A `# ` title and a required `## Blocks` table with the parts every page of the layout shares.
+Front matter is optional and holds only `origin` (`inferred` or `confirmed`). A `# ` title and a required
+`## Blocks` table with the parts every page of the layout shares.
 
 ### `apps/<app>/pages/<page>/README.md` and `apps/<app>/screens/<screen>/README.md`
 
@@ -358,6 +373,7 @@ One product with its price, stock and the order button.
 | `route`  | yes for a page                    | the page's route path, starting with `/`                          |
 | `screen` | for a screen, `route` or `screen` | the screen's name, when the mobile app defines navigation in code |
 | `layout` | no                                | a layout id of this app                                           |
+| `origin` | no                                | `inferred` or `confirmed`, as on a feature                        |
 
 Headings: the `# ` title is required, and the paragraph under it is the page's purpose. `## Blocks` and
 `## Also reached from` are optional. Entry points are `- <kind>   <name>` (`mail`, `notification`, `page`,

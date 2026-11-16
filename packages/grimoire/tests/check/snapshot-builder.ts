@@ -89,6 +89,7 @@ export function withApps(target: GrimoireSnapshot, ids: readonly string[]): Grim
       id: located(id, file, 2),
       type: located("site" as const, file, 3),
       root: located(`src/web/$sites/${id}`, file, 4),
+      origin: null,
       heading: null,
       conditions: [],
       layouts: [],
@@ -165,7 +166,7 @@ export function feature(id: string, input: FeatureInput = {}): WrittenFeature {
 export type FlowInput = {
   since?: string;
   status?: WrittenStatus;
-  steps?: [StepType, string][];
+  steps?: ([StepType, string] | [StepType, string, string])[];
   differs?: string[];
   criteria?: (string | [string, string])[];
 };
@@ -184,7 +185,9 @@ export function flow(featureId: string, id: string, input: FlowInput = {}): Writ
     who: located("customer", file, 5),
     origin: null,
     heading: null,
-    steps: (input.steps ?? []).map(([type, target], index) => step(file, index + 1, type, target)),
+    steps: (input.steps ?? []).map(([type, target, app], index) =>
+      step(file, index + 1, type, target, app ?? null),
+    ),
     differs: (input.differs ?? []).map((app, index) => listLine(app, file, 20 + index)),
     cases: [],
     notHandled: [],
@@ -193,7 +196,13 @@ export function flow(featureId: string, id: string, input: FlowInput = {}): Writ
   };
 }
 
-function step(file: string, index: number, type: StepType, target: string): WrittenStep {
+function step(
+  file: string,
+  index: number,
+  type: StepType,
+  target: string,
+  app: string | null,
+): WrittenStep {
   const route = type === "route" ? /^(\S+)\s+(\S+)$/.exec(target) : null;
   const [affectsFeature = "", affectsFlow = null] = type === "affects" ? target.split("/") : [];
 
@@ -201,6 +210,7 @@ function step(file: string, index: number, type: StepType, target: string): Writ
     index,
     type,
     target,
+    app,
     route: route ? { method: route[1] ?? "", path: route[2] ?? "" } : null,
     affects: type === "affects" ? { feature: affectsFeature, flow: affectsFlow } : null,
     note: null,

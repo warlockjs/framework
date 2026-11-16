@@ -213,6 +213,35 @@ describe("scry over the shop fixture", () => {
   });
 });
 
+describe("scry search finds mails and jobs", () => {
+  it("lists a mail and a job by their names", () => {
+    const withNamed: GrimoireSnapshot = {
+      ...snapshot,
+      book: {
+        ...snapshot.book,
+        facts: {
+          ...snapshot.book.facts,
+          named: [
+            ...snapshot.book.facts.named,
+            { type: "mail", name: "zz-verification", file: "src/app/users/zz.email.ts" },
+            { type: "job", name: "zz-reengagement", file: null },
+            { type: "event", name: "zz-event", file: null },
+          ],
+        },
+      },
+    };
+    const hitsFor = (text: string) => {
+      const result = scry(withNamed, { type: "search", text });
+
+      return result.type === "search" ? result.hits.map((hit) => `${hit.type} ${hit.id}`) : [];
+    };
+
+    expect(hitsFor("zz-verification")).toEqual(["mail zz-verification"]);
+    expect(hitsFor("zz-reengagement")).toEqual(["job zz-reengagement"]);
+    expect(hitsFor("zz-event")).toEqual([]);
+  });
+});
+
 describe("scry search ranking and impact caps", () => {
   const scoresOf = (text: string) => {
     const result = scry(snapshot, { type: "search", text, limit: 200 });
@@ -237,7 +266,19 @@ describe("scry search ranking and impact caps", () => {
 
   it("orders equal scores by type: flow, block, route, file, task", () => {
     const hits = scoresOf("new arrivals").filter((hit) => hit.score === 7);
-    const order = ["feature", "flow", "block", "page", "screen", "route", "file", "export", "task"];
+    const order = [
+      "feature",
+      "flow",
+      "block",
+      "page",
+      "screen",
+      "route",
+      "mail",
+      "job",
+      "file",
+      "export",
+      "task",
+    ];
     const ranks = hits.map((hit) => order.indexOf(hit.type));
 
     expect(ranks).toEqual([...ranks].sort((left, right) => left - right));

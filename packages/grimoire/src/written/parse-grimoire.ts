@@ -672,6 +672,7 @@ export async function parseGrimoire(root: string): Promise<ParseGrimoireResult> 
         at: missing.at,
       },
       root: found?.readme.root ?? { value: "", at: missing.at },
+      origin: found?.readme.origin ?? null,
       heading: found?.readme.heading ?? null,
       conditions: found?.readme.conditions ?? [],
       layouts: layouts.get(app.id) ?? [],

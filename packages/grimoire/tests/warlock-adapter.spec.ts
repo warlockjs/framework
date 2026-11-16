@@ -445,3 +445,78 @@ describe("installedVersion (the core version in the book manifest)", () => {
     expect(createWarlockAdapter().version).toMatch(/^\d+\.\d+\.\d+/);
   });
 });
+
+describe("createWarlockAdapter names mails and jobs", () => {
+  let project: string;
+
+  beforeAll(() => {
+    project = mkdtempSync(path.join(tmpdir(), "grimoire-named-"));
+
+    const files: Record<string, string> = {
+      "package.json": JSON.stringify({ name: "mini", version: "1.0.0" }),
+      "src/app/users/mails/verification.email.ts":
+        "/** Verifies the address. */\nexport const a = 1;\n",
+      "src/app/users/welcome.email.ts": "/** Welcomes a user. */\nexport const b = 1;\n",
+      "src/app/users/emails/reset-password.ts": "/** Resets a password. */\nexport const c = 1;\n",
+      "src/app/users/mails/receipt.mail.ts": "/** Sends a receipt. */\nexport const d = 1;\n",
+      "src/app/billing/jobs/email-outbox.job.ts":
+        "/** Sends queued mails. */\nexport const e = 1;\n",
+      "src/app/billing/jobs/unlisted.job.ts": "/** Not in a registry. */\nexport const f = 1;\n",
+    };
+
+    for (const [file, content] of Object.entries(files)) {
+      mkdirSync(path.dirname(path.join(project, file)), { recursive: true });
+      writeFileSync(path.join(project, file), content);
+    }
+  });
+
+  afterAll(() => rmSync(project, { recursive: true, force: true }));
+
+  const inspectWith =
+    (jobs: string[], schedules: string[]) => (cwd: string, sections: readonly InspectSection[]) =>
+      inspectApp({
+        cwd,
+        sections: sections.filter((section) => section !== "jobs" && section !== "schedules"),
+      }).then((report) => ({
+        ...report,
+        jobs: jobs.map((name) => ({
+          name,
+          queue: "default",
+          attempts: null,
+          backoff: null,
+          removeOnComplete: null,
+          removeOnFail: null,
+        })),
+        schedules: schedules.map((name) => ({ name, cron: null, intervals: {}, nextRun: null })),
+      }));
+
+  it("treats *.email.ts files and mails/ or emails/ folders as mails", async () => {
+    const named = await createWarlockAdapter({ inspect: inspectWith([], []) }).named?.(project);
+
+    expect((named ?? []).filter((thing) => thing.type === "mail")).toEqual(
+      expect.arrayContaining([
+        { type: "mail", name: "verification", file: "src/app/users/mails/verification.email.ts" },
+        { type: "mail", name: "welcome", file: "src/app/users/welcome.email.ts" },
+        { type: "mail", name: "reset-password", file: "src/app/users/emails/reset-password.ts" },
+        { type: "mail", name: "receipt", file: "src/app/users/mails/receipt.mail.ts" },
+      ]),
+    );
+  });
+
+  it("names jobs from defineJob() and from the scheduler, and keeps job files the registries miss", async () => {
+    const named = await createWarlockAdapter({
+      inspect: inspectWith(["send-receipt"], ["billing.email-outbox", "progress.weekly-reports"]),
+    }).named?.(project);
+
+    expect((named ?? []).filter((thing) => thing.type === "job")).toEqual([
+      { type: "job", name: "send-receipt", file: null },
+      {
+        type: "job",
+        name: "billing.email-outbox",
+        file: "src/app/billing/jobs/email-outbox.job.ts",
+      },
+      { type: "job", name: "progress.weekly-reports", file: null },
+      { type: "job", name: "unlisted", file: "src/app/billing/jobs/unlisted.job.ts" },
+    ]);
+  });
+});

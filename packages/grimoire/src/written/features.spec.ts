@@ -88,6 +88,36 @@ describe("parseFlow", () => {
     expect(flow.cases.find((entry) => entry.question === "expiry")?.doesNotApply).toBe(true);
   });
 
+  it("reads the app scope of a page step", () => {
+    const { sink, findings } = collect();
+    const flow = parseFlow(
+      FLOW,
+      flowText([
+        "## Steps",
+        "1. page   /support [web-admin]",
+        "2. page   /support [web-client] — the same path on another site",
+        "3. page   /support",
+        "4. mail   welcome [web-admin]",
+        "",
+        ...ALL_CASES,
+        "",
+        "## Acceptance criteria",
+        "- AC-1   one",
+      ]),
+      "catalog",
+      "wishlist",
+      sink,
+    );
+
+    expect(findings).toEqual([]);
+    expect(flow.steps.map((step) => [step.type, step.target, step.app, step.note])).toEqual([
+      ["page", "/support", "web-admin", null],
+      ["page", "/support", "web-client", "the same path on another site"],
+      ["page", "/support", null, null],
+      ["mail", "welcome [web-admin]", null, null],
+    ]);
+  });
+
   it("reports malformed steps, unknown kinds and numbering", () => {
     const { sink, codes } = collect();
 

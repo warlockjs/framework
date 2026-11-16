@@ -71,7 +71,7 @@ export const GRIMOIRE_CODE_LIST = [
     "structure",
     "error",
     "A front matter value has the wrong form",
-    "Use the form the message names: dates as yyyy-mm-dd, versions as 2.1, ids in lower-case-with-dashes, a status from the list.",
+    "Use the form the message names: dates as yyyy-mm-dd, versions as 2.1, ids in lower-case-with-dashes, a status from the list (a task status is open, waiting for approval, approved, in progress, blocked, done or dropped; a question for the owner is waiting for approval).",
     WRITE,
   ),
   define(
@@ -281,7 +281,7 @@ export const GRIMOIRE_CODE_LIST = [
     "links",
     "error",
     "A page step names a page that does not exist",
-    "Fix the route path in the flow, or add the page to one of the feature's apps.",
+    "Fix the route path in the flow, or add the page to one of the feature's apps. A step scoped like `page /support [web-admin]` looks only in that app.",
     RECORD,
   ),
   define(
@@ -403,7 +403,7 @@ export const GRIMOIRE_CODE_LIST = [
     "files",
     "error",
     "A feature's `folders` entry does not exist",
-    "Fix the folder path, or remove it from `folders`.",
+    "Fix the folder or file path, or remove it from `folders`.",
     WRITE,
   ),
   define(

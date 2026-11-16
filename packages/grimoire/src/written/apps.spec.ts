@@ -141,6 +141,48 @@ describe("parseAppReadme", () => {
     expect(app.conditions.map((condition) => condition.name)).toEqual(["pref:personalised"]);
   });
 
+  it("accepts origin on an app README, a layout, a page and a screen", () => {
+    const { sink, findings } = collect();
+    const app = parseAppReadme(
+      README,
+      "---\nid: web-client\ntype: site\nroot: src/web\norigin: inferred\n---\n# Site\n## Conditions\n- guest   a\n",
+      "web-client",
+      "site",
+      sink,
+    );
+    const layout = parseLayout(
+      "grimoire/apps/web-client/layouts/site.md",
+      "---\norigin: confirmed\n---\n# Site\n## Blocks\n| Block | Flow | Who sees it | Changes with |\n|---|---|---|---|\n| Nav | — | everyone | — |\n",
+      "web-client",
+      "site",
+      sink,
+    );
+    const page = parsePage(
+      PAGE,
+      "---\nroute: /\norigin: inferred\n---\n# Home\n",
+      "web-client",
+      "page",
+      "home",
+      sink,
+    );
+    const screen = parsePage(
+      "grimoire/apps/mobile/screens/cart/README.md",
+      "---\nscreen: Cart\norigin: inferred\n---\n# Cart\n",
+      "mobile",
+      "screen",
+      "cart",
+      sink,
+    );
+
+    expect(findings).toEqual([]);
+    expect([
+      app.origin?.value,
+      layout.origin?.value,
+      page.origin?.value,
+      screen.origin?.value,
+    ]).toEqual(["inferred", "confirmed", "inferred", "inferred"]);
+  });
+
   it("reports a wrong type, an id that is not the folder name and a missing Conditions heading", () => {
     const { sink, findings } = collect();
     const app = parseAppReadme(

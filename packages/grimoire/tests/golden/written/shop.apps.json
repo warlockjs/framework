@@ -26,6 +26,7 @@
         "column": null
       }
     },
+    "origin": null,
     "heading": {
       "value": "The shop mobile app",
       "at": {
@@ -72,6 +73,7 @@
         },
         "screen": null,
         "layout": null,
+        "origin": null,
         "heading": {
           "value": "Home screen",
           "at": {
@@ -134,6 +136,7 @@
         "column": null
       }
     },
+    "origin": null,
     "heading": {
       "value": "The admin site",
       "at": {
@@ -170,6 +173,7 @@
         },
         "screen": null,
         "layout": null,
+        "origin": null,
         "heading": {
           "value": "Orders",
           "at": {
@@ -230,6 +234,7 @@
         "column": null
       }
     },
+    "origin": null,
     "heading": {
       "value": "The shop website",
       "at": {
@@ -281,6 +286,7 @@
         "file": "grimoire/apps/web-client/layouts/site.md",
         "app": "web-client",
         "id": "site",
+        "origin": null,
         "heading": {
           "value": "The site layout",
           "at": {
@@ -360,6 +366,7 @@
             "column": null
           }
         },
+        "origin": null,
         "heading": {
           "value": "Home",
           "at": {
@@ -506,6 +513,7 @@
             "column": null
           }
         },
+        "origin": null,
         "heading": {
           "value": "Product",
           "at": {

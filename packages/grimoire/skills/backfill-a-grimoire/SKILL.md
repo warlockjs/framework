@@ -26,6 +26,9 @@ Start from the modules: a module is usually one feature. Then adjust.
 
 - Two modules that cannot be described without each other → one feature with both `folders`.
 - A module that does two unrelated things → two features; tag the files of the smaller one.
+- A folder shared by several features (a `components` folder with files of each) → list the files
+  each feature owns in its `folders`, one entry per file (`folders: [src/app/auth, src/web/components/login-form.tsx]`),
+  instead of tagging them in the code. A file entry wins over a folder of another feature.
 - Plumbing (config, shared utilities, the base layout) → no feature.
 - Mail, notifications, search: the machinery is a feature; each mail or notification belongs to
   the feature that sends it.
@@ -57,12 +60,27 @@ folders: [src/app/auth]
 ```
 
 - `origin: inferred` on the README and on each flow. The owner changes it to `confirmed`.
-- Start every feature at `1.0`. Do not reconstruct history; the changelog gets one line under `## Unreleased`:
-  `- 1.0  added  described from the existing code`.
-- **Steps:** take them from the routes and pages, in the order a user meets them.
-- **Cases:** write only the cases the code handles. For a question the code does not handle
-  (a double submit, an expired code), do not write a case. List it under `## Not handled`, in the
-  same form as a case (the question, then what happens today), so the owner sees the gap:
+- Start every feature at `1.0`. Do not reconstruct history; the changelog gets one line under `## Unreleased`
+  in the feature's own `CHANGELOG.md` (`grimoire/features/auth/CHANGELOG.md`), never in the README:
+
+  ```md
+  ## Unreleased
+
+  - 1.0 added described from the existing code
+  ```
+
+- **Steps:** take them from the routes and pages, in the order a user meets them. A mail is a
+  `*.mail.ts` or `*.email.ts` file (or a file in `mails/` or `emails/`), a job is a queue job or a
+  scheduled task. When two sites or apps have a page with one path, write the app after it:
+  `page   /support [web-admin]`.
+- **Flows:** a flow starts from a route, a page, a job or an event. Logic with no entry point of
+  its own (a guard, a calculation) is not a flow: write it in the cases or criteria of the flow
+  that reaches it.
+- **Cases:** answer the eight questions from what the code does. When the code answers a
+  question by doing nothing, that is still what happens: write it as a case with the result
+  (`duplicate   saved twice`, `double submit   two accounts`). List a question under
+  `## Not handled` only when the behaviour is a gap the owner should decide, in the same form as a
+  case (the question, then what happens today):
 
   ```md
   ## Not handled
@@ -70,6 +88,8 @@ folders: [src/app/auth]
   - double submit two quick taps create two accounts
   ```
 
+- **Read-only flows:** a flow that only reads answers the questions that cannot happen with one
+  line each, `does not apply: read-only`. That is expected, not a finding.
 - **Criteria:** one per case. Tag the existing tests with `@proves` where a test clearly proves
   one. Do not write new tests during a backfill.
 - **Intent you cannot see:** write `Unknown: why does a VIP skip the stock check?` in the flow.
@@ -97,7 +117,9 @@ no test, files with no header); fix errors first and list the warnings for the o
 - files inside a feature that no flow reaches (undescribed behaviour or dead code);
 - criteria with no test.
 
-Open one task per question that needs a decision. Do not fix code during a backfill; open a task
+Open one task per question that needs a decision, with `status: waiting for approval` and a
+`Decision needed:` line (see `write-a-feature`; any other word is `GR1004`). Mark every task you open
+for the owner this way, also when the owner is away. Do not fix code during a backfill; open a task
 for each bug you notice.
 
 ## Size

@@ -157,7 +157,7 @@ A required front matter key is missing.
 A front matter value has the wrong form.
 
 - **Severity:** error
-- **What to do:** Use the form the message names: dates as yyyy-mm-dd, versions as 2.1, ids in lower-case-with-dashes, a status from the list.
+- **What to do:** Use the form the message names: dates as yyyy-mm-dd, versions as 2.1, ids in lower-case-with-dashes, a status from the list (a task status is open, waiting for approval, approved, in progress, blocked, done or dropped; a question for the owner is waiting for approval).
 - **Skill:** `write-a-feature`
 
 ### GR1005
@@ -367,7 +367,7 @@ A route step names a route that does not exist.
 A page step names a page that does not exist.
 
 - **Severity:** error
-- **What to do:** Fix the route path in the flow, or add the page to one of the feature's apps.
+- **What to do:** Fix the route path in the flow, or add the page to one of the feature's apps. A step scoped like `page /support [web-admin]` looks only in that app.
 - **Skill:** `record-a-change`
 
 ### GR2003
@@ -489,7 +489,7 @@ A `@feature` tag names a feature that does not exist.
 A feature's `folders` entry does not exist.
 
 - **Severity:** error
-- **What to do:** Fix the folder path, or remove it from `folders`.
+- **What to do:** Fix the folder or file path, or remove it from `folders`.
 - **Skill:** `write-a-feature`
 
 ### GR3006

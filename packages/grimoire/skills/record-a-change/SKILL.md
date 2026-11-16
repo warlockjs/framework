@@ -65,7 +65,8 @@ shipped: catalog 2.1
 ```
 
 Add two lines: how it was verified (which tests, which criteria) and anything left open. If
-something is left open, open a new task for it; do not leave it only in the done file.
+something is left open, open a new task for it; do not leave it only in the done file. A task
+that needs the owner's answer gets `status: waiting for approval` and a `Decision needed:` line.
 
 ## 5. Check
 

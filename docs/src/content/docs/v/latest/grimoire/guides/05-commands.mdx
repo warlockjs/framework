@@ -273,11 +273,11 @@ file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest prod
 …
 ```
 
-Search looks at features, flows, blocks, pages, screens, API routes, file paths, export names, header sentences and
+Search looks at features, flows, blocks, pages, screens, API routes, mail and job names, file paths, export names, header sentences and
 tasks. Case does not matter, and every word must appear, in any order. Hits are ranked: an exact name or
 path first, then a name or path that starts with the text, then one that holds the words as whole words, then a
 substring, then a match found only in the header sentence, and last a fuzzy match (the letters in order, for texts of
-four letters or more). Within a rank the type decides: feature, flow, block, page, screen, route, file, export, task.
+four letters or more). Within a rank the type decides: feature, flow, block, page, screen, route, mail, job, file, export, task.
 `--limit` defaults to 20.
 
 ### Errors
@@ -361,5 +361,6 @@ console.log(await collectMobileFacts(root));
 `@warlock.js/core/tooling` (over `src` and each mobile app's source folders, leaving out `android/`, `ios/` and
 build output), routes, events and jobs from `inspectApp()`
 after the boot pass, pages from the web page graph, and mobile apps from their folders (`collectMobileFacts()`).
-`reachedFrom` of a page is `null` (unknown) for now. Mails are files named `*.mail.ts`, notifications files named
-`*.notification.ts`; jobs come from the queue's registry when it knows any, else from `*.job.ts` file names.
+`reachedFrom` of a page is `null` (unknown) for now. Mails are files named `*.mail.ts` or `*.email.ts` and files in a `mails/` or `emails/` folder; notifications are
+files named `*.notification.ts`. Jobs are the names of the queue's registry (`defineJob()`) and of the scheduler's
+scheduled tasks, plus any `*.job.ts` file the registries do not list.

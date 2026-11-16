@@ -42,6 +42,10 @@ status: waiting for approval
 - Decision needed: one wishlist per customer, or several named lists?
 ```
 
+A task that waits for the owner's answer has `status: waiting for approval` and a `Decision needed:` line.
+The other statuses are `open`, `approved`, `in progress`, `blocked`, `done` and `dropped`; any other
+word is an error (`GR1004`).
+
 ## 2. Write the brief
 
 `grimoire/features/catalog/versions/v3.md`: why, what changes (which flows are new or changed),
@@ -75,7 +79,10 @@ Customers browse products, search them and see what is new.
 - affected by orders/place-order (lowers stock)
 ```
 
-`id` never changes. `folders` are the folders whose files belong to this feature. `apps` must
+`id` never changes. `folders` are the folders whose files belong to this feature. An entry with a
+code-file extension names one file (`src/web/components/client/home/pricing-table.tsx`), for a
+feature that owns a few files in a folder shared with others. A file entry wins over the folder
+of another feature; each file has one owner. `apps` must
 exist under `grimoire/apps/`. A feature whose folders hold no file yet is fine while it is
 `proposed`.
 
@@ -125,7 +132,13 @@ who: customer
 
 **Steps.** Each step has a kind and the name used in code: `page`, `route`, `mail`,
 `notification`, `job`, `event`, `outside service`. Use `affects` for an effect on another
-feature (`affects   catalog/stock`). Warlock checks every name exists.
+feature (`affects   catalog/stock`). Warlock checks every name exists. A mail is a `*.mail.ts` or
+`*.email.ts` file, or a file in a `mails/` or `emails/` folder; a job is a queue job
+(`defineJob()`) or a scheduled task, by its name in code.
+
+When two sites, or a site and the mobile app, have a page with the same path, name the app after
+the path in brackets: `page   /support [web-admin]`. The step then looks in that app only (its
+pages, or its screens for a mobile app). Without brackets it looks in the apps the feature lists.
 
 **Cases.** Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
 expiry, double submit, outside service down), each with a case or "does not apply" and the

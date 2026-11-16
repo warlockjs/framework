@@ -174,10 +174,14 @@ function bootedInspect(): WarlockInspect {
 }
 
 /** `send-receipt.job.ts` → `send-receipt` (the stem without the role suffix). */
-function stemOf(file: string, suffix: string): string {
+function stemOf(file: string, ...suffixes: string[]): string {
   const base = path.posix.basename(file).replace(/\.(?:d\.ts|[cm]?[jt]sx?)$/, "");
 
-  return base.endsWith(`.${suffix}`) ? base.slice(0, -suffix.length - 1) : base;
+  for (const suffix of suffixes) {
+    if (base.endsWith(`.${suffix}`)) return base.slice(0, -suffix.length - 1);
+  }
+
+  return base;
 }
 
 function toBookFile(file: InspectFile, mobile: readonly BookMobileApp[]): BookFile {
@@ -426,32 +430,48 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
       return (report.routes ?? []).map((route) => toBookRoute(route, known, sitePages, exporters));
     },
     async named(root) {
-      const report = await inspect(root, ["events", "jobs"]);
+      const report = await inspect(root, ["events", "jobs", "schedules"]);
       const known = await currentFiles(root);
       const ofType = (type: string) => known.filter((file) => file.type === type);
       const named: BookNamedThing[] = [];
 
-      for (const file of ofType("mail"))
-        named.push({ type: "mail", name: stemOf(file.file, "mail"), file: file.file });
+      // `*.mail.ts`, `*.email.ts` and the files of a `mails/` or `emails/` folder are all typed as mails.
+      for (const file of ofType("mail")) {
+        named.push({
+          type: "mail",
+          name: stemOf(file.file, "mail", "email"),
+          file: file.file,
+        });
+      }
 
       const jobFiles = ofType("job");
-      const jobs = report.jobs ?? [];
+      const jobFileOf = (name: string): string | null =>
+        jobFiles.find((item) => {
+          const stem = stemOf(item.file, "job");
 
-      if (jobs.length > 0) {
-        for (const job of jobs) {
-          const file = jobFiles.find((item) => {
-            const stem = stemOf(item.file, "job");
+          return name === stem || name.endsWith(`.${stem}`) || name.endsWith(`/${stem}`);
+        })?.file ?? null;
+      const seen = new Set<string>();
 
-            return (
-              job.name === stem || job.name.endsWith(`.${stem}`) || job.name.endsWith(`/${stem}`)
-            );
-          });
+      // Queue jobs (`defineJob()`) and scheduled tasks are both jobs a flow can name.
+      for (const name of [
+        ...(report.jobs ?? []).map((job) => job.name),
+        ...(report.schedules ?? []).map((schedule) => schedule.name),
+      ]) {
+        if (seen.has(name)) continue;
 
-          named.push({ type: "job", name: job.name, file: file?.file ?? null });
-        }
-      } else {
-        for (const file of jobFiles)
-          named.push({ type: "job", name: stemOf(file.file, "job"), file: file.file });
+        seen.add(name);
+        named.push({ type: "job", name, file: jobFileOf(name) });
+      }
+
+      // A job file the registries do not list is still a job by its file name.
+      for (const file of jobFiles) {
+        const name = stemOf(file.file, "job");
+
+        if (seen.has(name) || [...seen].some((item) => jobFileOf(item) === file.file)) continue;
+
+        seen.add(name);
+        named.push({ type: "job", name, file: file.file });
       }
 
       for (const event of report.events ?? []) {

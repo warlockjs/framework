@@ -137,6 +137,43 @@ describe("checkAppNames", () => {
     expect(findings[3]?.subject).toMatchObject({ task: "T-1", app: "kiosk", feature: null });
   });
 
+  it("GR2008 and GR2009: a page step scope names an app with no folder, or one the feature does not list", () => {
+    const target = withApps(snapshot(), ["web", "admin"]);
+
+    target.written.features = [
+      feature("shop", {
+        apps: ["web"],
+        flows: [
+          flow("shop", "order", {
+            steps: [
+              ["page", "/support", "web"],
+              ["page", "/support", "admin"],
+              ["page", "/support", "kiosk"],
+              ["page", "/support"],
+            ],
+          }),
+        ],
+      }),
+    ];
+
+    expect(summary(checkAppNames(target))).toEqual([
+      'GR2009 grimoire/features/shop/flows/order.md:12 shop/order step 2 names app "admin", which feature shop does not list in apps',
+      'GR2008 grimoire/features/shop/flows/order.md:13 shop/order step 3 names app "kiosk", which has no folder in grimoire/apps',
+    ]);
+  });
+
+  it("GR2002: a scoped page step that matched nothing says which app it looked in", () => {
+    const order = flow("shop", "order", { steps: [["page", "/support", "web-admin"]] });
+    const target = snapshot();
+
+    target.written.features = [feature("shop", { flows: [order] })];
+    target.collected.flows[order.ref] = bookmap(order, [false]);
+
+    expect(summary(checkSteps(target))).toEqual([
+      'GR2002 grimoire/features/shop/flows/order.md:11 page step "/support [web-admin]" matches no page or screen of that app',
+    ]);
+  });
+
   it("GR2009: a flow names an app its feature does not list", () => {
     const findings = checkAppNames(
       appsSnapshot(["web", "mobile"], ["web"], ["mobile"], [["AC-1", "mobile"]]),

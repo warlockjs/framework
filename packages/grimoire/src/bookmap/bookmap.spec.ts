@@ -225,6 +225,7 @@ function world(
             file: "grimoire/apps/web-client/layouts/site.md",
             app: "web-client",
             id: "site",
+            origin: null,
             heading: null,
             blocks: [row("Cart count", "orders/place"), row("Header", null)],
           },
@@ -298,6 +299,32 @@ describe("buildCollectedFiles: flow book maps", () => {
       "src/web/$sites/client/products/show.page.tsx",
       "src/web/$sites/client/products/show.setup.ts",
     ]);
+  });
+
+  it("limits a scoped page step to its app", () => {
+    const input = world();
+    const catalog = input.written.features[0];
+
+    catalog?.flows[0]?.steps.push(
+      step(3, "page", "/products/[id]", "mobile"),
+      step(4, "page", "/products/[id]", "web-client"),
+      step(5, "page", "/products/[id]", "web-admin"),
+    );
+
+    const steps = buildCollectedFiles(input).flows["catalog/browse"]?.steps ?? [];
+
+    expect(steps[2]).toMatchObject({
+      target: "/products/[id] [mobile]",
+      found: true,
+      entry: "mobile/app/products/[id].tsx",
+      files: ["mobile/app/products/[id].tsx"],
+    });
+    expect(steps[3]).toMatchObject({
+      target: "/products/[id] [web-client]",
+      entry: "src/web/$sites/client/products/show.page.tsx",
+    });
+    expect(steps[3]?.files).not.toContain("mobile/app/products/[id].tsx");
+    expect(steps[4]).toMatchObject({ found: false, entry: null, files: [] });
   });
 
   it("does not match a page of an app the feature does not list", () => {

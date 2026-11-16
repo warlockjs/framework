@@ -10,9 +10,11 @@ import type {
   WrittenEntryPoint,
   WrittenLayout,
   WrittenListLine,
+  WrittenOrigin,
   WrittenPage,
 } from "../contracts/written";
 import type { Located } from "../contracts/location";
+import { ORIGINS } from "./features";
 import { FLOW_REF, FrontMatterReader, checks, projectFolder } from "./fields";
 import { readListLines } from "./lists";
 import {
@@ -32,6 +34,7 @@ export type AppReadme = {
   id: Located<string>;
   type: Located<"site" | "mobile">;
   root: Located<string>;
+  origin: Located<WrittenOrigin> | null;
   heading: Located<string> | null;
   conditions: WrittenListLine[];
 };
@@ -194,7 +197,7 @@ export function parseAppReadme(
   const document = readDocument(file, text, "required", sink);
   const fields = new FrontMatterReader(document, sink);
 
-  fields.onlyKeys(["id", "type", "root"], "app README");
+  fields.onlyKeys(["id", "type", "root", "origin"], "app README");
 
   const id = fields.required("id", checks.id);
 
@@ -214,6 +217,7 @@ export function parseAppReadme(
     id: id.value === "" ? { value: folder, at: id.at } : id,
     type: fields.oneOf("type", ["site", "mobile"] as const, fallbackType),
     root: { value: projectFolder(root.value) ?? root.value, at: root.at },
+    origin: fields.optionalOneOf("origin", ORIGINS),
     heading: heading(document),
     conditions: readListLines(file, findSection(document, "conditions")?.lines, "Conditions", sink),
   };
@@ -228,8 +232,9 @@ export function parseLayout(
   sink: FindingSink,
 ): WrittenLayout {
   const document = readDocument(file, text, "none", sink);
+  const fields = new FrontMatterReader(document, sink);
 
-  new FrontMatterReader(document, sink).onlyKeys([], "a layout");
+  fields.onlyKeys(["origin"], "a layout");
   checkHeadings(document, { title: false, required: ["Blocks"], optional: [] }, sink);
 
   const blocks = findSection(document, "blocks");
@@ -238,6 +243,7 @@ export function parseLayout(
     file,
     app,
     id,
+    origin: fields.optionalOneOf("origin", ORIGINS),
     heading: heading(document),
     blocks: blocks ? parseBlocksTable(file, blocks, sink) : [],
   };
@@ -255,7 +261,10 @@ export function parsePage(
   const document = readDocument(file, text, "required", sink);
   const fields = new FrontMatterReader(document, sink);
 
-  fields.onlyKeys(type === "page" ? ["route", "layout"] : ["route", "screen", "layout"], type);
+  fields.onlyKeys(
+    type === "page" ? ["route", "layout", "origin"] : ["route", "screen", "layout", "origin"],
+    type,
+  );
 
   const route = fields.scalar("route", { required: type === "page", check: checks.route });
   const screen =
@@ -291,6 +300,7 @@ export function parsePage(
     route,
     screen,
     layout: fields.scalar("layout", { required: false, check: checks.id }),
+    origin: fields.optionalOneOf("origin", ORIGINS),
     heading: heading(document),
     purpose: paragraphAfterTitle(document),
     blocks: blocks ? parseBlocksTable(file, blocks, sink) : [],

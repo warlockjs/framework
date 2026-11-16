@@ -216,6 +216,7 @@
             "index": 1,
             "type": "route",
             "target": "POST /api/login",
+            "app": null,
             "route": {
               "method": "POST",
               "path": "/api/login"
@@ -393,6 +394,7 @@
             "index": 1,
             "type": "route",
             "target": "POST /api/register",
+            "app": null,
             "route": {
               "method": "POST",
               "path": "/api/register"
@@ -409,6 +411,7 @@
             "index": 2,
             "type": "job",
             "target": "delete-unverified",
+            "app": null,
             "route": null,
             "affects": null,
             "note": "seven days later, if never verified",
@@ -811,6 +814,7 @@
             "index": 1,
             "type": "route",
             "target": "GET /api/products",
+            "app": null,
             "route": {
               "method": "GET",
               "path": "/api/products"
@@ -827,6 +831,7 @@
             "index": 2,
             "type": "page",
             "target": "/products/:id",
+            "app": null,
             "route": null,
             "affects": null,
             "note": null,
@@ -840,6 +845,7 @@
             "index": 3,
             "type": "route",
             "target": "GET /api/products/:id",
+            "app": null,
             "route": {
               "method": "GET",
               "path": "/api/products/:id"
@@ -1032,6 +1038,7 @@
             "index": 1,
             "type": "page",
             "target": "/",
+            "app": null,
             "route": null,
             "affects": null,
             "note": null,
@@ -1045,6 +1052,7 @@
             "index": 2,
             "type": "route",
             "target": "GET /api/products/new-arrivals",
+            "app": null,
             "route": {
               "method": "GET",
               "path": "/api/products/new-arrivals"
@@ -1247,6 +1255,7 @@
             "index": 1,
             "type": "page",
             "target": "/products/:id",
+            "app": null,
             "route": null,
             "affects": null,
             "note": null,
@@ -1260,6 +1269,7 @@
             "index": 2,
             "type": "route",
             "target": "POST /api/wishlist",
+            "app": null,
             "route": {
               "method": "POST",
               "path": "/api/wishlist"
@@ -1276,6 +1286,7 @@
             "index": 3,
             "type": "notification",
             "target": "wishlist-price-drop",
+            "app": null,
             "route": null,
             "affects": null,
             "note": null,
@@ -1289,6 +1300,7 @@
             "index": 4,
             "type": "page",
             "target": "/wishlist",
+            "app": null,
             "route": null,
             "affects": null,
             "note": null,
@@ -1680,6 +1692,7 @@
             "index": 1,
             "type": "page",
             "target": "/products/:id",
+            "app": null,
             "route": null,
             "affects": null,
             "note": null,
@@ -1693,6 +1706,7 @@
             "index": 2,
             "type": "route",
             "target": "POST /api/orders",
+            "app": null,
             "route": {
               "method": "POST",
               "path": "/api/orders"
@@ -1709,6 +1723,7 @@
             "index": 3,
             "type": "outside service",
             "target": "payment gateway",
+            "app": null,
             "route": null,
             "affects": null,
             "note": null,
@@ -1722,6 +1737,7 @@
             "index": 4,
             "type": "event",
             "target": "order.placed",
+            "app": null,
             "route": null,
             "affects": null,
             "note": null,
@@ -1735,6 +1751,7 @@
             "index": 5,
             "type": "affects",
             "target": "catalog/browse-products",
+            "app": null,
             "route": null,
             "affects": {
               "feature": "catalog",
@@ -1751,6 +1768,7 @@
             "index": 6,
             "type": "mail",
             "target": "order-confirmation",
+            "app": null,
             "route": null,
             "affects": null,
             "note": null,
@@ -1764,6 +1782,7 @@
             "index": 7,
             "type": "job",
             "target": "send-receipt",
+            "app": null,
             "route": null,
             "affects": null,
             "note": null,
@@ -1777,6 +1796,7 @@
             "index": 8,
             "type": "notification",
             "target": "order-shipped",
+            "app": null,
             "route": null,
             "affects": null,
             "note": null,

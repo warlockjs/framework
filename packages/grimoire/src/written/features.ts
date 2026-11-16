@@ -60,6 +60,7 @@ const STEP = new RegExp(
 const STEP_ANY_TYPE = new RegExp(String.raw`^(\d+)\.[ \t]+(\S.*?)${SEP}(\S.*)$`);
 const STEP_FIRST_WORD = /^(\d+)\.[ \t]+(\S+)[ \t]+(\S.*)$/;
 const NUMBERED = /^(\d+)\.(?:[ \t]|$)/;
+const PAGE_TARGET = /^(\S+)[ \t]+\[([a-z0-9]+(?:-[a-z0-9]+)*)\]$/;
 const ROUTE_TARGET = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|ALL)[ \t]+(\/\S*)$/i;
 const AFFECTS_TARGET = /^([a-z0-9]+(?:-[a-z0-9]+)*)(?:\/([a-z0-9]+(?:-[a-z0-9]+)*))?$/;
 const CRITERION = /^[-*][ \t]+AC-(\d+)(?:[ \t]+\[([a-z0-9-]+)\])?[ \t]+([^\s[].*)$/;
@@ -350,9 +351,19 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
     }
 
     const type = match[2] as StepType;
-    const target = (match[3] ?? "").trim();
+    let target = (match[3] ?? "").trim();
+    let app: string | null = null;
     let route: WrittenStep["route"] = null;
     let affects: WrittenStep["affects"] = null;
+
+    if (type === "page") {
+      const scoped = PAGE_TARGET.exec(target);
+
+      if (scoped) {
+        target = scoped[1] ?? "";
+        app = scoped[2] ?? null;
+      }
+    }
 
     if (type === "route") {
       const routeMatch = ROUTE_TARGET.exec(target);
@@ -388,6 +399,7 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
       index: Number(match[1]),
       type,
       target,
+      app,
       route,
       affects,
       note: match[4]?.trim() ?? null,

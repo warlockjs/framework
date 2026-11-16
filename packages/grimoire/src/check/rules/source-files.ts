@@ -6,7 +6,7 @@ import { createFinding } from "../../codes";
 import type { BookFile } from "../../contracts/adapter";
 import type { GrimoireFinding } from "../../contracts/findings";
 import type { GrimoireSnapshot } from "../../contracts/snapshot";
-import { isInsideFolder, toPosixPath } from "../../paths";
+import { isCodeFile, isInsideFolder, toPosixPath } from "../../paths";
 
 /** File types that need no header sentence (GR3001). */
 const NO_HEADER_TYPES: ReadonlySet<string> = new Set(["spec", "type", "locale", "config"]);
@@ -137,7 +137,9 @@ export function checkFolders(snapshot: GrimoireSnapshot): GrimoireFinding[] {
       findings.push(
         createFinding({
           code: "GR3005",
-          message: `folders entry "${folder.value}" of ${feature.id} holds no source file`,
+          message: isCodeFile(normalized)
+            ? `folders entry "${folder.value}" of ${feature.id} is not a source file of the project`
+            : `folders entry "${folder.value}" of ${feature.id} holds no source file`,
           at: folder.at,
           feature: feature.id,
         }),

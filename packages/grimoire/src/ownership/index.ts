@@ -4,11 +4,15 @@
  * - A `@feature <id>` header tag that names a feature wins. A tag that names
  *   no feature is left out here (the check reports it as `GR3004`), so the
  *   folder rule decides.
+ * - Otherwise a `folders` entry that names the file itself (an entry with a
+ *   code-file extension) owns it: a file entry is more specific than any
+ *   folder entry, so it wins over the folder of another feature.
  * - Otherwise the feature whose `folders` entry is the deepest folder holding
  *   the file owns it.
- * - Two features claiming the file the same way (two different tags, or the
- *   same deepest folder listed by two features) is a conflict: the file gets
- *   no owner and `conflicts` lists the claims (`GR3003`).
+ * - Two features claiming the file the same way (two different tags, the
+ *   same file listed by two features, or the same deepest folder listed by
+ *   two features) is a conflict: the file gets no owner and `conflicts`
+ *   lists the claims (`GR3003`).
  * - A feature borrows a file it does not own when one of its own files
  *   imports it directly. Spec files are never own or borrowed files and do
  *   not make a feature borrow anything.
@@ -16,9 +20,14 @@
 import type { BookFacts, BookFile } from "../contracts/adapter";
 import type { FileOwnership, Ownership } from "../contracts/bookmap";
 import type { WrittenGrimoire } from "../contracts/written";
-import { isInsideFolder, toPosixPath } from "../paths";
+import { isCodeFile, isInsideFolder, toPosixPath } from "../paths";
 
 type Claim = { feature: string; via: "tag" | "folder"; folder: string | null };
+
+/** Whether a `folders` entry names one code file instead of a folder. */
+function isFileEntry(entry: string): boolean {
+  return isCodeFile(entry);
+}
 
 function normalizeFolder(folder: string): string {
   return toPosixPath(folder.trim()).replace(/^\.\//, "").replace(/\/+$/, "");
@@ -66,11 +75,31 @@ function decide(
     return result;
   }
 
+  const fileOwners = [...folders]
+    .filter(([, list]) => list.includes(file.file))
+    .map(([feature]) => feature)
+    .sort();
+
+  if (fileOwners.length === 1) {
+    result.owner = fileOwners[0] ?? null;
+    result.via = "file";
+
+    return result;
+  }
+
+  if (fileOwners.length > 1) {
+    result.conflicts = fileOwners.map((feature) => ({ feature, via: "file" }));
+
+    return result;
+  }
+
   let deepest: Claim[] = [];
   let depth = -1;
 
   for (const [feature, list] of folders) {
     for (const folder of list) {
+      if (isFileEntry(folder)) continue;
+
       if (!isInsideFolder(file.file, folder)) continue;
 
       const folderDepth = folder.split("/").length;

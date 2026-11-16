@@ -33,10 +33,12 @@ root: src/web/$sites/client
 ```
 
 - `type` is `site` or `mobile`.
+- `origin` is optional: `inferred` when you described the app from code, `confirmed` once the owner agrees. Layouts,
+  pages and screens take it too.
 - `root` is the project folder of the site (`src/web/$sites/client`, or `src/web` in a single-site app) or of the
   mobile app (`mobile`). Warlock matches the app to the site or mobile app the code reports by this folder.
 - `## Conditions` declares every named condition the app uses: who is looking (`guest`, `customer`), a membership
-  (`vip`), or a setting (`pref:personalised`). A block can name only declared conditions.
+  (`vip`), or a setting (`pref:personalised`). A block's _Who sees it_ can name only declared conditions.
 
 ## Layouts
 
@@ -72,8 +74,8 @@ One product with its price, stock and the order button.
 | ------------ | ------------------------------------------------------------------------------------- |
 | Block        | The name of the block on the page.                                                    |
 | Flow         | The `<feature>/<flow>` the block shows, or `—` when it belongs to no flow (a header). |
-| Who sees it  | `everyone`, or condition names of the app.                                            |
-| Changes with | `—`, or items separated by `;`. An item is `<condition>: <text>` or free text.        |
+| Who sees it  | `everyone`, or condition names of the app (checked against the app's conditions).     |
+| Changes with | `—`, or items separated by `;`. Free text, not checked against the conditions.        |
 
 `route` is the route of the page in its site. A page whose route is not in the site any more is reported.
 

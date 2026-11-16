@@ -28,7 +28,17 @@ Every source file has at most one owner.
     */
    ```
 
-2. Otherwise the feature whose `folders` entry holds the file owns it. When two entries hold it (`src/web` and
+2. Otherwise a `folders` entry that names the file itself owns it. An entry with a code-file extension
+   (`.ts`, `.tsx`, `.js` and the like) is one file, not a folder. This lets a feature own a few files in a folder
+   that holds code of several features, with no tag in the code:
+
+   ```md
+   folders: [src/app/billing, src/web/components/client/home/pricing-table.tsx]
+   ```
+
+   A file entry is more specific than any folder entry, so it wins over the folder of another feature.
+
+3. Otherwise the feature whose `folders` entry holds the file owns it. When two entries hold it (`src/web` and
    `src/web/$sites/client/products`), the deepest folder wins.
 
 A file nobody claims has no owner. Two claims of the same strength are a conflict, and the file gets no owner:
@@ -37,6 +47,7 @@ A file nobody claims has no owner. Two claims of the same strength are a conflic
 | ----------------------------------------- | --------------------------------------------------------- |
 | Two different `@feature` tags in one file | [`GR3003`](../04-check/#gr3003)                           |
 | Two features list the same folder         | [`GR3003`](../04-check/#gr3003)                           |
+| Two features list the same file           | [`GR3003`](../04-check/#gr3003)                           |
 | A `@feature` tag names no feature         | [`GR3004`](../04-check/#gr3004) (the folders then decide) |
 | A file under `src/app/**` with no owner   | [`GR3002`](../04-check/#gr3002)                           |
 

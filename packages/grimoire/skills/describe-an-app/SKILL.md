@@ -44,7 +44,10 @@ root: src/web/$sites/client
 - pref:personalised the customer left personalised content on
 ```
 
-Every page and block of this app uses these names and no others. Add a condition here before
+`origin` is optional (`inferred` or `confirmed`), on the README and on layouts, pages and screens,
+as on features. Mark files you wrote from the code `inferred`.
+
+Every page and block of this app uses these names and no others in **Who sees it**. Add a condition here before
 using it. Name roles and permissions exactly as the access configuration does, so a reader can
 find them in the code.
 
@@ -102,7 +105,9 @@ The first page a visitor sees.
 - **One row per part of the page**, not one description per kind of user. Three roles and two
   preferences are a few rows, not six pages.
 - **Flow** is `feature/flow`. The rule for what the block shows lives there. Do not restate it.
-- **Who sees it** and **Changes with** use the app's condition names.
+- **Who sees it** uses the app's condition names, and the check reports a name the README does
+  not declare (`GR5002`). **Changes with** is free text: it is not checked, but starting an item
+  with a condition name (`vip: member prices`) keeps it readable.
 - Do not list blocks that come from the layout.
 
 ## A layout

@@ -463,6 +463,8 @@ const TYPE_ORDER: readonly ScryHitType[] = [
   "page",
   "screen",
   "route",
+  "mail",
+  "job",
   "file",
   "export",
   "task",
@@ -549,6 +551,12 @@ function candidates(snapshot: GrimoireSnapshot): Candidate[] {
     if (route.isPage) continue;
 
     list.push({ type: "route", id: `${route.method} ${route.path}`, detail: route.name });
+  }
+
+  for (const thing of facts.named) {
+    if (thing.type !== "mail" && thing.type !== "job") continue;
+
+    list.push({ type: thing.type, id: thing.name, detail: thing.file });
   }
 
   for (const file of facts.files) {

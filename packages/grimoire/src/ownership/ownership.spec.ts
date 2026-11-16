@@ -42,6 +42,53 @@ describe("resolveOwnership", () => {
     expect(ownership.files["src/web/$sites/client/home.page.tsx"]?.owner).toBe("web");
   });
 
+  it("lets a file entry own one file of a folder another feature holds", () => {
+    const ownership = resolveOwnership(
+      written({
+        features: [
+          feature({ id: "web", folders: ["src/web/components"] }),
+          feature({ id: "billing", folders: ["src/web/components/pricing-table.tsx"] }),
+        ],
+      }),
+      facts([
+        codeFile("src/web/components/pricing-table.tsx"),
+        codeFile("src/web/components/button.tsx"),
+      ]),
+    );
+
+    expect(ownership.files["src/web/components/pricing-table.tsx"]).toMatchObject({
+      owner: "billing",
+      via: "file",
+      folder: null,
+    });
+    expect(ownership.files["src/web/components/button.tsx"]).toMatchObject({
+      owner: "web",
+      via: "folder",
+    });
+    expect(ownership.features.billing?.own).toEqual(["src/web/components/pricing-table.tsx"]);
+  });
+
+  it("reports two features listing the same file as a conflict, and lets a tag win over a file entry", () => {
+    const ownership = resolveOwnership(
+      written({
+        features: [
+          feature({ id: "a", folders: ["src/x/one.ts", "src/x/two.ts"] }),
+          feature({ id: "b", folders: ["src/x/one.ts"] }),
+        ],
+      }),
+      facts([codeFile("src/x/one.ts"), codeFile("src/x/two.ts", [], { tags: { feature: ["b"] } })]),
+    );
+
+    expect(ownership.files["src/x/one.ts"]).toMatchObject({
+      owner: null,
+      conflicts: [
+        { feature: "a", via: "file" },
+        { feature: "b", via: "file" },
+      ],
+    });
+    expect(ownership.files["src/x/two.ts"]).toMatchObject({ owner: "b", via: "tag" });
+  });
+
   it("lets a @feature tag win over the folders", () => {
     const ownership = resolveOwnership(
       written({

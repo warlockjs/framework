@@ -58,7 +58,12 @@ export function facts(files: BookFile[], rest: Partial<Omit<BookFacts, "files">>
 }
 
 /** A step line: `route POST /x`, `page /`, `mail welcome`, `affects f/flow`, `outside service bank`. */
-export function step(index: number, type: StepType, target: string): WrittenStep {
+export function step(
+  index: number,
+  type: StepType,
+  target: string,
+  app: string | null = null,
+): WrittenStep {
   const route = type === "route" ? /^(\S+)\s+(\S+)$/.exec(target) : null;
   const [feature = "", flow] = type === "affects" ? target.split("/") : [];
 
@@ -66,6 +71,7 @@ export function step(index: number, type: StepType, target: string): WrittenStep
     index,
     type,
     target,
+    app,
     route: route ? { method: route[1] ?? "", path: route[2] ?? "" } : null,
     affects: type === "affects" ? { feature, flow: flow ?? null } : null,
     note: null,
@@ -194,6 +200,7 @@ export function page(
     route: located(route, file),
     screen: null,
     layout: null,
+    origin: null,
     heading: null,
     purpose: null,
     blocks,
@@ -216,6 +223,7 @@ export function app(
     id: located(id, file),
     type: located(type, file),
     root: located(root, file),
+    origin: null,
     heading: null,
     conditions: [],
     layouts: parts.layouts ?? [],

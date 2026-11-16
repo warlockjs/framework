@@ -59,7 +59,9 @@ export function checkSteps(snapshot: GrimoireSnapshot): GrimoireFinding[] {
         findings.push(
           createFinding({
             code: rule.code,
-            message: `${step.type} step "${step.target}" ${rule.missing}`,
+            message: `${step.type} step "${step.target}${step.app === null ? "" : ` [${step.app}]`}" ${
+              step.app === null ? rule.missing : "matches no page or screen of that app"
+            }`,
             at: step.at,
             feature: feature.id,
             flow: flow.ref,
@@ -109,6 +111,13 @@ export function checkAppNames(snapshot: GrimoireSnapshot): GrimoireFinding[] {
             app: criterion.app ?? "",
             at: criterion.at,
             where: criterion.id,
+          })),
+        ...flow.steps
+          .filter((step) => step.app !== null)
+          .map((step) => ({
+            app: step.app ?? "",
+            at: step.at,
+            where: `step ${step.index}`,
           })),
       ];
 

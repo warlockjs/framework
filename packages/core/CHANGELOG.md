@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `warlock inspect` files report `lines` (code files only), `about` (the file's header comment or `@fileoverview`), `tags` (header `@tag` values, such as `tags.feature`) and `exportDocs` (the first sentence of each export's JSDoc).
-- `warlock inspect` files take the roles `use-case`, `seed`, `request`, `mail`, `job`, `event` and `client`. A module named after one of these words (`events`, `jobs`, ...) keeps the roles of its own folders.
+- `warlock inspect` files take the roles `use-case`, `seed`, `request`, `mail`, `job`, `event` and `client`. A `*.email.ts` file and a file in an `emails/` folder get the role `mail`. A module named after one of these words (`events`, `jobs`, ...) keeps the roles of its own folders.
 - Inspect routes that use a controller tuple report `controller` and `action`. The `Route` type gains `$controller` and `$action`.
 - Inspect pages report `setupFile` and `site`. The page list is built from the web page graph.
 - `collectFiles()`, `fileRole()` and the `CollectFilesOptions` type are exported from `@warlock.js/core/tooling`. `collectFiles()` takes a `dirs` option to scan folders other than `src`; it skips `node_modules` and hidden folders.

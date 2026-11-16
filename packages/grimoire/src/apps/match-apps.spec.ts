@@ -11,6 +11,7 @@ function app(id: string, type: "site" | "mobile", root: string): WrittenApp {
     id: { value: id, at },
     type: { value: type, at },
     root: { value: root, at },
+    origin: null,
     heading: null,
     conditions: [],
     layouts: [],

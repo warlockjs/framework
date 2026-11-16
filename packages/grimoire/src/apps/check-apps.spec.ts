@@ -37,6 +37,7 @@ function page(id: string, patch: Partial<WrittenPage> = {}): WrittenPage {
     route: { value: "/", at: at(FILE, 2) },
     screen: null,
     layout: null,
+    origin: null,
     heading: null,
     purpose: null,
     blocks: [],
@@ -124,7 +125,7 @@ describe("checkApps", () => {
             layout: { value: "site", at: at(FILE, 3) },
           }),
         ],
-        layouts: [{ file: "l", app: "web", id: "site", heading: null, blocks: [] }],
+        layouts: [{ file: "l", app: "web", id: "site", origin: null, heading: null, blocks: [] }],
       },
       mobileApp: {
         screens: [

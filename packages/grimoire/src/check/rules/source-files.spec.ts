@@ -146,6 +146,14 @@ describe("checkFolders", () => {
       'GR3005 grimoire/features/shop/README.md:8 folders entry "src/app/sho" of shop holds no source file',
     ]);
   });
+
+  it("GR3005: a file entry must be a file the book knows", () => {
+    expect(
+      summary(checkFolders(foldersSnapshot(["src/app/shop/a.ts", "src/app/shop/gone.ts"]))),
+    ).toEqual([
+      'GR3005 grimoire/features/shop/README.md:8 folders entry "src/app/shop/gone.ts" of shop is not a source file of the project',
+    ]);
+  });
 });
 
 describe("checkUnreached", () => {

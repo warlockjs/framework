@@ -444,7 +444,7 @@
         "task": null,
         "file": "grimoire/features/catalog/flows/wishlist.md"
       },
-      "hint": "Fix the route path in the flow, or add the page to one of the feature's apps."
+      "hint": "Fix the route path in the flow, or add the page to one of the feature's apps. A step scoped like `page /support [web-admin]` looks only in that app."
     },
     {
       "code": "GR4001",

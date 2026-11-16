@@ -239,6 +239,7 @@
               "index": 1,
               "type": "page",
               "target": "/search",
+              "app": null,
               "route": null,
               "affects": null,
               "note": null,
@@ -252,6 +253,7 @@
               "index": 2,
               "type": "route",
               "target": "get /api/search",
+              "app": null,
               "route": {
                 "method": "GET",
                 "path": "/api/search"
@@ -268,6 +270,7 @@
               "index": 3,
               "type": "affects",
               "target": "catalog",
+              "app": null,
               "route": null,
               "affects": {
                 "feature": "catalog",
@@ -433,6 +436,7 @@
           "column": null
         }
       },
+      "origin": null,
       "heading": {
         "value": "The website",
         "at": {
@@ -478,6 +482,7 @@
           },
           "screen": null,
           "layout": null,
+          "origin": null,
           "heading": {
             "value": "Search results",
             "at": {

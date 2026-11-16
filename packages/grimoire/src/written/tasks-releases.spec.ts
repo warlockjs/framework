@@ -70,6 +70,22 @@ describe("parseTask", () => {
     ]);
   });
 
+  it("lists every allowed status when a task status is wrong", () => {
+    const { sink, findings } = collect();
+
+    parseTask(
+      "grimoire/tasks/open/T-10-fix.md",
+      "---\nid: T-10\ntype: decision\nstatus: waiting for the owner\n---\n# Fix\n",
+      { folder: "open", month: null, nameId: "T-10" },
+      sink,
+    );
+
+    expect(findings.map((finding) => finding.code)).toEqual(["GR1004"]);
+    expect(findings[0]?.message).toContain(
+      "use one of: open, waiting for approval, approved, in progress, blocked, done, dropped",
+    );
+  });
+
   it("reads `shipped: <feature> <version>`", () => {
     const { sink } = collect();
     const task = parseTask(

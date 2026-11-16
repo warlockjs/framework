@@ -21,9 +21,10 @@ import type {
 /**
  * Who owns one source file.
  *
- * Rules: a `@feature <id>` header tag wins; otherwise the feature whose
- * `folders` entry is the deepest folder holding the file. Two different tags,
- * or the same folder listed by two features, is a conflict (`GR3003`) and the
+ * Rules: a `@feature <id>` header tag wins; then a `folders` entry that names
+ * the file itself; otherwise the feature whose `folders` entry is the deepest
+ * folder holding the file. Two different tags, or the same file or folder
+ * listed by two features, is a conflict (`GR3003`) and the
  * file gets no owner. A feature borrows a file it does not own when one of its
  * own files imports it.
  */
@@ -31,11 +32,11 @@ export type FileOwnership = {
   file: string;
   owner: string | null;
   /** How the owner was decided. */
-  via: "tag" | "folder" | null;
+  via: "tag" | "folder" | "file" | null;
   /** The `folders` entry that matched, when `via` is `folder`. */
   folder: string | null;
   /** Every feature that claimed the file when there was a conflict. Empty otherwise. */
-  conflicts: { feature: string; via: "tag" | "folder" }[];
+  conflicts: { feature: string; via: "tag" | "folder" | "file" }[];
   /** Features with an own file that imports this one, sorted. */
   borrowedBy: string[];
 };

@@ -99,6 +99,8 @@ export type ScryHitType =
   | "page"
   | "screen"
   | "route"
+  | "mail"
+  | "job"
   | "file"
   | "export"
   | "task";
@@ -109,7 +111,7 @@ export type ScryHit = {
   /**
    * The id to ask about next: a feature id, `<feature>/<flow>`,
    * `<app>/<page>/<block>`, `<app> <route>`, `METHOD path`, a file path,
-   * `<file>#<export>`, or a task id.
+   * `<file>#<export>`, a mail or job name, or a task id.
    */
   id: string;
   /** Short text shown after the id (a header sentence, a block's flow). */
