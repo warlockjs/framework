@@ -6,7 +6,7 @@
   "steps": [
     {
       "index": 1,
-      "kind": "route",
+      "type": "route",
       "target": "POST /api/register",
       "found": true,
       "entry": "src/app/auth/controllers/register.controller.ts",
@@ -18,7 +18,7 @@
     },
     {
       "index": 2,
-      "kind": "job",
+      "type": "job",
       "target": "delete-unverified",
       "found": true,
       "entry": "src/app/shared/jobs/delete-unverified.job.ts",

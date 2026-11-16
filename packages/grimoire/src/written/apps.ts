@@ -281,7 +281,7 @@ export function parsePage(
     findSection(document, "also reached from")?.lines,
     "Also reached from",
     sink,
-  ).map((line) => ({ kind: line.name, name: line.text, at: line.at }));
+  ).map((line) => ({ type: line.name, name: line.text, at: line.at }));
 
   return {
     file,

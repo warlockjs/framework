@@ -106,7 +106,7 @@ export type WrittenChangelog = {
 };
 
 /** Flow step kinds. `affects` names an effect on another feature. */
-export type StepKind =
+export type StepType =
   | "page"
   | "route"
   | "mail"
@@ -120,7 +120,7 @@ export type StepKind =
 export type WrittenStep = {
   /** The number written before the dot. */
   index: number;
-  kind: StepKind;
+  type: StepType;
   /** The name as written (`POST /wishlist`, `/products/:id`, `order-confirmation`, `catalog/stock`). */
   target: string;
   /** For a route step: the uppercase method and the path. */
@@ -267,7 +267,7 @@ export type WrittenBlockFile = {
 /** One `- <kind>   <name>` line of `## Also reached from`. */
 export type WrittenEntryPoint = {
   /** `mail`, `notification`, `page`, `screen`, `outside service`, or another word. */
-  kind: string;
+  type: string;
   name: string;
   at: SourceLocation;
 };

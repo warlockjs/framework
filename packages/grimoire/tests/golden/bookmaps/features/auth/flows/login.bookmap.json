@@ -6,7 +6,7 @@
   "steps": [
     {
       "index": 1,
-      "kind": "route",
+      "type": "route",
       "target": "POST /api/login",
       "found": true,
       "entry": "src/app/auth/controllers/login.controller.ts",

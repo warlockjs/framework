@@ -213,10 +213,10 @@ export async function exportGrimoireSite(
   options: ExportGrimoireSiteOptions = {},
 ): Promise<string> {
   // Project-relative from here on; an absolute folder is kept where it is.
-  const outDir = projectPath(root, toPosixPath(options.outDir ?? GRIMOIRE_PATHS.staticSite)).replace(
-    /\/+$/,
-    "",
-  );
+  const outDir = projectPath(
+    root,
+    toPosixPath(options.outDir ?? GRIMOIRE_PATHS.staticSite),
+  ).replace(/\/+$/, "");
   const snapshot =
     options.snapshot ??
     (await createSnapshotSource(

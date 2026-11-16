@@ -15,7 +15,7 @@ import type {
   WrittenPage,
   WrittenStep,
   WrittenTask,
-  StepKind,
+  StepType,
 } from "../../src/contracts";
 
 export const at = (file = "grimoire/x.md", line = 1) => ({ file, line, column: null });
@@ -58,16 +58,16 @@ export function facts(files: BookFile[], rest: Partial<Omit<BookFacts, "files">>
 }
 
 /** A step line: `route POST /x`, `page /`, `mail welcome`, `affects f/flow`, `outside service bank`. */
-export function step(index: number, kind: StepKind, target: string): WrittenStep {
-  const route = kind === "route" ? /^(\S+)\s+(\S+)$/.exec(target) : null;
-  const [feature = "", flow] = kind === "affects" ? target.split("/") : [];
+export function step(index: number, type: StepType, target: string): WrittenStep {
+  const route = type === "route" ? /^(\S+)\s+(\S+)$/.exec(target) : null;
+  const [feature = "", flow] = type === "affects" ? target.split("/") : [];
 
   return {
     index,
-    kind,
+    type,
     target,
     route: route ? { method: route[1] ?? "", path: route[2] ?? "" } : null,
-    affects: kind === "affects" ? { feature, flow: flow ?? null } : null,
+    affects: type === "affects" ? { feature, flow: flow ?? null } : null,
     note: null,
     at: at(),
   };

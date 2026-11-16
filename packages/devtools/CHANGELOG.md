@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Register your own dashboard tab with one line in `src/config/devtools.ts`: `panels: ["<package>/devtools"]`. A panel declares an id and a title, the data routes served under `/__warlock/api/<id>` and a browser view module. Every route and file sits behind the devtools guard.
+- Register your own dashboard tab with one line in `src/config/devtools.ts`: `panels: ["<package>/devtools"]`. A panel declares an id and a title, the data routes served under `/__warlock/api/<id>` and a browser view module. Every route and file sits behind the devtools guard. A package entry resolves from the app root, also when the package only has an `import` condition in `exports`. A panel that lists the same method and path twice is left out with a message, a `panels` option that is not a list is reported once, and Back from a panel view returns to its first view.
 - The Processes tab uses the same panel registration, with no visible change.
 
 ## 5.53.0 - 2026-11-11

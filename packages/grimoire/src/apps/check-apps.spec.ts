@@ -267,12 +267,12 @@ describe("checkApps", () => {
 
   it("GR5008: an entry point that names nothing", () => {
     const entries = [
-      { kind: "mail", name: "welcome", at: at(FILE, 12) },
-      { kind: "mail", name: "missing", at: at(FILE, 13) },
-      { kind: "notification", name: "ping", at: at(FILE, 14) },
-      { kind: "page", name: "/", at: at(FILE, 15) },
-      { kind: "page", name: "/nowhere", at: at(FILE, 16) },
-      { kind: "outside service", name: "anything", at: at(FILE, 17) },
+      { type: "mail", name: "welcome", at: at(FILE, 12) },
+      { type: "mail", name: "missing", at: at(FILE, 13) },
+      { type: "notification", name: "ping", at: at(FILE, 14) },
+      { type: "page", name: "/", at: at(FILE, 15) },
+      { type: "page", name: "/nowhere", at: at(FILE, 16) },
+      { type: "outside service", name: "anything", at: at(FILE, 17) },
     ];
     const findings = checkApps(
       build({ app: { pages: [page("home", { alsoReachedFrom: entries })] } }),
@@ -284,8 +284,8 @@ describe("checkApps", () => {
 
   it("GR5008: a screen entry checks the declared and the file-based screens", () => {
     const entries = [
-      { kind: "screen", name: "/products/[id]", at: at(FILE, 1) },
-      { kind: "screen", name: "/nope", at: at(FILE, 2) },
+      { type: "screen", name: "/products/[id]", at: at(FILE, 1) },
+      { type: "screen", name: "/nope", at: at(FILE, 2) },
     ];
     const findings = checkApps(
       build({

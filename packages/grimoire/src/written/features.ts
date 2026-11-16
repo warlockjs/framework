@@ -6,7 +6,7 @@ import type { SourceLocation } from "../contracts/location";
 import {
   CASE_QUESTIONS,
   type ChangeWord,
-  type StepKind,
+  type StepType,
   type WrittenCase,
   type WrittenChangelog,
   type WrittenChangelogEntry,
@@ -37,7 +37,7 @@ export const STATUSES: readonly WrittenStatus[] = ["proposed", "building", "ship
 export const ORIGINS: readonly WrittenOrigin[] = ["inferred", "confirmed"];
 export const CHANGE_WORDS: readonly ChangeWord[] = ["added", "changed", "fixed", "removed"];
 /** Step kinds, longest first so `outside service` is tried before shorter words. */
-export const STEP_KINDS: readonly StepKind[] = [
+export const STEP_TYPES: readonly StepType[] = [
   "outside service",
   "notification",
   "affects",
@@ -55,9 +55,9 @@ const FALLBACK_STATUS: WrittenStatus = "building";
 // or tabs: two or more line them up, one is read too (a Markdown formatter
 // collapses them).
 const STEP = new RegExp(
-  String.raw`^(\d+)\.[ \t]+(${STEP_KINDS.join("|")})[ \t]+(\S.*?)(?:[ \t]+(?:—|--)[ \t]+(\S.*))?$`,
+  String.raw`^(\d+)\.[ \t]+(${STEP_TYPES.join("|")})[ \t]+(\S.*?)(?:[ \t]+(?:—|--)[ \t]+(\S.*))?$`,
 );
-const STEP_ANY_KIND = new RegExp(String.raw`^(\d+)\.[ \t]+(\S.*?)${SEP}(\S.*)$`);
+const STEP_ANY_TYPE = new RegExp(String.raw`^(\d+)\.[ \t]+(\S.*?)${SEP}(\S.*)$`);
 const STEP_FIRST_WORD = /^(\d+)\.[ \t]+(\S+)[ \t]+(\S.*)$/;
 const NUMBERED = /^(\d+)\.(?:[ \t]|$)/;
 const ROUTE_TARGET = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|ALL)[ \t]+(\/\S*)$/i;
@@ -329,13 +329,13 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
     const match = STEP.exec(line.text);
 
     if (!match) {
-      const other = STEP_ANY_KIND.exec(line.text) ?? STEP_FIRST_WORD.exec(line.text);
-      const kind = other?.[2] ?? "";
+      const other = STEP_ANY_TYPE.exec(line.text) ?? STEP_FIRST_WORD.exec(line.text);
+      const type = other?.[2] ?? "";
 
-      if (other && !STEP_KINDS.includes(kind as StepKind)) {
+      if (other && !STEP_TYPES.includes(type as StepType)) {
         sink.report(
           "GR1009",
-          `the step kind ${JSON.stringify(kind)} is not one of: ${STEP_KINDS.join(", ")}.`,
+          `the step kind ${JSON.stringify(type)} is not one of: ${STEP_TYPES.join(", ")}.`,
           at,
         );
       } else {
@@ -349,12 +349,12 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
       continue;
     }
 
-    const kind = match[2] as StepKind;
+    const type = match[2] as StepType;
     const target = (match[3] ?? "").trim();
     let route: WrittenStep["route"] = null;
     let affects: WrittenStep["affects"] = null;
 
-    if (kind === "route") {
+    if (type === "route") {
       const routeMatch = ROUTE_TARGET.exec(target);
 
       if (!routeMatch) {
@@ -369,7 +369,7 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
       route = { method: (routeMatch[1] ?? "").toUpperCase(), path: routeMatch[2] ?? "" };
     }
 
-    if (kind === "affects") {
+    if (type === "affects") {
       const affectsMatch = AFFECTS_TARGET.exec(target);
 
       if (!affectsMatch) {
@@ -386,7 +386,7 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
 
     steps.push({
       index: Number(match[1]),
-      kind,
+      type,
       target,
       route,
       affects,

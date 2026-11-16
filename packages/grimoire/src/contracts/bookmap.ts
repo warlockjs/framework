@@ -9,7 +9,7 @@ import type {
   CriterionId,
   FeatureVersion,
   FlowRef,
-  StepKind,
+  StepType,
   TaskStatus,
   TaskType,
   WrittenOrigin,
@@ -68,7 +68,7 @@ export type FeatureBookmap = {
 /** One step of a flow with the files behind it. */
 export type FlowBookmapStep = {
   index: number;
-  kind: StepKind;
+  type: StepType;
   target: string;
   /**
    * `true` when the step's name matched the book; `false` when it did not;

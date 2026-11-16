@@ -570,7 +570,7 @@
         ],
         "alsoReachedFrom": [
           {
-            "kind": "mail",
+            "type": "mail",
             "name": "order-confirmation",
             "at": {
               "file": "grimoire/apps/web-client/pages/product/README.md",

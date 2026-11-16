@@ -272,7 +272,7 @@ describe("buildCollectedFiles: flow book maps", () => {
 
     expect(routeStep).toEqual({
       index: 1,
-      kind: "route",
+      type: "route",
       target: "GET /api/products",
       found: true,
       entry: "src/app/catalog/list.controller.ts",
@@ -317,7 +317,7 @@ describe("buildCollectedFiles: flow book maps", () => {
   it("resolves named, outside service, affects and missing steps", () => {
     const steps = buildCollectedFiles(world()).flows["orders/place"]?.steps ?? [];
 
-    expect(steps.map((item) => [item.kind, item.found, item.entry])).toEqual([
+    expect(steps.map((item) => [item.type, item.found, item.entry])).toEqual([
       ["route", true, "src/app/orders/place.controller.ts"],
       ["outside service", null, null],
       ["mail", true, "src/app/orders/confirm.mail.ts"],

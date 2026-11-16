@@ -60,8 +60,7 @@ export function createSnapshotSource(
   root: string,
   options: SnapshotSourceOptions = {},
 ): SnapshotSource {
-  let cached: { snapshot: GrimoireSnapshot; at: number; stamp: number; took: number } | null =
-    null;
+  let cached: { snapshot: GrimoireSnapshot; at: number; stamp: number; took: number } | null = null;
   let opening: Promise<GrimoireSnapshot> | null = null;
 
   const reuseFor = (took: number): number => options.ttlMs ?? Math.max(2000, took * 5);

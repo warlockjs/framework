@@ -59,7 +59,7 @@ const flowAnswer = {
     steps: [
       {
         index: 1,
-        kind: "page",
+        type: "page",
         target: "/",
         found: true,
         entry: "src/pages/home.page.tsx",
@@ -67,7 +67,7 @@ const flowAnswer = {
       },
       {
         index: 2,
-        kind: "route",
+        type: "route",
         target: "GET /api/products/new-arrivals",
         found: true,
         entry: null,

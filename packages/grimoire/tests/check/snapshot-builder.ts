@@ -10,7 +10,7 @@ import type {
   GrimoireSnapshot,
   ProofLine,
   SourceLocation,
-  StepKind,
+  StepType,
   WrittenChangelogEntry,
   WrittenCriterion,
   WrittenFeature,
@@ -165,7 +165,7 @@ export function feature(id: string, input: FeatureInput = {}): WrittenFeature {
 export type FlowInput = {
   since?: string;
   status?: WrittenStatus;
-  steps?: [StepKind, string][];
+  steps?: [StepType, string][];
   differs?: string[];
   criteria?: (string | [string, string])[];
 };
@@ -184,7 +184,7 @@ export function flow(featureId: string, id: string, input: FlowInput = {}): Writ
     who: located("customer", file, 5),
     origin: null,
     heading: null,
-    steps: (input.steps ?? []).map(([kind, target], index) => step(file, index + 1, kind, target)),
+    steps: (input.steps ?? []).map(([type, target], index) => step(file, index + 1, type, target)),
     differs: (input.differs ?? []).map((app, index) => listLine(app, file, 20 + index)),
     cases: [],
     notHandled: [],
@@ -193,16 +193,16 @@ export function flow(featureId: string, id: string, input: FlowInput = {}): Writ
   };
 }
 
-function step(file: string, index: number, kind: StepKind, target: string): WrittenStep {
-  const route = kind === "route" ? /^(\S+)\s+(\S+)$/.exec(target) : null;
-  const [affectsFeature = "", affectsFlow = null] = kind === "affects" ? target.split("/") : [];
+function step(file: string, index: number, type: StepType, target: string): WrittenStep {
+  const route = type === "route" ? /^(\S+)\s+(\S+)$/.exec(target) : null;
+  const [affectsFeature = "", affectsFlow = null] = type === "affects" ? target.split("/") : [];
 
   return {
     index,
-    kind,
+    type,
     target,
     route: route ? { method: route[1] ?? "", path: route[2] ?? "" } : null,
-    affects: kind === "affects" ? { feature: affectsFeature, flow: affectsFlow } : null,
+    affects: type === "affects" ? { feature: affectsFeature, flow: affectsFlow } : null,
     note: null,
     at: at(file, 10 + index),
   };
@@ -253,7 +253,7 @@ export function bookmap(target: WrittenFlow, found: (boolean | null)[]): FlowBoo
     ref: target.ref,
     steps: target.steps.map((item, index): FlowBookmapStep => ({
       index: item.index,
-      kind: item.kind,
+      type: item.type,
       target: item.target,
       found: found[index] ?? true,
       entry: null,

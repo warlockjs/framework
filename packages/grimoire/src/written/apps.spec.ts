@@ -190,8 +190,8 @@ describe("parseLayout, parsePage and parseBlockFile", () => {
     expect(page.layout?.value).toBe("site");
     expect(page.purpose).toBe("The first page.");
     expect(page.alsoReachedFrom).toEqual([
-      { kind: "mail", name: "order-confirmation", at: { file: PAGE, line: 8, column: null } },
-      { kind: "notification", name: "order-shipped", at: { file: PAGE, line: 9, column: null } },
+      { type: "mail", name: "order-confirmation", at: { file: PAGE, line: 8, column: null } },
+      { type: "notification", name: "order-shipped", at: { file: PAGE, line: 9, column: null } },
     ]);
     expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([["GR1028", 10]]);
   });

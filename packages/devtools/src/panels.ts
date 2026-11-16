@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -205,12 +205,103 @@ function resolvePanelSpecifier(entry: string, root: string): string {
     return pathToFileURL(path.resolve(root, entry)).href;
   }
 
+  return resolveFromNodeModules(entry, root) ?? resolveWithRequire(entry, root) ?? entry;
+}
+
+/** Picks the file an `exports` target names: `import`, then `default`, then `node`. */
+function exportTarget(target: unknown): string | undefined {
+  if (typeof target === "string") return target;
+
+  if (Array.isArray(target)) {
+    for (const item of target) {
+      const found = exportTarget(item);
+
+      if (found !== undefined) return found;
+    }
+
+    return undefined;
+  }
+
+  if (target !== null && typeof target === "object") {
+    const conditions = target as Record<string, unknown>;
+
+    for (const condition of ["import", "node", "default"]) {
+      const found = exportTarget(conditions[condition]);
+
+      if (found !== undefined) return found;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Resolves a package specifier by looking it up in the `node_modules` folders
+ * above the app root and reading its `exports` map. `createRequire().resolve`
+ * cannot do this for a package that only has an `import` condition.
+ */
+function resolveFromNodeModules(entry: string, root: string): string | undefined {
+  const parts = entry.split("/");
+  const nameLength = entry.startsWith("@") ? 2 : 1;
+  const name = parts.slice(0, nameLength).join("/");
+  const subpath = parts.length > nameLength ? `./${parts.slice(nameLength).join("/")}` : ".";
+
+  if (!name) return undefined;
+
+  let directory = path.resolve(root);
+
+  for (;;) {
+    const packageDirectory = path.join(directory, "node_modules", name);
+    const manifestFile = path.join(packageDirectory, "package.json");
+
+    if (existsSync(manifestFile)) {
+      try {
+        const manifest = JSON.parse(readFileSync(manifestFile, "utf8")) as {
+          exports?: unknown;
+          main?: string;
+        };
+        const exported = manifest.exports;
+        const map =
+          exported !== null && typeof exported === "object" && !Array.isArray(exported)
+            ? (exported as Record<string, unknown>)
+            : undefined;
+        const hasSubpaths =
+          map !== undefined && Object.keys(map).some((key) => key.startsWith("."));
+        const target =
+          exported === undefined
+            ? subpath === "."
+              ? (manifest.main ?? "index.js")
+              : subpath
+            : hasSubpaths
+              ? exportTarget(map?.[subpath])
+              : subpath === "."
+                ? exportTarget(exported)
+                : undefined;
+
+        if (target === undefined) return undefined;
+
+        const file = path.resolve(packageDirectory, target);
+
+        return isFile(file) ? pathToFileURL(file).href : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+
+    const parent = path.dirname(directory);
+
+    if (parent === directory) return undefined;
+
+    directory = parent;
+  }
+}
+
+/** The `require` resolution, for packages the `node_modules` lookup does not understand. */
+function resolveWithRequire(entry: string, root: string): string | undefined {
   try {
-    // From the app root, so a package the app installed resolves even when
-    // devtools itself cannot see it.
     return pathToFileURL(createRequire(path.join(root, "package.json")).resolve(entry)).href;
   } catch {
-    return entry;
+    return undefined;
   }
 }
 

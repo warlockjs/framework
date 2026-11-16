@@ -4,11 +4,11 @@
 import { createFinding } from "../../codes";
 import type { GrimoireFinding } from "../../contracts/findings";
 import type { GrimoireSnapshot } from "../../contracts/snapshot";
-import type { StepKind, WrittenStep } from "../../contracts/written";
+import type { StepType, WrittenStep } from "../../contracts/written";
 import { isRetired, writtenLookup } from "./lookup";
 
 /** Code and wording of a step that matched nothing, by step kind. */
-const STEP_CODES: Partial<Record<StepKind, { code: string; missing: string }>> = {
+const STEP_CODES: Partial<Record<StepType, { code: string; missing: string }>> = {
   route: { code: "GR2001", missing: "matches no route" },
   page: { code: "GR2002", missing: "matches no page or screen of the feature's apps" },
   mail: { code: "GR2003", missing: "matches no mail" },
@@ -19,7 +19,7 @@ const STEP_CODES: Partial<Record<StepKind, { code: string; missing: string }>> =
 };
 
 /** Step kinds whose names come from the facts read with the routes (a booted app). */
-const BOOT_KINDS: ReadonlySet<StepKind> = new Set([
+const BOOT_TYPES: ReadonlySet<StepType> = new Set([
   "route",
   "mail",
   "notification",
@@ -35,7 +35,7 @@ const BOOT_KINDS: ReadonlySet<StepKind> = new Set([
  */
 export function checkSteps(snapshot: GrimoireSnapshot): GrimoireFinding[] {
   const findings: GrimoireFinding[] = [];
-  const skipBootKinds = snapshot.routes === "missing";
+  const skipBootTypes = snapshot.routes === "missing";
 
   for (const feature of snapshot.written.features) {
     for (const flow of feature.flows) {
@@ -46,12 +46,12 @@ export function checkSteps(snapshot: GrimoireSnapshot): GrimoireFinding[] {
       if (!bookmap) continue;
 
       flow.steps.forEach((step: WrittenStep, position) => {
-        const rule = STEP_CODES[step.kind];
+        const rule = STEP_CODES[step.type];
 
-        if (!rule || (skipBootKinds && BOOT_KINDS.has(step.kind))) return;
+        if (!rule || (skipBootTypes && BOOT_TYPES.has(step.type))) return;
 
         const mapped =
-          bookmap.steps.find((item) => item.index === step.index && item.kind === step.kind) ??
+          bookmap.steps.find((item) => item.index === step.index && item.type === step.type) ??
           bookmap.steps[position];
 
         if (mapped?.found !== false) return;
@@ -59,7 +59,7 @@ export function checkSteps(snapshot: GrimoireSnapshot): GrimoireFinding[] {
         findings.push(
           createFinding({
             code: rule.code,
-            message: `${step.kind} step "${step.target}" ${rule.missing}`,
+            message: `${step.type} step "${step.target}" ${rule.missing}`,
             at: step.at,
             feature: feature.id,
             flow: flow.ref,

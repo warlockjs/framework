@@ -237,7 +237,7 @@
           "steps": [
             {
               "index": 1,
-              "kind": "page",
+              "type": "page",
               "target": "/search",
               "route": null,
               "affects": null,
@@ -250,7 +250,7 @@
             },
             {
               "index": 2,
-              "kind": "route",
+              "type": "route",
               "target": "get /api/search",
               "route": {
                 "method": "GET",
@@ -266,7 +266,7 @@
             },
             {
               "index": 3,
-              "kind": "affects",
+              "type": "affects",
               "target": "catalog",
               "route": null,
               "affects": {
@@ -531,7 +531,7 @@
           ],
           "alsoReachedFrom": [
             {
-              "kind": "outside service",
+              "type": "outside service",
               "name": "the partner site's search box",
               "at": {
                 "file": "grimoire/apps/site/pages/results/README.md",

@@ -236,9 +236,9 @@ function checkReached(
   for (const entry of page.alsoReachedFrom) {
     let found = true;
 
-    if (entry.kind === "mail" || entry.kind === "notification") {
-      found = facts.named.some((item) => item.type === entry.kind && item.name === entry.name);
-    } else if (entry.kind === "page") {
+    if (entry.type === "mail" || entry.type === "notification") {
+      found = facts.named.some((item) => item.type === entry.type && item.name === entry.name);
+    } else if (entry.type === "page") {
       const site = match.site;
       const wanted = normalizeRoute(entry.name);
 
@@ -249,7 +249,7 @@ function checkReached(
             item.site === site.id &&
             (normalizeRoute(item.route) === wanted || item.name === entry.name),
         );
-    } else if (entry.kind === "screen") {
+    } else if (entry.type === "screen") {
       const wanted = normalizeRoute(entry.name);
 
       found =
@@ -267,7 +267,7 @@ function checkReached(
     findings.push(
       createFinding({
         code: "GR5008",
-        message: `${label} is reached from ${entry.kind} "${entry.name}", which does not exist`,
+        message: `${label} is reached from ${entry.type} "${entry.name}", which does not exist`,
         at: entry.at,
         app: appId,
         ...subject,

@@ -8,7 +8,7 @@ import type { AppMatch } from "../contracts/snapshot";
 import type { WrittenFeature, WrittenGrimoire, WrittenStep } from "../contracts/written";
 import { importClosure, type FileGraph } from "../graph";
 
-const NAMED_KINDS: ReadonlySet<string> = new Set<BookNamedType>([
+const NAMED_TYPES: ReadonlySet<string> = new Set<BookNamedType>([
   "mail",
   "job",
   "event",
@@ -122,7 +122,7 @@ function pageStep(
 
 function namedStep(step: WrittenStep, facts: BookFacts, graph: FileGraph): StepMatch {
   const named = facts.named.filter(
-    (thing) => thing.type === step.kind && thing.name === step.target,
+    (thing) => thing.type === step.type && thing.name === step.target,
   );
   const first = named[0];
 
@@ -169,12 +169,12 @@ export function resolveStep(
 ): FlowBookmapStep {
   let match: StepMatch;
 
-  if (step.kind === "route") match = routeStep(step, context.facts, context.graph);
-  else if (step.kind === "page")
+  if (step.type === "route") match = routeStep(step, context.facts, context.graph);
+  else if (step.type === "page")
     match = pageStep(step, feature, context.facts, context.apps, context.graph);
-  else if (NAMED_KINDS.has(step.kind)) match = namedStep(step, context.facts, context.graph);
-  else if (step.kind === "affects") match = affectsStep(step, context.written);
+  else if (NAMED_TYPES.has(step.type)) match = namedStep(step, context.facts, context.graph);
+  else if (step.type === "affects") match = affectsStep(step, context.written);
   else match = { found: null, entry: null, files: [] };
 
-  return { index: step.index, kind: step.kind, target: step.target, ...match };
+  return { index: step.index, type: step.type, target: step.target, ...match };
 }

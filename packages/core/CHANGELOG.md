@@ -11,10 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - `warlock inspect` files report `lines` (code files only), `about` (the file's header comment or `@fileoverview`), `tags` (header `@tag` values, such as `tags.feature`) and `exportDocs` (the first sentence of each export's JSDoc).
-- `warlock inspect` files take the roles `use-case`, `seed`, `request`, `mail`, `job`, `event` and `client`.
+- `warlock inspect` files take the roles `use-case`, `seed`, `request`, `mail`, `job`, `event` and `client`. A module named after one of these words (`events`, `jobs`, ...) keeps the roles of its own folders.
 - Inspect routes that use a controller tuple report `controller` and `action`. The `Route` type gains `$controller` and `$action`.
 - Inspect pages report `setupFile` and `site`. The page list is built from the web page graph.
-- `collectFiles()`, `fileRole()` and the `CollectFilesOptions` type are exported from `@warlock.js/core/tooling`. `collectFiles()` takes a `dirs` option to scan folders other than `src`.
+- `collectFiles()`, `fileRole()` and the `CollectFilesOptions` type are exported from `@warlock.js/core/tooling`. `collectFiles()` takes a `dirs` option to scan folders other than `src`; it skips `node_modules` and hidden folders.
 - `withMcpTools()` attaches the MCP tools a package registers to a command. `mcp.tools` in `warlock.config.ts` lists them too, and `startWarlockMcpServer()` takes the same list as `tools`.
 - A registered MCP tool is checked like a built-in one. A tool name that is already taken stops the server with a message that names the tool.
 - `cli.commands` accepts arrays of commands (`CLICommandEntry`), so one register function can return several commands.
@@ -25,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - A file whose name ends in `.use-case.ts`, `.seed.ts`, `.request.ts`, `.mail.ts`, `.job.ts`, `.event.ts` or `.client.ts` gets its role from the suffix, even inside another folder. For example, `services/mail/welcome.mail.ts` is a `mail` file.
-- `warlock explain <code>` answers codes that a package registered with `withExplainCodes()` and reads only `warlock.config.ts`.
+- `warlock explain <code>` answers codes that a package registered with `withExplainCodes()` and reads only `warlock.config.ts`. Codes are matched in any case, and a `warlock.config.ts` that fails to load is named in the error.
 
 ### Fixed
 

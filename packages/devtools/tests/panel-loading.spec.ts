@@ -1,3 +1,5 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
@@ -96,5 +98,38 @@ describe("loadDevtoolsPanels", () => {
       'Devtools panel id "processes" is already registered by the "Processes" panel; each panel needs its own id. The panel was not added.',
       'Devtools panel id "grimoire" is already registered by the "Grimoire" panel; each panel needs its own id. The panel was not added.',
     ]);
+  });
+
+  it("resolves an import-only package from the app root", async () => {
+    const app = mkdtempSync(path.join(tmpdir(), "devtools-panels-"));
+
+    try {
+      const pkg = path.join(app, "node_modules", "@example", "import-only");
+
+      mkdirSync(path.join(pkg, "dist"), { recursive: true });
+      writeFileSync(
+        path.join(pkg, "package.json"),
+        JSON.stringify({
+          name: "@example/import-only",
+          exports: { "./devtools": { types: "./dist/d.d.ts", import: "./dist/devtools.mjs" } },
+        }),
+      );
+      writeFileSync(path.join(pkg, "dist", "devtools.mjs"), "export default {};");
+
+      const importModule = vi.fn(async () => ({ default: panel("import-only") }));
+
+      await loadDevtoolsPanels(["@example/import-only/devtools"], {
+        root: app,
+        warn: vi.fn(),
+        importModule,
+      });
+
+      const called = String((importModule.mock.calls[0] as unknown[])[0]);
+
+      expect(called.startsWith("file:")).toBe(true);
+      expect(called.endsWith("/dist/devtools.mjs")).toBe(true);
+    } finally {
+      rmSync(app, { recursive: true, force: true });
+    }
   });
 });

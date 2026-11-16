@@ -6,7 +6,7 @@
   "steps": [
     {
       "index": 1,
-      "kind": "page",
+      "type": "page",
       "target": "/",
       "found": true,
       "entry": "src/web/$sites/client/home.page.tsx",
@@ -21,7 +21,7 @@
     },
     {
       "index": 2,
-      "kind": "route",
+      "type": "route",
       "target": "GET /api/products/new-arrivals",
       "found": true,
       "entry": "src/app/catalog/controllers/new-arrivals.controller.ts",

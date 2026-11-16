@@ -6,7 +6,7 @@
   "steps": [
     {
       "index": 1,
-      "kind": "route",
+      "type": "route",
       "target": "GET /api/products",
       "found": true,
       "entry": "src/app/catalog/controllers/products.controller.ts",
@@ -20,7 +20,7 @@
     },
     {
       "index": 2,
-      "kind": "page",
+      "type": "page",
       "target": "/products/:id",
       "found": true,
       "entry": "src/web/$sites/client/products/show.page.tsx",
@@ -34,7 +34,7 @@
     },
     {
       "index": 3,
-      "kind": "route",
+      "type": "route",
       "target": "GET /api/products/:id",
       "found": true,
       "entry": "src/app/catalog/controllers/products.controller.ts",

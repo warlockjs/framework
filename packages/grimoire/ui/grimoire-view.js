@@ -481,12 +481,12 @@ async function flowView(ctx, feature, flowId) {
       map.steps.length
         ? table(
             ctx,
-            ["#", "Kind", "Target", "Found", "Files"],
+            ["#", "Type", "Target", "Found", "Files"],
             map.steps.map((step) => [
               [String(step.index)],
-              [step.kind],
+              [step.type],
               [
-                step.kind === "route" && step.target.includes(" ")
+                step.type === "route" && step.target.includes(" ")
                   ? link(
                       ctx,
                       step.target,
@@ -883,9 +883,9 @@ async function modulesView(ctx) {
 /** Pick the view for the hash route. */
 async function body(ctx) {
   const parts = ctx.route ? ctx.route.split("/").map(decodeSegment) : [];
-  const [kind = "", first = "", second = ""] = parts;
+  const [type = "", first = "", second = ""] = parts;
 
-  switch (kind) {
+  switch (type) {
     case "feature":
       return featureView(ctx, first);
     case "flow":

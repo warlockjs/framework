@@ -72,7 +72,7 @@ describe("parseFlow", () => {
 
     expect(findings).toEqual([]);
     expect(flow.ref).toBe("catalog/wishlist");
-    expect(flow.steps.map((step) => [step.index, step.kind, step.target, step.note])).toEqual([
+    expect(flow.steps.map((step) => [step.index, step.type, step.target, step.note])).toEqual([
       [1, "page", "/products/:id", null],
       [2, "route", "post /api/wishlist", "saves it"],
       [3, "outside service", "payment gateway", "may be slow"],
@@ -260,7 +260,7 @@ describe("parseFlow", () => {
     );
 
     expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([["GR1009", 15]]);
-    expect(flow.steps.map((step) => [step.kind, step.target, step.note])).toEqual([
+    expect(flow.steps.map((step) => [step.type, step.target, step.note])).toEqual([
       ["page", "/products/:id", null],
       ["route", "POST /wishlist", "saves it"],
       ["outside service", "payment gateway", null],

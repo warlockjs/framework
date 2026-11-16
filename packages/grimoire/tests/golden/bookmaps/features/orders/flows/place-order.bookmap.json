@@ -6,7 +6,7 @@
   "steps": [
     {
       "index": 1,
-      "kind": "page",
+      "type": "page",
       "target": "/products/:id",
       "found": true,
       "entry": "src/web/$sites/client/products/show.page.tsx",
@@ -20,7 +20,7 @@
     },
     {
       "index": 2,
-      "kind": "route",
+      "type": "route",
       "target": "POST /api/orders",
       "found": true,
       "entry": "src/app/orders/controllers/place-order.controller.ts",
@@ -37,7 +37,7 @@
     },
     {
       "index": 3,
-      "kind": "outside service",
+      "type": "outside service",
       "target": "payment gateway",
       "found": null,
       "entry": null,
@@ -45,7 +45,7 @@
     },
     {
       "index": 4,
-      "kind": "event",
+      "type": "event",
       "target": "order.placed",
       "found": true,
       "entry": "src/app/orders/events/order-placed.event.ts",
@@ -55,7 +55,7 @@
     },
     {
       "index": 5,
-      "kind": "affects",
+      "type": "affects",
       "target": "catalog/browse-products",
       "found": true,
       "entry": null,
@@ -63,7 +63,7 @@
     },
     {
       "index": 6,
-      "kind": "mail",
+      "type": "mail",
       "target": "order-confirmation",
       "found": true,
       "entry": "src/app/orders/mails/order-confirmation.mail.ts",
@@ -73,7 +73,7 @@
     },
     {
       "index": 7,
-      "kind": "job",
+      "type": "job",
       "target": "send-receipt",
       "found": true,
       "entry": "src/app/orders/jobs/send-receipt.job.ts",
@@ -83,7 +83,7 @@
     },
     {
       "index": 8,
-      "kind": "notification",
+      "type": "notification",
       "target": "order-shipped",
       "found": true,
       "entry": "src/app/orders/notifications/order-shipped.notification.ts",

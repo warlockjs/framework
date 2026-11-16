@@ -214,7 +214,7 @@
         "steps": [
           {
             "index": 1,
-            "kind": "route",
+            "type": "route",
             "target": "POST /api/login",
             "route": {
               "method": "POST",
@@ -391,7 +391,7 @@
         "steps": [
           {
             "index": 1,
-            "kind": "route",
+            "type": "route",
             "target": "POST /api/register",
             "route": {
               "method": "POST",
@@ -407,7 +407,7 @@
           },
           {
             "index": 2,
-            "kind": "job",
+            "type": "job",
             "target": "delete-unverified",
             "route": null,
             "affects": null,
@@ -809,7 +809,7 @@
         "steps": [
           {
             "index": 1,
-            "kind": "route",
+            "type": "route",
             "target": "GET /api/products",
             "route": {
               "method": "GET",
@@ -825,7 +825,7 @@
           },
           {
             "index": 2,
-            "kind": "page",
+            "type": "page",
             "target": "/products/:id",
             "route": null,
             "affects": null,
@@ -838,7 +838,7 @@
           },
           {
             "index": 3,
-            "kind": "route",
+            "type": "route",
             "target": "GET /api/products/:id",
             "route": {
               "method": "GET",
@@ -1030,7 +1030,7 @@
         "steps": [
           {
             "index": 1,
-            "kind": "page",
+            "type": "page",
             "target": "/",
             "route": null,
             "affects": null,
@@ -1043,7 +1043,7 @@
           },
           {
             "index": 2,
-            "kind": "route",
+            "type": "route",
             "target": "GET /api/products/new-arrivals",
             "route": {
               "method": "GET",
@@ -1245,7 +1245,7 @@
         "steps": [
           {
             "index": 1,
-            "kind": "page",
+            "type": "page",
             "target": "/products/:id",
             "route": null,
             "affects": null,
@@ -1258,7 +1258,7 @@
           },
           {
             "index": 2,
-            "kind": "route",
+            "type": "route",
             "target": "POST /api/wishlist",
             "route": {
               "method": "POST",
@@ -1274,7 +1274,7 @@
           },
           {
             "index": 3,
-            "kind": "notification",
+            "type": "notification",
             "target": "wishlist-price-drop",
             "route": null,
             "affects": null,
@@ -1287,7 +1287,7 @@
           },
           {
             "index": 4,
-            "kind": "page",
+            "type": "page",
             "target": "/wishlist",
             "route": null,
             "affects": null,
@@ -1678,7 +1678,7 @@
         "steps": [
           {
             "index": 1,
-            "kind": "page",
+            "type": "page",
             "target": "/products/:id",
             "route": null,
             "affects": null,
@@ -1691,7 +1691,7 @@
           },
           {
             "index": 2,
-            "kind": "route",
+            "type": "route",
             "target": "POST /api/orders",
             "route": {
               "method": "POST",
@@ -1707,7 +1707,7 @@
           },
           {
             "index": 3,
-            "kind": "outside service",
+            "type": "outside service",
             "target": "payment gateway",
             "route": null,
             "affects": null,
@@ -1720,7 +1720,7 @@
           },
           {
             "index": 4,
-            "kind": "event",
+            "type": "event",
             "target": "order.placed",
             "route": null,
             "affects": null,
@@ -1733,7 +1733,7 @@
           },
           {
             "index": 5,
-            "kind": "affects",
+            "type": "affects",
             "target": "catalog/browse-products",
             "route": null,
             "affects": {
@@ -1749,7 +1749,7 @@
           },
           {
             "index": 6,
-            "kind": "mail",
+            "type": "mail",
             "target": "order-confirmation",
             "route": null,
             "affects": null,
@@ -1762,7 +1762,7 @@
           },
           {
             "index": 7,
-            "kind": "job",
+            "type": "job",
             "target": "send-receipt",
             "route": null,
             "affects": null,
@@ -1775,7 +1775,7 @@
           },
           {
             "index": 8,
-            "kind": "notification",
+            "type": "notification",
             "target": "order-shipped",
             "route": null,
             "affects": null,

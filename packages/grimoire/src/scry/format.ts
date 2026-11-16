@@ -246,7 +246,7 @@ const STATUS_TEXT: Record<CriterionStatus, string> = {
 };
 
 function stepLines(steps: readonly FlowBookmapStep[]): string[] {
-  const kindWidth = Math.max(0, ...steps.map((step) => step.kind.length));
+  const typeWidth = Math.max(0, ...steps.map((step) => step.type.length));
   const targetWidth = Math.max(0, ...steps.map((step) => step.target.length));
 
   return steps.map((step) => {
@@ -254,12 +254,12 @@ function stepLines(steps: readonly FlowBookmapStep[]): string[] {
       step.found === false
         ? "not found"
         : step.entry === null
-          ? step.found === null && step.kind === "route"
+          ? step.found === null && step.type === "route"
             ? "no route facts"
             : "—"
           : `${step.entry}${step.files.length > 1 ? ` (+${step.files.length - 1} files)` : ""}`;
 
-    return `${step.index}. ${step.kind.padEnd(kindWidth)}  ${step.target.padEnd(targetWidth)} ${where}`;
+    return `${step.index}. ${step.type.padEnd(typeWidth)}  ${step.target.padEnd(targetWidth)} ${where}`;
   });
 }
 

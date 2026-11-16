@@ -6,7 +6,7 @@
   "steps": [
     {
       "index": 1,
-      "kind": "page",
+      "type": "page",
       "target": "/products/:id",
       "found": true,
       "entry": "src/web/$sites/client/products/show.page.tsx",
@@ -20,7 +20,7 @@
     },
     {
       "index": 2,
-      "kind": "route",
+      "type": "route",
       "target": "POST /api/wishlist",
       "found": false,
       "entry": null,
@@ -28,7 +28,7 @@
     },
     {
       "index": 3,
-      "kind": "notification",
+      "type": "notification",
       "target": "wishlist-price-drop",
       "found": false,
       "entry": null,
@@ -36,7 +36,7 @@
     },
     {
       "index": 4,
-      "kind": "page",
+      "type": "page",
       "target": "/wishlist",
       "found": false,
       "entry": null,

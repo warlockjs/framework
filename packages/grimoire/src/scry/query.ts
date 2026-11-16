@@ -318,7 +318,7 @@ function scryRoute(
       flow.steps
         .filter(
           (step) =>
-            step.kind === "route" &&
+            step.type === "route" &&
             step.route !== null &&
             routeMatches(route, step.route.method, step.route.path),
         )
