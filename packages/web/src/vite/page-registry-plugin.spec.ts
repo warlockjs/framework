@@ -217,6 +217,33 @@ describe("clientPageRegistry — virtual module id contract", () => {
     expect(source).not.toContain("import type");
   });
 
+  it("emits plain JavaScript for the error and forbidden page loaders, with their setup modules", () => {
+    const appRoot = makeAppRoot();
+    writeFile(
+      path.join(appRoot, "src/web/home.page.tsx"),
+      pageSource("/", "export default function Home() {\n  return null;\n}\n"),
+    );
+    writeFile(
+      path.join(appRoot, "src/web/error.page.tsx"),
+      "export default function ErrorPage() {\n  return null;\n}\n",
+    );
+    writeFile(path.join(appRoot, "src/web/error.setup.ts"), "export function register() {}\n");
+    writeFile(
+      path.join(appRoot, "src/web/forbidden.page.tsx"),
+      "export default function Forbidden() {\n  return null;\n}\n",
+    );
+    writeFile(path.join(appRoot, "src/web/forbidden.setup.ts"), "export function register() {}\n");
+
+    const source = callHook<string>(
+      clientPageRegistry({ appRoot }),
+      "load",
+      RESOLVED_CLIENT_PAGE_REGISTRY_ID,
+    );
+
+    expect(source).toContain("setupModule.register");
+    expect(() => parse(source, { sourceType: "module" })).not.toThrow();
+  });
+
   it("zero pages is a legal empty registry, not an error", () => {
     const source = callHook<string>(
       clientPageRegistry({ appRoot: makeAppRoot() }),

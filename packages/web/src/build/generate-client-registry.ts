@@ -235,11 +235,13 @@ function specialPageLoaderSource(
       ? "pageModule"
       : "{ ...pageModule, ...(setupModule.register === undefined ? {} : { register: setupModule.register }) }";
 
+  // Plain JavaScript only: the registry is a virtual module without a `.ts`
+  // id, so the production bundler parses it as JavaScript.
   return [
-    `let ${name}Promise: Promise<Record<string, unknown>> | undefined;`,
+    `let ${name}Promise;`,
     `const ${name} = () =>`,
     `  (${name}Promise ??= Promise.all([${imports.join(", ")}])`,
-    `    .then(([pageModule${setupFile === undefined ? "" : ", setupModule"}]) => (${merged}) as Record<string, unknown>)`,
+    `    .then(([pageModule${setupFile === undefined ? "" : ", setupModule"}]) => (${merged}))`,
     "    .catch((error) => {",
     "      // A failed load (a dropped connection) is retried by the next error, not cached.",
     `      ${name}Promise = undefined;`,
