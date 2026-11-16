@@ -2,6 +2,122 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+## 5.55.0 (2026-11-16)
+
+Final gate and fixes after the pilot: `findings/5.55/reports/FIX-VERIFY.md` (typecheck, strictness, lint, format), `POST-REVIEW.md` (the `kind` to `type` rename), `PILOT-FIXES.md` and `PILOT-FIXES-2.md` (grimoire suite at 460 tests on the last run).
+
+### T-137 [decision] Grimoire: label, changelog stamping, mobile screens (decided)
+
+- Source: design sessions of 2026-11-16; decided by the owner the same day.
+- What and why: Three decisions. Grimoire is experimental in 5.55.0 (stable in 6.0). The agent writes the release number and date into each feature changelog; Warlock only collects the unreleased entries into the release file, and `warlock grimoire check` reports an entry a release lists without a matching release and date. Mobile screens are declared by the agent in the app's folder when navigation is defined in code, and are listed from the file structure only when the app uses file-based routing.
+- Shipped: Decided 2026-11-16; applied in 5.55.0.
+- Verified: the label, stamping and screen rules are in the written-file structure page and the skills; the checks are covered by the specs of T-125, T-129, T-131 and T-132 and reviewed in `findings/5.55/reports/REVIEW-written.md` and `REVIEW-book-check.md`.
+
+### T-135 [feature] Scaffold, skills and docs for Grimoire
+
+- Source: owner decision of 2026-11-16 (on by default in new apps).
+- What and why: `warlock add grimoire` (core feature map and create-warlock feature list, kept in parity), a helper that inserts a command into `cli.commands` of an existing `warlock.config.ts`, the registration in the template config, ignore rules for the generated files, a line in the template's agent guide, the six skills in `packages/grimoire/skills`, a docs section, and the scaffolder spinner text. Grimoire is in the template and offered as a feature; selecting it on a fresh scaffold changes nothing.
+- Shipped: 5.55.0 (experimental).
+- Verified: core `src/generations` 25 files, 158 tests; create-warlock template-grimoire, features-map-contract, grouped-features, spinner and template-integrity specs, 77 pass; `check-feature-parity.ts` passes with no omission entry. Reviewed in `REVIEW-scaffold-skills.md`. The skill-snippet gate was not run (no skill snippet has an import or title, so none is compiled).
+
+### T-134 [feature] Devtools: the Grimoire tab
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: A Grimoire tab registered through the panel registration of T-123. One search box across flows, blocks, routes, files and tasks; views for a book entry, a feature, a flow, an app page, tasks, releases and the check report; small graphs only; a static export of the book's site for people without the app running. Every string is set as text, and the devtools guard applies to its routes.
+- Shipped: 5.55.0 (experimental).
+- Verified: `tests/devtools.spec.ts` (11) and `src/devtools/view.spec.ts` (9): 20 pass, including an offline render of the exported page and an `<img onerror>` hit shown as text. Reviewed in `REVIEW-devtools.md`. Not run inside a real `warlock dev` app; the route handlers were called directly.
+
+### T-133 [feature] Grimoire: test results per criterion
+
+- Source: owner request of 2026-11-16 (the whole package in one release).
+- What and why: A Vitest reporter at `@warlock.js/grimoire/vitest` records the last result (pass, fail, skipped) of every test marked `// @proves <feature>/<flow> AC-n` in `grimoire/book/test-results.json`. Partial runs merge, and results older than their test file are shown as stale.
+- Shipped: 5.55.0 (experimental).
+- Verified: `src/test-results/test-results.spec.ts`, `src/vitest/reporter.spec.ts`, and `tests/vitest-reporter.spec.ts`, a real run through `startVitest` on a temp project. Reviewed in `REVIEW-written.md`.
+
+### T-132 [feature] Grimoire apps: sites, mobile apps, pages and blocks
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: `grimoire/apps/<app>/` for each site and mobile app: named conditions, layouts, pages with a blocks table (flow, who sees it, changes with), and block files for page-specific detail. Mobile apps are discovered from `app.json` or `app.config.*`, with file-based or code-based routing.
+- Shipped: 5.55.0 (experimental).
+- Verified: `src/apps/check-apps.spec.ts` (12) and `src/warlock/mobile-facts.spec.ts` (6), on the Expo and code-navigated fixtures (`tests/fixtures/apps-expo/`, `tests/fixtures/apps-code-nav/`). Reviewed in `REVIEW-written.md`.
+
+### T-131 [feature] Grimoire tasks and releases
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: `grimoire/tasks/open/` and `grimoire/tasks/done/<yyyy-mm>/`, one file per task, and `grimoire/releases/<version>.md`. `warlock grimoire release <version>` collects the unreleased changelog entries into the release file and never edits a feature changelog.
+- Shipped: 5.55.0 (experimental).
+- Verified: `src/releases/releases.spec.ts` and `src/tasks/tasks.spec.ts`: 25 pass, covering collection, re-running an older release without duplicates, a byte-identical second run, and unchanged feature changelog bytes. Reviewed in `REVIEW-book-check.md`.
+
+### T-130 [feature] Grimoire commands, Warlock adapter and MCP tools
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: The Warlock adapter (facts from `inspectApp()`, named mails, jobs, events and notifications), `registerGrimoireCommands()` for `warlock.config.ts`, the commands `grimoire build`, `grimoire check`, `grimoire release` and `scry` (file, impact, route, feature, flow and search), compact text by default and `--json`, and the matching MCP tools through the registration of T-122. Commands that need only files do not boot the app.
+- Shipped: 5.55.0 (experimental).
+- Verified: grimoire `tests/scry.spec.ts` with goldens, `tests/warlock-commands.spec.ts`, `tests/warlock-adapter.spec.ts`, `tests/warlock-entry-imports.spec.ts`; core `explain-command.spec.ts`, `cli-commands.manager.plugins.spec.ts`, `collect-files.spec.ts` and `mcp-tool-registry.spec.ts`. Reviewed in `REVIEW-core-web.md` and `REVIEW-book-check.md`.
+
+### T-129 [feature] Grimoire check: the read-only report
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: `warlock grimoire check` reads everything and edits nothing. Each finding has a stable GR code that `warlock explain` describes, covering broken links from steps, flows, blocks and conditions, criteria without tests, tests pointing at missing criteria (`// @proves`), files no flow reaches, stale README dates and structure errors. Findings for `proposed` work are shown as expected. Exit code 1 only on problems; `--json` is supported.
+- Shipped: 5.55.0 (experimental).
+- Verified: `src/proves`, `src/check` and `tests/check`: 9 files, 75 pass, one spec per rule (failing and passing), and a check that the docs page lists every code. Reviewed in `REVIEW-book-check.md` and `REVIEW-written.md`.
+
+### T-128 [feature] Grimoire: ownership, book maps and collected indexes
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: Feature ownership (its folders, `@feature` header tags, file entries; one owner per file) and borrowing, written as `features/<feature>/bookmap.json`, `flows/<flow>.bookmap.json`, `features/index.json` and `tasks/index.json`, rebuilt incrementally. Files with two owners or none are reported.
+- Shipped: 5.55.0 (experimental).
+- Verified: `src/ownership`, `src/bookmap`, `src/workspace` and `tests/bookmaps.golden.spec.ts`: 5 files, 39 pass, golden files over the shop fixture (`tests/golden/bookmaps/`). Reviewed in `REVIEW-book-check.md`.
+
+### T-127 [feature] Grimoire book: builder, freshness, per-file mirror
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: `grimoire/book/` written from the adapter's facts: one JSON entry per source file at the source's path, module summaries, `routes.json`, page and screen lists, a fingerprint of source hashes so only changed entries are rebuilt, and a route cache refreshed only when a routes file or its imports change. A no-change run does no work, and file-only questions never boot the app.
+- Shipped: 5.55.0 (experimental).
+- Verified: `src/book/render.spec.ts` (11) and `tests/book.spec.ts` (17): 28 pass, with 46 golden files (`tests/golden/book/`). Reviewed in `REVIEW-book-check.md`.
+
+### T-126 [feature] Grimoire: the written files and their parser
+
+- Source: owner request and design sessions of 2026-11-16; the templates in the draft skills are the fixed structure.
+- What and why: The parser and structure rules for every agent-written file (feature README, CHANGELOG, flows, versions, app README, layouts, pages, blocks, tasks and releases), the step types, `AC-n` criteria and the `<feature>/<flow>` reference. Every malformed case gives a located message with a stable GR code.
+- Shipped: 5.55.0 (experimental).
+- Verified: 7 spec files, 114 pass (`src/written`, `tests/written`), golden files for the shop and messy fixtures, and one spec per structure code GR1001 to GR1028. Reviewed in `REVIEW-written.md` (203 tests across 17 files, with neighbouring specs).
+
+### T-125 [feature] Grimoire package: skeleton, family wiring, adapter contract
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: `packages/grimoire` with a framework-neutral root entry (no `@warlock.js/core` or `@warlock.js/web` import), the `./warlock`, `./vitest` and `./devtools` entries, the family wiring in the release tools (34 packages), the docs sidebar and the adapter contract. Typed stubs for the later tasks.
+- Shipped: 5.55.0 (experimental).
+- Verified: `packages/grimoire`: 8 spec files, 25 pass (`npx vitest run`), including the import-scan spec that guards the root entry; the release-tool family spec and the feature-parity and exports-parity checks. Reviewed in `REVIEW-scaffold-skills.md` (release-tool wiring).
+
+### T-124 [feature] Pages report: setup file, site and full layout chain
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: The inspect report's pages now carry their setup file, site and the outermost-first layout chain, taken from the web build's page-graph discovery (`discoverPageGraph`) so the report and the build agree.
+- Shipped: 5.55.0 (experimental).
+- Verified: core `collect-pages.spec.ts` (with a multi-site fixture compared against `discoverPageGraph`) and `inspect-app.spec.ts`: 20 pass; web `src/build`: 413 pass. Reviewed in `REVIEW-core-web.md`.
+
+### T-123 [feature] Devtools: registered panels instead of hard-coded tabs
+
+- Source: owner decision of 2026-11-16 (accepted as public API).
+- What and why: A panel registration (a data route under the guarded scope, a tab and a view module), with the Processes panel moved onto it. Packages and the app can register panels through the devtools config.
+- Shipped: 5.55.0 (experimental).
+- Verified: `tests/panels.spec.ts` (27), `tests/panel-loading.spec.ts` (5), `tests/panels-ui.spec.ts` and a connector case; the guard covers registered routes. The post-review fix for import-only package resolution has its own spec (`POST-REVIEW.md`). Reviewed in `REVIEW-devtools.md`.
+
+### T-122 [feature] MCP server: let packages and the app register tools
+
+- Source: owner decision of 2026-11-16 (accepted as public API).
+- What and why: A `tools` option on the MCP server start function and a registration list that `warlock mcp` and `warlock dev --mcp` read, from the Warlock config or from registered commands' packages. Grimoire's MCP tools are the first user.
+- Shipped: 5.55.0 (experimental).
+- Verified: `src/tooling/mcp/mcp-tool-registry.spec.ts` (10) and `src/dev-server/dev-agent-mcp-tools.spec.ts` (1): a registered tool is listed and called over the server. Reviewed in `REVIEW-core-web.md`.
+
+### T-121 [feature] Inspect report: line counts, header sentence, export comments, more file roles, controller on routes
+
+- Source: owner request and design sessions of 2026-11-16.
+- What and why: The inspect report gains each file's line count, header sentence, `@tag` values and the first sentence above each export. New file roles `use-case`, `seed`, `request`, `mail`, `job`, `event` and `client`. A route registered as a controller tuple keeps its controller class and action. The conventions skill now names `.use-case.ts`.
+- Shipped: 5.55.0 (experimental). `schemaVersion` stayed 1 (fields only added; the STABILITY rule in `inspect-report.types.ts`). The new fields are optional in the schema, and the JSON schema was regenerated.
+- Verified: `collect-files.spec.ts` (14 role cases, plus header, tags, export docs and line counts), `inspect-app.spec.ts` (controller and action on routes; JSON Schema validation) and `router-controller-tuple.spec.ts`: 74 pass across `src/tooling/inspect` and `src/router`. Reviewed in `REVIEW-core-web.md` (a module named after a role word was fixed there).
+
 ## 5.54.0 (2026-11-16)
 
 ### T-119 [chore] Move to the 2026-11-16 @mongez releases
