@@ -41,7 +41,7 @@ export function mountDevtoolsRoutes(server: FastifyInstance, deps: MountDevtools
         reply.code(error.statusCode ?? 500).send({ error: error.message });
       });
 
-      registerUiAssets(instance, panels);
+      registerUiAssets(instance);
       registerSessionRoutes(instance, deps, panels);
       registerRequestsRoutes(instance, deps);
       registerAiRoutes(instance, deps);

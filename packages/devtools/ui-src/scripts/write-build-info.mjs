@@ -10,8 +10,6 @@
  * (default `<package>/ui/dashboard`; a relative `--out` is taken from the
  * current directory). Exits 1 when the bundle is not exactly one HTML file,
  * one JS file and one CSS file.
- *
- * Owner: WP-8.
  */
 import { createHash } from "node:crypto";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";

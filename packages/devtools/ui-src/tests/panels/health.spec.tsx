@@ -50,14 +50,23 @@ describe("Health panel", () => {
     mockApi([[/^api\/health/, { instances: [] }]]);
     renderPanel(HealthPanel);
 
-    expect(await screen.findByText(/No instance has reported a health check yet/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/No instance has reported a health check yet/),
+    ).toBeInTheDocument();
   });
 
   it("shows an API error with message and ref", async () => {
-    mockApi([[/^api\/health/, failure(500, "Health could not be read. Try again in a moment.", { ref: "h-1" })]]);
+    mockApi([
+      [
+        /^api\/health/,
+        failure(500, "Health could not be read. Try again in a moment.", { ref: "h-1" }),
+      ],
+    ]);
     renderPanel(HealthPanel);
 
-    expect(await screen.findByText("Health could not be read. Try again in a moment.")).toBeInTheDocument();
-    expect(screen.getByText("h-1")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Health could not be read. Try again in a moment."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Reference: h-1")).toBeInTheDocument();
   });
 });

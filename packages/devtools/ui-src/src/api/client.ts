@@ -5,8 +5,6 @@ import type { DevtoolsApiErrorBody, DevtoolsErrorCode } from "@contracts";
  * dashboard root (`"api/requests"`), so the same bundle works under
  * `/__warlock` and under a production path. Every POST/PUT/PATCH/DELETE
  * carries the session's CSRF token; every call is same-origin and uncached.
- *
- * Owner: WP-6 (scaffold implementation; keep the exported names).
  */
 
 /** A failed call: the server's message (what failed and what to do next), its code and reference. */

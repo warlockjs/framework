@@ -14,7 +14,14 @@ const run: AiRun = {
   incomplete: true,
   models: ["provider/<img onerror=alert(1)>"],
   duration: 100,
-  usage: { input: 10, output: 5, total: 15, cachedTokens: 8, cacheWriteTokens: 2, inputIncludesCache: false },
+  usage: {
+    input: 10,
+    output: 5,
+    total: 15,
+    cachedTokens: 8,
+    cacheWriteTokens: 2,
+    inputIncludesCache: false,
+  },
   cost: 0.12,
   toolCalls: 1,
   retries: 2,
@@ -25,13 +32,19 @@ const run: AiRun = {
   providerCompactions: 0,
 };
 
-const answer = (runs: AiRun[]) => ({ available: true, runs, aggregate: { traces: runs.length, usage: run.usage } });
+const answer = (runs: AiRun[]) => ({
+  available: true,
+  runs,
+  aggregate: { traces: runs.length, usage: run.usage },
+});
 
 beforeEach(() => FakeEventSource.install());
 
 describe("AI panel", () => {
   it("renders install guidance", async () => {
-    mockApi([["api/ai", { available: false, message: "Install @warlock.js/ai-panoptic", runs: [] }]]);
+    mockApi([
+      ["api/ai", { available: false, message: "Install @warlock.js/ai-panoptic", runs: [] }],
+    ]);
     renderPanel(AiPanel);
 
     expect(await screen.findByText("Install @warlock.js/ai-panoptic")).toBeInTheDocument();
@@ -59,7 +72,11 @@ describe("AI panel", () => {
     expect(screen.getByText("provider/<img onerror=alert(1)>")).toBeInTheDocument();
     expect(document.querySelector("img")).toBeNull();
     expect(screen.getByLabelText(/Filter AI runs by HTTP request id/)).toBeInTheDocument();
-    expect(screen.getByText(/1 runs · 10 input tokens · 5 output tokens · \$0\.120000 USD \(reported cost\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /1 runs · 10 input tokens · 5 output tokens · \$0\.120000 USD \(reported cost\)/,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("renders tool timing and retry/compaction metadata in the selected run tree", async () => {
@@ -98,11 +115,16 @@ describe("AI panel", () => {
     expect(await screen.findByText("tool search · completed · +10 ms · 40 ms")).toBeInTheDocument();
     expect(screen.getByText(/"retry\.attempts"/)).toBeInTheDocument();
     expect(screen.getByText(/"agent\.compactions"/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open HTTP request" })).toHaveAttribute("href", "#requests/http-a");
+    expect(screen.getByRole("link", { name: "Open HTTP request" })).toHaveAttribute(
+      "href",
+      "#requests/http-a",
+    );
   });
 
   it("shows background, unpriced and unreported values", async () => {
-    mockApi([["api/ai", answer([{ ...run, requestId: undefined, cost: undefined, cacheHits: undefined }])]]);
+    mockApi([
+      ["api/ai", answer([{ ...run, requestId: undefined, cost: undefined, cacheHits: undefined }])],
+    ]);
     renderPanel(AiPanel);
 
     expect(await screen.findByText(/cache write · unpriced/)).toBeInTheDocument();
@@ -137,7 +159,7 @@ describe("AI panel", () => {
     renderPanel(AiPanel);
 
     expect(await screen.findByText("AI runs could not be read. Reload.")).toBeInTheDocument();
-    expect(screen.getByText("ai-1")).toBeInTheDocument();
+    expect(screen.getByText("Reference: ai-1")).toBeInTheDocument();
   });
 
   it("shows a span-load failure beside the run summary", async () => {
@@ -149,6 +171,8 @@ describe("AI panel", () => {
 
     const detail = await screen.findByRole("region", { name: "AI run detail" });
 
-    expect(await within(detail).findByText("This run is no longer stored. Pick another run.")).toBeInTheDocument();
+    expect(
+      await within(detail).findByText("This run is no longer stored. Pick another run."),
+    ).toBeInTheDocument();
   });
 });

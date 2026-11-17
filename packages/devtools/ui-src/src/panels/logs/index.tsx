@@ -1,14 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import type { DevtoolsInstancesView, DevtoolsLogRow, DevtoolsLogsView } from "@contracts";
 import { useApi, useStream, type StreamEvent } from "@/api/hooks";
+import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import {
   clockTime,
-  EmptyState,
-  ErrorMessage,
   instanceLabel,
   Json,
   levelTone,
-  LoadingRows,
   PanelHeader,
   queryString,
   SelectField,
@@ -34,7 +32,9 @@ export function LogsPanel({ instance, session }: DevtoolsPanelProps) {
 
     const entry = event.data as DevtoolsLogRow;
 
-    setLive((previous) => [{ instance: null, ...entry }, ...previous].slice(0, MAX_ROWS));
+    setLive((previous) =>
+      [{ ...entry, instance: entry.instance ?? null }, ...previous].slice(0, MAX_ROWS),
+    );
   }, []);
 
   useStream(["log"], onStream);
@@ -55,19 +55,33 @@ export function LogsPanel({ instance, session }: DevtoolsPanelProps) {
 
   return (
     <div>
-      <PanelHeader title="Logs" note={production ? "Warnings and errors, without their context." : undefined}>
-        <SelectField aria-label="Level" value={level} onChange={(event) => setLevel(event.target.value)}>
+      <PanelHeader
+        title="Logs"
+        note={production ? "Warnings and errors, without their context." : undefined}
+      >
+        <SelectField
+          aria-label="Level"
+          value={level}
+          onChange={(event) => setLevel(event.target.value)}
+        >
           {LEVELS.map((name) => (
             <option key={name} value={name}>
               {name || "All levels"}
             </option>
           ))}
         </SelectField>
-        <TextField placeholder="Filter module" aria-label="Filter module" value={module} onChange={(event) => setModule(event.target.value)} />
+        <TextField
+          placeholder="Filter module"
+          aria-label="Filter module"
+          value={module}
+          onChange={(event) => setModule(event.target.value)}
+        />
       </PanelHeader>
-      {error ? <ErrorMessage error={error} title="Could not load the logs" onRetry={reload} /> : null}
+      {error ? (
+        <ErrorMessage error={error} title="Could not load the logs" onRetry={reload} />
+      ) : null}
       {!data && loading ? <LoadingRows /> : null}
-      {data && !rows.length ? <EmptyState>No logs found for these filters.</EmptyState> : null}
+      {data && !rows.length ? <EmptyState title="No logs found for these filters." /> : null}
       <div className="space-y-1">
         {rows.map((row, index) => (
           <div key={`${row.at}-${index}`} className="rounded-md border p-2 text-sm">
@@ -76,7 +90,9 @@ export function LogsPanel({ instance, session }: DevtoolsPanelProps) {
               <span>
                 {row.module} · {row.action} · {clockTime(row.at)}
               </span>
-              {production && row.instance ? <span>{instanceLabel(row.instance, instances?.instances)}</span> : null}
+              {production && row.instance ? (
+                <span>{instanceLabel(row.instance, instances?.instances)}</span>
+              ) : null}
               {row.requestId ? (
                 <a className="underline" href={`#requests/${encodeURIComponent(row.requestId)}`}>
                   request

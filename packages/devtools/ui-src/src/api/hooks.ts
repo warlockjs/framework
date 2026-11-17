@@ -3,8 +3,6 @@ import { ApiError, apiFetch } from "./client";
 
 /**
  * Data hooks shared by every tab.
- *
- * Owner: WP-6 (scaffold implementation; keep the exported names and shapes).
  */
 
 export type ApiState<T> = {

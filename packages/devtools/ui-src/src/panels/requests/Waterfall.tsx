@@ -1,10 +1,15 @@
-import { EmptyState, formatMs } from "@/components/ui/panel-kit";
+import { EmptyState } from "@/components/common";
+import { formatMs } from "@/components/ui/panel-kit";
 import { queryText } from "./query-text";
 import type { RequestDetail } from "./types";
 
 type Entry = { label: string; at: number; duration: number; kind: "phase" | "query" | "cache" };
 
-const COLORS = { phase: "var(--chart-3)", query: "var(--chart-1)", cache: "var(--chart-2)" } as const;
+const COLORS = {
+  phase: "var(--chart-3)",
+  query: "var(--chart-1)",
+  cache: "var(--chart-2)",
+} as const;
 
 /** The timed work of one request as bars on the request's own time scale. */
 export function Waterfall({ request }: { request: RequestDetail }) {
@@ -31,7 +36,7 @@ export function Waterfall({ request }: { request: RequestDetail }) {
       : []),
   ];
 
-  if (!entries.length) return <EmptyState>No timed work recorded for this request.</EmptyState>;
+  if (!entries.length) return <EmptyState title="No timed work recorded for this request." />;
 
   const total = Math.max(request.durationMs || 0, 1);
 
@@ -42,7 +47,10 @@ export function Waterfall({ request }: { request: RequestDetail }) {
         const width = Math.max(0.5, Math.min(100 - start, (entry.duration / total) * 100));
 
         return (
-          <div key={index} className="grid grid-cols-[minmax(0,14rem)_1fr_4.5rem] items-center gap-2 text-xs">
+          <div
+            key={index}
+            className="grid grid-cols-[minmax(0,14rem)_1fr_4.5rem] items-center gap-2 text-xs"
+          >
             <span className="truncate font-mono" title={entry.label}>
               {entry.label}
             </span>

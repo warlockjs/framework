@@ -2,13 +2,11 @@ import { useState } from "react";
 import type { DevtoolsRouteStatsRow, DevtoolsRouteStatsView } from "@contracts";
 import { useApi } from "@/api/hooks";
 import { PercentileBar } from "@/components/charts";
+import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import {
   DASH,
-  EmptyState,
-  ErrorMessage,
   formatMs,
   formatNumber,
-  LoadingRows,
   NUM,
   PanelHeader,
   queryString,
@@ -16,7 +14,14 @@ import {
   SelectField,
   TextField,
 } from "@/components/ui/panel-kit";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { DevtoolsPanelProps } from "@/panels/types";
 
 type RouteEntry = { method: string; path: string; name?: string; middleware?: string[] };
@@ -26,7 +31,8 @@ function PhaseBars({ route }: { route: DevtoolsRouteStatsRow }) {
   const phases = route.phases.slice(0, 8);
   const peak = Math.max(...phases.map((phase) => phase.sumMs), 1);
 
-  if (!phases.length) return <p className="text-xs text-muted-foreground">No phase timings for this route.</p>;
+  if (!phases.length)
+    return <p className="text-xs text-muted-foreground">No phase timings for this route.</p>;
 
   return (
     <ul className="m-0 list-none space-y-1 p-0" aria-label="Slowest phases">
@@ -36,7 +42,10 @@ function PhaseBars({ route }: { route: DevtoolsRouteStatsRow }) {
             {phase.name}
           </span>
           <span className="h-3 rounded-sm bg-muted">
-            <span className="block h-3 rounded-sm" style={{ width: `${(phase.sumMs / peak) * 100}%`, background: "var(--chart-3)" }} />
+            <span
+              className="block h-3 rounded-sm"
+              style={{ width: `${(phase.sumMs / peak) * 100}%`, background: "var(--chart-3)" }}
+            />
           </span>
           <span className="text-right tabular-nums">
             {formatMs(phase.sumMs / Math.max(phase.count, 1))} avg
@@ -51,14 +60,20 @@ function RouteStats({ instance }: Pick<DevtoolsPanelProps, "instance">) {
   const [sort, setSort] = useState<SortKey>("total");
   const [open, setOpen] = useState<string | null>(null);
   const path = `api/routes/stats${queryString({ sort, instance: instance === "all" ? undefined : instance })}`;
-  const { data, error, loading, reload } = useApi<DevtoolsRouteStatsView>(path, { refreshMs: 10_000 });
+  const { data, error, loading, reload } = useApi<DevtoolsRouteStatsView>(path, {
+    refreshMs: 10_000,
+  });
   const percent = data ? Math.round(data.sampleRate * 1000) / 10 : null;
 
   return (
     <section aria-label="Route statistics">
       <PanelHeader
         title="Route statistics"
-        note={percent !== null && percent < 100 ? `Counts come from sampled requests (${percent} %).` : undefined}
+        note={
+          percent !== null && percent < 100
+            ? `Counts come from sampled requests (${percent} %).`
+            : undefined
+        }
       >
         <label className="flex items-center gap-2 text-sm">
           Sort by
@@ -70,9 +85,13 @@ function RouteStats({ instance }: Pick<DevtoolsPanelProps, "instance">) {
           </SelectField>
         </label>
       </PanelHeader>
-      {error ? <ErrorMessage error={error} title="Could not load the route statistics" onRetry={reload} /> : null}
+      {error ? (
+        <ErrorMessage error={error} title="Could not load the route statistics" onRetry={reload} />
+      ) : null}
       {!data && loading ? <LoadingRows rows={3} /> : null}
-      {data && !data.routes.length ? <EmptyState>No route timings yet. Make some requests to your app.</EmptyState> : null}
+      {data && !data.routes.length ? (
+        <EmptyState title="No route timings yet. Make some requests to your app." />
+      ) : null}
       {data?.routes.length ? (
         <Table aria-label="Route statistics table">
           <TableHeader>
@@ -87,7 +106,12 @@ function RouteStats({ instance }: Pick<DevtoolsPanelProps, "instance">) {
           </TableHeader>
           <TableBody>
             {data.routes.map((route) => (
-              <RouteRow key={route.key} route={route} open={open === route.key} onToggle={() => setOpen(open === route.key ? null : route.key)} />
+              <RouteRow
+                key={route.key}
+                route={route}
+                open={open === route.key}
+                onToggle={() => setOpen(open === route.key ? null : route.key)}
+              />
             ))}
           </TableBody>
         </Table>
@@ -96,7 +120,15 @@ function RouteStats({ instance }: Pick<DevtoolsPanelProps, "instance">) {
   );
 }
 
-function RouteRow({ route, open, onToggle }: { route: DevtoolsRouteStatsRow; open: boolean; onToggle: () => void }) {
+function RouteRow({
+  route,
+  open,
+  onToggle,
+}: {
+  route: DevtoolsRouteStatsRow;
+  open: boolean;
+  onToggle: () => void;
+}) {
   return (
     <>
       <TableRow data-state={open ? "selected" : undefined}>
@@ -129,16 +161,26 @@ function RouteMap() {
   const [needle, setNeedle] = useState("");
   const text = needle.toLowerCase();
   const routes = (data ?? []).filter((route) =>
-    `${route.method} ${route.path} ${route.name ?? ""} ${(route.middleware ?? []).join(" ")}`.toLowerCase().includes(text),
+    `${route.method} ${route.path} ${route.name ?? ""} ${(route.middleware ?? []).join(" ")}`
+      .toLowerCase()
+      .includes(text),
   );
 
   return (
     <section aria-label="Route map">
       <SectionTitle>Route map</SectionTitle>
-      <TextField placeholder="Filter routes" aria-label="Filter routes" className="mb-2" value={needle} onChange={(event) => setNeedle(event.target.value)} />
-      {error ? <ErrorMessage error={error} title="Could not load the route map" onRetry={reload} /> : null}
+      <TextField
+        placeholder="Filter routes"
+        aria-label="Filter routes"
+        className="mb-2"
+        value={needle}
+        onChange={(event) => setNeedle(event.target.value)}
+      />
+      {error ? (
+        <ErrorMessage error={error} title="Could not load the route map" onRetry={reload} />
+      ) : null}
       {!data && loading ? <LoadingRows rows={3} /> : null}
-      {data && !routes.length ? <EmptyState>No routes found.</EmptyState> : null}
+      {data && !routes.length ? <EmptyState title="No routes found." /> : null}
       {routes.length ? (
         <Table aria-label="Route map table">
           <TableHeader>
@@ -155,7 +197,9 @@ function RouteMap() {
                 <TableCell className="font-mono text-xs">{route.method}</TableCell>
                 <TableCell className="font-mono text-xs">{route.path}</TableCell>
                 <TableCell>{route.name || DASH}</TableCell>
-                <TableCell className="text-xs whitespace-normal">{(route.middleware ?? []).join(", ") || DASH}</TableCell>
+                <TableCell className="text-xs whitespace-normal">
+                  {(route.middleware ?? []).join(", ") || DASH}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

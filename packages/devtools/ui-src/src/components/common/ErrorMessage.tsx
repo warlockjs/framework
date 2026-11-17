@@ -1,4 +1,5 @@
 import { ApiError } from "@/api/client";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +12,8 @@ export type ErrorMessageProps = {
   reference?: string | null;
   /** A short heading above the message. */
   title?: string;
+  /** Shows a "Try again" button that calls this. */
+  onRetry?: () => void;
   className?: string;
 };
 
@@ -28,7 +31,14 @@ export function errorText(error: unknown): string {
  * nothing when there is neither an `error` nor a `message`. Place it where
  * the action happened (inside the open dialog or next to the form).
  */
-export function ErrorMessage({ error, message, reference, title, className }: ErrorMessageProps) {
+export function ErrorMessage({
+  error,
+  message,
+  reference,
+  title,
+  onRetry,
+  className,
+}: ErrorMessageProps) {
   if (!error && !message) return null;
 
   const text = message ?? errorText(error);
@@ -40,6 +50,11 @@ export function ErrorMessage({ error, message, reference, title, className }: Er
         {title ? <AlertTitle>{title}</AlertTitle> : null}
         <p>{text}</p>
         {ref ? <p className="font-mono text-xs">Reference: {ref}</p> : null}
+        {onRetry ? (
+          <Button variant="outline" size="xs" className="mt-2" onClick={onRetry}>
+            Try again
+          </Button>
+        ) : null}
       </AlertDescription>
     </Alert>
   );

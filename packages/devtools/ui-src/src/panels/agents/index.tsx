@@ -1,20 +1,24 @@
 import { useCallback, useState } from "react";
 import { useApi, useStream } from "@/api/hooks";
 import { Button } from "@/components/ui/button";
+import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import {
   Code,
   DASH,
-  EmptyState,
-  ErrorMessage,
   formatCost,
   Json,
-  LoadingRows,
   PanelHeader,
   RowButton,
   TextField,
 } from "@/components/ui/panel-kit";
 import type { DevtoolsPanelProps } from "@/panels/types";
-import type { AgentRun, AgentRunsAnswer, AgentToolCall, AgentTraceDetail, AgentTurn } from "./types";
+import type {
+  AgentRun,
+  AgentRunsAnswer,
+  AgentToolCall,
+  AgentTraceDetail,
+  AgentTurn,
+} from "./types";
 
 const value = (item: number | string | null | undefined) => (item == null ? DASH : String(item));
 
@@ -78,11 +82,18 @@ function Turn({ turn }: { turn: AgentTurn }) {
 }
 
 /** Compares the prompt and tool definitions of a run with the previous run of the same agent. */
-export function agentDiffText(trace: AgentTraceDetail, previous: AgentTraceDetail | undefined): string {
+export function agentDiffText(
+  trace: AgentTraceDetail,
+  previous: AgentTraceDetail | undefined,
+): string {
   if (!previous) return "No earlier run of this agent to compare with.";
 
   const tools = (item: AgentTraceDetail) =>
-    new Map(item.turns.flatMap((turn) => turn.toolsOffered).map((tool) => [tool.name, tool.schemaHash] as const));
+    new Map(
+      item.turns
+        .flatMap((turn) => turn.toolsOffered)
+        .map((tool) => [tool.name, tool.schemaHash] as const),
+    );
   const now = tools(trace);
   const before = tools(previous);
   const changed = [...now].filter(([name, hash]) => before.has(name) && before.get(name) !== hash);
@@ -97,16 +108,23 @@ export function agentDiffText(trace: AgentTraceDetail, previous: AgentTraceDetai
 }
 
 function RunDetail({ run, earlier }: { run: AgentRun; earlier: AgentRun | undefined }) {
-  const { data: trace, error, loading, reload } = useApi<AgentTraceDetail>(
-    `api/ai/agent-runs/${encodeURIComponent(run.runId)}`,
+  const {
+    data: trace,
+    error,
+    loading,
+    reload,
+  } = useApi<AgentTraceDetail>(`api/ai/agent-runs/${encodeURIComponent(run.runId)}`);
+  const previous = useApi<AgentTraceDetail>(
+    earlier ? `api/ai/agent-runs/${encodeURIComponent(earlier.runId)}` : null,
   );
-  const previous = useApi<AgentTraceDetail>(earlier ? `api/ai/agent-runs/${encodeURIComponent(earlier.runId)}` : null);
   const comparing = Boolean(earlier) && !previous.data && !previous.error;
 
   return (
     <section aria-label="Agent run detail" className="space-y-2">
       <AgentRunSummary run={run} />
-      {error ? <ErrorMessage error={error} title="Could not load this agent run" onRetry={reload} /> : null}
+      {error ? (
+        <ErrorMessage error={error} title="Could not load this agent run" onRetry={reload} />
+      ) : null}
       {!trace && loading ? <LoadingRows rows={3} /> : null}
       {trace ? (
         <>
@@ -143,10 +161,16 @@ export function AgentsPanel({ route, navigate }: DevtoolsPanelProps) {
   const path = `api/ai/agent-runs${applied ? `?requestId=${encodeURIComponent(applied)}` : ""}`;
   const { data, error, loading, reload } = useApi<AgentRunsAnswer>(path);
 
-  useStream(["agent-trace"], useCallback(() => reload(), [reload]));
+  useStream(
+    ["agent-trace"],
+    useCallback(() => reload(), [reload]),
+  );
 
   const selected = data?.runs.find((run) => run.runId === route);
-  const earlier = selected && data ? data.runs.slice(data.runs.indexOf(selected) + 1).find((run) => run.agent === selected.agent) : undefined;
+  const earlier =
+    selected && data
+      ? data.runs.slice(data.runs.indexOf(selected) + 1).find((run) => run.agent === selected.agent)
+      : undefined;
 
   return (
     <div>
@@ -171,17 +195,25 @@ export function AgentsPanel({ route, navigate }: DevtoolsPanelProps) {
           Filter / refresh
         </Button>
       </form>
-      {error ? <ErrorMessage error={error} title="Could not load the agent runs" onRetry={reload} /> : null}
+      {error ? (
+        <ErrorMessage error={error} title="Could not load the agent runs" onRetry={reload} />
+      ) : null}
       {!data && loading ? <LoadingRows /> : null}
-      {data && !data.available ? <EmptyState>{data.message || "No agent traces yet."}</EmptyState> : null}
+      {data && !data.available ? (
+        <EmptyState title={data.message || "No agent traces yet."} />
+      ) : null}
       {data?.available && !data.runs.length ? (
-        <EmptyState>No agent runs yet. Execute an agent in development; runs appear as turns finish.</EmptyState>
+        <EmptyState title="No agent runs yet. Execute an agent in development; runs appear as turns finish." />
       ) : null}
       {data?.available && data.runs.length ? (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
           <div className="space-y-1">
             {data.runs.map((run) => (
-              <RowButton key={run.runId} selected={run.runId === route} onClick={() => navigate(run.runId)}>
+              <RowButton
+                key={run.runId}
+                selected={run.runId === route}
+                onClick={() => navigate(run.runId)}
+              >
                 <AgentRunSummary run={run} />
               </RowButton>
             ))}
@@ -190,7 +222,7 @@ export function AgentsPanel({ route, navigate }: DevtoolsPanelProps) {
             {selected ? (
               <RunDetail key={selected.runId} run={selected} earlier={earlier} />
             ) : (
-              <EmptyState>Select a run to inspect its prompt, tools, calls and refusals.</EmptyState>
+              <EmptyState title="Select a run to inspect its prompt, tools, calls and refusals." />
             )}
           </div>
         </div>

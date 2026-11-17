@@ -412,7 +412,7 @@ export function mountProductionDevtools(
       );
 
       // ---- Routes ---------------------------------------------------------
-      registerUiAssets(instance, deps.panels);
+      registerUiAssets(instance);
       registerAuthRoutes(instance, deps);
 
       instance.get("/api/panels", async () => listPanelInfos(deps.panels, deps.builtInPanels));

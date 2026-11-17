@@ -1,16 +1,22 @@
-import { useCallback, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import type { DevtoolsInstancesView } from "@contracts";
 import { apiFetch } from "@/api/client";
 import { useApi, useStream, type StreamEvent } from "@/api/hooks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import {
   DASH,
-  EmptyState,
-  ErrorMessage,
   formatMs,
   instanceLabel,
-  LoadingRows,
   PanelHeader,
   queryString,
   RowButton,
@@ -33,7 +39,17 @@ const SINCE = [
   { value: "24h", label: "Last 24 hours" },
 ];
 
-function Row({ row, selected, onOpen, label }: { row: RequestRow; selected: boolean; onOpen: () => void; label: string | null }) {
+function Row({
+  row,
+  selected,
+  onOpen,
+  label,
+}: {
+  row: RequestRow;
+  selected: boolean;
+  onOpen: () => void;
+  label: string | null;
+}) {
   return (
     <RowButton selected={selected} onClick={onOpen}>
       <div className="flex items-center justify-between gap-2">
@@ -69,7 +85,9 @@ export function RequestsPanel({ route, navigate, session }: DevtoolsPanelProps) 
   const { data: instances } = useApi<DevtoolsInstancesView>(production ? "api/instances" : null);
   const filteredRef = useRef(filtered);
 
-  filteredRef.current = filtered;
+  useEffect(() => {
+    filteredRef.current = filtered;
+  }, [filtered]);
 
   const onStream = useCallback((event: StreamEvent) => {
     if (event.type !== "request" || filteredRef.current) return;
@@ -108,15 +126,20 @@ export function RequestsPanel({ route, navigate, session }: DevtoolsPanelProps) 
     }
   };
 
-  const update = (key: keyof Filters) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setDraft((previous) => ({ ...previous, [key]: event.target.value }));
+  const update =
+    (key: keyof Filters) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setDraft((previous) => ({ ...previous, [key]: event.target.value }));
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <div>
         <PanelHeader
           title="Requests"
-          note={production ? "Sampled requests, plus slow and failed ones kept without a timeline." : undefined}
+          note={
+            production
+              ? "Sampled requests, plus slow and failed ones kept without a timeline."
+              : undefined
+          }
         >
           {isAdmin ? (
             confirming ? (
@@ -135,12 +158,38 @@ export function RequestsPanel({ route, navigate, session }: DevtoolsPanelProps) 
             )
           ) : null}
         </PanelHeader>
-        {clearError ? <ErrorMessage error={clearError} title="Could not clear the requests" /> : null}
+        {clearError ? (
+          <ErrorMessage error={clearError} title="Could not clear the requests" />
+        ) : null}
         <form onSubmit={apply} className="mb-3 flex flex-wrap gap-2" aria-label="Request filters">
-          <TextField type="search" placeholder="Search url or id" aria-label="Search url or id" value={draft.q} onChange={update("q")} />
-          <TextField placeholder="Status: 404 or 5xx" aria-label="Status" className="w-36" value={draft.status} onChange={update("status")} />
-          <TextField placeholder="Method" aria-label="Method" className="w-24" value={draft.method} onChange={update("method")} />
-          <TextField placeholder="Route" aria-label="Route" className="w-32" value={draft.route} onChange={update("route")} />
+          <TextField
+            type="search"
+            placeholder="Search url or id"
+            aria-label="Search url or id"
+            value={draft.q}
+            onChange={update("q")}
+          />
+          <TextField
+            placeholder="Status: 404 or 5xx"
+            aria-label="Status"
+            className="w-36"
+            value={draft.status}
+            onChange={update("status")}
+          />
+          <TextField
+            placeholder="Method"
+            aria-label="Method"
+            className="w-24"
+            value={draft.method}
+            onChange={update("method")}
+          />
+          <TextField
+            placeholder="Route"
+            aria-label="Route"
+            className="w-32"
+            value={draft.route}
+            onChange={update("route")}
+          />
           <SelectField aria-label="Since" value={draft.since} onChange={update("since")}>
             {SINCE.map((item) => (
               <option key={item.value} value={item.value}>
@@ -165,12 +214,18 @@ export function RequestsPanel({ route, navigate, session }: DevtoolsPanelProps) 
             </Button>
           ) : null}
         </form>
-        {error ? <ErrorMessage error={error} title="Could not load the requests" onRetry={reload} /> : null}
+        {error ? (
+          <ErrorMessage error={error} title="Could not load the requests" onRetry={reload} />
+        ) : null}
         {!data && loading ? <LoadingRows /> : null}
         {data && !rows.length ? (
-          <EmptyState>
-            {filtered ? "No request matches these filters. Loosen or reset them." : "No requests yet. Make a request to your app."}
-          </EmptyState>
+          <EmptyState
+            title={
+              filtered
+                ? "No request matches these filters. Loosen or reset them."
+                : "No requests yet. Make a request to your app."
+            }
+          />
         ) : null}
         <div className="space-y-1">
           {rows.map((row) => (
@@ -185,7 +240,11 @@ export function RequestsPanel({ route, navigate, session }: DevtoolsPanelProps) 
         </div>
       </div>
       <div>
-        {route ? <RequestDetailView key={route} id={route} session={session} /> : <EmptyState>Select a request to inspect it.</EmptyState>}
+        {route ? (
+          <RequestDetailView key={route} id={route} session={session} />
+        ) : (
+          <EmptyState title="Select a request to inspect it." />
+        )}
       </div>
     </div>
   );

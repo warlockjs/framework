@@ -2,14 +2,19 @@ import type { DevtoolsJobsReport, DevtoolsJobsView } from "@contracts";
 import { useApi } from "@/api/hooks";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import {
   DASH,
-  EmptyState,
-  ErrorMessage,
   formatMs,
   formatNumber,
-  LoadingRows,
   NUM,
   PanelHeader,
   queryString,
@@ -20,13 +25,11 @@ import type { DevtoolsPanelProps } from "@/panels/types";
 function Schedules({ report }: { report: DevtoolsJobsReport }) {
   if (!report.available.scheduler) {
     return (
-      <EmptyState>
-        The scheduler is not installed in this app. Install @warlock.js/scheduler to see its jobs here.
-      </EmptyState>
+      <EmptyState title="The scheduler is not installed in this app. Install @warlock.js/scheduler to see its jobs here." />
     );
   }
 
-  if (!report.schedules.length) return <EmptyState>No scheduled jobs are registered.</EmptyState>;
+  if (!report.schedules.length) return <EmptyState title="No scheduled jobs are registered." />;
 
   return (
     <Table aria-label="Schedules">
@@ -49,12 +52,18 @@ function Schedules({ report }: { report: DevtoolsJobsReport }) {
               {job.name} {job.isRunning ? <Badge variant="secondary">running</Badge> : null}
             </TableCell>
             <TableCell className="font-mono text-xs">{job.cron ?? job.interval ?? DASH}</TableCell>
-            <TableCell><Time at={job.lastRunAt} /></TableCell>
-            <TableCell><Time at={job.nextRunAt} /></TableCell>
+            <TableCell>
+              <Time at={job.lastRunAt} />
+            </TableCell>
+            <TableCell>
+              <Time at={job.nextRunAt} />
+            </TableCell>
             <TableCell className={NUM}>{formatMs(job.lastDurationMs)}</TableCell>
             <TableCell className={NUM}>{formatNumber(job.runs)}</TableCell>
             <TableCell className={NUM}>{job.failures || DASH}</TableCell>
-            <TableCell className="max-w-xs text-xs whitespace-normal text-destructive">{job.lastError ?? DASH}</TableCell>
+            <TableCell className="max-w-xs text-xs whitespace-normal text-destructive">
+              {job.lastError ?? DASH}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -64,10 +73,12 @@ function Schedules({ report }: { report: DevtoolsJobsReport }) {
 
 function Queues({ report }: { report: DevtoolsJobsReport }) {
   if (!report.available.queue) {
-    return <EmptyState>The queue is not installed in this app. Install @warlock.js/queue to see its job counts here.</EmptyState>;
+    return (
+      <EmptyState title="The queue is not installed in this app. Install @warlock.js/queue to see its job counts here." />
+    );
   }
 
-  if (!report.queues.length) return <EmptyState>No queue reported job counts.</EmptyState>;
+  if (!report.queues.length) return <EmptyState title="No queue reported job counts." />;
 
   const states = [...new Set(report.queues.flatMap((queue) => Object.keys(queue.counts)))];
 
@@ -77,7 +88,9 @@ function Queues({ report }: { report: DevtoolsJobsReport }) {
         <TableRow>
           <TableHead>Queue</TableHead>
           {states.map((state) => (
-            <TableHead key={state} className={NUM}>{state}</TableHead>
+            <TableHead key={state} className={NUM}>
+              {state}
+            </TableHead>
           ))}
         </TableRow>
       </TableHeader>
@@ -86,7 +99,9 @@ function Queues({ report }: { report: DevtoolsJobsReport }) {
           <TableRow key={queue.name}>
             <TableCell className="font-mono text-xs">{queue.name}</TableCell>
             {states.map((state) => (
-              <TableCell key={state} className={NUM}>{formatNumber(queue.counts[state] ?? 0)}</TableCell>
+              <TableCell key={state} className={NUM}>
+                {formatNumber(queue.counts[state] ?? 0)}
+              </TableCell>
             ))}
           </TableRow>
         ))}
@@ -103,9 +118,13 @@ export function JobsPanel({ instance }: DevtoolsPanelProps) {
   return (
     <div>
       <PanelHeader title="Jobs" />
-      {error ? <ErrorMessage error={error} title="Could not load the jobs" onRetry={reload} /> : null}
+      {error ? (
+        <ErrorMessage error={error} title="Could not load the jobs" onRetry={reload} />
+      ) : null}
       {!data && loading ? <LoadingRows rows={3} /> : null}
-      {data && !data.instances.length ? <EmptyState>No instance has reported its jobs yet.</EmptyState> : null}
+      {data && !data.instances.length ? (
+        <EmptyState title="No instance has reported its jobs yet." />
+      ) : null}
       <div className="space-y-4">
         {data?.instances.map(({ instance: info, report }) => (
           <Card key={info.id}>

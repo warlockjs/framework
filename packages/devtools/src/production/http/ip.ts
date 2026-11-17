@@ -47,6 +47,8 @@ function parseCidr(entry: string): { address: string; prefix: number; family: 4 
 
   const prefix = Number(text);
 
+  if (family !== 4 && family !== 6) return null;
+
   return prefix <= (family === 4 ? 32 : 128) ? { address, prefix, family } : null;
 }
 

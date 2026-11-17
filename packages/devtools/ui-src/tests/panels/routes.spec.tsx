@@ -49,7 +49,9 @@ describe("Routes panel", () => {
 
     expect(within(mapTable).getByText("posts.show")).toBeInTheDocument();
     await user.type(screen.getByLabelText("Filter routes"), "login");
-    expect(within(screen.getByRole("table", { name: "Route map table" })).queryByText("posts.show")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("table", { name: "Route map table" })).queryByText("posts.show"),
+    ).not.toBeInTheDocument();
   });
 
   it("expands a route to its slowest phases", async () => {
@@ -81,14 +83,24 @@ describe("Routes panel", () => {
 
   it("shows each section's error with message and ref", async () => {
     mockApi([
-      [/^api\/routes\/stats/, failure(500, "Route statistics are unavailable. Reload.", { ref: "r-1" })],
-      ["api/routes", failure(500, "The route map could not be read. Restart the app.", { ref: "r-2" })],
+      [
+        /^api\/routes\/stats/,
+        failure(500, "Route statistics are unavailable. Reload.", { ref: "r-1" }),
+      ],
+      [
+        "api/routes",
+        failure(500, "The route map could not be read. Restart the app.", { ref: "r-2" }),
+      ],
     ]);
     renderPanel(RoutesPanel);
 
-    expect(await screen.findByText("Route statistics are unavailable. Reload.")).toBeInTheDocument();
-    expect(screen.getByText("r-1")).toBeInTheDocument();
-    expect(await screen.findByText("The route map could not be read. Restart the app.")).toBeInTheDocument();
-    expect(screen.getByText("r-2")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Route statistics are unavailable. Reload."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Reference: r-1")).toBeInTheDocument();
+    expect(
+      await screen.findByText("The route map could not be read. Restart the app."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Reference: r-2")).toBeInTheDocument();
   });
 });

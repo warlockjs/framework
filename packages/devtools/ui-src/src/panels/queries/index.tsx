@@ -4,13 +4,11 @@ import { apiFetch } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import { HistogramBars } from "@/components/charts";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import {
   Code,
-  EmptyState,
-  ErrorMessage,
   formatMs,
   formatNumber,
-  LoadingRows,
   NUM,
   PanelHeader,
   SectionTitle,
@@ -19,7 +17,14 @@ import {
   Time,
   DASH,
 } from "@/components/ui/panel-kit";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { DevtoolsPanelProps } from "@/panels/types";
 import { BackgroundQueries } from "./BackgroundQueries";
 import { ExplainBox, type ExplainOutcome } from "./ExplainBox";
@@ -44,7 +49,9 @@ function ShapeDetail({
 }) {
   const slowest = shape.slowest;
   const run = () =>
-    apiFetch<ExplainOutcome>(`api/queries/${encodeURIComponent(shape.id)}/explain`, { method: "POST" });
+    apiFetch<ExplainOutcome>(`api/queries/${encodeURIComponent(shape.id)}/explain`, {
+      method: "POST",
+    });
 
   return (
     <section aria-label="Query detail" className="rounded-lg border p-3">
@@ -57,7 +64,8 @@ function ShapeDetail({
       <SectionTitle>Slowest example</SectionTitle>
       {slowest ? (
         <p className="text-sm">
-          <span className="tabular-nums">{formatMs(slowest.durationMs)}</span> · <Time at={slowest.at} />
+          <span className="tabular-nums">{formatMs(slowest.durationMs)}</span> ·{" "}
+          <Time at={slowest.at} />
           {slowest.route ? <> · {slowest.route}</> : null}
           {slowest.requestId ? (
             <>
@@ -74,8 +82,8 @@ function ShapeDetail({
       )}
       {shape.nPlusOne.requests ? (
         <p className="mt-2 text-sm">
-          <Badge variant="destructive">N+1</Badge> in {shape.nPlusOne.requests} sampled requests, up to{" "}
-          {shape.nPlusOne.maxPerRequest} runs in one request.
+          <Badge variant="destructive">N+1</Badge> in {shape.nPlusOne.requests} sampled requests, up
+          to {shape.nPlusOne.maxPerRequest} runs in one request.
         </p>
       ) : null}
       {isAdmin ? (
@@ -85,14 +93,15 @@ function ShapeDetail({
             <ExplainBox run={run} />
             {production ? (
               <p className="mt-1 text-xs text-muted-foreground">
-                EXPLAIN uses the slowest example, held by the instance that ran it. It only plans the query unless the
-                project allows executing plans.
+                EXPLAIN uses the slowest example, held by the instance that ran it. It only plans
+                the query unless the project allows executing plans.
               </p>
             ) : null}
           </>
         ) : (
           <p className="mt-3 text-xs text-muted-foreground">
-            EXPLAIN is not available for this query type (Postgres SELECT/WITH and MongoDB find, aggregate and count only).
+            EXPLAIN is not available for this query type (Postgres SELECT/WITH and MongoDB find,
+            aggregate and count only).
           </p>
         )
       ) : null}
@@ -106,7 +115,9 @@ export function QueriesPanel({ route, navigate, instance, session }: DevtoolsPan
   const production = session.mode === "production";
   const isAdmin = session.role === "admin";
   const path = `api/queries/stats${queryString({ sort, instance: instance === "all" ? undefined : instance })}`;
-  const { data, error, loading, reload } = useApi<DevtoolsQueryStatsView>(path, { refreshMs: 10_000 });
+  const { data, error, loading, reload } = useApi<DevtoolsQueryStatsView>(path, {
+    refreshMs: 10_000,
+  });
   const selected = data?.shapes.find((shape) => shape.id === route);
   const percent = data ? Math.round(data.sampleRate * 1000) / 10 : null;
 
@@ -133,10 +144,12 @@ export function QueriesPanel({ route, navigate, instance, session }: DevtoolsPan
           </SelectField>
         </label>
       </PanelHeader>
-      {error ? <ErrorMessage error={error} title="Could not load the query statistics" onRetry={reload} /> : null}
+      {error ? (
+        <ErrorMessage error={error} title="Could not load the query statistics" onRetry={reload} />
+      ) : null}
       {!data && loading ? <LoadingRows /> : null}
       {data && !data.shapes.length ? (
-        <EmptyState>No queries recorded yet. Make requests that use the database; they appear here.</EmptyState>
+        <EmptyState title="No queries recorded yet. Make requests that use the database; they appear here." />
       ) : null}
       {data?.shapes.length ? (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -181,9 +194,15 @@ export function QueriesPanel({ route, navigate, instance, session }: DevtoolsPan
                   <TableCell className={NUM}>{formatMs(shape.histogram.maxMs)}</TableCell>
                   <TableCell className={NUM}>{shape.errors || DASH}</TableCell>
                   <TableCell className={NUM}>
-                    {shape.nPlusOne.requests ? <Badge variant="destructive">{shape.nPlusOne.requests}</Badge> : DASH}
+                    {shape.nPlusOne.requests ? (
+                      <Badge variant="destructive">{shape.nPlusOne.requests}</Badge>
+                    ) : (
+                      DASH
+                    )}
                   </TableCell>
-                  {production ? <TableCell className={NUM}>{shape.instances.length}</TableCell> : null}
+                  {production ? (
+                    <TableCell className={NUM}>{shape.instances.length}</TableCell>
+                  ) : null}
                 </TableRow>
               ))}
             </TableBody>
@@ -192,9 +211,9 @@ export function QueriesPanel({ route, navigate, instance, session }: DevtoolsPan
             {selected ? (
               <ShapeDetail shape={selected} isAdmin={isAdmin} production={production} />
             ) : route ? (
-              <EmptyState>This query shape is no longer in the statistics. Pick another one.</EmptyState>
+              <EmptyState title="This query shape is no longer in the statistics. Pick another one." />
             ) : (
-              <EmptyState>Select a query to see its latency and slowest example.</EmptyState>
+              <EmptyState title="Select a query to see its latency and slowest example." />
             )}
           </div>
         </div>

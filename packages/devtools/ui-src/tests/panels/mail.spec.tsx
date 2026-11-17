@@ -4,7 +4,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MailPanel } from "@/panels/mail";
 import { failure, FakeEventSource, mockApi, renderPanel } from "./helpers";
 
-const summary = { id: "m1", requestId: "req-3", capturedAt: Date.now() - 5000, to: ["a@x.test"], subject: "Welcome <b>aboard</b>" };
+const summary = {
+  id: "m1",
+  requestId: "req-3",
+  capturedAt: Date.now() - 5000,
+  to: ["a@x.test"],
+  subject: "Welcome <b>aboard</b>",
+};
 const mail = {
   ...summary,
   from: "noreply@x.test",
@@ -19,7 +25,10 @@ beforeEach(() => FakeEventSource.install());
 
 describe("Mail panel", () => {
   it("lists messages and shows a detail with a sandboxed HTML frame", async () => {
-    mockApi([["api/mails", [summary]], ["api/mails/m1", mail]]);
+    mockApi([
+      ["api/mails", [summary]],
+      ["api/mails/m1", mail],
+    ]);
     const user = userEvent.setup();
 
     renderPanel(MailPanel);
@@ -31,7 +40,10 @@ describe("Mail panel", () => {
     expect(frame).toHaveAttribute("src", "api/mails/m1/html");
     expect(screen.getByText("terms.pdf · application/pdf · 2,048 bytes")).toBeInTheDocument();
     expect(screen.getByText("x-tag")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open the request that sent it" })).toHaveAttribute("href", "#requests/req-3");
+    expect(screen.getByRole("link", { name: "Open the request that sent it" })).toHaveAttribute(
+      "href",
+      "#requests/req-3",
+    );
     expect(document.querySelector("b")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Text" }));
@@ -58,17 +70,26 @@ describe("Mail panel", () => {
   });
 
   it("shows API errors with message and ref", async () => {
-    mockApi([["api/mails", failure(500, "The mailbox could not be read. Try again.", { ref: "ml-1" })]]);
+    mockApi([
+      ["api/mails", failure(500, "The mailbox could not be read. Try again.", { ref: "ml-1" })],
+    ]);
     renderPanel(MailPanel);
 
-    expect(await screen.findByText("The mailbox could not be read. Try again.")).toBeInTheDocument();
-    expect(screen.getByText("ml-1")).toBeInTheDocument();
+    expect(
+      await screen.findByText("The mailbox could not be read. Try again."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Reference: ml-1")).toBeInTheDocument();
   });
 
   it("shows a missing message as an error", async () => {
-    mockApi([["api/mails", [summary]], ["api/mails/m1", failure(404, "That message is no longer in the mailbox. Pick another one.")]]);
+    mockApi([
+      ["api/mails", [summary]],
+      ["api/mails/m1", failure(404, "That message is no longer in the mailbox. Pick another one.")],
+    ]);
     renderPanel(MailPanel, { route: "m1" });
 
-    expect(await screen.findByText("That message is no longer in the mailbox. Pick another one.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("That message is no longer in the mailbox. Pick another one."),
+    ).toBeInTheDocument();
   });
 });

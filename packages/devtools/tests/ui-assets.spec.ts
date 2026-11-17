@@ -38,9 +38,25 @@ describe("registerUiAssets", () => {
     expect(response.body).toContain("pnpm --filter @warlock.js/devtools build:ui");
   });
 
+  it("redirects the dashboard path without a trailing slash, keeping the query", async () => {
+    const server = Fastify();
+
+    server.register(async (instance) => registerUiAssets(instance), { prefix: "/__warlock" });
+    await server.ready();
+
+    const bare = await server.inject({ method: "GET", url: "/__warlock?x=1" });
+
+    expect(bare.statusCode).toBe(308);
+    expect(bare.headers.location).toBe("/__warlock/?x=1");
+    expect((await server.inject({ method: "GET", url: "/__warlock/" })).statusCode).toBe(503);
+  });
+
   it("serves the built index as is, with no tab injection", async () => {
     mkdirSync(path.join(state.root, "dashboard", "assets"), { recursive: true });
-    writeFileSync(path.join(state.root, "dashboard", "index.html"), "<title>Warlock Devtools</title><div id=root></div>");
+    writeFileSync(
+      path.join(state.root, "dashboard", "index.html"),
+      "<title>Warlock Devtools</title><div id=root></div>",
+    );
     writeFileSync(path.join(state.root, "dashboard", "assets", "app.js"), "console.log(1)");
     writeFileSync(path.join(state.root, "dashboard", "assets", "app.css"), "body{}");
 

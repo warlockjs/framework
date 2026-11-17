@@ -198,9 +198,10 @@ Turn a panel off in production with `production.panels[<id>]: false`; see
 ## Security
 
 A panel's data routes, its view module and its assets are mounted in the same
-scope as the dashboard, so the same guard applies to each request:
+scope as the dashboard, so the same guard applies to each request. In
+development:
 
-- devtools mounts nothing outside development;
+- devtools mounts nothing outside development unless the production monitor is enabled;
 - only a loopback socket is answered;
 - the `Host` must be a loopback name (or one in `allowedHosts`);
 - an `Origin` from another site is refused, so a web page you visit cannot
@@ -209,3 +210,6 @@ scope as the dashboard, so the same guard applies to each request:
 
 A refused request gets an empty `404` before the handler runs. Only the files
 a panel lists are served; a request never becomes a file path.
+
+In the production monitor the loopback rules do not apply. The sign-in gate does: see
+[Devtools security](/v/latest/devtools/security/).

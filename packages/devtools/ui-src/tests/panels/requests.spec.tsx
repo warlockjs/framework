@@ -4,7 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DevtoolsSampleSummary } from "@contracts";
 import { RequestsPanel } from "@/panels/requests";
 import type { RequestDetail } from "@/panels/requests/types";
-import { devSession, failure, FakeEventSource, instanceA, mockApi, prodAdmin, prodViewer, renderPanel } from "./helpers";
+import {
+  devSession,
+  failure,
+  FakeEventSource,
+  instanceA,
+  mockApi,
+  prodAdmin,
+  prodViewer,
+  renderPanel,
+} from "./helpers";
 
 const row = (overrides: Partial<DevtoolsSampleSummary> = {}): DevtoolsSampleSummary => ({
   id: "req-1",
@@ -43,14 +52,26 @@ const detail = (overrides: Partial<RequestDetail> = {}): RequestDetail =>
       },
     ],
     cache: [],
-    logs: [{ level: "warn", module: "app", action: "slow", message: "slow thing", at: 1030, context: { id: 7 } }],
+    logs: [
+      {
+        level: "warn",
+        module: "app",
+        action: "slow",
+        message: "slow thing",
+        at: 1030,
+        context: { id: 7 },
+      },
+    ],
     mails: ["mail-1"],
     warnings: [{ type: "n+1", message: "Ran 6 times", shape: "select * from posts", count: 6 }],
     droppedQueries: 0,
     ...overrides,
   }) as RequestDetail;
 
-const aiOff = [/^api\/ai\?requestId=/, { available: false, message: "Install ai", runs: [] }] as const;
+const aiOff: [RegExp, { available: boolean; message: string; runs: never[] }] = [
+  /^api\/ai\?requestId=/,
+  { available: false, message: "Install ai", runs: [] },
+];
 
 beforeEach(() => FakeEventSource.install());
 
@@ -73,11 +94,13 @@ describe("Requests panel", () => {
   });
 
   it("shows the server's message and ref on an API error", async () => {
-    mockApi([["api/requests", failure(500, "The request store failed. Try again.", { ref: "ref-123" })]]);
+    mockApi([
+      ["api/requests", failure(500, "The request store failed. Try again.", { ref: "ref-123" })],
+    ]);
     renderPanel(RequestsPanel);
 
     expect(await screen.findByText("The request store failed. Try again.")).toBeInTheDocument();
-    expect(screen.getByText("ref-123")).toBeInTheDocument();
+    expect(screen.getByText("Reference: ref-123")).toBeInTheDocument();
   });
 
   it("filters by the fields and sends them to the server", async () => {
@@ -93,7 +116,11 @@ describe("Requests panel", () => {
     await user.click(screen.getByRole("button", { name: "Filter" }));
 
     await waitFor(() =>
-      expect(calls.some((call) => call.url === "api/requests?status=5xx&method=POST&route=%2Fposts&since=1h")).toBe(true),
+      expect(
+        calls.some(
+          (call) => call.url === "api/requests?status=5xx&method=POST&route=%2Fposts&since=1h",
+        ),
+      ).toBe(true),
     );
     expect(await screen.findByText(/No request matches these filters/)).toBeInTheDocument();
   });
@@ -113,7 +140,10 @@ describe("Requests panel", () => {
     expect(within(detailView).getAllByText("select * from posts").length).toBeGreaterThan(0);
     expect(within(detailView).getByText("N+1")).toBeInTheDocument();
     expect(within(detailView).getByText("slow thing")).toBeInTheDocument();
-    expect(within(detailView).getByRole("link", { name: "Mail mail-1" })).toHaveAttribute("href", "#mail/mail-1");
+    expect(within(detailView).getByRole("link", { name: "Mail mail-1" })).toHaveAttribute(
+      "href",
+      "#mail/mail-1",
+    );
     expect(await within(detailView).findByText("Install ai")).toBeInTheDocument();
   });
 
@@ -130,13 +160,21 @@ describe("Requests panel", () => {
     await user.click(await screen.findByRole("button", { name: "Explain" }));
 
     expect((await screen.findAllByText(/Seq Scan/)).length).toBeGreaterThan(0);
-    expect(calls.some((call) => call.url === "api/requests/req-1/queries/q1/explain" && call.method === "POST")).toBe(true);
+    expect(
+      calls.some(
+        (call) => call.url === "api/requests/req-1/queries/q1/explain" && call.method === "POST",
+      ),
+    ).toBe(true);
   });
 
   it("shows an EXPLAIN failure inside the query, with its message", async () => {
     mockApi([
       ["api/requests/req-1", detail()],
-      ["api/requests/req-1/queries/q1/explain", failure(500, "EXPLAIN failed: connection closed. Try again.", { ref: "ex-1" }), "POST"],
+      [
+        "api/requests/req-1/queries/q1/explain",
+        failure(500, "EXPLAIN failed: connection closed. Try again.", { ref: "ex-1" }),
+        "POST",
+      ],
       aiOff,
       ["api/requests", []],
     ]);
@@ -145,8 +183,10 @@ describe("Requests panel", () => {
     renderPanel(RequestsPanel, { route: "req-1" });
     await user.click(await screen.findByRole("button", { name: "Explain" }));
 
-    expect(await screen.findByText("EXPLAIN failed: connection closed. Try again.")).toBeInTheDocument();
-    expect(screen.getByText("ex-1")).toBeInTheDocument();
+    expect(
+      await screen.findByText("EXPLAIN failed: connection closed. Try again."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Reference: ex-1")).toBeInTheDocument();
   });
 
   it("uses the shape route for EXPLAIN in production, for an admin only", async () => {
@@ -155,7 +195,17 @@ describe("Requests panel", () => {
       ["api/requests", []],
       ["api/instances", { current: instanceA.id, instances: [instanceA] }],
       ["api/requests/req-1", productionDetail],
-      ["api/queries/shape1/explain", { shapeId: "shape1", driver: "postgres", executing: false, plan: { Plan: 1 }, instance: instanceA.id }, "POST"],
+      [
+        "api/queries/shape1/explain",
+        {
+          shapeId: "shape1",
+          driver: "postgres",
+          executing: false,
+          plan: { Plan: 1 },
+          instance: instanceA.id,
+        },
+        "POST",
+      ],
     ]);
     const user = userEvent.setup();
 

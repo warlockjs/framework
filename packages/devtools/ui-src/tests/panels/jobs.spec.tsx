@@ -56,7 +56,9 @@ describe("Jobs panel", () => {
     mockApi([[/^api\/jobs/, view]]);
     renderPanel(JobsPanel, { session: prodViewer });
 
-    expect(await screen.findByText(/The scheduler is not installed in this app/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/The scheduler is not installed in this app/),
+    ).toBeInTheDocument();
     expect(screen.getByText(/The queue is not installed in this app/)).toBeInTheDocument();
   });
 
@@ -72,6 +74,6 @@ describe("Jobs panel", () => {
     renderPanel(JobsPanel);
 
     expect(await screen.findByText("Jobs could not be read. Try again.")).toBeInTheDocument();
-    expect(screen.getByText("jb-1")).toBeInTheDocument();
+    expect(screen.getByText("Reference: jb-1")).toBeInTheDocument();
   });
 });

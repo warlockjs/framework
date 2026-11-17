@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { resolveUiRoot } from "../ui-root";
 
 /**
@@ -59,11 +59,21 @@ const NOT_BUILT_HTML =
  * plus their init script). The asset name is matched against a fixed
  * whitelist — never joined into a filesystem path — so no request can
  * traverse outside it. Before the first `build:ui` the root answers 503 with
- * a note that says how to build. The second parameter is ignored (tabs now
- * come from `GET api/panels`).
+ * a note that says how to build.
  */
-export function registerUiAssets(server: FastifyInstance, _panels?: unknown): void {
-  const serveIndex = (_request: unknown, reply: FastifyReply): void => {
+export function registerUiAssets(server: FastifyInstance): void {
+  const serveIndex = (request: FastifyRequest, reply: FastifyReply): void => {
+    const [pathname = "", search] = request.url.split("?");
+
+    // The page loads its assets by relative URL, so it must be served from `<path>/`.
+    if (!pathname.endsWith("/")) {
+      reply
+        .code(308)
+        .header("Cache-Control", "no-store")
+        .redirect(`${pathname}/${search === undefined ? "" : `?${search}`}`, 308);
+      return;
+    }
+
     const index = path.join(resolveUiRoot(), "dashboard", "index.html");
 
     if (!existsSync(index)) {

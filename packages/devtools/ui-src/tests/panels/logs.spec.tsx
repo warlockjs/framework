@@ -3,7 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { DevtoolsLogRow } from "@contracts";
 import { LogsPanel } from "@/panels/logs";
-import { devSession, failure, FakeEventSource, instanceA, mockApi, prodViewer, renderPanel } from "./helpers";
+import {
+  devSession,
+  failure,
+  FakeEventSource,
+  instanceA,
+  mockApi,
+  prodViewer,
+  renderPanel,
+} from "./helpers";
 
 const log = (overrides: Partial<DevtoolsLogRow> = {}): DevtoolsLogRow => ({
   level: "warn",
@@ -37,7 +45,10 @@ describe("Logs panel", () => {
 
     expect(await screen.findByText("web-1 #0")).toBeInTheDocument();
     expect(screen.queryByText("Context")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "request" })).toHaveAttribute("href", "#requests/req-2");
+    expect(screen.getByRole("link", { name: "request" })).toHaveAttribute(
+      "href",
+      "#requests/req-2",
+    );
   });
 
   it("filters by level and module through the server", async () => {
@@ -57,11 +68,16 @@ describe("Logs panel", () => {
     renderPanel(LogsPanel);
     await screen.findByText("Gateway timed out");
 
-    act(() => FakeEventSource.latest().emit("log", log({ message: "Fresh entry", at: Date.now() })));
+    act(() =>
+      FakeEventSource.latest().emit("log", log({ message: "Fresh entry", at: Date.now() })),
+    );
 
     const fresh = await screen.findByText("Fresh entry");
 
-    expect(fresh.compareDocumentPosition(screen.getByText("Gateway timed out")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      fresh.compareDocumentPosition(screen.getByText("Gateway timed out")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("shows the empty state and API errors", async () => {
@@ -69,6 +85,6 @@ describe("Logs panel", () => {
     renderPanel(LogsPanel);
 
     expect(await screen.findByText("Logs could not be read. Try again.")).toBeInTheDocument();
-    expect(screen.getByText("lg-1")).toBeInTheDocument();
+    expect(screen.getByText("Reference: lg-1")).toBeInTheDocument();
   });
 });

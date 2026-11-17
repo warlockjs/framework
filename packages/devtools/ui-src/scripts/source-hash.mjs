@@ -11,7 +11,7 @@
  * `package.json` `devDependencies`. Line endings are normalised to LF, so a
  * checkout with CRLF gives the same hash.
  *
- * Owner: WP-8. Plain Node, no dependencies.
+ * Plain Node, no dependencies.
  */
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";

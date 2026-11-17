@@ -66,7 +66,7 @@ export default {
 | **Resources** | Memory, CPU, event-loop delay and garbage collection, with a 10-minute history | the process |
 | **Health**   | Readiness checks over time | core `health.readiness()` |
 | **Errors**   | Failed requests grouped by cause with counts | tracing and logger |
-| **Jobs**     | Scheduled jobs and queue counts (when those packages are used) | `@warlock.js/scheduler`, `@warlock.js/queue` |
+| **Jobs**     | Registered scheduled jobs with schedule, last and next run (no run history, duration or error yet); queue counts only when the queue driver reports them (not available today) | `@warlock.js/scheduler`, `@warlock.js/queue` |
 | **Agents**   | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                      | `@warlock.js/ai` `agentTraces` store      |
 | **Routes**   | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                               |
 | **API**      | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`    |
@@ -316,7 +316,7 @@ The app refuses to boot with a `DevtoolsProductionConfigError`
 | Code | Fix |
 | ---- | --- |
 | `DT001` | Set `DEVTOOLS_PATH` or `production.path`. |
-| `DT002` | Use a path of 8+ characters starting with `/`, with letters, digits, `-_./` only; not `/__warlock`. |
+| `DT002` | Use a path of 8+ characters starting with `/`, with letters, digits and `- _ . ~ /` only; not `/__warlock`. |
 | `DT003` | No admin: set `DEVTOOLS_ADMIN_EMAIL` plus a password or setup token, or run `warlock devtools:reset-admin --email <email>`. |
 | `DT004` | The env password breaks the rules (8+ characters, at most 72 bytes, not common, not the email). |
 | `DT005` | Install `@warlock.js/cascade` and configure a database. |
@@ -328,8 +328,12 @@ The app refuses to boot with a `DevtoolsProductionConfigError`
 
 Every dashboard URL gives a 404: check that `production.enabled` is true, the
 dashboard is not disabled or locked (`warlock devtools:enable`), the request is
-HTTPS (`trustedProxies`), the IP is in `allowedIps`, and you opened the exact
-`DEVTOOLS_PATH`.
+HTTPS (`trustedProxies`), the IP is in `allowedIps`, the tab is not turned off,
+and you opened the exact `DEVTOOLS_PATH`. Most closed cases log nothing on
+purpose. The boot line `devtools production monitor mounted at /ops-… (DEVTOOLS_PATH)`
+shows the monitor started; the audit log has `dashboard.disabled`,
+`dashboard.locked` and `login.blocked`; only an unreadable state or session
+store logs a warning (`devtools`, at most once a minute).
 
 Full pages: "Devtools in production" and "Devtools security" in the docs.
 

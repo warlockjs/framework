@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Code, ErrorMessage } from "@/components/ui/panel-kit";
+import { ErrorMessage } from "@/components/common";
+import { Code } from "@/components/ui/panel-kit";
 
 export type ExplainOutcome = { plan: unknown; executing?: boolean; instance?: string };
 
@@ -9,12 +10,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** A JSON value as a tree: objects and arrays fold, leaves print. */
-export function PlanTree({ value, label, depth = 0 }: { value: unknown; label?: string; depth?: number }) {
+export function PlanTree({
+  value,
+  label,
+  depth = 0,
+}: {
+  value: unknown;
+  label?: string;
+  depth?: number;
+}) {
   if (Array.isArray(value) || isRecord(value)) {
     const entries = Array.isArray(value)
       ? value.map((item, index) => [String(index), item] as const)
       : Object.entries(value);
-    const nodeType = isRecord(value) && typeof value["Node Type"] === "string" ? value["Node Type"] : null;
+    const nodeType =
+      isRecord(value) && typeof value["Node Type"] === "string" ? value["Node Type"] : null;
 
     return (
       <details open={depth < 3} className="ml-3 text-xs">

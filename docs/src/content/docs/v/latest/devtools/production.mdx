@@ -56,20 +56,23 @@ npx warlock migrate
 ```
 
 The accounts, sessions, audit log, request samples and instance reports live in your app's database through Cascade
-(MongoDB or SQL). No cache driver is needed. The monitor needs `encryption.key` (64 hex characters) in
+(MongoDB or SQL). They use seven tables or collections: `devtools_accounts`, `devtools_sessions`, `devtools_invites`,
+`devtools_audit`, `devtools_state`, `devtools_samples` and `devtools_reports`. The audit time is stored in `occurred_at`, and
+the detail of a request sample and each instance report are stored as JSON text. No cache driver is needed. The monitor needs `encryption.key` (64 hex characters) in
 `src/config/encryption.ts`, because two-factor secrets are stored encrypted with it.
 
 ## Environment variables
 
 | Variable                 | Required                                     | Meaning                                                                                                                        |
 | ------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `DEVTOOLS_PATH`          | Yes                                          | The dashboard path, for example `/ops-7f3k2q9x`. Starts with `/`, at least 8 characters, only letters, digits, `-_./`.        |
+| `DEVTOOLS_PATH`          | Yes                                          | The dashboard path, for example `/ops-7f3k2q9x`. Starts with `/`, at least 8 characters, only letters, digits and `- _ . ~ /`.   |
 | `DEVTOOLS_ADMIN_EMAIL`   | While no admin exists                        | The first admin.                                                                                                               |
 | `DEVTOOLS_ADMIN_PASSWORD` | One of these two while no admin exists      | A first password. It works until it is changed at the first sign-in, which is forced. It must pass the password rules.         |
 | `DEVTOOLS_SETUP_TOKEN`   | One of these two while no admin exists       | At least 32 characters (`openssl rand -base64 32`). The admin opens `<origin><path>/#/setup/<token>` and chooses a password.   |
 
-Set either the password or the setup token, not both. The path is never logged in full: the boot log shows only
-its first characters. Pick a path nobody can guess; it is one layer of protection, not the only one.
+Set either the password or the setup token, not both. The boot log shows only the first characters of the path, and core's persistent request log skips it. Core's optional one-line
+request summary (`http.log`) prints every request path, this one included, so keep that setting off in production or filter
+that log. Pick a path nobody can guess; it is one layer of protection, not the only one.
 
 ## First sign-in
 
@@ -228,11 +231,22 @@ which nginx honours when buffering is on.
 
 ## Performance
 
-TODO(coordinator): add the benchmark numbers from the overhead benchmark (unsampled cost per request, blended cost at the
-default sample rate, throughput change with the monitor off and on) and the version they were measured on.
-
 With the monitor off, nothing is attached. With it on, a request that is not sampled does one random draw and a timing
 check.
+
+Measured on 5.56.0 (Intel Xeon Gold 6312U, Node 22), driving the capture hooks for 50 000 simulated requests with 3
+phases, 5 queries and 1 log each:
+
+| Sample rate         | Added cost per request |
+| ------------------- | ---------------------- |
+| 0 (nothing sampled) | 0.13 µs                |
+| 0.1 (the default)   | 1.32 µs                |
+| 1 (every request)   | 12 µs                  |
+
+On a real Fastify server (16 keep-alive clients on loopback) with a very light handler of about 83 µs, the default
+rate lowered throughput by 6 to 8 % and a rate of 1 by 27 %. With a rate of 0 no loss was measurable. A handler that takes
+a few milliseconds loses well under 1 % at the default rate, because the added cost is a few microseconds per request.
+Measure your own app before raising `sampleRate`.
 
 ## Options
 
@@ -304,11 +318,20 @@ That is by design: the dashboard hides itself. A 404 can mean:
 - You have **no session**. Only the login page is public; open `<path>/`, not a deeper URL.
 - The **path is wrong**. It must match `DEVTOOLS_PATH` exactly.
 
-Check the server log first (the boot line says whether the monitor mounted), then the audit log (**Admin, Audit**) for
-`dashboard.disabled`, `dashboard.locked` and `login.blocked` entries.
+Most of these cases write nothing to the server log, because that is what keeps the 404 uniform. Check, in this order:
 
-TODO(coordinator): confirm which of these cases the server log names once the gate is implemented, and add the exact
-log lines.
+1. The boot line says whether the monitor mounted: `devtools production monitor mounted at /ops-… (DEVTOOLS_PATH)`
+   (module `devtools`, action `ready`). If it is missing, look for the startup error (see [Startup errors](#startup-errors)).
+2. The audit log (**Admin, Audit**) has `dashboard.disabled`, `dashboard.locked` and `login.blocked` entries for the
+   disabled and locked cases. `warlock devtools:enable` writes `dashboard.enabled`.
+3. Two cases are written to the server log (module `devtools`, at most one line a minute), and the dashboard is closed
+   while they last:
+   - `The devtools dashboard state could not be read and the dashboard is closed: <reason>`: the database is unreachable
+     or the tables are missing.
+   - `The devtools session could not be checked and the request was refused: <reason>`: the session lookup failed.
+
+Not HTTPS, a client IP outside `allowedIps`, a missing session, a wrong path and a tab that is turned off leave no entry
+by design.
 
 ### The live view does not update
 

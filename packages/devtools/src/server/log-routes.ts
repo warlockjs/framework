@@ -12,15 +12,15 @@ type LogsQuery = {
 };
 
 /**
- * Registers the log listing route, filterable by `level` and `module`. It
- * answers from the insights (every instance in production) when they are
- * mounted, else from the collector's logs.
+ * Registers the log listing route, filterable by `level` and `module`. In
+ * production it answers from the insights (every instance, no `context`);
+ * in development it answers from the collector's logs, which keep `context`.
  */
 export function registerLogRoutes(server: FastifyInstance, deps: MountDevtoolsRoutesDeps): void {
   server.get<{ Querystring: LogsQuery }>("/api/logs", async (request, reply) => {
     const { level, module } = request.query;
 
-    if (deps.insights) {
+    if (deps.mode === "production" && deps.insights) {
       const query = parseInsightQuery(request.query);
 
       reply.header("Cache-Control", "no-store");

@@ -296,17 +296,27 @@ describe("mountDevtoolsRoutes guard", () => {
 });
 
 describe("mountDevtoolsRoutes UI assets", () => {
-  it("serves index.html at the dashboard root and with a trailing slash", async () => {
+  it("serves index.html at the dashboard root and redirects the path without a trailing slash", async () => {
     const { deps } = createDeps();
     const server = buildServer(deps);
 
-    for (const url of ["/__warlock", "/__warlock/"]) {
-      const response = await server.inject({ method: "GET", url, remoteAddress: "127.0.0.1" });
-      expect(response.statusCode).toBe(200);
-      expect(response.headers["content-type"]).toContain("text/html");
-      expect(response.headers["cache-control"]).toBe("no-store");
-      expect(response.body).toContain("<title>Warlock Devtools</title>");
-    }
+    const bare = await server.inject({
+      method: "GET",
+      url: "/__warlock",
+      remoteAddress: "127.0.0.1",
+    });
+    expect(bare.statusCode).toBe(308);
+    expect(bare.headers.location).toBe("/__warlock/");
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/__warlock/",
+      remoteAddress: "127.0.0.1",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/html");
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body).toContain("<title>Warlock Devtools</title>");
   });
 
   it("serves app.js and app.css with the right content types", async () => {

@@ -40,16 +40,24 @@ const view = (): DevtoolsErrorsView => ({
 
 describe("Errors panel", () => {
   it("renders groups with counts and expands a stack with a link to the last request", async () => {
-    mockApi([[/^api\/errors/, view()], ["api/instances", { current: instanceA.id, instances: [instanceA] }]]);
+    mockApi([
+      [/^api\/errors/, view()],
+      ["api/instances", { current: instanceA.id, instances: [instanceA] }],
+    ]);
     const user = userEvent.setup();
 
     renderPanel(ErrorsPanel, { session: prodViewer });
-    await user.click(await screen.findByRole("button", { name: "Cannot read properties of undefined" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Cannot read properties of undefined" }),
+    );
 
     expect(screen.getByText("17")).toBeInTheDocument();
     expect(screen.getByText("web-1 #0")).toBeInTheDocument();
     expect(screen.getByText(/at handler \(posts.ts:10\)/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open the last request" })).toHaveAttribute("href", "#requests/req-5");
+    expect(screen.getByRole("link", { name: "Open the last request" })).toHaveAttribute(
+      "href",
+      "#requests/req-5",
+    );
   });
 
   it("says when a group has no stack", async () => {
@@ -70,10 +78,12 @@ describe("Errors panel", () => {
   });
 
   it("shows an API error with message and ref", async () => {
-    mockApi([[/^api\/errors/, failure(500, "Errors could not be read. Try again.", { ref: "er-1" })]]);
+    mockApi([
+      [/^api\/errors/, failure(500, "Errors could not be read. Try again.", { ref: "er-1" })],
+    ]);
     renderPanel(ErrorsPanel, { session: devSession });
 
     expect(await screen.findByText("Errors could not be read. Try again.")).toBeInTheDocument();
-    expect(screen.getByText("er-1")).toBeInTheDocument();
+    expect(screen.getByText("Reference: er-1")).toBeInTheDocument();
   });
 });

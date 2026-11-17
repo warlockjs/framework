@@ -1,12 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
 import { useApi, useStream, type StreamEvent } from "@/api/hooks";
+import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import {
   Code,
   DASH,
-  EmptyState,
-  ErrorMessage,
   formatNumber,
-  LoadingRows,
   PanelHeader,
   RowButton,
   SectionTitle,
@@ -15,7 +13,13 @@ import {
 } from "@/components/ui/panel-kit";
 import type { DevtoolsPanelProps } from "@/panels/types";
 
-type MailSummary = { id: string; requestId?: string; capturedAt: number; to: string[]; subject: string };
+type MailSummary = {
+  id: string;
+  requestId?: string;
+  capturedAt: number;
+  to: string[];
+  subject: string;
+};
 type Mail = MailSummary & {
   from?: string;
   cc: string[];
@@ -26,10 +30,16 @@ type Mail = MailSummary & {
 };
 
 function MailDetail({ id }: { id: string }) {
-  const { data: mail, error, loading, reload } = useApi<Mail>(`api/mails/${encodeURIComponent(id)}`);
+  const {
+    data: mail,
+    error,
+    loading,
+    reload,
+  } = useApi<Mail>(`api/mails/${encodeURIComponent(id)}`);
   const [html, setHtml] = useState(true);
 
-  if (error && !mail) return <ErrorMessage error={error} title="Could not load this message" onRetry={reload} />;
+  if (error && !mail)
+    return <ErrorMessage error={error} title="Could not load this message" onRetry={reload} />;
   if (!mail) return loading ? <LoadingRows rows={4} /> : null;
 
   const fields: [string, string | undefined][] = [
@@ -84,12 +94,13 @@ function MailDetail({ id }: { id: string }) {
         <ul className="list-disc pl-5 text-sm">
           {mail.attachments.map((file, index) => (
             <li key={`${file.filename}-${index}`}>
-              {file.filename} · {file.contentType || "unknown type"} · {formatNumber(file.size)} bytes
+              {file.filename} · {file.contentType || "unknown type"} · {formatNumber(file.size)}{" "}
+              bytes
             </li>
           ))}
         </ul>
       ) : (
-        <EmptyState>No attachments.</EmptyState>
+        <EmptyState title="No attachments." />
       )}
     </section>
   );
@@ -97,7 +108,9 @@ function MailDetail({ id }: { id: string }) {
 
 /** The Mail tab: captured messages, with the HTML body in a sandboxed frame. */
 export function MailPanel({ route, navigate }: DevtoolsPanelProps) {
-  const { data, error, loading, reload } = useApi<MailSummary[]>("api/mails", { refreshMs: 30_000 });
+  const { data, error, loading, reload } = useApi<MailSummary[]>("api/mails", {
+    refreshMs: 30_000,
+  });
   const [live, setLive] = useState<MailSummary[]>([]);
 
   const onStream = useCallback((event: StreamEvent) => {
@@ -122,9 +135,13 @@ export function MailPanel({ route, navigate }: DevtoolsPanelProps) {
     <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <div>
         <PanelHeader title="Mail" />
-        {error ? <ErrorMessage error={error} title="Could not load the mailbox" onRetry={reload} /> : null}
+        {error ? (
+          <ErrorMessage error={error} title="Could not load the mailbox" onRetry={reload} />
+        ) : null}
         {!data && loading ? <LoadingRows /> : null}
-        {data && !mails.length ? <EmptyState>No mail captured. Send an email from your app; it appears here.</EmptyState> : null}
+        {data && !mails.length ? (
+          <EmptyState title="No mail captured. Send an email from your app; it appears here." />
+        ) : null}
         <div className="space-y-1">
           {mails.map((mail) => (
             <RowButton key={mail.id} selected={mail.id === route} onClick={() => navigate(mail.id)}>
@@ -136,7 +153,13 @@ export function MailPanel({ route, navigate }: DevtoolsPanelProps) {
           ))}
         </div>
       </div>
-      <div>{route ? <MailDetail key={route} id={route} /> : <EmptyState>Select a message to inspect it.</EmptyState>}</div>
+      <div>
+        {route ? (
+          <MailDetail key={route} id={route} />
+        ) : (
+          <EmptyState title="Select a message to inspect it." />
+        )}
+      </div>
     </div>
   );
 }

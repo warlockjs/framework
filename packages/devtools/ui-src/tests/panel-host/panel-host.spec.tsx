@@ -11,7 +11,9 @@ afterEach(() => setPanelModuleLoader(null));
 describe("PanelHost", () => {
   it("renders the 5.55 fixture view module with the 5.55 context", async () => {
     // The fixture the server specs use: it calls api("search?q=a") and draws bars with the rows' count.
-    const fixture = (await import("../../../tests/fixtures/test-panel/view.js")) as unknown as LegacyPanelModule;
+    // @ts-expect-error The fixture is a plain JavaScript view module without a declaration file.
+    const fixture =
+      (await import("../../../tests/fixtures/test-panel/view.js")) as unknown as LegacyPanelModule;
     const api = mockApi({ "api/test/search": { body: { results: [1, 2, 3] } } });
 
     setPanelModuleLoader(async () => fixture);
@@ -88,10 +90,13 @@ describe("PanelHost", () => {
 
     await expect(seen?.api("read")).resolves.toEqual({ ok: true });
     await expect(seen?.api("write", { method: "POST", body: "{}" })).resolves.toEqual({ saved: 1 });
-    await expect(seen?.api("bad", { method: "POST" })).rejects.toThrow("The flow name is empty. Type a name.");
+    await expect(seen?.api("bad", { method: "POST" })).rejects.toThrow(
+      "The flow name is empty. Type a name.",
+    );
     await expect(seen?.api("gone", { method: "DELETE" })).resolves.toBeUndefined();
 
-    const header = (method: string) => api.calls.find((call) => call.method === method)?.headers.get("X-Devtools-Csrf");
+    const header = (method: string) =>
+      api.calls.find((call) => call.method === method)?.headers.get("X-Devtools-Csrf");
 
     expect(header("GET")).toBeNull();
     expect(header("POST")).toBe("csrf-xyz");
@@ -102,19 +107,28 @@ describe("PanelHost", () => {
     setPanelModuleLoader(async () => ({}));
     render(<PanelHost id="book" title="Book" route="" />);
 
-    expect(await screen.findByText(/Book panel's view module has no default export function/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Book panel's view module has no default export function/),
+    ).toBeInTheDocument();
   });
 
   it("shows an error when the module fails to load, and retries on the next mount", async () => {
-    const loader = vi.fn().mockRejectedValueOnce(new Error("404 view.js")).mockResolvedValue({
-      default: (context: LegacyPanelContext) => void context.root.append(context.empty("Loaded")),
-    });
+    const loader = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("404 view.js"))
+      .mockResolvedValue({
+        default: (context: LegacyPanelContext) => void context.root.append(context.empty("Loaded")),
+      });
 
     setPanelModuleLoader(loader);
 
     const first = render(<PanelHost id="book" title="Book" route="" />);
 
-    expect(await screen.findByText(/Book panel's view module did not load \(404 view.js\)\. Check the server log\./)).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        /Book panel's view module did not load \(404 view.js\)\. Check the server log\./,
+      ),
+    ).toBeInTheDocument();
     first.unmount();
 
     render(<PanelHost id="book" title="Book" route="" />);

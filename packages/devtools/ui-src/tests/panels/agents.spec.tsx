@@ -26,7 +26,13 @@ function trace(runId: string, promptHash = "p1", toolHash = "abcdef123456") {
     status: "completed",
     input: "swap squats",
     systemPrompt: { hash: promptHash, text: "You are a coach." },
-    toolSchemas: { [toolHash]: { name: "update_plan", description: "Change the plan.", schema: '{"type":"object"}' } },
+    toolSchemas: {
+      [toolHash]: {
+        name: "update_plan",
+        description: "Change the plan.",
+        schema: '{"type":"object"}',
+      },
+    },
     turns: [
       {
         index: 0,
@@ -50,7 +56,9 @@ function trace(runId: string, promptHash = "p1", toolHash = "abcdef123456") {
         ],
         usage: { input: 10, output: 5, total: 15 },
         cost: 0.001,
-        contract: [{ type: "refusal-retry", tripIndex: 0, tool: "update_plan", reason: "not in library" }],
+        contract: [
+          { type: "refusal-retry", tripIndex: 0, tool: "update_plan", reason: "not in library" },
+        ],
       },
     ],
     usage: { input: 10, output: 5, total: 15 },
@@ -61,7 +69,9 @@ beforeEach(() => FakeEventSource.install());
 
 describe("Agents panel", () => {
   it("renders install guidance and an empty state", async () => {
-    mockApi([["api/ai/agent-runs", { available: false, message: "Install @warlock.js/ai 5.38", runs: [] }]]);
+    mockApi([
+      ["api/ai/agent-runs", { available: false, message: "Install @warlock.js/ai 5.38", runs: [] }],
+    ]);
     renderPanel(AgentsPanel);
 
     expect(await screen.findByText("Install @warlock.js/ai 5.38")).toBeInTheDocument();
@@ -79,7 +89,9 @@ describe("Agents panel", () => {
     renderPanel(AgentsPanel);
 
     expect(await screen.findByText("coach · completed · 40 ms")).toBeInTheDocument();
-    expect(screen.getByText("2 turns · 2 tool calls · 1 refused · 10 input · 5 output · $0.001230 USD")).toBeInTheDocument();
+    expect(
+      screen.getByText("2 turns · 2 tool calls · 1 refused · 10 input · 5 output · $0.001230 USD"),
+    ).toBeInTheDocument();
     expect(screen.getByText("mock/<img onerror=alert(1)>")).toBeInTheDocument();
     expect(document.querySelector("img")).toBeNull();
     expect(screen.getByLabelText(/Filter agent runs by HTTP request id/)).toBeInTheDocument();
@@ -108,11 +120,23 @@ describe("Agents panel", () => {
     expect(await screen.findByText("System prompt p1")).toBeInTheDocument();
     expect(screen.getByText("You are a coach.")).toBeInTheDocument();
     expect(screen.getByText("Tool update_plan@abcdef12")).toBeInTheDocument();
-    expect(screen.getByText("turn 0 · tool_calls · 12 ms · 10 input · 5 output · $0.001000 USD")).toBeInTheDocument();
-    expect(screen.getByText("Tools offered (~40 tokens): update_plan@abcdef12")).toBeInTheDocument();
-    expect(screen.getByText("update_plan · failed · 3 ms · refused: Exercise not in library · error: Exercise not in library")).toBeInTheDocument();
-    expect(screen.getByText("contract: refusal-retry update_plan (not in library)")).toBeInTheDocument();
-    expect(await screen.findByText("Same system prompt and tool definitions as run_1.")).toBeInTheDocument();
+    expect(
+      screen.getByText("turn 0 · tool_calls · 12 ms · 10 input · 5 output · $0.001000 USD"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Tools offered (~40 tokens): update_plan@abcdef12"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "update_plan · failed · 3 ms · refused: Exercise not in library · error: Exercise not in library",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("contract: refusal-retry update_plan (not in library)"),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("Same system prompt and tool definitions as run_1."),
+    ).toBeInTheDocument();
   });
 
   it("flags a changed prompt and tool definitions against the previous run of the agent", async () => {
@@ -136,21 +160,28 @@ describe("Agents panel", () => {
 
     renderPanel(AgentsPanel, { route: "run_1" });
 
-    expect(await screen.findByText("No earlier run of this agent to compare with.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No earlier run of this agent to compare with."),
+    ).toBeInTheDocument();
     await user.click(screen.getByText("System prompt p1"));
     expect(screen.getByText("Text not kept (only the hash is recorded).")).toBeInTheDocument();
   });
 
   it("shows API errors with message and ref", async () => {
-    mockApi([["api/ai/agent-runs", failure(500, "Agent runs could not be read. Reload.", { ref: "ag-1" })]]);
+    mockApi([
+      ["api/ai/agent-runs", failure(500, "Agent runs could not be read. Reload.", { ref: "ag-1" })],
+    ]);
     renderPanel(AgentsPanel);
 
     expect(await screen.findByText("Agent runs could not be read. Reload.")).toBeInTheDocument();
-    expect(screen.getByText("ag-1")).toBeInTheDocument();
+    expect(screen.getByText("Reference: ag-1")).toBeInTheDocument();
   });
 
   it("selecting a run navigates to it", async () => {
-    mockApi([["api/ai/agent-runs", { available: true, runs: [row("run_1")] }], ["api/ai/agent-runs/run_1", trace("run_1")]]);
+    mockApi([
+      ["api/ai/agent-runs", { available: true, runs: [row("run_1")] }],
+      ["api/ai/agent-runs/run_1", trace("run_1")],
+    ]);
     const user = userEvent.setup();
     const { navigations } = renderPanel(AgentsPanel);
 

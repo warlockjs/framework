@@ -2,6 +2,13 @@
 
 `@warlock.js/grimoire` is new in 5.55.0 and experimental: its file layout, `GR` codes and API may change in any release until it is marked stable.
 
+## 5.56.0
+
+### Added
+
+- The Grimoire tab works in the devtools production monitor. It is read-only there: it opens the book without writing any file. `GrimoireDevtoolsPanel` gains `production`, and `GrimoirePanelContext` gains `mode`.
+
+
 ## 5.55.0 - 2026-11-17
 
 ### Added

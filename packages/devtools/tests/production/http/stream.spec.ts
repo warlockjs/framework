@@ -150,7 +150,7 @@ describe("the production stream", () => {
       `event: request\ndata: ${JSON.stringify({ id: "r1", method: "GET", path: "/x", startedAt: 1, queryCount: 0, warningCount: 0, instance: "host:1:abc" })}`,
     );
     expect(text).toContain(
-      `event: log\ndata: ${JSON.stringify({ level: "error", module: "m", action: "a", message: "kept", at: 2 })}`,
+      `event: log\ndata: ${JSON.stringify({ level: "error", module: "m", action: "a", message: "kept", at: 2, instance: "host:1:abc" })}`,
     );
     expect(text).not.toContain("dropped");
     expect(text).not.toContain("s3cret");

@@ -2,7 +2,8 @@ import type { DevtoolsHealthReport, DevtoolsHealthView } from "@contracts";
 import { useApi } from "@/api/hooks";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState, ErrorMessage, LoadingRows, PanelHeader, queryString, Time } from "@/components/ui/panel-kit";
+import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
+import { PanelHeader, queryString, Time } from "@/components/ui/panel-kit";
 import type { DevtoolsPanelProps } from "@/panels/types";
 
 function statusBadge(status: DevtoolsHealthReport["status"]) {
@@ -16,7 +17,10 @@ function HistoryStrip({ history }: { history: DevtoolsHealthReport["history"] })
   if (!history.length) return <p className="text-xs text-muted-foreground">No history yet.</p>;
 
   return (
-    <ul className="m-0 flex list-none flex-wrap gap-0.5 p-0" aria-label="Health history, oldest first">
+    <ul
+      className="m-0 flex list-none flex-wrap gap-0.5 p-0"
+      aria-label="Health history, oldest first"
+    >
       {history.map((entry) => (
         <li
           key={entry.at}
@@ -37,10 +41,12 @@ export function HealthPanel({ instance }: DevtoolsPanelProps) {
   return (
     <div>
       <PanelHeader title="Health" note="Readiness checks, updated every 15 seconds." />
-      {error ? <ErrorMessage error={error} title="Could not load the health checks" onRetry={reload} /> : null}
+      {error ? (
+        <ErrorMessage error={error} title="Could not load the health checks" onRetry={reload} />
+      ) : null}
       {!data && loading ? <LoadingRows rows={3} /> : null}
       {data && !data.instances.length ? (
-        <EmptyState>No instance has reported a health check yet. The first check runs shortly after the app starts.</EmptyState>
+        <EmptyState title="No instance has reported a health check yet. The first check runs shortly after the app starts." />
       ) : null}
       <div className="grid gap-4 lg:grid-cols-2">
         {data?.instances.map(({ instance: info, report }) => {
@@ -62,14 +68,20 @@ export function HealthPanel({ instance }: DevtoolsPanelProps) {
                     {checks.map(([name, passing]) => (
                       <li key={name} className="flex items-center justify-between gap-2">
                         <span className="font-mono text-xs">{name}</span>
-                        <span className={passing ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}>
+                        <span
+                          className={
+                            passing ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
+                          }
+                        >
                           {passing ? "passing" : "failing"}
                         </span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No readiness checks are registered.</p>
+                  <p className="text-sm text-muted-foreground">
+                    No readiness checks are registered.
+                  </p>
                 )}
                 <HistoryStrip history={report.history} />
               </CardContent>

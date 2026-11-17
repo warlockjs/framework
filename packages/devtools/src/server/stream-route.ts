@@ -74,7 +74,11 @@ export function registerStreamRoute(server: FastifyInstance, deps: MountDevtools
         if (event.type === "log") {
           if (!session.logLevels.includes(event.data.level)) return;
 
-          write(`event: log\ndata: ${JSON.stringify(withoutContext(event.data))}\n\n`);
+          const row = withoutContext(event.data);
+
+          write(
+            `event: log\ndata: ${JSON.stringify(instanceId !== undefined ? { ...row, instance: instanceId } : row)}\n\n`,
+          );
           return;
         }
       }

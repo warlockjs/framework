@@ -1,6 +1,10 @@
 import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { DevtoolsResourcePoint, DevtoolsResourceSnapshot, DevtoolsResourcesView } from "@contracts";
+import type {
+  DevtoolsResourcePoint,
+  DevtoolsResourceSnapshot,
+  DevtoolsResourcesView,
+} from "@contracts";
 import { ResourcesPanel } from "@/panels/resources";
 import { failure, instanceA, instanceB, mockApi, prodViewer, renderPanel } from "./helpers";
 
@@ -33,7 +37,11 @@ const snapshot = (): DevtoolsResourceSnapshot => ({
 
 const view = (): DevtoolsResourcesView => ({
   instances: [
-    { instance: instanceA, snapshot: snapshot(), history: [point(1000, 200 * 1024 * 1024), point(2000, 250 * 1024 * 1024)] },
+    {
+      instance: instanceA,
+      snapshot: snapshot(),
+      history: [point(1000, 200 * 1024 * 1024), point(2000, 250 * 1024 * 1024)],
+    },
     { instance: instanceB, snapshot: snapshot(), history: [] },
   ],
 });
@@ -66,16 +74,25 @@ describe("Resources panel", () => {
     mockApi([[/^api\/resources/, { instances: [] }]]);
     renderPanel(ResourcesPanel);
 
-    expect(await screen.findByText(/No instance has reported its resources yet/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/No instance has reported its resources yet/),
+    ).toBeInTheDocument();
   });
 
   it("shows an API error with message and ref", async () => {
-    mockApi([[/^api\/resources/, failure(500, "Resources are not available. Restart the app.", { ref: "res-1" })]]);
+    mockApi([
+      [
+        /^api\/resources/,
+        failure(500, "Resources are not available. Restart the app.", { ref: "res-1" }),
+      ],
+    ]);
     renderPanel(ResourcesPanel);
 
     const alert = await screen.findByRole("alert");
 
-    expect(within(alert).getByText("Resources are not available. Restart the app.")).toBeInTheDocument();
-    expect(within(alert).getByText("res-1")).toBeInTheDocument();
+    expect(
+      within(alert).getByText("Resources are not available. Restart the app."),
+    ).toBeInTheDocument();
+    expect(within(alert).getByText("Reference: res-1")).toBeInTheDocument();
   });
 });

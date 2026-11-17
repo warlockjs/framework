@@ -15,7 +15,8 @@ let server: FastifyInstance;
 async function build(deps: Partial<MountDevtoolsRoutesDeps>) {
   server = Fastify();
   server.setErrorHandler((error, _request, reply) => {
-    if (error instanceof DevtoolsApiError) return reply.status(error.statusCode).send(error.toBody());
+    if (error instanceof DevtoolsApiError)
+      return reply.status(error.statusCode).send(error.toBody());
 
     return reply.status(500).send({ error: error.message });
   });
@@ -47,13 +48,24 @@ describe("insights routes (production, shared)", () => {
 
     await store.reports.write(report("b", NOW - 1000, { queries: [shape("q9", [900])] }));
 
-    return build({ insights: createSharedInsights({ store, reporter, sampleRate: 0.1 }) });
+    return build({
+      mode: "production",
+      insights: createSharedInsights({ store, reporter, sampleRate: 0.1 }),
+    });
   }
 
   it("serves every view as no-store JSON", async () => {
     const app = await shared();
 
-    for (const path of ["instances", "resources", "queries/stats", "routes/stats", "health", "errors", "jobs"]) {
+    for (const path of [
+      "instances",
+      "resources",
+      "queries/stats",
+      "routes/stats",
+      "health",
+      "errors",
+      "jobs",
+    ]) {
       const response = await app.inject({ method: "GET", url: `/api/${path}` });
 
       expect(response.statusCode, path).toBe(200);
@@ -109,11 +121,48 @@ describe("insights routes (development, local)", () => {
   });
 });
 
+describe("development logs with local insights", () => {
+  it("keeps the collector logs and their context", async () => {
+    const collector = createCollector(collectorOptions);
+
+    collector.addLog(undefined, {
+      level: "debug",
+      module: "m",
+      action: "a",
+      message: "hi",
+      at: 1,
+      context: { a: 1 },
+    });
+    const app = await build({ collector, insights: createLocalInsights(reporter) });
+    const rows = (await app.inject({ url: "/api/logs" })).json();
+
+    expect(rows).toEqual([
+      {
+        level: "debug",
+        module: "m",
+        action: "a",
+        message: "hi",
+        at: 1,
+        requestId: null,
+        instance: null,
+        context: { a: 1 },
+      },
+    ]);
+  });
+});
+
 describe("without insights", () => {
   it("registers no insights routes and keeps the 5.55 logs", async () => {
     const collector = createCollector(collectorOptions);
 
-    collector.addLog(undefined, { level: "warn", module: "m", action: "a", message: "hi", at: 1, context: { a: 1 } });
+    collector.addLog(undefined, {
+      level: "warn",
+      module: "m",
+      action: "a",
+      message: "hi",
+      at: 1,
+      context: { a: 1 },
+    });
     collector.addLog(undefined, { level: "info", module: "n", action: "a", message: "yo", at: 2 });
     const app = await build({ collector });
 
@@ -122,7 +171,16 @@ describe("without insights", () => {
     const rows = (await app.inject({ url: "/api/logs?level=warn" })).json();
 
     expect(rows).toEqual([
-      { level: "warn", module: "m", action: "a", message: "hi", at: 1, requestId: null, instance: null, context: { a: 1 } },
+      {
+        level: "warn",
+        module: "m",
+        action: "a",
+        message: "hi",
+        at: 1,
+        requestId: null,
+        instance: null,
+        context: { a: 1 },
+      },
     ]);
     expect((await app.inject({ url: "/api/logs?module=n" })).json()).toHaveLength(1);
   });

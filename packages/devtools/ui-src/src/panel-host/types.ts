@@ -4,8 +4,6 @@
  * the built-in Processes tab) keep working inside the React shell. Its
  * default export is called with this object and returns (or fills `root`
  * with) DOM nodes.
- *
- * Owner: WP-6.
  */
 export type LegacyPanelContext = {
   id: string;

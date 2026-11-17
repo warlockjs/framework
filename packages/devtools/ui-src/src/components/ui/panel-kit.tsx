@@ -1,12 +1,11 @@
 import * as React from "react";
-import { ApiError } from "@/api/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 
 /**
- * Small building blocks the built-in tabs share: the loading, empty and error
- * states, the number and time formatters, and the form controls the filters use.
+ * Small building blocks the built-in tabs share: the number and time formatters
+ * and the form controls the filters use. The loading, empty and error states
+ * live in `@/components/common`.
  */
 
 /** A value that is not known, shown instead of a blank. */
@@ -85,66 +84,6 @@ export function Time({ at, className }: { at: number | null | undefined; classNa
 /** A clock time, for log rows. */
 export function clockTime(at: number | null | undefined): string {
   return at == null ? DASH : new Date(at).toLocaleTimeString();
-}
-
-/** The shape of any failure a view can show. */
-export function toApiError(error: unknown): ApiError {
-  return error instanceof ApiError
-    ? error
-    : new ApiError(
-        error instanceof Error ? error.message : String(error),
-        0,
-      );
-}
-
-/**
- * A failed call: what failed and what to do next (the server's message), with
- * the reference to quote to support when there is one.
- */
-export function ErrorMessage({
-  error,
-  title = "Could not load this view",
-  onRetry,
-}: {
-  error: unknown;
-  title?: string;
-  onRetry?: () => void;
-}) {
-  const failure = toApiError(error);
-
-  return (
-    <div
-      role="alert"
-      className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
-    >
-      <p className="font-medium">{title}</p>
-      <p className="mt-1">{failure.message}</p>
-      {failure.ref ? (
-        <p className="mt-1 text-xs">
-          Reference: <code className="font-mono">{failure.ref}</code>. Quote it to an admin.
-        </p>
-      ) : null}
-      {onRetry ? (
-        <Button variant="outline" size="xs" className="mt-2" onClick={onRetry}>
-          Try again
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
-export function EmptyState({ children }: { children: React.ReactNode }) {
-  return <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{children}</p>;
-}
-
-export function LoadingRows({ rows = 4 }: { rows?: number }) {
-  return (
-    <div role="status" aria-label="Loading" className="space-y-2">
-      {Array.from({ length: rows }, (_, index) => (
-        <Skeleton key={index} className="h-8 w-full" />
-      ))}
-    </div>
-  );
 }
 
 /** A title row with controls on the right. */

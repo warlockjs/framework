@@ -4,6 +4,34 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.56.0
+
+### Upgrading
+
+- The dashboard is now a React app and replaces `ui/app.js`. Panel view modules keep working unchanged. Styles of a view that relied on the old dashboard's CSS classes may look different.
+- These panel ids are now reserved: `resources`, `health`, `errors`, `jobs`, `instances`, `auth`, `account` and `admin`. A panel that uses one is left out with a message.
+- The production monitor is opt-in. Nothing changes until you set `production.enabled`. To use it, install `@warlock.js/devtools` as a regular dependency, add `devtoolsConnector()`, `devtoolsMigrations` and `registerDevtoolsCommands()` to `warlock.config.ts`, run `warlock migrate`, and set `DEVTOOLS_PATH` and the first admin in the environment. See "Devtools in production" in the docs.
+- `GET api/logs` rows now carry `instance` and `requestId`.
+- `GET <path>` without a trailing slash now redirects to `<path>/` in development too.
+
+### Added
+
+- Production monitor: a dashboard at a secret path that answers your app's own 404 to anyone who is not signed in. It has its own accounts (admin and viewer roles) stored through Cascade, forced password change, authenticator-app and passkey two-factor, recovery codes, invite links, sign-in rate limits, an audit log, and a switch to disable it from the dashboard. It refuses to start without a path, a first admin and an encryption key (`DT001` to `DT010`).
+- Production capture: sampled requests, query shapes, routes, error groups and warn and error logs are kept per process with bounded memory and written to the database as redacted samples (shapes only, never values). Slow and failed requests outside the sample are kept as summaries. At the default sample rate the added cost is about 1.3 µs per request.
+- Several instances share one view: each process writes a report, and the dashboard merges them with an instance picker.
+- EXPLAIN by query shape: plain `EXPLAIN` for PostgreSQL reads and `queryPlanner` for MongoDB reads. Executing plans run only with `explain.executing: true`, and never for statements that write.
+- New tabs: Resources (memory, CPU, event loop, garbage collection), Health, Errors and Jobs. Queries and Routes show latency statistics with histograms, in development too.
+- `warlock devtools:enable` and `warlock devtools:reset-admin` (`registerDevtoolsCommands()`), and `devtoolsMigrations`, from `@warlock.js/devtools/production`.
+- Panels can set `production: true`, and the panel factory receives `mode` (`"development"` or `"production"`). In production a panel's GET routes need a signed-in user, and every other method needs an admin, the CSRF header, and is written to the audit log.
+
+### Changed
+
+- The dashboard tabs are rebuilt in React with the same features: requests with filters, waterfall, EXPLAIN and curl, queries, routes, logs, mail, AI runs, agent traces and API docs.
+- The live stream sends `retry` and `hello` first, and request and log events carry `instance`.
+- Query shapes drop dollar-quoted strings.
+- The server answers 503 with a build hint when `ui/dashboard/` is missing.
+
+
 ## 5.55.0 - 2026-11-17
 
 ### Added

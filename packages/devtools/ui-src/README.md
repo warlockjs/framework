@@ -62,8 +62,8 @@ can use it.
 ## Size budget and the release gate
 
 `assets/app.js` plus `assets/app.css` must stay at or under 300 KB gzipped. The release gate
-(`npm run check:devtools-ui` in `tools/release`) checks three things: the source hash in `build-info.json` matches this
-folder, `contracts.ts` and the UI dependency versions; a fresh build is byte-identical to the shipped files; and the
-size is within budget. If `ui/dashboard/` is stale, the gate fails: rebuild and commit it.
-
-TODO(coordinator): confirm the `dev:ui` proxy variables and the gate wording against `ui-src/vite.config.ts` and the gate script once both are final.
+(`npm run check:devtools-ui` in `tools/release`) checks four things: `build-info.json` exists and its source hash matches
+this folder, `contracts.ts` and the UI dependency versions; every shipped file still matches its recorded hash; a fresh
+build is byte-identical to the shipped files; and the size is within budget. If `ui/dashboard/` is stale, the gate fails:
+rebuild and commit it. The gate runs Vite with a 10 minute timeout; on the shared server start it through the same
+wrapper as the build.
