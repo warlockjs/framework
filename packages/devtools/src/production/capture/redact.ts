@@ -18,15 +18,17 @@ const BRACES = /\{[^{}]*\}/g;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 
 /**
- * A database error message without the values the driver quoted in it
- * (a duplicate key message carries the key): quoted strings, emails and
- * `{ … }` documents become `?`.
+ * Error text without the values a driver or a handler put in it (a duplicate
+ * key message carries the key): quoted strings, emails and `{ … }` documents
+ * become `?`, then the text is cut to `max` characters.
  */
+export function scrubErrorText(text: string, max: number): string {
+  return truncate(text.replace(QUOTED, "?").replace(EMAIL, "?").replace(BRACES, "{?}"), max);
+}
+
+/** A database error message without the values the driver quoted in it. */
 export function scrubQueryError(message: string): string {
-  return truncate(
-    message.replace(QUOTED, "?").replace(EMAIL, "?").replace(BRACES, "{?}"),
-    QUERY_ERROR_MAX,
-  );
+  return scrubErrorText(message, QUERY_ERROR_MAX);
 }
 
 function redactQuery(query: DevtoolsQuery): DevtoolsSampleQuery {
@@ -112,7 +114,7 @@ export function toStoredSample(
     droppedQueries,
   };
 
-  if (request.error !== undefined) detail.error = truncate(request.error, ERROR_MAX);
+  if (request.error !== undefined) detail.error = scrubErrorText(request.error, ERROR_MAX);
 
   return { id: request.id, instance, startedAt: request.startedAt, summary, detail };
 }

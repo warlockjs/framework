@@ -37,6 +37,9 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 /** The routes of the opt-in API documentation pages (they keep a CSP of their own). */
 const DOCS_PATTERNS = new Set(["/docs", "/docs/swagger"]);
 
+/** The mail preview's HTML: framed by the dashboard, with a policy of its own. */
+const MAIL_HTML_PATTERN = "/api/mails/:id/html";
+
 /** Which tab a route belongs to: a route of a tab that is off answers the uniform 404. */
 const TAB_OF_ROUTE: readonly (readonly [prefix: string, tab: string])[] = [
   ["/api/resources", "resources"],
@@ -255,8 +258,12 @@ export function mountProductionDevtools(
         const pattern = relative === "" ? "/" : relative;
         const method = request.method;
 
-        // The bare path (no trailing slash) redirects to the shell's address.
-        if ((request.raw.url ?? "").split("?")[0] === prefix) {
+        // The bare path (no trailing slash) redirects to the shell's address. The
+        // address as sent: core's server drops a trailing slash before routing,
+        // so the rewritten URL of `<path>/` is the bare path too.
+        const sent = request.originalUrl ?? request.raw.url ?? "";
+
+        if (sent.split("?")[0] === prefix) {
           setDevtoolsRequestContext(request, {
             client,
             meta,
@@ -267,9 +274,7 @@ export function mountProductionDevtools(
 
           if (method !== "GET" && method !== "HEAD") return notFound(request, reply);
 
-          const search = request.raw.url?.includes("?")
-            ? `?${request.raw.url.split("?").slice(1).join("?")}`
-            : "";
+          const search = sent.includes("?") ? `?${sent.split("?").slice(1).join("?")}` : "";
 
           return reply.redirect(`${prefix}/${search}`, 308);
         }
@@ -337,13 +342,16 @@ export function mountProductionDevtools(
 
         const pattern = devtoolsRequestContext(request)?.pattern ?? "";
 
-        // The mail preview is the one page the dashboard frames, from its own origin.
-        if (pattern === "/api/mails/:id/html") reply.header("X-Frame-Options", "SAMEORIGIN");
+        // The mail preview is the one page the dashboard frames, from its own origin, and it sends its own policy.
+        if (pattern === MAIL_HTML_PATTERN) {
+          reply.header("X-Frame-Options", "SAMEORIGIN");
 
-        if (
-          String(reply.getHeader("content-type") ?? "").startsWith("text/html") &&
-          reply.getHeader("content-security-policy") === undefined
-        ) {
+          return payload;
+        }
+
+        // Always the dashboard's policy: the app's own (core's security headers set one on every response) is not
+        // written for this page and must not replace it.
+        if (String(reply.getHeader("content-type") ?? "").startsWith("text/html")) {
           reply.header(
             "Content-Security-Policy",
             DOCS_PATTERNS.has(pattern) ? DOCS_CSP : DASHBOARD_CSP,
@@ -397,9 +405,10 @@ export function mountProductionDevtools(
 
           const ref = createErrorRef();
 
-          // Never rate limited: the reference the browser shows must always be findable in the log.
+          // Never rate limited: the reference the browser shows must always be findable in the log. The route is
+          // written relative to the dashboard path, which never reaches the log.
           deps.warn?.(
-            `Devtools dashboard error ${ref} on ${request.method} ${request.routeOptions.url ?? ""}: ${error.message}`,
+            `Devtools dashboard error ${ref} on ${request.method} ${devtoolsRequestContext(request)?.pattern ?? "(dashboard route)"}: ${error.message}`,
           );
           request.log.error({ ref, err: error }, "devtools dashboard error");
 

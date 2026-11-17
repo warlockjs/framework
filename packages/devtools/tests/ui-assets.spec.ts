@@ -51,6 +51,22 @@ describe("registerUiAssets", () => {
     expect((await server.inject({ method: "GET", url: "/__warlock/" })).statusCode).toBe(503);
   });
 
+  it("serves <path>/ when the server drops a trailing slash before routing, as core's does", async () => {
+    const server = Fastify({
+      rewriteUrl: (request) => (request.url ?? "/").replace(/(?<=.)\/(?=\?|$)/, ""),
+    });
+
+    server.register(async (instance) => registerUiAssets(instance), { prefix: "/__warlock" });
+    await server.ready();
+
+    expect((await server.inject({ method: "GET", url: "/__warlock/" })).statusCode).toBe(503);
+
+    const bare = await server.inject({ method: "GET", url: "/__warlock?x=1" });
+
+    expect(bare.statusCode).toBe(308);
+    expect(bare.headers.location).toBe("/__warlock/?x=1");
+  });
+
   it("serves the built index as is, with no tab injection", async () => {
     mkdirSync(path.join(state.root, "dashboard", "assets"), { recursive: true });
     writeFileSync(

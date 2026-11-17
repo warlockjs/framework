@@ -69,7 +69,7 @@ Every dashboard response that is not a 404 carries `Cache-Control: no-store`, `X
 noarchive`, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
 `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy: same-origin` and a restrictive
 `Permissions-Policy`. The HTML page also carries a `Content-Security-Policy` that allows scripts only from the dashboard's
-own origin. The API docs pages keep the policy they need.
+own origin; it replaces any policy the app sets for its own pages. The API docs pages keep the policy they need.
 
 ## Rate limits
 
@@ -79,7 +79,9 @@ Failed sign-ins and failed second-factor checks are counted in the audit log ove
 - 20 per IP,
 - 100 in total: the whole path answers 404 for 15 minutes.
 
-`warlock devtools:enable` resets the counts. The limits are options under `rateLimits`.
+A correct password does not reset an account's count, so signing in again does not buy more second-factor guesses;
+only a completed sign-in does. A caller over the IP limit gets the same answer without any password check, so it costs
+the app no CPU, and refused tries are written to the audit log at most once a minute per address and account. `warlock devtools:enable` resets the counts. The limits are options under `rateLimits`.
 
 ## Audit log
 
@@ -137,3 +139,12 @@ See [Registering a panel](/v/latest/devtools/panels/).
 - EXPLAIN works only on the instance that holds the query example.
 - Anyone who can send many failed sign-ins can close the dashboard. That is the safe failure; an admin reopens it with
   the CLI.
+- The per-IP limit counts each address. A client with many addresses (an IPv6 range, a botnet) is held back by the
+  per-account and global limits instead.
+- Request paths are kept as served (without the query string). Keep tokens out of URL paths.
+- A signed-in session can add or remove a second factor without typing the password again (the last required factor
+  cannot be removed). Keep sessions short with `session.idleMinutes` if that matters to you.
+- The cookie is scoped to the dashboard path, not to one host name only: a site on a sibling subdomain that you do not
+  control could set a cookie for the same path. Do not serve the dashboard on a domain that shares a parent with
+  untrusted sites.
+- The mail preview, when turned on, loads the remote images of an email.

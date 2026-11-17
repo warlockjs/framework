@@ -2,6 +2,7 @@ import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
 import { config } from "../config/config-getter";
 import type { Request } from "./request";
+import { isExcludedFromRequestLog } from "./request-log/request-log-exclusions";
 
 /**
  * Level for a per-phase request log line (start, middleware, validation,
@@ -19,8 +20,9 @@ export function phaseLogLevel(level: LogLevel = "info"): LogLevel {
 /**
  * Arm the one-line request summary: written at `info` when the response
  * closes, with method, path, status, duration and request id. A 5xx is
- * skipped because it already leaves its own error record. Does nothing
- * unless `http.log` is on. Never throws.
+ * skipped because it already leaves its own error record, and so is a path
+ * registered with `excludeFromRequestLog` (a private path must not reach the
+ * log). Does nothing unless `http.log` is on. Never throws.
  */
 export function armRequestSummary(request: Request): void {
   try {
@@ -39,7 +41,9 @@ export function armRequestSummary(request: Request): void {
 
         const durationMs = Date.now() - request.startTime;
         const method = request.method;
-        const path = String(request.path ?? "").split("?")[0];
+        const path = String(request.path ?? "").split("?")[0] ?? "";
+
+        if (isExcludedFromRequestLog(path)) return;
 
         log.info(
           "request",

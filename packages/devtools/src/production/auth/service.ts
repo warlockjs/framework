@@ -60,6 +60,9 @@ const MAX_PASSWORD_INPUT = 1024;
 /** How long this process remembers that an IP was over its limit. */
 const IP_BLOCK_CACHE_MS = 30_000;
 const IP_BLOCK_CACHE_SIZE = 1000;
+/** A refused try is written to the audit log at most this often per address and account. */
+const BLOCKED_AUDIT_INTERVAL = MINUTE;
+const BLOCKED_AUDIT_CACHE_SIZE = 1000;
 /** Marks the session as having passed a passkey check a moment ago (sensitive actions). */
 const STEP_UP_CHALLENGE = "stepup:ok";
 /** A stored hash no password can match. */
@@ -86,6 +89,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
   let inFlight = 0;
   let dummyHashPromise: Promise<string> | null = null;
   const blockedIps = new Map<string, { until: number; checkedAt: number }>();
+  const blockedAudits = new Map<string, { at: number; ref: string }>();
 
   // -------------------------------------------------------------------------
   // Small helpers
@@ -238,6 +242,40 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     return ref;
   }
 
+  /**
+   * Writes a `login.blocked` entry, at most once a minute per address and
+   * account: refused tries cost no password check against the limits, so
+   * without this a caller over its limit could grow the audit log without
+   * bound. A skipped write answers the reference of the last one.
+   */
+  async function auditBlocked(input: {
+    auth?: DevtoolsAuthenticated | null;
+    accountId?: string | null;
+    email?: string | null;
+    meta: DevtoolsRequestMeta;
+    detail?: AuditDetail;
+  }): Promise<string> {
+    const key = `${input.meta.ip}|${input.accountId ?? input.auth?.account.id ?? ""}`;
+    const at = now();
+    const last = blockedAudits.get(key);
+
+    if (last && at - last.at < BLOCKED_AUDIT_INTERVAL) return last.ref;
+
+    blockedAudits.delete(key);
+
+    if (blockedAudits.size >= BLOCKED_AUDIT_CACHE_SIZE) {
+      const oldest = blockedAudits.keys().next();
+
+      if (!oldest.done) blockedAudits.delete(oldest.value);
+    }
+
+    const ref = await audit("login.blocked", input);
+
+    blockedAudits.set(key, { at, ref });
+
+    return ref;
+  }
+
   // -------------------------------------------------------------------------
   // Compare-and-set helpers
   // -------------------------------------------------------------------------
@@ -328,6 +366,18 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
 
   /** Whether a try from `ip` for `account` is refused: dashboard locked, or the IP or the account is over its limit. */
   async function isBlocked(account: DevtoolsAccountRecord | null, ip: string): Promise<boolean> {
+    return (await blockedBy(account, ip)) !== null;
+  }
+
+  /**
+   * Why a try is refused: `"caller"` when the dashboard is locked or the IP is
+   * over its limit (nothing about the account), `"account"` when only the
+   * account is, `null` when it is not refused.
+   */
+  async function blockedBy(
+    account: DevtoolsAccountRecord | null,
+    ip: string,
+  ): Promise<"caller" | "account" | null> {
     const state = await store.state.read();
     const at = now();
     const stateResetAt = state.failuresResetAt ?? 0;
@@ -342,7 +392,9 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
       accountId: account?.id ?? "-",
     });
 
-    return locked || overIp || (account !== null && accountCount >= limits.account);
+    if (locked || overIp) return "caller";
+
+    return account !== null && accountCount >= limits.account ? "account" : null;
   }
 
   /** Closes the whole dashboard for `lockMinutes` once failures anywhere reach the global limit. */
@@ -378,7 +430,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     code: DevtoolsErrorCode,
     input: { email: string | null; accountId?: string | null; meta: DevtoolsRequestMeta; detail?: AuditDetail },
   ): Promise<never> {
-    const ref = await audit(type, input);
+    const ref = type === "login.blocked" ? await auditBlocked(input) : await audit(type, input);
 
     if (type === "login.failed") await lockWhenOverGlobalLimit(input.meta);
 
@@ -406,7 +458,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     code: DevtoolsErrorCode = "auth.invalid-code",
   ): Promise<void> {
     if (await isBlocked(auth.account, meta.ip)) {
-      const ref = await audit("login.blocked", { auth, meta, detail: { step: "second-factor" } });
+      const ref = await auditBlocked({ auth, meta, detail: { step: "second-factor" } });
 
       fail(code, ref);
     }
@@ -454,7 +506,10 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     meta: DevtoolsRequestMeta,
   ): Promise<DevtoolsAuthStep> {
     if (stage === "active") {
-      const step = await createSession(account, "active", meta);
+      // Fully signed in: earlier failures of this account stop counting. Never at the password step, or each new
+      // sign-in with a known password would open a fresh round of second-factor guesses.
+      const reset = await casAccount(account, () => ({ failuresResetAt: now() }));
+      const step = await createSession(reset ?? account, "active", meta);
 
       await store.sessions.remove(auth.session.id);
 
@@ -623,13 +678,18 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     const email = normalizeEmail(input?.email);
     const password = passwordInput(input?.password);
     const account = email ? await store.accounts.findByEmail(email) : null;
-    const blocked = await isBlocked(account, meta.ip);
+    const blockedReason = await blockedBy(account, meta.ip);
+    const blocked = blockedReason !== null;
     const verifiable =
       !blocked && account !== null && !account.passwordHash.startsWith("!") && password !== "";
-    // Unknown email, blocked caller or unusable hash: verify against a dummy
-    // hash so the answer takes as long as a real check.
+    // Unknown email, blocked account or unusable hash: verify against a dummy
+    // hash so the answer takes as long as a real check. A caller that is over
+    // its own limit (or a locked dashboard) learns nothing about the account
+    // from the timing, so it costs no password work at all: a blocked address
+    // is no lever on the app's CPU and cannot hold the verification slots.
     const hash = verifiable && account ? account.passwordHash : await dummyHash();
-    const matches = await withSlot(() => verifyPassword(password, hash));
+    const matches =
+      blockedReason === "caller" ? false : await withSlot(() => verifyPassword(password, hash));
 
     if (blocked) {
       return failLogin("login.blocked", "auth.invalid-credentials", {
@@ -648,7 +708,10 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     }
 
     const at = now();
-    const updated = await casAccount(account, () => ({ failuresResetAt: at, lastLoginAt: at }));
+    // The failures count resets only when the password alone completes the sign-in (see `moveTo`).
+    const updated = await casAccount(account, (fresh) =>
+      nextStage(fresh) === "active" ? { failuresResetAt: at, lastLoginAt: at } : { lastLoginAt: at },
+    );
 
     if (!updated) return failLogin("login.failed", "auth.invalid-credentials", { email, meta });
 
@@ -908,7 +971,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
       if (await isBlocked(auth.account, meta.ip)) {
         await verifyPassword(current, await dummyHash());
 
-        const ref = await audit("login.blocked", { auth, meta, detail: { step: "password" } });
+        const ref = await auditBlocked({ auth, meta, detail: { step: "password" } });
 
         fail("auth.wrong-current-password", ref);
       }

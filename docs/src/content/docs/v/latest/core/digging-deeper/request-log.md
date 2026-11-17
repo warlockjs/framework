@@ -177,7 +177,7 @@ import { excludeFromRequestLog } from "@warlock.js/core";
 const stopExcluding = excludeFromRequestLog("/ops-7f3k2q9x");
 ```
 
-Nothing is written for an excluded request: not the URL, not the body. The lifecycle log line of the request is not affected.
+Nothing is written for an excluded request: not the URL, not the body. The one-line request summary (`http.log`) skips it too.
 
 ## Good to know
 

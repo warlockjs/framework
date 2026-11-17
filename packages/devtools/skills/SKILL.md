@@ -290,17 +290,26 @@ Options under `production` (all optional, defaults in brackets):
 `auditRetentionDays` [90], `passkeys.rpName`, `passkeys.rpId`.
 
 - Redaction: queries are stored as their shape (no literals or bindings), logs
-  lose `context`, phases lose `attrs`, cache keys become counts, headers and
-  bodies come only from core's request log.
+  lose `context`, phases lose `attrs`, cache keys become counts, request error
+  messages and stacks lose quoted values, emails and `{ … }` documents, headers
+  and bodies come only from core's request log. Paths are kept (no query
+  string): keep secrets out of URL paths.
 - EXPLAIN is admin-only and plain (`EXPLAIN (FORMAT JSON)`, MongoDB
-  `queryPlanner`). `explain.executing: true` allows `EXPLAIN ANALYZE` and
+  `queryPlanner`), for one read statement only (a MongoDB aggregate with `$out`
+  or `$merge` never). PostgreSQL plans run in a read-only transaction that is
+  rolled back. `explain.executing: true` allows `EXPLAIN ANALYZE` and
   `executionStats`; they run the query, so leave it off unless accepted.
+- A correct password does not reset an account's failed-try count; only a
+  completed sign-in (second factor included) does. A caller over the IP limit
+  costs no password check, and refused tries are audited at most once a minute
+  per address and account.
 - Several instances share the database: each writes a report every 10 s, the
   instance picker filters, the live stream is per instance.
 - Disable from the dashboard (admin); re-enable with `warlock devtools:enable`
   or a new `DEVTOOLS_PATH`. Lost admin: `warlock devtools:reset-admin --email <email>`.
-- Behind a proxy set `trustedProxies` and forward `X-Forwarded-For` and
-  `X-Forwarded-Proto`; turn off proxy buffering (or rely on
+- Behind a proxy set `trustedProxies`, set `origin`, and have the proxy set
+  (not pass through) `X-Forwarded-For`, `X-Forwarded-Proto` and
+  `X-Forwarded-Host`; turn off proxy buffering (or rely on
   `X-Accel-Buffering: no`) for the live view.
 - Tabs on in production: requests, queries, routes, resources, health, errors,
   logs, jobs. `mail`, `ai`, `agents`, `api`, `processes` need

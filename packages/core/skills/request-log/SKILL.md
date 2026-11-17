@@ -88,8 +88,8 @@ isExcludedFromRequestLog("/ops-7f3k2q9xyz"); // false: whole path segments only
 stopExcluding();
 ```
 
-Requests under the prefix write no record. The per-request lifecycle log line is
-not affected.
+Requests under the prefix write no record, and the one-line request summary
+(`http.log`) skips them too.
 
 ## Gotchas
 

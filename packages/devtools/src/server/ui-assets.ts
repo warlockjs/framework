@@ -63,14 +63,18 @@ const NOT_BUILT_HTML =
  */
 export function registerUiAssets(server: FastifyInstance): void {
   const serveIndex = (request: FastifyRequest, reply: FastifyReply): void => {
-    const [pathname = "", search] = request.url.split("?");
+    // The address as sent: core's server drops a trailing slash before routing.
+    const [pathname = "", search] = (request.originalUrl ?? request.url).split("?");
 
-    // The page loads its assets by relative URL, so it must be served from `<path>/`.
+    // The page loads its assets by relative URL, so it must be served from `<path>/`. The target is built from
+    // the route, never from the request, so it always stays on the dashboard path.
     if (!pathname.endsWith("/")) {
+      const base = (request.routeOptions.url ?? pathname).replace(/\/+$/, "");
+
       reply
         .code(308)
         .header("Cache-Control", "no-store")
-        .redirect(`${pathname}/${search === undefined ? "" : `?${search}`}`, 308);
+        .redirect(`${base}/${search === undefined ? "" : `?${search}`}`, 308);
       return;
     }
 

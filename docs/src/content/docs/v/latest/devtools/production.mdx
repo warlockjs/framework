@@ -70,9 +70,10 @@ the detail of a request sample and each instance report are stored as JSON text.
 | `DEVTOOLS_ADMIN_PASSWORD` | One of these two while no admin exists      | A first password. It works until it is changed at the first sign-in, which is forced. It must pass the password rules.         |
 | `DEVTOOLS_SETUP_TOKEN`   | One of these two while no admin exists       | At least 32 characters (`openssl rand -base64 32`). The admin opens `<origin><path>/#/setup/<token>` and chooses a password.   |
 
-Set either the password or the setup token, not both. The boot log shows only the first characters of the path, and core's persistent request log skips it. Core's optional one-line
-request summary (`http.log`) prints every request path, this one included, so keep that setting off in production or filter
-that log. Pick a path nobody can guess; it is one layer of protection, not the only one.
+Set either the password or the setup token, not both. The path is never written in full to the app's logs: the boot log
+shows only its first characters, core's persistent request log and its one-line request summary (`http.log`) skip it,
+and a dashboard error is logged with the route relative to the path. Pick a path nobody can guess; it is one layer of
+protection, not the only one.
 
 ## First sign-in
 
@@ -175,7 +176,7 @@ Nothing that leaves the process (the API, the database, the live stream) carries
 
 | Item     | Kept                                                                                      | Removed                                              |
 | -------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| Request  | Id, method, path (no query string), route pattern, status, timing, error message          | Headers, body, query string, params                  |
+| Request  | Id, method, path (no query string), route pattern, status, timing, error message and stack | Headers, body, query string, params; quoted values, emails and `{ … }` documents in the error |
 | Query    | Connection, driver, shape (SQL with placeholders), collection, command, timing, row count, error message | SQL literals, bindings, Mongo filter and pipeline values, caller file path |
 | Log      | Level, module, action, message, time                                                       | `context`                                            |
 | Phase    | Name, start, duration                                                                      | `attrs`                                              |
@@ -185,17 +186,25 @@ Nothing that leaves the process (the API, the database, the live stream) carries
 Headers and bodies appear only through core's [request log](/v/latest/core/digging-deeper/request-log/), which
 applies its own allowlist and redaction. The dashboard's own requests are never captured and never written to that log.
 
+The path is kept as the app served it, because it is what you look for when a request fails. Keep secrets out of URL
+paths (a reset link such as `/reset/<token>` is better as `/reset?token=<token>` or a form post); anyone who can sign in to
+the dashboard can read the paths of sampled and failed requests for `requestRetentionHours`.
+
 ## EXPLAIN
 
 Admins can explain a query shape from the **Queries** tab. Only the process that ran the query holds the example, so
 EXPLAIN asks that process; from another one it answers that the example is elsewhere, and you can try again.
 
-- PostgreSQL: `EXPLAIN (FORMAT JSON)` for `SELECT` and `WITH`.
-- MongoDB: `explain` with `queryPlanner` verbosity for `find`, `aggregate` and `count`.
+- PostgreSQL: `EXPLAIN (FORMAT JSON)` for one `SELECT` or `WITH` statement that writes nothing. Strings, quoted names,
+  dollar-quoted bodies and comments are read the way PostgreSQL reads them, so a `;` or a keyword cannot hide in them.
+  The plan runs in a read-only transaction that is always rolled back.
+- MongoDB: `explain` with `queryPlanner` verbosity for `find`, `aggregate` and `count`. An aggregate with `$out` or
+  `$merge` is never explained.
 
 These plans do not run the query. Plans that do (PostgreSQL `EXPLAIN ANALYZE`, MongoDB `executionStats`) run only with
 `explain: { executing: true }`, and only for those read statements. They run the real query against your production
-database, so turn them on only when you accept the load. Every run is audited.
+database, so turn them on only when you accept the load. In PostgreSQL the read-only transaction also stops a function
+the query calls from writing. Every run is audited.
 
 ## Tabs in production
 
@@ -221,11 +230,14 @@ location / {
   proxy_set_header Host $host;
   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
   proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-Host $host;
   proxy_buffering off;
 }
 ```
 
-Set `trustedProxies: ["loopback"]` for this. Entries can be IP addresses, CIDR ranges, `"loopback"` or `"private"`.
+Set `trustedProxies: ["loopback"]` for this. nginx passes on any header the client sent unless the configuration sets
+it, so set every forwarded header the dashboard reads (`X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`), and
+set `origin` to your public origin so the CSRF check and passkeys never depend on a header. Entries can be IP addresses, CIDR ranges, `"loopback"` or `"private"`.
 `proxy_buffering off` lets the live view reach the browser at once. The dashboard also sends `X-Accel-Buffering: no`,
 which nginx honours when buffering is on.
 

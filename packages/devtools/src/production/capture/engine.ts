@@ -11,7 +11,7 @@ import type { DevtoolsCaptureCounters, DevtoolsSampleDetail, DevtoolsSampleSumma
 import type { DevtoolsStoredSample } from "../store/types";
 import { createShapeExplainer } from "./explain";
 import { sampleMatchesFilter } from "./filter";
-import { scrubQueryError, toStoredSample } from "./redact";
+import { scrubErrorText, scrubQueryError, toStoredSample } from "./redact";
 import {
   createErrorGroups,
   createQueryStats,
@@ -110,8 +110,17 @@ function stripQuery(path: string): string {
   return index === -1 ? path : path.slice(0, index);
 }
 
+/** The lengths the error groups keep (see `createErrorGroups`). */
+const REQUEST_ERROR_MAX = 500;
+const REQUEST_STACK_MAX = 4000;
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** A request's error message as the monitor keeps it: without the values in it (see `scrubErrorText`). */
+function requestErrorMessage(error: unknown): string {
+  return scrubErrorText(errorMessage(error), REQUEST_ERROR_MAX);
 }
 
 function touchesMonitorTables(event: DevtoolsQueryEvent): boolean {
@@ -250,9 +259,13 @@ export function createCaptureEngine(deps: DevtoolsCaptureDeps): DevtoolsCaptureE
 
     errors.record({
       source: "request",
-      message: error === undefined ? `HTTP ${status}` : errorMessage(error),
+      message: error === undefined ? `HTTP ${status}` : requestErrorMessage(error),
       name: error instanceof Error ? error.name : null,
-      stack: error instanceof Error ? (error.stack ?? null) : null,
+      // The first line of a stack repeats the message.
+      stack:
+        error instanceof Error && error.stack !== undefined
+          ? scrubErrorText(error.stack, REQUEST_STACK_MAX)
+          : null,
       route: route ?? null,
       status: status ?? null,
       requestId: request.requestId,
@@ -270,7 +283,7 @@ export function createCaptureEngine(deps: DevtoolsCaptureDeps): DevtoolsCaptureE
     collector.endRequest(request.requestId, {
       ...(result.status === undefined ? {} : { status: result.status }),
       durationMs: result.durationMs,
-      ...(result.error === undefined ? {} : { error: errorMessage(result.error) }),
+      ...(result.error === undefined ? {} : { error: requestErrorMessage(result.error) }),
       ...(route === undefined ? {} : { route }),
     });
 
@@ -337,7 +350,7 @@ export function createCaptureEngine(deps: DevtoolsCaptureDeps): DevtoolsCaptureE
     collector.endRequest(request.requestId, {
       ...(result.status === undefined ? {} : { status: result.status }),
       durationMs: result.durationMs,
-      ...(result.error === undefined ? {} : { error: errorMessage(result.error) }),
+      ...(result.error === undefined ? {} : { error: requestErrorMessage(result.error) }),
       ...(request.route === undefined ? {} : { route: request.route }),
     });
   };

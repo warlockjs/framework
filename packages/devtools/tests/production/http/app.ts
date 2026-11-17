@@ -8,6 +8,7 @@ import Fastify, {
 } from "fastify";
 import { vi } from "vitest";
 import { totpCode } from "../../../../core/src/encryption/totp";
+import { normalizeRequestPath } from "../../../../core/src/router/normalize-request-path";
 import { checkDevtoolsPanels, type MountedDevtoolsPanel } from "../../../src/panels";
 import { createDevtoolsAuth } from "../../../src/production/auth";
 import type { DevtoolsAuthService, DevtoolsCrypto } from "../../../src/production/auth";
@@ -126,6 +127,12 @@ export type AppConfig = {
   env?: Record<string, string>;
   /** How long the open/closed state is cached (ms). */
   stateTtlMs?: number;
+  /**
+   * Build the server as core's `startHttpServer` does: its `rewriteUrl` drops a
+   * trailing slash before routing, and its first `onRequest` hook stamps the
+   * app-wide security headers (a `frame-ancestors` CSP) on the raw response.
+   */
+  coreServer?: boolean;
 };
 
 export async function createApp(config: AppConfig = {}) {
@@ -154,7 +161,26 @@ export async function createApp(config: AppConfig = {}) {
     plan: [],
     instance: instance.id,
   }));
-  const app: FastifyInstance = Fastify();
+  const app: FastifyInstance = config.coreServer
+    ? Fastify({
+        rewriteUrl(request) {
+          const url = request.url ?? "/";
+          const query = url.indexOf("?");
+
+          return query === -1
+            ? normalizeRequestPath(url)
+            : normalizeRequestPath(url.slice(0, query)) + url.slice(query);
+        },
+      })
+    : Fastify();
+
+  if (config.coreServer) {
+    app.addHook("onRequest", async (_request, reply) => {
+      reply.raw.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+      reply.raw.setHeader("X-Frame-Options", "DENY");
+      reply.raw.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    });
+  }
 
   if (config.cors) {
     app.addHook("onRequest", async (_request, reply) => {
