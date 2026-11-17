@@ -1,5 +1,11 @@
 ﻿# Changelog — release tooling
 
+## 5.56.0 - 2026-11-17
+
+### Added
+
+- The release gate checks the devtools dashboard bundle: it must match its sources, rebuild byte for byte and stay within its size budget.
+
 ## 5.55.0 - 2026-11-17
 
 ### Changed

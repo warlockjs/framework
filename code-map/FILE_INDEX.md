@@ -108,7 +108,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 ## docs
 
 - `docs/README.md`
-- `docs/astro.config.mjs` - docsRoot, groupedSectionItems, pkgTopic, fullSections, sitemapSections, coreSections, cascadeSections, webSections
+- `docs/astro.config.mjs` - docsRoot, groupedSectionItems, pkgTopic, fullSections, grimoireSections, sitemapSections, coreSections, cascadeSections
 - `docs/tasks.completed.md`
 - `docs/tasks.md`
 
@@ -578,7 +578,10 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `docs/src/content/docs/v/latest/core/upgrade-to-v5.mdx` - Upgrade to v5 - The breaking changes between Warlock v4 and v5, with the exact edits an existing applicat…
 - `docs/src/content/docs/v/latest/create-warlock/index.mdx` - Create Warlock - The official project scaffolder — one command spins up a complete, configured Warlock app…
 - `docs/src/content/docs/v/latest/devtools/ai-panel.mdx` - AI panel - Inspect Panoptic AI runs alongside the HTTP requests that triggered them in the developme…
-- `docs/src/content/docs/v/latest/devtools/index.mdx` - Devtools - A loopback-only development dashboard for request timing, database queries, N+1 warnings,…
+- `docs/src/content/docs/v/latest/devtools/index.mdx` - Devtools - A React dashboard for request timing, database queries, N+1 warnings, resources, health, …
+- `docs/src/content/docs/v/latest/devtools/panels.mdx` - Registering a panel - Add your own tab to the devtools dashboard, with data routes behind the devtools guard an…
+- `docs/src/content/docs/v/latest/devtools/production.mdx` - Devtools in production - Run the devtools monitor in production at a secret path, behind accounts with two-factor …
+- `docs/src/content/docs/v/latest/devtools/security.mdx` - Devtools security - How the production monitor is protected, what it logs, what it keeps and for how long, an…
 - `docs/src/content/docs/v/latest/fs/essentials/01-the-helpers.md` - The fs object - The mental model behind @warlock.js/fs — one async fs facade with files, dirs, lazy handl…
 - `docs/src/content/docs/v/latest/fs/essentials/02-atomic-vs-non-atomic.md` - Atomic vs non-atomic writes - When fs.files.put is fine and when you need { atomic: true } — concurrent readers, file w…
 - `docs/src/content/docs/v/latest/fs/getting-started/01-introduction.md` - Introduction - What @warlock.js/fs is and why — one fs object with node:fs&#x27;s power and sane default…
@@ -602,6 +605,16 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `docs/src/content/docs/v/latest/fs/recipes/resolve-project-relative-paths.md` - Resolve project-relative paths - Anchor a directory once with fs.dir(root), then build File/Directory handles with .file(.…
 - `docs/src/content/docs/v/latest/fs/recipes/safely-overwrite-json-config.md` - Safely overwrite a JSON config - Read a JSON config, change a field, write it back atomically with the fs facade — no half…
 - `docs/src/content/docs/v/latest/fs/reference/api.md` - API reference - The complete public surface of @warlock.js/fs — the fs facade first, then the low-level p…
+- `docs/src/content/docs/v/latest/grimoire/guides/01-written-files.mdx` - Written files - The fixed structure of every file agents write under grimoire/ (features, changelogs, flo…
+- `docs/src/content/docs/v/latest/grimoire/guides/02-book.mdx` - The book - What Warlock writes under grimoire/book/, the shape of each file entry, module summaries,…
+- `docs/src/content/docs/v/latest/grimoire/guides/03-features-and-book-maps.mdx` - Features and book maps - How the Grimoire decides which feature owns each source file, which files a feature borro…
+- `docs/src/content/docs/v/latest/grimoire/guides/04-check.mdx` - The check - What `warlock grimoire check` reports, how findings on proposed work are shown as expecte…
+- `docs/src/content/docs/v/latest/grimoire/guides/05-commands.mdx` - Commands - warlock grimoire build, check and release, warlock scry for files, impact, routes, featur…
+- `docs/src/content/docs/v/latest/grimoire/guides/06-tasks-and-releases.mdx` - Tasks and releases - One file per task, one file per release, and how a release collects the changelog entries…
+- `docs/src/content/docs/v/latest/grimoire/guides/07-apps.mdx` - Apps, pages and blocks - How agents describe sites and mobile apps under grimoire/apps, with named conditions, lay…
+- `docs/src/content/docs/v/latest/grimoire/guides/08-test-results.mdx` - Test results - Prove an acceptance criterion with a test, and see its last result in the Grimoire with t…
+- `docs/src/content/docs/v/latest/grimoire/guides/09-devtools.mdx` - The devtools tab - Browse the Grimoire in the devtools dashboard (search, features, flows, pages, tasks, rel…
+- `docs/src/content/docs/v/latest/grimoire/index.mdx` - Grimoire - An experimental project map for Warlock.js apps, written partly by Warlock and partly by …
 - `docs/src/content/docs/v/latest/herald/essentials/01-the-messaging-model.md` - The messaging model - How herald maps onto RabbitMQ — channels, queues, ack semantics, and what the metadata en…
 - `docs/src/content/docs/v/latest/herald/essentials/02-connection-and-config.md` - Connection and config - How herald connects to RabbitMQ, what the connection options mean, multi-broker setups, a…
 - `docs/src/content/docs/v/latest/herald/getting-started/01-introduction.md` - Introduction - What @warlock.js/herald is, when to reach for it, and how it compares to raw amqplib, HTT…
@@ -732,6 +745,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `docs/src/content/docs/v/latest/web/guides/03-sitemap-and-robots.mdx` - Sitemap and robots.txt - Configure managed sitemap generations, storage, refreshes, HTTP caching, and robots.txt i…
 - `docs/src/content/docs/v/latest/web/guides/04-page-actions-and-session-example.md` - Page actions with a user session - A small account page that reads a signed-in user and saves a form.
 - `docs/src/content/docs/v/latest/web/guides/05-multiple-sites-in-one-app.mdx` - Multiple sites in one app - Serve several fixed and tenant-resolved domains from one Warlock Web application, with an…
+- `docs/src/content/docs/v/latest/web/guides/06-read-the-page-graph.mdx` - Read the page graph - Read the pages, setup files, sites and layout chains the web build sees, without starting…
 - `docs/src/content/docs/v/latest/web/index.mdx` - @warlock.js/web - Server-rendered React pages for Warlock apps, with hydration, typed loaders, filesystem r…
 
 ## docs/src/route-middleware.ts
@@ -764,7 +778,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/access/src/middleware/index.ts` - access/src/middleware/index.ts
 - `packages/access/src/middleware/test-support/make-ctx.ts` - access/src/middleware/test-support/make-ctx.ts, makeCtx
 - `packages/access/src/services/access-config.ts` - setAccessConfig, resetAccessConfig, accessConfig
-- `packages/access/src/services/access.ts` - can, cannot, canAll, canAny, forbidden, authorize, authorizeAll, authorizeAny
+- `packages/access/src/services/access.ts` - services/access.ts, can, cannot, canAll, canAny, forbidden, authorize, authorizeAll
 - `packages/access/src/services/default-resolver.ts` - DefaultAccessResolver, toRoleList
 - `packages/access/src/services/engine.ts` - services/engine.ts, warnedUnpolicedPermissions, resetUnpolicedWarnings, tenantFor, cacheKey, cached, permissionsFor, rolesFor
 - `packages/access/src/services/index.ts` - access/src/services/index.ts
@@ -1026,7 +1040,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/guard/contracts/verdict.type.ts` - GuardrailPhase, GuardrailAction, GuardrailMatch, GuardrailVerdict
 - `packages/ai/src/guard/detectors/index.ts` - detectors/index.ts
 - `packages/ai/src/guard/detectors/injection.ts` - CompiledMarker, InjectionDetector, NormalizedText, BUILT_IN_MARKERS, CONFUSABLES, normalizeForMatch, compileMarkers, injection
-- `packages/ai/src/guard/detectors/links.ts` - LinkKind, Edit, LinkHit, ScanSettings, Destination, UnclosedTitles, ParsedTag, stripControlOrSpace
+- `packages/ai/src/guard/detectors/links.ts` - LinkKind, Edit, LinkHit, ScanSettings, Destination, UnclosedTitles, ParsedTag, detectors/links.ts
 - `packages/ai/src/guard/detectors/moderation.ts` - OpenAiModerationDetector, loadOpenAi, moderation
 - `packages/ai/src/guard/detectors/pii.ts` - RawHit, CATEGORY_PATTERNS, ALL_CATEGORIES, escapeRegExp, applyMask, scanCategories, isLocalPartChar, isWordChar
 - `packages/ai/src/guard/detectors/topic.ts` - locate, describeTerm, topic, verdict
@@ -1107,7 +1121,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/observe/resolve-observers.ts` - FlowObserveOption, resolveObservers, warnedObservers, notifyObservers, surfaceObserverError
 - `packages/ai/src/orchestrator/as-tool.ts` - SharedScopePayload, ResolvedToolSession, orchestrator/as-tool.ts, asTool, resolveSession, coerceInput
 - `packages/ai/src/orchestrator/checkpoint.ts` - PersistParams, DEFAULT_KEEP_SNAPSHOTS, summarizeRoute, persistCheckpoint, prune
-- `packages/ai/src/orchestrator/commands.ts` - OrchestratorCommandHandlers, createCommandDispatcher
+- `packages/ai/src/orchestrator/commands.ts` - OrchestratorCommandHandlers, orchestrator/commands.ts, createCommandDispatcher
 - `packages/ai/src/orchestrator/compaction.ts` - CompactionOutcome, orchestrator/compaction.ts, DEFAULT_COMPACTION_KEEP, isCallbackForm, shouldCompact, produceCompaction, summarizeSlice, stringifyContent
 - `packages/ai/src/orchestrator/dispatch.ts` - DispatchParams, DispatchOutcome, deriveRunId, buildSupervisorConfig, toNumber, buildTurnSnapshot, mapDecisionSource, dispatchTurn
 - `packages/ai/src/orchestrator/emitter-port.type.ts` - OrchestratorEmitterLike
@@ -1151,7 +1165,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/rag/as-tool.ts` - RagToolInput, rag/as-tool.ts, ragToolSchema, ragAsTool
 - `packages/ai/src/rag/chunk/chunk.ts` - DEFAULT_CHUNK_SIZE, DEFAULT_CHUNK_OVERLAP, chunk
 - `packages/ai/src/rag/chunk/fixed.ts` - fixedChunk
-- `packages/ai/src/rag/chunk/markdown.ts` - SectionSpan, markdownChunk, splitSections
+- `packages/ai/src/rag/chunk/markdown.ts` - SectionSpan, chunk/markdown.ts, markdownChunk, splitSections
 - `packages/ai/src/rag/chunk/recursive.ts` - AnchoredPiece, DEFAULT_SEPARATORS, recursiveChunk, splitToPieces, splitKeepingSeparator, hardSplit, anchorPieces, packPieces
 - `packages/ai/src/rag/chunk/sentence.ts` - SentenceSpan, sentenceChunk, splitSentences
 - `packages/ai/src/rag/contracts/chunk-options.type.ts` - ChunkType, ChunkOptions, Chunk
@@ -1309,7 +1323,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/workflow/run-scoped-emitter.ts` - runScopedEmitter
 - `packages/ai/src/workflow/signature.ts` - workflow/signature.ts, stepFingerprint, hash, computeSignature
 - `packages/ai/src/workflow/snapshot.ts` - PersistParams, PersistOutcome, workflow/snapshot.ts, resolveSnapshotStore, persistSnapshot, loadSnapshotForResume
-- `packages/ai/src/workflow/state.ts` - cloneState, deepFreeze
+- `packages/ai/src/workflow/state.ts` - workflow/state.ts, cloneState, deepFreeze
 - `packages/ai/src/workflow/step-runner.ts` - MutableStepSnapshot, ExecuteStepParams, ParallelParams, asAgentResult, executeStep, runParallelStep, finalizeSnapshot, buildFailedSnapshot
 - `packages/ai/src/workflow/step.ts` - step, validate
 - `packages/ai/src/workflow/workflow.ts` - workflow, execute, resume, normalizeExecuteArgs, validate, generateRunId
@@ -1642,7 +1656,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-tools/src/errors.ts` - CalculatorFailure, CalculatorErrorOptions, CalculatorError, DateTimeFailure, DateTimeErrorOptions, DateTimeError, McpTransportFailure, McpTransportErrorOptions
 - `packages/ai-tools/src/http/http-request.ts` - ALL_METHODS, BODYLESS_METHODS, REDIRECT_STATUSES, CREDENTIAL_HEADERS, httpRequestInputSchema, resolveUrl, baseHostAllowlist, readCappedBody
 - `packages/ai-tools/src/index.ts` - ai-tools/src/index.ts
-- `packages/ai-tools/src/mcp/client.ts` - ToolsListResult, McpClientImpl, combineSignals, unwrapResult, IMAGE_MEDIA_TYPES, toResultParts, unwrapContent, normalizeBlock
+- `packages/ai-tools/src/mcp/client.ts` - ToolsListResult, McpClientImpl, mcp/client.ts, combineSignals, unwrapResult, IMAGE_MEDIA_TYPES, toResultParts, unwrapContent
 - `packages/ai-tools/src/mcp/error.ts` - McpError, isMcpError
 - `packages/ai-tools/src/mcp/index.ts` - McpFactory, src/mcp/index.ts, mcp
 - `packages/ai-tools/src/mcp/json-schema-to-standard.ts` - AjvValidateFunctionLike, AjvInstanceLike, AjvConstructorLike, AjvModuleLike, JsonSchemaStandard, AjvErrorObject, AJV_INSTALL_INSTRUCTIONS, loadAjv
@@ -1803,7 +1817,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/auth/src/models/auth-token-family/index.ts` - auth-token-family/index.ts
 - `packages/auth/src/models/auth-token-family/migration.ts` - auth-token-family/migration.ts, AuthTokenFamilyMigration
 - `packages/auth/src/models/auth.model.ts` - Auth
-- `packages/auth/src/models/index.ts` - models/index.ts, authMigrations
+- `packages/auth/src/models/index.ts` - src/models/index.ts, authMigrations
 - `packages/auth/src/models/one-time-token/index.ts` - one-time-token/index.ts
 - `packages/auth/src/models/one-time-token/migration.ts` - one-time-token/migration.ts, OneTimeTokenMigration
 - `packages/auth/src/models/one-time-token/one-time-token.model.ts` - OneTimeTokenPurpose, OneTimeToken, oneTimeTokenSchema
@@ -2107,7 +2121,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/cascade/src/model/relation-decorators.ts` - AnyRelationOptions, buildRelationDefinition, stashRelationInMetadata, RELATION_METADATA_KEY, makeRelationDecorator, resolveOptions, BelongsTo, HasOne
 - `packages/cascade/src/operations/database.ts` - DataSourceSelector, CreateDatabaseResult, DropAllTablesResult, operations/database.ts, createDatabase, dropAllTables
 - `packages/cascade/src/operations/index.ts` - operations/index.ts
-- `packages/cascade/src/operations/migrations.ts` - ExportMigrationsSQLOptions, RollbackMigrationsOptions, PendingMigration, runMigrations, rollbackMigrations, freshMigrate, exportMigrationsSQL, listExecutedMigrations
+- `packages/cascade/src/operations/migrations.ts` - ExportMigrationsSQLOptions, RollbackMigrationsOptions, PendingMigration, operations/migrations.ts, runMigrations, rollbackMigrations, freshMigrate, exportMigrationsSQL
 - `packages/cascade/src/operations/rollback-guard.ts` - ConfirmRollbackOptions, hasDestructiveOperations, describeOperation, formatRollbackPlan, askOnTerminal, confirmRollback
 - `packages/cascade/src/query-builder/json-path-operand.ts` - JsonPathOperand, JSON_PATH_PLACEHOLDER, jsonPathOperation
 - `packages/cascade/src/query-builder/keyset-chunk.ts` - KeysetPlan, ChunkPage, readRowKey, runChunks, streamRows
@@ -2194,7 +2208,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/context/src/shared-storage.ts` - ContextFrame, ContextStorage, ContextSlot, sharedStorage, NO_SCOPE, currentContextScope, runWithSlots, withSlots
 - `packages/context/vitest.config.ts` - context/vitest.config.ts
 
-## packages/core (660 test files not listed)
+## packages/core (672 test files not listed)
 
 - `packages/core/README.md`
 - `packages/core/TODO.md`
@@ -2300,7 +2314,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/benchmark/types.ts` - BenchmarkConfigurations, BenchmarkOptions, BenchmarkResult, BenchmarkSuccessResult, BenchmarkErrorResult, BenchmarkChannel, BenchmarkStats, BenchmarkProfilerOptions
 - `packages/core/src/bootstrap.ts` - bootstrap
 - `packages/core/src/bootstrap/README.md`
-- `packages/core/src/bootstrap/setup.ts` - displayEnvironmentMode
+- `packages/core/src/bootstrap/setup.ts` - bootstrap/setup.ts, displayEnvironmentMode
 - `packages/core/src/cache/README.md`
 - `packages/core/src/cache/cache.migration.ts` - cacheMigration
 - `packages/core/src/cache/database-cache-driver.ts` - DatabaseCacheOptions, CacheModel, DatabaseCacheDriver
@@ -2363,7 +2377,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/cli/commands/drop-tables.command.ts` - dropTablesCommand
 - `packages/core/src/cli/commands/e2e.command.ts` - readE2EOptions, e2eCommandAction, e2eCommand
 - `packages/core/src/cli/commands/explain.command.ts` - explainCommand
-- `packages/core/src/cli/commands/explain/explain-command.action.ts` - ExplainedErrorCode, withDocs, formatExplanation, formatCodeList, explainCommandAction
+- `packages/core/src/cli/commands/explain/explain-command.action.ts` - ExplainedErrorCode, withDocs, formatExplanation, formatRegisteredExplanation, explainPackageCode, formatCodeList, explainCommandAction
 - `packages/core/src/cli/commands/generate/generate.command.ts` - generators, recorded, commonOptions, endpointOptions, dispatchGenerator, generatorOptionsForDispatch, generateCommand, makeCommand
 - `packages/core/src/cli/commands/generate/generators/column-dsl-parser.ts` - ParsedColumn, typeMapping, parseColumnDsl
 - `packages/core/src/cli/commands/generate/generators/controller.generator.ts` - generateController
@@ -2385,7 +2399,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/cli/commands/generate/utils/name-parser.ts` - Name, parseModulePath, parseName, pluralName, singularName
 - `packages/core/src/cli/commands/generate/utils/path-resolver.ts` - resolveModulePath, resolveComponentPath, moduleExists, componentExists, ensureDirectory, ensureComponentDirectory
 - `packages/core/src/cli/commands/generate/utils/prompt.ts` - utils/prompt.ts, confirm, input, select
-- `packages/core/src/cli/commands/generate/utils/writer.ts` - setDryRun, skippedFiles, setSkipExisting, reportSkippedFiles, isDryRun, relativePath, existingContent, putFileAsync
+- `packages/core/src/cli/commands/generate/utils/writer.ts` - utils/writer.ts, setDryRun, skippedFiles, setSkipExisting, reportSkippedFiles, isDryRun, relativePath, existingContent
 - `packages/core/src/cli/commands/inspect.command.ts` - inspectCommand
 - `packages/core/src/cli/commands/inspect/inspect-command.action.ts` - stringOption, formatInspectSummary, inspectCommandAction
 - `packages/core/src/cli/commands/issue.command.ts` - issueCommand
@@ -2433,7 +2447,8 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/cli/parse-cli-args.ts` - ParsedCliArgs, CliOptionSchema, CliOptionValueError, TRUE_VALUES, FALSE_VALUES, collectBooleanKeys, collectMultiCharAliases, toBoolean
 - `packages/core/src/cli/start.ts` - commandsManager
 - `packages/core/src/cli/string-similarity.ts` - Suggestion, levenshteinDistance, findSimilar, startsWithAny
-- `packages/core/src/commands/cli-command.ts` - CLICommand, command
+- `packages/core/src/commands/cli-command.ts` - CLICommandEntry, CLICommand, command
+- `packages/core/src/commands/explain-codes.ts` - ExplainableCode, CodeExplainer, EXPLAIN_CODES, withExplainCodes, explainersOf, explainRegisteredCode
 - `packages/core/src/commands/index.ts` - commands/index.ts
 - `packages/core/src/commands/types.ts` - CLICommandSource, CommandActionData, CLICommandPreload, CLICommandOption, ResolvedCLICommandOption, CLICommandAction, CLICommandOptions, commands/types.ts
 - `packages/core/src/config/README.md`
@@ -2586,6 +2601,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/encryption/hash.ts` - encryption/hash.ts, hmacHash
 - `packages/core/src/encryption/index.ts` - encryption/index.ts
 - `packages/core/src/encryption/password.ts` - ScryptParams, BcryptBackend, SCRYPT_DEFAULTS, BCRYPTJS_INSTALL_INSTRUCTIONS, loadNativeBcrypt, loadBcryptjs, bcryptjsLoading, guardPasswordLength
+- `packages/core/src/encryption/totp.ts` - TotpOptions, base32Encode, base32Decode, generateTotpSecret, codeForStep, stepAt, totpCode, verifyTotp
 - `packages/core/src/encryption/types.ts` - EncryptionConfigurations, EncryptionPasswordConfigurations, encryption/types.ts
 - `packages/core/src/errors/container-key-missing-error.ts` - ContainerKeyMissingError
 - `packages/core/src/errors/error-codes.ts` - ErrorCodeArea, ErrorCodeCategory, ErrorCodeDefinition, WarlockErrorCode, errors/error-codes.ts, ERROR_CODES_DOCS_URL, ERROR_CODES, isWarlockErrorCode
@@ -2610,6 +2626,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/generations/features/bull-board.feature.ts` - ProjectPackageJson, isQueueInstalled, addDashboardConfigBlock, completeBullBoardInstallation, bullBoardFeature
 - `packages/core/src/generations/features/design-system.feature.ts` - assertDesignSystemTailwind, designSystemFeature
 - `packages/core/src/generations/features/devtools.feature.ts` - devtoolsFeature
+- `packages/core/src/generations/features/grimoire.feature.ts` - registerCommands, ignoreGeneratedFiles, hasDevtools, mountDevtoolsPanel, registerReporter, grimoireFeature
 - `packages/core/src/generations/features/herald.feature.ts` - heraldFeature
 - `packages/core/src/generations/features/image.feature.ts` - imageFeature
 - `packages/core/src/generations/features/index.ts` - features/index.ts, featuresMap
@@ -2628,7 +2645,9 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/generations/features/scheduler.feature.ts` - schedulerFeature
 - `packages/core/src/generations/features/ses.feature.ts` - sesFeature
 - `packages/core/src/generations/features/shadcn.feature.ts` - writeComponentsJson, writeCnUtil, appendThemeTokens, addWebPathAlias, printNextStep, completeShadcnInstallation, shadcnFeature
+- `packages/core/src/generations/features/shared/insert-cli-command-entry.ts` - insertCliCommandEntry, insertIntoArray, addProperty, matchingBracket, codeOnly, escapeForRegExp
 - `packages/core/src/generations/features/shared/insert-connector-entry.ts` - ConnectorInsertion, insertConnectorEntry, escapeForRegExp
+- `packages/core/src/generations/features/shared/insert-grimoire-wiring.ts` - GRIMOIRE_GITIGNORE_LINES, ensureImportLine, appendGitignoreLines, exportedObject, ownKeys, insertVitestReporter, insertDevtoolsPanel, GRIMOIRE_DEVTOOLS_CONFIG
 - `packages/core/src/generations/features/shared/insert-queue-dashboard-block.ts` - DashboardBlockInsertion, insertQueueDashboardBlock, findMatchingBraceIndex
 - `packages/core/src/generations/features/shared/link-ai-package-import.ts` - linkAiPackageImport
 - `packages/core/src/generations/features/shared/merge-web-sitemap-config.ts` - WebSitemapMergeResult, mergeWebSitemapConfig, hasSyntaxErrors, hasTopLevelSitemapProperty, propertyKeyName, findExportedConfigObjectLiteral, lastPropertyEnd
@@ -2640,7 +2659,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/generations/features/sitemap.feature.ts` - installSitemapConfig, sitemapFeature
 - `packages/core/src/generations/features/socket.feature.ts` - socketFeature
 - `packages/core/src/generations/features/tailwind.feature.ts` - POSTCSS_CONFIG_FILES, createStylesheet, writePostcssConfig, importStylesheetFromRoot, completeTailwindInstallation, tailwindFeature
-- `packages/core/src/generations/features/test.feature.ts` - completeTestInstallation, testFeature
+- `packages/core/src/generations/features/test.feature.ts` - usesGrimoire, completeTestInstallation, testFeature
 - `packages/core/src/generations/features/types.ts` - FeatureDefinition, features/types.ts, INSTALLED_WARLOCK_VERSION
 - `packages/core/src/generations/features/web.feature.ts` - VITE_RANGE, registerWebConnector, completeWebInstallation, webFeature
 - `packages/core/src/generations/generation-fs.ts` - fileExistsAsync, directoryExistsAsync, getFileAsync, getJsonFileAsync, putFileAsync, putJsonFileAsync, ensureDirectoryAsync
@@ -2672,8 +2691,8 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/http/events.ts` - http/events.ts, logResponse, wrapResponseInDataKey
 - `packages/core/src/http/file-range.ts` - ByteRange, ResolveByteRangeInput, statFile, ifRangeHolds, resolveByteRange
 - `packages/core/src/http/flush-pending-cookies.ts` - ParkedCookie, installedCookiePluginVersion, flushPendingCookies
-- `packages/core/src/http/health.ts` - HealthCheck, HealthStatus, HealthRegistry, nonNegativeInteger, copyStatus, health
-- `packages/core/src/http/index.ts` - http/index.ts
+- `packages/core/src/http/health.ts` - HealthCheck, HealthStatus, HealthRegistry, http/health.ts, nonNegativeInteger, copyStatus, health
+- `packages/core/src/http/index.ts` - src/http/index.ts
 - `packages/core/src/http/lazy-static.ts` - FileRoute, ReplyDecorator, LazyStaticMount, optionError, staticOptions, fileRoutes, registerLazyStatic, prepareStatic
 - `packages/core/src/http/list-endpoint.ts` - ListQuery, ListEndpointOptions, ListEndpointRepositoryOptions, ListEndpointBody, validated, listEndpoint
 - `packages/core/src/http/middleware/cache-response-middleware.ts` - CachedResponsePayload, CacheMiddlewareOptions, ParsedCacheOptions, defaultCacheOptions, warnUndeclaredLocalesOnce, resolveCacheTags, parseCacheOptions, cacheMiddleware
@@ -2706,6 +2725,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/http/request-log/build-request-log-record.ts` - RequestLogInput, REQUEST_LOG_HEADER_ALLOWLIST, RESPONSE_LOG_HEADER_ALLOWLIST, REQUEST_HEADER_SET, RESPONSE_HEADER_SET, buildRequestLogRecord, round, redactDraft
 - `packages/core/src/http/request-log/index.ts` - request-log/index.ts
 - `packages/core/src/http/request-log/query-shape.ts` - RequestLogQueryEvent, request-log/query-shape.ts, requestLogQueryShape
+- `packages/core/src/http/request-log/request-log-exclusions.ts` - excludedPrefixes, normalize, excludeFromRequestLog, isExcludedFromRequestLog
 - `packages/core/src/http/request-log/request-log-file-channel.ts` - RequestLogFile, RequestLogFileChannelOptions, RequestLogFileChannel, requestLogDirectory, REQUEST_LOG_FILE_PATTERN, selectRequestLogFilesToPrune
 - `packages/core/src/http/request-log/request-log-runtime.ts` - RequestLogCollectorChannel, QueryEvent, startRequestLog, start, resetRequestLogRuntimeForTests
 - `packages/core/src/http/request-log/request-log-scope.ts` - RequestLogScope, REQUEST_LOG_N_PLUS_ONE_THRESHOLD, scopes, beginRequestLogScope, endRequestLogScope, hasRequestLogScope, recordRequestLogEntry, recordRequestLogPhase
@@ -2713,7 +2733,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/http/request-log/request-log.types.ts` - RequestLogOnly, RequestLogInclude, HttpRequestLogConfig, ResolvedRequestLogConfig, RequestLogPhase, RequestLogLogEntry, RequestLogQueries, RequestLogError
 - `packages/core/src/http/request-log/resolve-request-log-config.ts` - DEFAULT_REQUEST_LOG_SLOW_MS, DEFAULT_REQUEST_LOG_MAX_BODY_BYTES, DEFAULT_REQUEST_LOG_MAX_DAYS, DEFAULT_REQUEST_LOG_MAX_SIZE_MB, resolveRequestLogConfig, getRequestLogConfig, isRequestLogEnabled, resetRequestLogConfigForTests
 - `packages/core/src/http/request-log/should-keep-request-log.ts` - RequestLogOutcome, isRequestLogErrorOutcome, shouldKeepRequestLog
-- `packages/core/src/http/request-log/track-request-log.ts` - reportedFailures, reportFailureOnce, getDefaultRequestLogChannel, resolveChannels, writeRequestLogRecord, trackRequestLog, finishRequestLog, attempt
+- `packages/core/src/http/request-log/track-request-log.ts` - reportedFailures, reportFailureOnce, getDefaultRequestLogChannel, resolveChannels, writeRequestLogRecord, isExcludedRequest, trackRequestLog, finishRequestLog
 - `packages/core/src/http/request-phase-log.ts` - phaseLogLevel, armRequestSummary
 - `packages/core/src/http/request-refusal.ts` - RequestRefusal, createRequestRefusal
 - `packages/core/src/http/request.ts` - StandardHeaders, HeaderKeys, RequestCookieOptions, RequestTranslator, Request, resolvedMiddlewares, warnRequestOnDeprecated, markRawInput
@@ -2727,6 +2747,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/http/server.ts` - DrainServer, DrainResponse, FastifyInstance, TrustProxy, TrustProxyPredicate, ClosableServer, DrainState, isTrustProxyPredicate
 - `packages/core/src/http/stream-react-response.ts` - PipeableReactStream, StreamReactResponseOptions, streamReactResponse
 - `packages/core/src/http/stream-transport.ts` - StreamTransport, createStreamTransport, createRetainedTail
+- `packages/core/src/http/tracing/handled-request-error.ts` - handledErrors, noteHandledRequestError, takeHandledRequestError
 - `packages/core/src/http/tracing/index.ts` - tracing/index.ts
 - `packages/core/src/http/tracing/trace-id.ts` - ALL_ZERO_TRACE_ID, parseTraceparentTraceId, deriveTraceId
 - `packages/core/src/http/tracing/tracing-dispatcher.ts` - ResolvedTracing, TracingContextSource, runtimeHooks, resolveTracingConfig, isTracingEnabled, registerTracingHooks, resetTracingConfigForTests, buildTracingContext
@@ -3007,7 +3028,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tooling/check/environment-step.ts` - MIN_NODE_VERSION, parseVersion, compareVersions, minimumOfRange, appEnginesRange, checkNodeVersion
 - `packages/core/src/tooling/check/family-versions-step.ts` - InstalledFamilyPackage, SCOPE_DIRECTORY, findScopeDirectory, listInstalledFamilyPackages, versionParts, compare, checkFamilyVersions
 - `packages/core/src/tooling/check/fixes.ts` - ProblemFix, importFixes, applyFixes, applyConventionFixes
-- `packages/core/src/tooling/check/index.ts` - check/index.ts
+- `packages/core/src/tooling/check/index.ts` - tooling/check/index.ts
 - `packages/core/src/tooling/check/integration-spec-conventions.ts` - Resolve, PURE_PACKAGES, readSource, touchesApp, integrationSpecProblems
 - `packages/core/src/tooling/check/lint-step.ts` - LintOutcome, errorMessage, toolFailure, runOxlint, runLint
 - `packages/core/src/tooling/check/locale-conventions.ts` - configuredLocaleCodes, moduleLocaleFiles, localeCoverageProblems
@@ -3019,7 +3040,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tooling/check/security-conventions.ts` - LogFinding, UNFILTERED_METHODS, IGNORED_RECEIVERS, displayCallee, isIgnoredReceiver, callReceiving, receivingCall, checkRequestAll
 - `packages/core/src/tooling/check/server-graph-imports.ts` - ServerGraphCache, ASSET_EXTENSIONS, SKIPPED_DIRECTORIES, serverBundleImportHazard, createServerGraphCache, webSources, serverGraph, serverGraphImportProblems
 - `packages/core/src/tooling/check/source-ast.ts` - SourceFinding, MemberAccess, Declaration, isMemberAccess, keyName, positionOf, unwrap, literalString
-- `packages/core/src/tooling/check/source-files.ts` - listSourceFiles, listTestFiles
+- `packages/core/src/tooling/check/source-files.ts` - check/source-files.ts, listSourceFiles, listTestFiles
 - `packages/core/src/tooling/check/tests-step.ts` - VitestRun, VitestRunner, TEST_TIMEOUT_ENV, testTimeoutMs, findVitest, runVitest, vitestArguments, isRecord
 - `packages/core/src/tooling/check/translation-conventions.ts` - translationProblems
 - `packages/core/src/tooling/check/web-conventions.ts` - ConventionOptions, webFindings, responseSchemaFindings
@@ -3034,26 +3055,30 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tooling/index.ts` - src/tooling/index.ts
 - `packages/core/src/tooling/inspect/boot-for-inspect.ts` - InspectBootResult, wiringFilesFromBoot, appEventBus, bootForInspect, inspectOptionsFromBoot
 - `packages/core/src/tooling/inspect/collect-config.ts` - CONFIG_EXTENSIONS, isPlainObject, configValueType, configFileFor, collectConfig
-- `packages/core/src/tooling/inspect/collect-files.ts` - EXTENSIONS, projectFile, fileModule, fileRole, bindingNames, collectFiles
+- `packages/core/src/tooling/inspect/collect-files.ts` - CollectFilesOptions, NAMED_ROLES, EXTENSIONS, projectFile, fileModule, fileRole, countLines, bindingNames
 - `packages/core/src/tooling/inspect/collect-models.ts` - InspectModelModule, CollectedModels, isRecord, staticOf, stringOrNull, isModelClass, errorMessage, readColumns
 - `packages/core/src/tooling/inspect/collect-packages.ts` - AppModuleImporter, createAppModuleImporter, readJson, stringField, readAppPackage, collectPackages, errorMessage, numberOrNull
-- `packages/core/src/tooling/inspect/collect-pages.ts` - InstalledPageLike, isInstalledPage, installedPagesFromConnectors, toPosix, relativeTo, layoutChainOf, exportsName, collectPages
+- `packages/core/src/tooling/inspect/collect-pages.ts` - InstalledPageLike, GraphPageLike, WebBuildModule, isInstalledPage, installedPagesFromConnectors, importWebBuild, discoverGraphPages, toPosix
 - `packages/core/src/tooling/inspect/collect-routes.ts` - METHOD_ORDER, methodRank, functionName, limitValue, windowValue, readRateLimit, readLogging, globalRateLimit
 - `packages/core/src/tooling/inspect/collect-wiring.ts` - WiringSourceFile, wiringFilesFromScan, collectWiring
 - `packages/core/src/tooling/inspect/event-recorder.ts` - RecordedListener, EventBus, EventRecorder, isEventBus, listenerName, currentModuleFile, groupListeners
 - `packages/core/src/tooling/inspect/explain-file.ts` - ExplainedFile, explainFile, formatFileExplanation
+- `packages/core/src/tooling/inspect/file-comments.ts` - FileHeader, SUMMARY_TAGS, onlyWhitespace, commentLines, firstSentence, splitTags, readFileHeader, createDocLookup
 - `packages/core/src/tooling/inspect/index.ts` - inspect/index.ts
 - `packages/core/src/tooling/inspect/inspect-app.ts` - InspectOptions, isInspectSection, parseInspectSections, inspectApp
 - `packages/core/src/tooling/inspect/inspect-report.schema.ts` - nullableString, stringArray, jsonSchema, authSource, route, model, resource, configKey
 - `packages/core/src/tooling/inspect/inspect-report.types.ts` - InspectSection, JsonSchema, InspectRouteAuth, InspectRouteRateLimit, InspectRouteLogging, InspectParameter, InspectRoute, InspectModelColumn
 - `packages/core/src/tooling/mcp/__fixtures__/fake-mcp-context.ts` - FakeContextCalls, fixtureReport, cleanCheckReport, fakeDevtools, fakeMcpContext
 - `packages/core/src/tooling/mcp/__fixtures__/stdio-server.ts` - main
+- `packages/core/src/tooling/mcp/configured-mcp-tools.ts` - configuredMcpTools
 - `packages/core/src/tooling/mcp/create-mcp-context.ts` - CreateMcpContextOptions, findCliEntry, createMcpContext
 - `packages/core/src/tooling/mcp/db-schema.ts` - DbSchemaColumn, DbSchemaTable, DbSchema, columnType, buildDbSchema
 - `packages/core/src/tooling/mcp/docs-search.ts` - DocsSection, DocsSearchHit, DocsCorpus, DOCS_CORPUS_GLOBS, sourceOf, packageOf, splitSections, loadDocsCorpus
 - `packages/core/src/tooling/mcp/index.ts` - tooling/mcp/index.ts
 - `packages/core/src/tooling/mcp/load-ai-tools.ts` - ServeToolContract, ServeTransportOptions, ServeHandle, AiToolsServeModule, MCP_INSTALL_HINT, isAiToolsServeModule, isMissingModule, PACKAGES
-- `packages/core/src/tooling/mcp/mcp-tools.ts` - WarlockMcpContext, WarlockMcpTool, MCP_MAKE_GENERATORS, stringArg, booleanArg, integerArg, stringsArg, includesText
+- `packages/core/src/tooling/mcp/mcp-tool-registry.ts` - WarlockMcpToolSource, MCP_TOOLS, withMcpTools, mcpToolsOf, mcpToolsFromConfig
+- `packages/core/src/tooling/mcp/mcp-tools.ts` - WarlockMcpContext, WarlockMcpTool, mcp/mcp-tools.ts, MCP_MAKE_GENERATORS, stringArg, booleanArg, integerArg, stringsArg
+- `packages/core/src/tooling/mcp/resolve-mcp-tools.ts` - PROPERTY_TYPES, isRecord, schemaProblem, assertValidTool, isToolList, gateWrites, resolveWarlockMcpTools
 - `packages/core/src/tooling/mcp/start-mcp-server.ts` - WarlockMcpTransport, StartWarlockMcpServerOptions, WarlockMcpServerHandle, LOOPBACK_HOSTS, isLoopbackHost, resolveMcpTransport, EMPTY_USAGE, report
 - `packages/core/src/tooling/mcp/tool-input.ts` - McpInputProperty, McpInputSchema, StandardResult, StandardInputSchema, inputSchema, isRecord, checkProperty, validateToolInput
 - `packages/core/src/tooling/problem.ts` - ProblemSource, ToolingProblem, ProblemInput, createProblem
@@ -3207,12 +3232,12 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/tests/fixtures/vitest-exit-app/src/test-global-setup.ts` - setup, teardown
 - `packages/core/tests/fixtures/vitest-exit-app/src/test-runner.ts` - WarlockTestRunner
 - `packages/core/tests/fixtures/vitest-exit-app/src/test-setup.ts`
-- `packages/core/tests/fixtures/vitest-exit-app/src/web/home.page.tsx` - config, Home
+- `packages/core/tests/fixtures/vitest-exit-app/src/web/home.page.tsx` - web/home.page.tsx, config, Home
 - `packages/core/tests/fixtures/vitest-exit-app/src/web/root.tsx` - Root, vitest-exit-app/src/web/root.tsx
 - `packages/core/tests/fixtures/vitest-exit-app/vitest.config.ts` - vitest-exit-app/vitest.config.ts, core, packages, source, shared
 - `packages/core/tests/fixtures/vitest-exit-app/warlock.config.ts` - vitest-exit-app/warlock.config.ts
 - `packages/core/tests/fixtures/vitest-plugin-app/vitest.config.ts` - vitest-plugin-app/vitest.config.ts
-- `packages/core/tests/integration/http/harness.ts` - HttpHarness, bootHarness
+- `packages/core/tests/integration/http/harness.ts` - HttpHarness, integration/http/harness.ts, bootHarness
 - `packages/core/tests/integration/runtimes/fixtures/serve-on-runtime.ts` - runtimeName, router, server, address
 - `packages/core/tests/integration/web/single-bundle-app.ts` - SingleBundleAppOptions, SINGLE_BUNDLE_ROUTE, SINGLE_BUNDLE_MARKERS, writeSingleBundleApp
 - `packages/core/tests/integration/web/two-site-app.ts` - workspace, SITE_HOSTS, NAMED_ROUTE, page, linkWorkspaceDependencies, writeTwoSiteApp
@@ -3228,7 +3253,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/tooling/index.ts` - core/tooling/index.ts
 - `packages/core/vitest.config.ts` - core/vitest.config.ts, workspaceSource
 
-## packages/create-warlock (41 test files not listed)
+## packages/create-warlock (42 test files not listed)
 
 - `packages/create-warlock/README.md`
 - `packages/create-warlock/bin/create-app.js` - bin/create-app.js
@@ -3319,16 +3344,16 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/templates/design-system-mantine/src/web/design-system/types/control-props.ts` - ControlProps, Choice, SelectProps, RadioProps, CheckProps, DateProps, design-system-mantine/src/web/design-system/types/control-props.ts
 - `packages/create-warlock/templates/design-system/SOURCES.md`
 - `packages/create-warlock/templates/design-system/src/web/components/ui/LICENSE.md`
-- `packages/create-warlock/templates/design-system/src/web/components/ui/button.tsx` - buttonVariants, Button
+- `packages/create-warlock/templates/design-system/src/web/components/ui/button.tsx` - web/components/ui/button.tsx, buttonVariants, Button
 - `packages/create-warlock/templates/design-system/src/web/components/ui/calendar.tsx` - Calendar, CalendarDayButton
 - `packages/create-warlock/templates/design-system/src/web/components/ui/checkbox.tsx` - Checkbox
 - `packages/create-warlock/templates/design-system/src/web/components/ui/command.tsx` - Command, CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandSeparator, CommandItem
-- `packages/create-warlock/templates/design-system/src/web/components/ui/dialog.tsx` - Dialog, DialogTrigger, DialogPortal, DialogClose, DialogOverlay, DialogContent, DialogHeader, DialogFooter
-- `packages/create-warlock/templates/design-system/src/web/components/ui/input.tsx` - Input
-- `packages/create-warlock/templates/design-system/src/web/components/ui/label.tsx` - Label
+- `packages/create-warlock/templates/design-system/src/web/components/ui/dialog.tsx` - web/components/ui/dialog.tsx, Dialog, DialogTrigger, DialogPortal, DialogClose, DialogOverlay, DialogContent, DialogHeader
+- `packages/create-warlock/templates/design-system/src/web/components/ui/input.tsx` - web/components/ui/input.tsx, Input
+- `packages/create-warlock/templates/design-system/src/web/components/ui/label.tsx` - web/components/ui/label.tsx, Label
 - `packages/create-warlock/templates/design-system/src/web/components/ui/popover.tsx` - Popover, PopoverTrigger, PopoverContent, PopoverAnchor, PopoverHeader, PopoverTitle, PopoverDescription
 - `packages/create-warlock/templates/design-system/src/web/components/ui/radio-group.tsx` - RadioGroup, RadioGroupItem
-- `packages/create-warlock/templates/design-system/src/web/components/ui/switch.tsx` - Switch
+- `packages/create-warlock/templates/design-system/src/web/components/ui/switch.tsx` - web/components/ui/switch.tsx, Switch
 - `packages/create-warlock/templates/design-system/src/web/components/ui/textarea.tsx` - Textarea
 - `packages/create-warlock/templates/design-system/src/web/design-system/components/checkbox-input.tsx` - design-system/src/web/design-system/components/checkbox-input.tsx, CheckboxInput
 - `packages/create-warlock/templates/design-system/src/web/design-system/components/date-picker-input.tsx` - design-system/src/web/design-system/components/date-picker-input.tsx, DatePickerInput
@@ -3367,7 +3392,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/templates/warlock/skills/testing-strategy/SKILL.md` - testing-strategy - Vitest test scope, co-located service and endpoint specs when testing is enabled, isolati…
 - `packages/create-warlock/templates/warlock/skills/web-code-standards/SKILL.md` - web-code-standards - Warlock web pages and setup files, component and hook ownership, Mongez forms, accessible…
 - `packages/create-warlock/templates/warlock/src/app/auth/controllers/forgot-password.controller.ts` - forgotPasswordController
-- `packages/create-warlock/templates/warlock/src/app/auth/controllers/login.controller.ts` - loginController
+- `packages/create-warlock/templates/warlock/src/app/auth/controllers/login.controller.ts` - warlock/src/app/auth/controllers/login.controller.ts, loginController
 - `packages/create-warlock/templates/warlock/src/app/auth/controllers/logout-all.controller.ts` - logoutAllController
 - `packages/create-warlock/templates/warlock/src/app/auth/controllers/logout.controller.ts` - logoutController
 - `packages/create-warlock/templates/warlock/src/app/auth/controllers/me.controller.ts` - meController
@@ -3379,7 +3404,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/templates/warlock/src/app/auth/models/otp/migrations/22-12-2025_10-30-20.otp-migration.ts`
 - `packages/create-warlock/templates/warlock/src/app/auth/models/otp/otp.model.ts` - OTPSchema, OTP, otpSchema
 - `packages/create-warlock/templates/warlock/src/app/auth/requests/guarded.request.ts` - GuardedRequest, GuardedRequestHandler
-- `packages/create-warlock/templates/warlock/src/app/auth/routes.ts` - auth/routes.ts
+- `packages/create-warlock/templates/warlock/src/app/auth/routes.ts` - warlock/src/app/auth/routes.ts
 - `packages/create-warlock/templates/warlock/src/app/auth/schema/login.schema.ts` - LoginSchema, loginSchema
 - `packages/create-warlock/templates/warlock/src/app/auth/schema/reset-password.schema.ts` - ResetPasswordSchema, resetPasswordSchema
 - `packages/create-warlock/templates/warlock/src/app/auth/services/auth.service.ts` - LoginCredentials, LoginResult, auth/services/auth.service.ts, loginService, logoutService, logoutAllService, refreshTokensService
@@ -3429,6 +3454,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/templates/warlock/src/config/cache.ts` - warlock/src/config/cache.ts, globalPrefix, cacheConfigurations
 - `packages/create-warlock/templates/warlock/src/config/database.postgres.ts` - databaseConfigurations
 - `packages/create-warlock/templates/warlock/src/config/database.ts` - config/database.ts, databaseConfigurations
+- `packages/create-warlock/templates/warlock/src/config/devtools.ts`
 - `packages/create-warlock/templates/warlock/src/config/http.ts` - warlock/src/config/http.ts, httpConfigurations
 - `packages/create-warlock/templates/warlock/src/config/log.ts` - warlock/src/config/log.ts, consoleLog, productionConsoleLog, logConfigurations
 - `packages/create-warlock/templates/warlock/src/config/mail.ts` - warlock/src/config/mail.ts, mailConfigurations
@@ -3467,48 +3493,236 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/tests/acceptance/starter-browser-gate.mjs` - Cdp, file, checkout, requireFromCheckout, options, candidate, state, output
 - `packages/create-warlock/vitest.config.ts` - create-warlock/vitest.config.ts
 
-## packages/devtools (19 test files not listed)
+## packages/devtools (86 test files not listed)
 
 - `packages/devtools/README.md`
+- `packages/devtools/bench/production-overhead.ts` - production, instance, body, noop, noopHooks, startServer, load, median
 - `packages/devtools/scripts/generate-llms.mjs` - devtools/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
-- `packages/devtools/skills/SKILL.md` - warlock-js-devtools - Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines…
+- `packages/devtools/skills/SKILL.md` - warlock-js-devtools - Dev dashboard and opt-in production monitor for Warlock apps via `devtoolsConnector`: req…
 - `packages/devtools/src/caller-location.ts` - packageDirectory, captureCallerLocation, parseFrame, normalizePath, shouldSkip
 - `packages/devtools/src/collector.ts` - src/collector.ts, createCollector, summary, mailSummary, copyRequest
 - `packages/devtools/src/current-request-id.ts` - currentRequestId
-- `packages/devtools/src/devtools-connector.ts` - DevtoolsConnectorOptions, PostmanBuilder, DEVTOOLS_CONNECTOR_PRIORITY, readConfiguredOptions, devtoolsConnector, attachSource, explainQuery, listRoutes
+- `packages/devtools/src/devtools-connector.ts` - DevtoolsConnectorOptions, ConnectorLogger, PostmanBuilder, DEVTOOLS_CONNECTOR_PRIORITY, readConfiguredOptions, devtoolsConnector, attachSource, wireDevelopmentInsights
 - `packages/devtools/src/index.ts` - devtools/src/index.ts
 - `packages/devtools/src/n-plus-one.ts` - detectNPlusOne, truncate, mostFrequentCaller
 - `packages/devtools/src/options.ts` - src/options.ts, resolveDevtoolsOptions
-- `packages/devtools/src/process-panel.ts` - ProcessPanel, loadProcessPanel
-- `packages/devtools/src/query-shape.ts` - QueryShapeInput, src/query-shape.ts, queryShape, normalizeMongoValue, isMongoLeaf
+- `packages/devtools/src/panels.ts` - MountedDevtoolsPanel, LoadDevtoolsPanelsOptions, DevtoolsProductionPanels, RESERVED_PANEL_IDS, METHODS, CONTENT_TYPES, panelContentType, toFilePath
+- `packages/devtools/src/process-panel.ts` - ProcessPanel, loadProcessPanel, processesDevtoolsPanel
+- `packages/devtools/src/production/auth/common-passwords.ts` - COMMON_PASSWORDS
+- `packages/devtools/src/production/auth/default-crypto.ts` - defaultDevtoolsCrypto
+- `packages/devtools/src/production/auth/helpers.ts` - auth/helpers.ts, checkPasswordPolicy, generateToken, hashToken, generateTemporaryPassword, safeEqual, normalizeEmail, isPlausibleEmail
+- `packages/devtools/src/production/auth/index.ts` - auth/index.ts
+- `packages/devtools/src/production/auth/passkeys.ts` - Options, SimpleWebAuthnServer, production/auth/passkeys.ts, loadDevtoolsPasskeys
+- `packages/devtools/src/production/auth/service.ts` - Stage, AuditDetail, hasFactor, fail, cut, createDevtoolsAuth, withSlot, dummyHash
+- `packages/devtools/src/production/auth/types.ts` - DevtoolsRequestMeta, DevtoolsAuthenticated, DevtoolsAuthStep, DevtoolsCrypto, DevtoolsPasskeys, DevtoolsAuthDeps, DevtoolsAuthService, auth/types.ts
+- `packages/devtools/src/production/boot.ts` - BootProductionDevtoolsInput, maskDashboardPath, hasEncryptionKey, bootProductionDevtools
+- `packages/devtools/src/production/capture/dev-stats.ts` - attachDevelopmentStats
+- `packages/devtools/src/production/capture/engine.ts` - DevtoolsQueryEvent, DevtoolsTracedRequest, RequestState, DevtoolsCaptureHooks, DevtoolsCaptureEngine, capture/engine.ts, stripQuery, errorMessage
+- `packages/devtools/src/production/capture/explain.ts` - ExplainStatement, ExplainRunner, ReadOnlyTransaction, isIdentifierCharacter, commentEnd, maskSql, withoutLeadingNoise, isOneRead
+- `packages/devtools/src/production/capture/filter.ts` - sampleMatchesFilter, statusMatches
+- `packages/devtools/src/production/capture/index.ts` - capture/index.ts
+- `packages/devtools/src/production/capture/production-capture.ts` - CacheEventData, CACHE_EVENT_TYPES, toLevel, createProductionCapture
+- `packages/devtools/src/production/capture/redact.ts` - capture/redact.ts, scrubErrorText, scrubQueryError, redactQuery, toStoredSample
+- `packages/devtools/src/production/capture/stats-stores.ts` - QueryEntry, RouteEntry, MONGO_EXPLAINABLE, isExplainableShape, shapeIds, shapeIdOf, truncate, copyHistogram
+- `packages/devtools/src/production/capture/types.ts` - DevtoolsQueryObservation, DevtoolsQueryStats, DevtoolsRequestObservation, DevtoolsRouteStatsStore, DevtoolsErrorGroups, DevtoolsRecentLogs, DevtoolsRequestSource, DevtoolsExplainStatement
+- `packages/devtools/src/production/cli/actions.ts` - CliOutput, DevtoolsCliContext, ResetAdminContext, cli/actions.ts, CLI_AUDIT_IP, reportStoreError, runEnable, resolveAdminEmail
+- `packages/devtools/src/production/cli/index.ts` - production/cli/index.ts, PRELOAD, io, exitWith, openStore, registerDevtoolsCommands
+- `packages/devtools/src/production/contracts.ts` - DevtoolsMode, DevtoolsRole, DevtoolsSessionStage, DevtoolsPasswordSource, DevtoolsInstanceInfo, DevtoolsHistogram, DevtoolsQueryShapeStats, DevtoolsRoutePhaseStats
+- `packages/devtools/src/production/errors.ts` - DevtoolsConfigCode, DevtoolsProductionConfigError, DevtoolsApiError, DevtoolsStoreConflictError, production/errors.ts, DEVTOOLS_CONFIG_CODES, DEVTOOLS_ERROR_MESSAGES, DEVTOOLS_ERROR_STATUS
+- `packages/devtools/src/production/http/access.ts` - Method, http/access.ts, PUBLIC, VIEWER, ADMIN, pending, ALL_STEPS, productionRouteAccess
+- `packages/devtools/src/production/http/auth-routes.ts` - ROLES, bodyOf, text, optionalText, email, role, purpose, idParam
+- `packages/devtools/src/production/http/client.ts` - http/client.ts, firstValue, hostnameOf, forwardedClient, resolveClient
+- `packages/devtools/src/production/http/constants.ts` - DEVTOOLS_CSRF_HEADER, DEVTOOLS_SESSION_COOKIE, DEVTOOLS_SESSION_COOKIE_INSECURE
+- `packages/devtools/src/production/http/context.ts` - DevtoolsRequestContext, http/context.ts, contexts, setDevtoolsRequestContext, devtoolsRequestContext
+- `packages/devtools/src/production/http/cookie.ts` - sessionCookieName, sessionCookie, readCookie
+- `packages/devtools/src/production/http/headers.ts` - DASHBOARD_HEADERS, DASHBOARD_CSP, DOCS_CSP
+- `packages/devtools/src/production/http/index.ts` - production/http/index.ts
+- `packages/devtools/src/production/http/ip.ts` - http/ip.ts, PRIVATE_V4, PRIVATE_V6, normalizeIp, parseCidr, isValidNetworkEntry, compiled, compile
+- `packages/devtools/src/production/http/mount.ts` - SAFE_METHODS, DOCS_PATTERNS, TAB_OF_ROUTE, tabOf, tokenHash, uniformNotFound, originAllowed, hasBody
+- `packages/devtools/src/production/http/state.ts` - http/state.ts, hashDashboardPath, createDashboardState
+- `packages/devtools/src/production/http/types.ts` - DevtoolsRouteAccess, DevtoolsRouteAccessRule, DevtoolsDashboardState, MountProductionDevtoolsDeps, DevtoolsClientInfo, DevtoolsProxyRequest, DevtoolsRoleRequirement, production/http/types.ts
+- `packages/devtools/src/production/index.ts` - production/index.ts
+- `packages/devtools/src/production/insights/cap-report.ts` - ListSetter, sizeOf, LISTS, capReportSize
+- `packages/devtools/src/production/insights/health.ts` - insights/health.ts, coreReadiness, createHealthHistory, report, run, check
+- `packages/devtools/src/production/insights/index.ts` - insights/index.ts
+- `packages/devtools/src/production/insights/insights.ts` - ReportLoader, DEFAULT_INSIGHT_LIMIT, MAX_INSIGHT_LIMIT, limitOf, matches, infoOf, build, select
+- `packages/devtools/src/production/insights/instance.ts` - createInstanceInfo
+- `packages/devtools/src/production/insights/jobs.ts` - SchedulerJobLike, DevtoolsJobsLoaders, SCHEDULER_KEY, importOptional, defaultLoaders, readableInterval, toSchedule, createJobsReader
+- `packages/devtools/src/production/insights/readiness.ts` - DevtoolsHealthStatusReader
+- `packages/devtools/src/production/insights/reporter.ts` - emptyJobs, createLocalReporter
+- `packages/devtools/src/production/insights/resources.ts` - GcKind, DevtoolsResourceSources, insights/resources.ts, gcKindName, defaultSources, nsToMs, createResourceMonitor, sample
+- `packages/devtools/src/production/insights/types.ts` - DevtoolsResourceMonitor, DevtoolsHealthHistory, DevtoolsLocalReporter, DevtoolsInstanceSelector, DevtoolsInsightQuery, DevtoolsInsights, DevtoolsReportWriter, DevtoolsJobsReader
+- `packages/devtools/src/production/insights/writer.ts` - insights/writer.ts, startReportWriter, fail, write, housekeeping, enqueue
+- `packages/devtools/src/production/openapi.ts` - Core, createProductionOpenApi, readAppPackage
+- `packages/devtools/src/production/options.ts` - ResolvedDevtoolsProductionOptions, production/options.ts, DEVTOOLS_PRODUCTION_DEFAULTS, DEVTOOLS_ENV, LOG_LEVELS, invalid, present, integerAtLeastOne
+- `packages/devtools/src/production/stats/histogram.ts` - createHistogram, bucketIndex, recordDuration, mergeHistograms, histogramQuantile, histogramMean, shortId
+- `packages/devtools/src/production/stats/index.ts` - stats/index.ts
+- `packages/devtools/src/production/stats/merge.ts` - slower, mergeQueryShapeStats, mergePhases, mergeRouteStats, mergeErrorGroups
+- `packages/devtools/src/production/store/cascade-store.ts` - ModelsModule, RowQuery, RowClass, CascadeStoreOptions, rows, query, byId, insert
+- `packages/devtools/src/production/store/index.ts` - production/store/index.ts
+- `packages/devtools/src/production/store/mapping.ts` - Row, toNumber, toNumberOrNull, toStringOrNull, toBoolean, parseJson, toArray, ACCOUNT_COLUMNS
+- `packages/devtools/src/production/store/memory-store.ts` - store/memory-store.ts, copy, defaultStateRecord, sampleStatusMatches, sampleMatches, createMemoryStore
+- `packages/devtools/src/production/store/migrations.ts` - store/migrations.ts, devtoolsMigrations
+- `packages/devtools/src/production/store/models/account.migration.ts` - DevtoolsAccountsMigration
+- `packages/devtools/src/production/store/models/account.model.ts` - DevtoolsAccountRow
+- `packages/devtools/src/production/store/models/audit.migration.ts` - DevtoolsAuditMigration
+- `packages/devtools/src/production/store/models/audit.model.ts` - DevtoolsAuditRow
+- `packages/devtools/src/production/store/models/base.ts` - DevtoolsRowModel
+- `packages/devtools/src/production/store/models/index.ts` - store/models/index.ts
+- `packages/devtools/src/production/store/models/invite.migration.ts` - DevtoolsInvitesMigration
+- `packages/devtools/src/production/store/models/invite.model.ts` - DevtoolsInviteRow
+- `packages/devtools/src/production/store/models/report.migration.ts` - DevtoolsReportsMigration
+- `packages/devtools/src/production/store/models/report.model.ts` - DevtoolsReportRow
+- `packages/devtools/src/production/store/models/sample.migration.ts` - DevtoolsSamplesMigration
+- `packages/devtools/src/production/store/models/sample.model.ts` - DevtoolsSampleRow
+- `packages/devtools/src/production/store/models/session.migration.ts` - DevtoolsSessionsMigration
+- `packages/devtools/src/production/store/models/session.model.ts` - DevtoolsSessionRow
+- `packages/devtools/src/production/store/models/state.migration.ts` - DevtoolsStateMigration
+- `packages/devtools/src/production/store/models/state.model.ts` - DevtoolsStateRow
+- `packages/devtools/src/production/store/types.ts` - DevtoolsStore, DevtoolsPasskeyRecord, DevtoolsAccountRecord, NewDevtoolsAccount, DevtoolsAccountPatch, DevtoolsAccountStore, DevtoolsSessionRecord, NewDevtoolsSession
+- `packages/devtools/src/query-shape.ts` - QueryShapeInput, src/query-shape.ts, postgresShapes, queryShape, normalizeMongoValue, isMongoLeaf
 - `packages/devtools/src/request-history.ts` - summaryToRow, rowToSummary, mergeRequestHistory, FILTER_KEYS, filterFromQuery, hasFilter, toLogLevel, recordToDetail
 - `packages/devtools/src/safe-value.ts` - toSafeValue, snapshot, constructorName
 - `packages/devtools/src/server/ai-routes.ts` - registerAiRoutes
 - `packages/devtools/src/server/background-routes.ts` - registerBackgroundRoutes
-- `packages/devtools/src/server/explain-route.ts` - isExplainableSql, registerExplainRoute
+- `packages/devtools/src/server/explain-route.ts` - isExplainableSql, registerExplainRoute, registerShapeExplainRoute
 - `packages/devtools/src/server/guard.ts` - server/guard.ts, LOOPBACK_ADDRESSES, LOOPBACK_HOSTS, PROXY_HEADERS, isLoopbackAddress, hostnameOf, isAllowedDevtoolsHost, originHostname
 - `packages/devtools/src/server/index.ts` - devtools/src/server/index.ts, mountDevtoolsRoutes
+- `packages/devtools/src/server/insights-routes.ts` - InsightsQuerystring, QUERY_SORTS, ROUTE_SORTS, parseInsightQuery, registerInsightsRoutes
 - `packages/devtools/src/server/log-routes.ts` - LogsQuery, registerLogRoutes
 - `packages/devtools/src/server/mail-routes.ts` - registerMailRoutes
 - `packages/devtools/src/server/openapi-routes.ts` - registerOpenApiRoutes
-- `packages/devtools/src/server/process-routes.ts` - registerProcessRoutes
-- `packages/devtools/src/server/requests-routes.ts` - registerRequestsRoutes
+- `packages/devtools/src/server/panel-routes.ts` - registerPanelRoutes
+- `packages/devtools/src/server/requests-routes.ts` - UNIT_MS, parseTimeBound, sampleFilterFromQuery, sendApiError, registerProductionRequestsRoutes, registerRequestsRoutes
 - `packages/devtools/src/server/route-routes.ts` - registerRouteRoutes
-- `packages/devtools/src/server/stream-route.ts` - registerStreamRoute
-- `packages/devtools/src/server/types.ts` - DevtoolsRouteRow, DevtoolsRequestLogSource, MountDevtoolsRoutesDeps, server/types.ts
+- `packages/devtools/src/server/session-routes.ts` - developmentSessionView, panelInfos, registerSessionRoutes
+- `packages/devtools/src/server/stream-route.ts` - withoutContext, registerStreamRoute
+- `packages/devtools/src/server/types.ts` - DevtoolsRouteRow, DevtoolsRequestLogSource, DevtoolsStreamSession, MountDevtoolsRoutesDeps, server/types.ts
 - `packages/devtools/src/server/ui-assets.ts` - UiAsset, uiFile, UI_ASSETS, sendFile, registerUiAssets
 - `packages/devtools/src/sources/agent-trace-source.ts` - DevtoolsAgentTrace, DevtoolsAgentTraceStore, DevtoolsAgentTraceEvent, DevtoolsAgentRun, DevtoolsAgentTraceSource, AGENT_TRACES_KEY, AGENT_TRACE_INSTALL_GUIDANCE, summarizeAgentTrace
 - `packages/devtools/src/sources/ai-source.ts` - DevtoolsAiEvent, DevtoolsAiSource, DevtoolsAiRun, AI_INSTALL_GUIDANCE, summarizeAiTrace, snapshotSpan, attachAiSource
 - `packages/devtools/src/sources/cache-source.ts` - CacheEventData, EVENT_TYPES, attachCacheSource
-- `packages/devtools/src/sources/log-source.ts` - DevtoolsLogChannel, toDevtoolsLevel, attachLogSource
+- `packages/devtools/src/sources/log-source.ts` - DevtoolsLogChannel, toDevtoolsLevel, messageText, attachLogSource
 - `packages/devtools/src/sources/mail-source.ts` - addressToString, attachmentSize, toDevtoolsAttachment, attachMailSource
 - `packages/devtools/src/sources/query-source.ts` - QueryEvent, redactBindings, attachQuerySource
 - `packages/devtools/src/sources/tracing-source.ts` - attachTracingSource
-- `packages/devtools/src/types.ts` - DevtoolsOptions, ResolvedDevtoolsOptions, DevtoolsCallerLocation, DevtoolsPhase, DevtoolsQuery, DevtoolsCacheOperation, DevtoolsLogEntry, DevtoolsMail
+- `packages/devtools/src/types.ts` - DevtoolsOptions, DevtoolsProductionOptions, ResolvedDevtoolsOptions, DevtoolsPanelMethod, DevtoolsPanelRequest, DevtoolsPanelRoute, DevtoolsPanel, DevtoolsPanelFactoryContext
 - `packages/devtools/src/ui-root.ts` - isPackageRoot, resolveUiRoot
-- `packages/devtools/ui/app.js` - app, tabs, state, api, el, errorView, empty, time
+- `packages/devtools/tests/fixtures/test-panel/graph.js` - drawBars
+- `packages/devtools/tests/fixtures/test-panel/panel.ts` - devtoolsPanel
+- `packages/devtools/tests/fixtures/test-panel/view.js` - renderTestPanel
+- `packages/devtools/tests/production/auth/harness.ts` - FakeCrypto, World, auth/harness.ts, START, MINUTE, instance, meta, baseOptions
+- `packages/devtools/tests/production/capture/helpers.ts` - TestEngine, capture/helpers.ts, instance, productionOptions, SECRET, createClock, createEngine, traced
+- `packages/devtools/tests/production/http/app.ts` - TestApp, AppConfig, http/app.ts, PATH, HOST, ORIGIN, PASSWORD, TOTP_SECRET
+- `packages/devtools/tests/production/http/harness.ts` - production/http/harness.ts
+- `packages/devtools/tests/production/http/mock-registrars.ts`
+- `packages/devtools/tests/production/http/stubs.ts` - Module, http/stubs.ts, requestsRoutes, insightsRoutes, logRoutes, explainRoute, uiAssets
+- `packages/devtools/tests/production/insights/helpers.ts` - insights/helpers.ts, instance, point, snapshot, histogramOf, shape, route, errorGroup
+- `packages/devtools/tests/production/store/store-contract.ts` - StoreUnderTest, MakeStore, newAccount, newSession, newInvite, auditEntry, sample, report
+- `packages/devtools/ui-src/README.md`
+- `packages/devtools/ui-src/scripts/source-hash.d.mts` - DASHBOARD_BUILD_DEPENDENCIES
+- `packages/devtools/ui-src/scripts/source-hash.mjs` - DASHBOARD_BUILD_DEPENDENCIES, EXCLUDED_UI_DIRECTORIES, EXCLUDED_UI_FILES, listFiles, isBuildInput, dashboardSourceHash
+- `packages/devtools/ui-src/scripts/write-build-info.d.mts` - DASHBOARD_GZIP_BUDGET_BYTES, DASHBOARD_FILES
+- `packages/devtools/ui-src/scripts/write-build-info.mjs` - DASHBOARD_GZIP_BUDGET_BYTES, DASHBOARD_FILES, ASSET_FILES, fileRecord, assertBundleShape, writeBuildInfo, parseOutDir, main
+- `packages/devtools/ui-src/src/account/AccountPage.tsx` - Reload, PasswordSection, TotpSection, PasskeysSection, RecoverySection, SessionsSection, AccountPage
+- `packages/devtools/ui-src/src/admin/AdminPage.tsx` - PAGES, AdminPage
+- `packages/devtools/ui-src/src/admin/AuditPage.tsx` - AUDIT_TYPES, FAILURES, query, AuditPage
+- `packages/devtools/ui-src/src/admin/SettingsPage.tsx` - SettingsPage
+- `packages/devtools/ui-src/src/admin/UsersPage.tsx` - Pending, inviteLink, InviteForm, dialogFor, UsersPage
+- `packages/devtools/ui-src/src/api/client.ts` - ApiError, ApiRequest, api/client.ts, NOT_FOUND_EVENT, setCsrfToken, getCsrfToken, apiUrl, apiFetch
+- `packages/devtools/ui-src/src/api/hooks.ts` - ApiState, StreamEvent, useApi, useInterval, useStream
+- `packages/devtools/ui-src/src/api/types.ts` - AuthStepWithCodes, api/types.ts
+- `packages/devtools/ui-src/src/app/App.tsx` - SignInLink, readLink, App
+- `packages/devtools/ui-src/src/app/Header.tsx` - HeaderProps, Header
+- `packages/devtools/ui-src/src/app/InstancePicker.tsx` - InstancePickerProps, InstancePicker
+- `packages/devtools/ui-src/src/app/Menu.tsx` - MenuProps, Menu, MenuLink, MenuButton
+- `packages/devtools/ui-src/src/app/Shell.tsx` - Shell
+- `packages/devtools/ui-src/src/app/session.tsx` - SessionContextValue, SessionContext, useSession
+- `packages/devtools/ui-src/src/app/useColorScheme.ts` - useColorScheme
+- `packages/devtools/ui-src/src/app/useHashRoute.ts` - useHashRoute
+- `packages/devtools/ui-src/src/auth/AuthLayout.tsx` - AuthLayoutProps, AuthLayout
+- `packages/devtools/ui-src/src/auth/InviteScreen.tsx` - InviteScreenProps, InviteScreen
+- `packages/devtools/ui-src/src/auth/LoginScreen.tsx` - LoginScreenProps, LoginScreen
+- `packages/devtools/ui-src/src/auth/MfaEnrolScreen.tsx` - MfaEnrolScreenProps, MfaEnrolScreen
+- `packages/devtools/ui-src/src/auth/MfaVerifyScreen.tsx` - MfaVerifyScreenProps, MfaVerifyScreen
+- `packages/devtools/ui-src/src/auth/PasswordChangeScreen.tsx` - PasswordChangeScreenProps, PasswordChangeScreen
+- `packages/devtools/ui-src/src/auth/PasswordForm.tsx` - PasswordFormProps, PasswordForm
+- `packages/devtools/ui-src/src/auth/RecoveryCodes.tsx` - RecoveryCodesProps, RecoveryCodes
+- `packages/devtools/ui-src/src/auth/SetupScreen.tsx` - SetupScreenProps, SetupScreen
+- `packages/devtools/ui-src/src/auth/TotpEnrolment.tsx` - TotpEnrolmentProps, TotpEnrolment
+- `packages/devtools/ui-src/src/auth/passkeys.ts` - RegistrationOptions, AuthenticationOptions, src/auth/passkeys.ts, passkeyFailure, registerPasskey, authenticateWithPasskey
+- `packages/devtools/ui-src/src/components/charts/Histogram.tsx` - bucketLabel, HistogramBars
+- `packages/devtools/ui-src/src/components/charts/LineChart.tsx` - LineSeries, LineChart
+- `packages/devtools/ui-src/src/components/charts/PercentileBar.tsx` - PercentileBar
+- `packages/devtools/ui-src/src/components/charts/Sparkline.tsx` - Sparkline
+- `packages/devtools/ui-src/src/components/charts/index.ts` - charts/index.ts
+- `packages/devtools/ui-src/src/components/common/Bytes.tsx`
+- `packages/devtools/ui-src/src/components/common/ConfirmDialog.tsx` - ConfirmDialogProps, ConfirmDialog
+- `packages/devtools/ui-src/src/components/common/CopyButton.tsx` - CopyButtonProps, CopyButton
+- `packages/devtools/ui-src/src/components/common/Duration.tsx`
+- `packages/devtools/ui-src/src/components/common/EmptyState.tsx` - EmptyStateProps, EmptyState
+- `packages/devtools/ui-src/src/components/common/ErrorMessage.tsx` - ErrorMessageProps, errorText, ErrorMessage
+- `packages/devtools/ui-src/src/components/common/LoadingRows.tsx` - LoadingRowsProps, LoadingRows
+- `packages/devtools/ui-src/src/components/common/RelativeTime.tsx`
+- `packages/devtools/ui-src/src/components/common/ViewBoundary.tsx` - ViewBoundaryProps, ViewBoundaryState, ViewBoundary
+- `packages/devtools/ui-src/src/components/common/format.tsx` - DurationProps, BytesProps, RelativeTimeProps, formatDuration, formatBytes, formatRelativeTime, Duration, Bytes
+- `packages/devtools/ui-src/src/components/common/index.ts` - components/common/index.ts
+- `packages/devtools/ui-src/src/components/ui/LICENSE.md`
+- `packages/devtools/ui-src/src/components/ui/alert.tsx` - alertVariants, Alert, AlertTitle, AlertDescription
+- `packages/devtools/ui-src/src/components/ui/badge.tsx` - badgeVariants, Badge
+- `packages/devtools/ui-src/src/components/ui/button.tsx` - src/components/ui/button.tsx, buttonVariants, Button
+- `packages/devtools/ui-src/src/components/ui/card.tsx` - Card, CardHeader, CardTitle, CardDescription, CardAction, CardContent, CardFooter
+- `packages/devtools/ui-src/src/components/ui/dialog.tsx` - src/components/ui/dialog.tsx, Dialog, DialogTrigger, DialogPortal, DialogClose, DialogOverlay, DialogContent, DialogHeader
+- `packages/devtools/ui-src/src/components/ui/input.tsx` - src/components/ui/input.tsx, Input
+- `packages/devtools/ui-src/src/components/ui/label.tsx` - src/components/ui/label.tsx, Label
+- `packages/devtools/ui-src/src/components/ui/panel-kit.tsx` - DASH, formatNumber, formatMs, formatBytes, formatPercent, formatCost, formatDuration, relativeTime
+- `packages/devtools/ui-src/src/components/ui/skeleton.tsx` - Skeleton
+- `packages/devtools/ui-src/src/components/ui/switch.tsx` - src/components/ui/switch.tsx, Switch
+- `packages/devtools/ui-src/src/components/ui/table.tsx` - Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell, TableCaption
+- `packages/devtools/ui-src/src/lib/route.ts` - AdminPage, HashRoute, lib/route.ts, parseHash, tabHash, clearHash
+- `packages/devtools/ui-src/src/lib/useAction.ts` - ActionResult, ActionState, useAction
+- `packages/devtools/ui-src/src/lib/utils.ts` - lib/utils.ts, cn
+- `packages/devtools/ui-src/src/main.tsx` - container
+- `packages/devtools/ui-src/src/panel-host/PanelHost.tsx` - PanelHostProps, PanelHost
+- `packages/devtools/ui-src/src/panel-host/context.ts` - PanelContextOptions, panel-host/context.ts, panelFetch, buildPanelContext
+- `packages/devtools/ui-src/src/panel-host/dom.ts` - Attrs, fill, el, svg, empty, panelApiUrl, panelHref
+- `packages/devtools/ui-src/src/panel-host/modules.ts` - PanelModuleLoader, defaultLoader, modules, setPanelModuleLoader, loadPanelModule
+- `packages/devtools/ui-src/src/panel-host/types.ts` - LegacyPanelContext, LegacyPanelModule, panel-host/types.ts
+- `packages/devtools/ui-src/src/panels/agents/index.tsx` - agents/index.tsx, value, AgentRunSummary, ToolCall, Turn, agentDiffText, RunDetail, AgentsPanel
+- `packages/devtools/ui-src/src/panels/agents/types.ts` - AgentRun, AgentRunsAnswer, AgentToolCall, AgentTurn, AgentTraceDetail, agents/types.ts
+- `packages/devtools/ui-src/src/panels/ai/index.tsx` - ai/index.tsx, value, aiUsageText, AiRunSummary, AiSpan, RunDetail, AiPanel
+- `packages/devtools/ui-src/src/panels/ai/types.ts` - AiUsage, AiRun, AiAnswer, AiSpanNode, AiTrace, ai/types.ts
+- `packages/devtools/ui-src/src/panels/api/index.tsx` - api/index.tsx, VIEWERS, DOCS_VIEWER_KEY, savedViewer, saveViewer, ApiPanel
+- `packages/devtools/ui-src/src/panels/errors/index.tsx` - errors/index.tsx, ErrorsPanel, GroupRows
+- `packages/devtools/ui-src/src/panels/health/index.tsx` - health/index.tsx, statusBadge, HistoryStrip, HealthPanel
+- `packages/devtools/ui-src/src/panels/jobs/index.tsx` - jobs/index.tsx, Schedules, Queues, JobsPanel
+- `packages/devtools/ui-src/src/panels/logs/index.tsx` - logs/index.tsx, LEVELS, LogsPanel
+- `packages/devtools/ui-src/src/panels/mail/index.tsx` - MailSummary, Mail, mail/index.tsx, MailDetail, MailPanel
+- `packages/devtools/ui-src/src/panels/queries/BackgroundQueries.tsx` - BackgroundQuery, BackgroundQueries
+- `packages/devtools/ui-src/src/panels/queries/ExplainBox.tsx` - ExplainOutcome, isRecord, PlanTree, ExplainBox
+- `packages/devtools/ui-src/src/panels/queries/index.tsx` - SortKey, queries/index.tsx, SORTS, ShapeDetail, QueriesPanel
+- `packages/devtools/ui-src/src/panels/registry.ts` - panels/registry.ts, BUILT_IN_PANELS, isBuiltInPanel
+- `packages/devtools/ui-src/src/panels/requests/RecordSections.tsx` - RecordSections
+- `packages/devtools/ui-src/src/panels/requests/RequestDetailView.tsx` - AiRunRow, AiAnswer, CopyCurl, QueryRow, AiSection, RequestDetailView
+- `packages/devtools/ui-src/src/panels/requests/Waterfall.tsx` - Entry, COLORS, Waterfall
+- `packages/devtools/ui-src/src/panels/requests/index.tsx` - Filters, requests/index.tsx, NO_FILTERS, SINCE, Row, RequestsPanel
+- `packages/devtools/ui-src/src/panels/requests/query-text.ts` - queryText, canExplainDevelopment
+- `packages/devtools/ui-src/src/panels/requests/types.ts` - RequestRow, RequestRecord, DetailQuery, DetailCacheOperation, DetailWarning, RequestDetail, requests/types.ts
+- `packages/devtools/ui-src/src/panels/resources/index.tsx` - Entry, resources/index.tsx, Metric, series, InstanceResources, ResourcesPanel
+- `packages/devtools/ui-src/src/panels/routes/index.tsx` - RouteEntry, SortKey, routes/index.tsx, PhaseBars, RouteStats, RouteRow, RouteMap, RoutesPanel
+- `packages/devtools/ui-src/src/panels/types.ts` - DevtoolsPanelProps, panels/types.ts
+- `packages/devtools/ui-src/tests/helpers/api.ts` - MockRequest, MockAnswer, MockHandler, mockApi, instanceInfo, account, sessionView, signedOut
+- `packages/devtools/ui-src/tests/helpers/fake-panels.tsx` - fakeRegistry, noop
+- `packages/devtools/ui-src/tests/panels/fixtures.ts` - histogram
+- `packages/devtools/ui-src/tests/panels/helpers.tsx` - Answer, Route, ApiCall, FakeEventSource, instanceA, instanceB, session, devSession
+- `packages/devtools/ui-src/tests/setup.ts` - tests/setup.ts
+- `packages/devtools/ui-src/vite.config.ts` - ui-src/vite.config.ts, devBase, proxied
+- `packages/devtools/ui/dashboard/assets/app.js` - me, v, S, ce, ie, le, ne, oe
 - `packages/devtools/ui/docs-swagger.js`
+- `packages/devtools/ui/panels/processes.js` - renderProcesses
 - `packages/devtools/vitest.config.ts` - devtools/vitest.config.ts
+- `packages/devtools/vitest.integration.config.ts` - devtools/vitest.integration.config.ts
+- `packages/devtools/vitest.ui.config.ts`
 
 ## packages/fs (33 test files not listed)
 
@@ -3551,9 +3765,183 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/fs/src/transaction-store.ts` - Image, Change, Journal, Head, metadataName, digest, journalPath, headPath
 - `packages/fs/src/transaction-types.ts` - TransactionOptions, TransactionWriteOptions, FileTransaction, TransactionReadOptions, TransactionInspection, FsTransactionError
 - `packages/fs/src/transaction.ts` - StagedTransaction, TransactionRoot, validateOptions, jsonResult, resultOf, replay, transactionAsync, inspectTransactionsAsync
-- `packages/fs/src/write.ts` - putFileAsync, putFile, putJsonFileAsync, putJsonFile, renameSyncWithRetry
+- `packages/fs/src/write.ts` - src/write.ts, putFileAsync, putFile, putJsonFileAsync, putJsonFile, renameSyncWithRetry
 - `packages/fs/tests/helpers.ts` - tests/helpers.ts, withTempDir
 - `packages/fs/vitest.config.ts` - fs/vitest.config.ts
+
+## packages/grimoire (49 test files not listed)
+
+- `packages/grimoire/README.md`
+- `packages/grimoire/scripts/generate-llms.mjs` - grimoire/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
+- `packages/grimoire/skills/backfill-a-grimoire/SKILL.md` - backfill-a-grimoire - Write the Grimoire for a project that already has code but no `grimoire/` folder: build t…
+- `packages/grimoire/skills/describe-an-app/SKILL.md` - describe-an-app - Describe where users meet the product in `grimoire/apps/`: one folder per site or mobile …
+- `packages/grimoire/skills/document-a-file/SKILL.md` - document-a-file - Write the one-sentence header and the public-export comments the Grimoire copies into its…
+- `packages/grimoire/skills/index.md`
+- `packages/grimoire/skills/record-a-change/SKILL.md` - record-a-change - Finish a change the Grimoire way: tie each test to the acceptance criterion it proves, re…
+- `packages/grimoire/skills/use-the-grimoire/SKILL.md` - use-the-grimoire - Find the right files before changing a Warlock.js project by asking the Grimoire (experim…
+- `packages/grimoire/skills/write-a-feature/SKILL.md` - write-a-feature - Describe a new feature, or a new version of one, in `grimoire/features/` before writing c…
+- `packages/grimoire/src/apps/check-apps.ts` - Subject, flowSubject, pageSubject, normalizeRoute, blockSlug, pagesOf, checkApps, checkReached
+- `packages/grimoire/src/apps/index.ts` - apps/index.ts
+- `packages/grimoire/src/apps/match-apps.ts` - sameRoot, matchApps
+- `packages/grimoire/src/book/build.ts` - StoredBook, Scan, book/build.ts, WRITE_STATE_PATH, grimoireVersion, absolutePath, readStoredBook, scanSourceRoots
+- `packages/grimoire/src/book/index.ts` - book/index.ts
+- `packages/grimoire/src/book/io.ts` - IO_CONCURRENCY, isSkippedName, mapLimit, hashText, hashFile, hashIfExists, isMissing, cleanFolder
+- `packages/grimoire/src/book/normalize.ts` - cleanPath, cleanNullable, normalizeFiles, normalizeRoutes, normalizeSites, normalizePages, normalizeMobile, normalizeNamed
+- `packages/grimoire/src/book/render.ts` - PageUse, ScreenUse, NO_MODULE, byText, entryPathsFor, routeRef, packagesOf, groupBy
+- `packages/grimoire/src/book/write.ts` - WriteState, book/write.ts, isKept, isGenerated, readDiskText, writeBook
+- `packages/grimoire/src/bookmap/build.ts` - CollectedInput, bookmap/build.ts, flowFileId, resultFor, flowCriteria, shownBy, flowBookmap, featureBookmap
+- `packages/grimoire/src/bookmap/index.ts` - bookmap/index.ts
+- `packages/grimoire/src/bookmap/steps.ts` - StepMatch, StepContext, NAMED_TYPES, normalizeRoutePath, routeMatches, sortedUnique, NOTHING, routeStep
+- `packages/grimoire/src/bookmap/write.ts` - bookmap/write.ts, absolute, json, readText, writeAtomic, listDir, existingBookmaps, removeIfEmpty
+- `packages/grimoire/src/check/check-grimoire.ts` - CHECK_RULES, checkGrimoire, finishReport, proposedWork, isProposed, compareFindings, severityRank, compareText
+- `packages/grimoire/src/check/format-check-report.ts` - FormatCheckOptions, formatCheckReport, location, plural
+- `packages/grimoire/src/check/index.ts` - src/check/index.ts
+- `packages/grimoire/src/check/rules/book-notes.ts` - checkBookNotes
+- `packages/grimoire/src/check/rules/criteria.ts` - checkCriteriaTests, checkProofTargets
+- `packages/grimoire/src/check/rules/links.ts` - rules/links.ts, STEP_CODES, BOOT_TYPES, checkSteps, checkAppNames, checkChangelogLinks, checkRelations
+- `packages/grimoire/src/check/rules/lookup.ts` - WrittenLookup, writtenLookup, featureStatus, isRetired, parseVersion, compareVersions
+- `packages/grimoire/src/check/rules/source-files.ts` - rules/source-files.ts, NO_HEADER_TYPES, NO_FEATURE_TYPES, top, checkHeaders, checkOwners, needsFeature, checkFolders
+- `packages/grimoire/src/check/rules/versions.ts` - checkReadmeDates, checkChangeWords, checkFlowVersions
+- `packages/grimoire/src/codes/codes.ts` - GrimoireCode, define, GRIMOIRE_CODE_LIST, GRIMOIRE_CODES
+- `packages/grimoire/src/codes/index.ts` - GrimoireError, codes/index.ts, GRIMOIRE_CODES_DOCS_URL, isGrimoireCode, explainGrimoireCode, grimoireCodeDocsUrl, createFinding
+- `packages/grimoire/src/contracts/adapter.ts` - BookFileType, BookExport, BookImport, BookFile, BookRoute, BookSite, BookPageLink, BookPage
+- `packages/grimoire/src/contracts/book.ts` - BookRouteRef, BookEntry, BookRoutesFile, BookSitePagesFile, BookMobileScreensFile, BookModuleSummary, BookManifestFile, BookManifest
+- `packages/grimoire/src/contracts/bookmap.ts` - FileOwnership, Ownership, FeatureBookmap, FlowBookmapStep, FlowBookmapCriterion, FlowBookmap, FeaturesIndex, TaskSummary
+- `packages/grimoire/src/contracts/findings.ts` - GrimoireSeverity, GrimoireCodeArea, GrimoireCodeDefinition, GrimoireFinding, GrimoireFindingInput, RouteFreshness, GrimoireCheckReport
+- `packages/grimoire/src/contracts/index.ts` - grimoire/src/contracts/index.ts
+- `packages/grimoire/src/contracts/location.ts` - SourceLocation, Located
+- `packages/grimoire/src/contracts/releases.ts` - ReleaseEntry, ReleaseCollection, CollectedListText, WriteReleaseResult
+- `packages/grimoire/src/contracts/scry.ts` - ScryQuery, ScryNotes, ScryPageRef, ScryFileResult, ScryImpactResult, ScryRouteResult, ScryFeatureResult, ScryFlowResult
+- `packages/grimoire/src/contracts/snapshot.ts` - GrimoireSnapshot, OpenGrimoireOptions, GrimoireRule, AppMatch, contracts/snapshot.ts
+- `packages/grimoire/src/contracts/test-results.ts` - ProofLine, TestOutcome, ProofResult, TestResultsStore, CriterionStatus
+- `packages/grimoire/src/contracts/written.ts` - WrittenStatus, WrittenOrigin, FeatureVersion, FlowRef, CriterionId, WrittenListLine, WrittenFeatureReadme, ChangeWord
+- `packages/grimoire/src/devtools/data.ts` - GrimoirePanelError, GrimoireSummary, GrimoireAppsAnswer, GrimoirePageAnswer, GrimoireReleasesAnswer, ask, required, summary
+- `packages/grimoire/src/devtools/graphs.ts` - GraphNode, GraphEdge, GrimoireGraph, GraphBuilder, GRAPH_LIMIT, fileLabel, fileGraph, featureGraph
+- `packages/grimoire/src/devtools/index.ts` - GrimoirePanelRequest, GrimoireDevtoolsPanel, GrimoirePanelContext, devtools/index.ts, one, grimoireDevtoolsPanel
+- `packages/grimoire/src/devtools/site.ts` - ExportGrimoireSiteOptions, SearchItem, SITE_FILE_LIMIT, uiFolder, buildSiteData, inlineJson, inlineCode, attempt
+- `packages/grimoire/src/devtools/snapshot-source.ts` - SnapshotSourceOptions, SnapshotSource, manifestStamp, loadAdapter, createSnapshotSource, open
+- `packages/grimoire/src/front-matter/index.ts` - FrontMatterValue, FrontMatterField, FrontMatterResult, front-matter/index.ts, unquote, inlineList, readFrontMatter, frontMatterString
+- `packages/grimoire/src/graph/index.ts` - FileGraph, graph/index.ts, fileGraph, walk, importClosure, importerClosure, packageNameOf
+- `packages/grimoire/src/index.ts` - grimoire/src/index.ts
+- `packages/grimoire/src/ownership/index.ts` - Claim, ownership/index.ts, isFileEntry, normalizeFolder, taggedFeatures, countsForFeature, decide, resolveOwnership
+- `packages/grimoire/src/paths/index.ts` - BookPathInput, paths/index.ts, GRIMOIRE_DIR, GRIMOIRE_PATHS, GRIMOIRE_IGNORE_RULES, toPosixPath, projectPath, isInsideFolder
+- `packages/grimoire/src/proves/index.ts` - proves/index.ts
+- `packages/grimoire/src/proves/scan-proofs.ts` - ScanProofsResult, ParsedProof, scanProofsInText, scanProofs, malformed, withoutBlockComments, testName, closingQuote
+- `packages/grimoire/src/scry/format.ts` - FormatScryOptions, section, countedSection, plural, shorten, notes, countsLine, releaseOf
+- `packages/grimoire/src/scry/index.ts` - scry/index.ts
+- `packages/grimoire/src/scry/parse.ts` - QUERY_OPTIONS, malformed, textOf, parseRouteText, parseFlowText, parseFeatureText, parseLimit, parseScryQuery
+- `packages/grimoire/src/scry/query.ts` - Candidate, byText, sortedUnique, notesOf, fileOf, bookFile, siteApp, mobileApp
+- `packages/grimoire/src/tasks/index.ts` - Subject, tasks/index.ts, subjectOf, resolveFlow, hasVersion, briefPath, checkTasks
+- `packages/grimoire/src/test-results/criterion-status.ts` - CriterionTestResult, criterionStatus
+- `packages/grimoire/src/test-results/index.ts` - test-results/index.ts, hashTestFile, readTestResults, isStore, compareResults, mergeTestResults, writeTestResults, checkTestResults
+- `packages/grimoire/src/vitest/index.ts` - GrimoireReporterOptions, GrimoireReporter, ReportedCase, ReportedModule, VitestContext, ModuleRecord, vitest/index.ts, OUTCOMES
+- `packages/grimoire/src/warlock/actions.ts` - CommandIO, CommandContext, Options, warlock/actions.ts, plural, reportError, printJson, withFreshRoutes
+- `packages/grimoire/src/warlock/adapter.ts` - WarlockInspect, WarlockAdapterOptions, ExportIndex, warlock/adapter.ts, versionIn, installedVersion, coreVersion, withConsoleOnStderr
+- `packages/grimoire/src/warlock/commands.ts` - warlock/commands.ts, BOOT, WEB_CONFIG, preloadFor, GRIMOIRE_ACTIONS, io, exitWith, explainCode
+- `packages/grimoire/src/warlock/index.ts` - warlock/index.ts
+- `packages/grimoire/src/warlock/mcp-tools.ts` - warlock/mcp-tools.ts, GRIMOIRE_MCP_TOOL_NAMES, toolError, text, createGrimoireMcpTools
+- `packages/grimoire/src/warlock/mobile-facts.ts` - MobileAppOption, CollectMobileFactsOptions, CODE_EXTENSIONS, IGNORED_FOLDERS, compare, exists, readJson, hasDependency
+- `packages/grimoire/src/workspace/index.ts` - GrimoireRun, workspace/index.ts, testFileHashes, runGrimoire, openGrimoire
+- `packages/grimoire/src/written/apps.ts` - AppReadme, BLOCK_COLUMNS, heading, tableCells, parseBlocksTable, parseAppReadme, parseLayout, parsePage
+- `packages/grimoire/src/written/features.ts` - STATUSES, ORIGINS, CHANGE_WORDS, STEP_TYPES, STEP, STEP_ANY_TYPE, heading, sameAsName
+- `packages/grimoire/src/written/fields.ts` - FrontMatterReader, ID, VERSION, TASK_ID, FLOW_REF, SEP, isDate, projectFolder
+- `packages/grimoire/src/written/index.ts` - written/index.ts
+- `packages/grimoire/src/written/lists.ts` - ListNames, BULLET, LIST_LINE, escapeRegExp, bulletLines, splitListLine, readListLines
+- `packages/grimoire/src/written/markdown.ts` - BodyLine, Heading, Section, WrittenDocument, LogicalLine, written/markdown.ts, normalizeKey, splitLines
+- `packages/grimoire/src/written/parse-grimoire.ts` - ParseGrimoireResult, PageType, Job, Listing, Walker, decoder, mapLimited, readWritten
+- `packages/grimoire/src/written/sink.ts` - FindingSubject, FindingSink
+- `packages/grimoire/src/written/tasks-releases.ts` - TaskPlace, TASK_TYPES, TASK_STATUSES, heading, parseTask, parseRelease, readCollected
+- `packages/grimoire/tests/check/snapshot-builder.ts` - FeatureInput, FlowInput, ROOT, at, located, snapshot, withApps, feature
+- `packages/grimoire/tests/fixtures/apps-code-nav/grimoire/apps/rider/README.md`
+- `packages/grimoire/tests/fixtures/apps-code-nav/grimoire/apps/rider/screens/orders/README.md`
+- `packages/grimoire/tests/fixtures/apps-code-nav/mobile/src/navigation.tsx` - screens
+- `packages/grimoire/tests/fixtures/apps-expo/mobile/app/(tabs)/_layout.tsx` - Screen, (tabs)/_layout.tsx
+- `packages/grimoire/tests/fixtures/apps-expo/mobile/app/(tabs)/index.tsx` - Screen, (tabs)/index.tsx
+- `packages/grimoire/tests/fixtures/apps-expo/mobile/app/(tabs)/profile.tsx` - Screen
+- `packages/grimoire/tests/fixtures/apps-expo/mobile/app/(tabs)/profile.web.tsx` - Screen
+- `packages/grimoire/tests/fixtures/apps-expo/mobile/app/+html.tsx` - Screen
+- `packages/grimoire/tests/fixtures/apps-expo/mobile/app/+not-found.tsx` - Screen
+- `packages/grimoire/tests/fixtures/apps-expo/mobile/app/_layout.tsx` - Screen, apps-expo/mobile/app/_layout.tsx
+- `packages/grimoire/tests/fixtures/apps-expo/mobile/app/api/ping+api.ts` - Screen
+- `packages/grimoire/tests/fixtures/apps-expo/mobile/app/products/[id].tsx` - Screen, apps-expo/mobile/app/products/[id].tsx
+- `packages/grimoire/tests/fixtures/apps-expo/mobile/app/products/index.tsx` - Screen, products/index.tsx
+- `packages/grimoire/tests/fixtures/apps-expo/mobile/app/settings.tsx` - Screen
+- `packages/grimoire/tests/fixtures/shop-facts.ts` - AdapterCalls, shopRoot, shopFacts, createShopAdapter
+- `packages/grimoire/tests/fixtures/shop/e2e/checkout.e2e.ts`
+- `packages/grimoire/tests/fixtures/shop/grimoire/apps/mobile/README.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/apps/mobile/screens/home/README.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/apps/web-admin/README.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/apps/web-admin/pages/orders/README.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/apps/web-client/README.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/apps/web-client/layouts/site.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/apps/web-client/pages/home/README.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/apps/web-client/pages/home/blocks/new-arrivals.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/apps/web-client/pages/product/README.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/features/auth/README.md` - Accounts and sign-in
+- `packages/grimoire/tests/fixtures/shop/grimoire/features/auth/flows/login.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/features/auth/flows/sign-up.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/features/catalog/README.md` - Product catalog
+- `packages/grimoire/tests/fixtures/shop/grimoire/features/catalog/flows/browse-products.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/features/catalog/flows/new-arrivals.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/features/catalog/flows/wishlist.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/features/catalog/versions/v3.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/features/orders/README.md` - Orders
+- `packages/grimoire/tests/fixtures/shop/grimoire/features/orders/flows/place-order.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/tasks/done/2026-11/T-010-new-arrivals-no-country.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/tasks/open/T-014-wishlist.md`
+- `packages/grimoire/tests/fixtures/shop/grimoire/tasks/open/T-015-double-order.md`
+- `packages/grimoire/tests/fixtures/shop/mobile/app/_layout.tsx` - shop/mobile/app/_layout.tsx, Component
+- `packages/grimoire/tests/fixtures/shop/mobile/app/index.tsx` - app/index.tsx, Component
+- `packages/grimoire/tests/fixtures/shop/mobile/app/products/[id].tsx` - shop/mobile/app/products/[id].tsx, Component
+- `packages/grimoire/tests/fixtures/shop/src/app/auth/controllers/login.controller.ts` - LoginController, shop/src/app/auth/controllers/login.controller.ts
+- `packages/grimoire/tests/fixtures/shop/src/app/auth/controllers/register.controller.ts` - RegisterController
+- `packages/grimoire/tests/fixtures/shop/src/app/auth/routes.ts` - shop/src/app/auth/routes.ts
+- `packages/grimoire/tests/fixtures/shop/src/app/auth/services/login.service.ts` - login
+- `packages/grimoire/tests/fixtures/shop/src/app/auth/services/register.service.ts` - register
+- `packages/grimoire/tests/fixtures/shop/src/app/catalog/controllers/new-arrivals.controller.ts` - NewArrivalsController
+- `packages/grimoire/tests/fixtures/shop/src/app/catalog/controllers/products.controller.ts` - ProductsController
+- `packages/grimoire/tests/fixtures/shop/src/app/catalog/models/product.model.ts` - Product
+- `packages/grimoire/tests/fixtures/shop/src/app/catalog/repositories/products.repository.ts` - productsRepository
+- `packages/grimoire/tests/fixtures/shop/src/app/catalog/routes.ts` - catalog/routes.ts
+- `packages/grimoire/tests/fixtures/shop/src/app/catalog/services/new-arrivals.service.ts` - listNewArrivals
+- `packages/grimoire/tests/fixtures/shop/src/app/orders/controllers/place-order.controller.ts` - PlaceOrderController
+- `packages/grimoire/tests/fixtures/shop/src/app/orders/events/order-placed.event.ts` - orderPlaced
+- `packages/grimoire/tests/fixtures/shop/src/app/orders/jobs/send-receipt.job.ts` - sendReceiptJob
+- `packages/grimoire/tests/fixtures/shop/src/app/orders/mails/order-confirmation.mail.ts` - sendOrderConfirmation
+- `packages/grimoire/tests/fixtures/shop/src/app/orders/notifications/order-shipped.notification.ts` - orderShipped
+- `packages/grimoire/tests/fixtures/shop/src/app/orders/routes.ts` - orders/routes.ts
+- `packages/grimoire/tests/fixtures/shop/src/app/orders/services/place-order.service.ts` - placeOrder
+- `packages/grimoire/tests/fixtures/shop/src/app/shared/jobs/delete-unverified.job.ts` - deleteUnverifiedJob
+- `packages/grimoire/tests/fixtures/shop/src/app/shared/utils/money.ts` - formatMoney
+- `packages/grimoire/tests/fixtures/shop/src/config/app.ts` - shop/src/config/app.ts, Component
+- `packages/grimoire/tests/fixtures/shop/src/web/$sites/admin/layout.tsx` - admin/layout.tsx, Component
+- `packages/grimoire/tests/fixtures/shop/src/web/$sites/admin/orders.page.tsx` - Component
+- `packages/grimoire/tests/fixtures/shop/src/web/$sites/admin/root.tsx` - admin/root.tsx, Component
+- `packages/grimoire/tests/fixtures/shop/src/web/$sites/client/home.page.tsx` - client/home.page.tsx, Component
+- `packages/grimoire/tests/fixtures/shop/src/web/$sites/client/home.setup.ts` - loader
+- `packages/grimoire/tests/fixtures/shop/src/web/$sites/client/layout.tsx` - client/layout.tsx, Component
+- `packages/grimoire/tests/fixtures/shop/src/web/$sites/client/products/show.page.tsx` - Component
+- `packages/grimoire/tests/fixtures/shop/src/web/$sites/client/products/show.setup.ts` - loader
+- `packages/grimoire/tests/fixtures/shop/src/web/$sites/client/root.tsx` - client/root.tsx, Component
+- `packages/grimoire/tests/fixtures/written-messy/grimoire/apps/site/README.md`
+- `packages/grimoire/tests/fixtures/written-messy/grimoire/apps/site/pages/results/README.md`
+- `packages/grimoire/tests/fixtures/written-messy/grimoire/apps/site/pages/results/blocks/result-list.md`
+- `packages/grimoire/tests/fixtures/written-messy/grimoire/features/search/README.md` - Product search
+- `packages/grimoire/tests/fixtures/written-messy/grimoire/features/search/flows/find.md`
+- `packages/grimoire/tests/fixtures/written-messy/grimoire/tasks/open/T-2-tune-ranking.md`
+- `packages/grimoire/tests/golden/book/app/auth/index.md`
+- `packages/grimoire/tests/golden/book/app/catalog/index.md`
+- `packages/grimoire/tests/golden/book/app/orders/index.md`
+- `packages/grimoire/tests/golden/book/app/shared/index.md`
+- `packages/grimoire/tests/golden/book/config/index.md`
+- `packages/grimoire/tests/golden/book/mobile/app/index.md`
+- `packages/grimoire/tests/golden/book/web/index.md`
+- `packages/grimoire/tests/support/copy-fixture.ts` - FixtureCopy, copyFixture
+- `packages/grimoire/tests/support/fake-dom.ts` - FakeNode, build, fakeHelpers, fakePanelContext
+- `packages/grimoire/tests/support/written-model.ts` - FlowInput, FeatureInput, at, located, codeFile, facts, step, flow
+- `packages/grimoire/ui/grimoire-static.js` - grimoireStaticApi, grimoireStaticContext, grimoireStaticMount, show
+- `packages/grimoire/ui/grimoire-view.js` - NAV, decodeSegment, plain, targetOf, nodeTarget, shorten, NODE_COLOURS, graphView
+- `packages/grimoire/vitest.config.ts` - grimoire/vitest.config.ts
 
 ## packages/herald (14 test files not listed)
 
@@ -3710,8 +4098,8 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/process/src/identity.ts` - Observation, Identity, ProcessNotOwnedError, execute, executeCommand, TOKEN_ENV, statFields, exiting
 - `packages/process/src/index.ts` - process/src/index.ts
 - `packages/process/src/platform.ts` - PortablePlatform, Command, Execute, OwnershipProof, ReadProof, Row, UnsupportedProcessPlatformError, RowSource
-- `packages/process/src/registry.ts` - RegistryEntry, Registry, record, strings, parseRegistry
-- `packages/process/src/resources.ts` - mountedCgroup, validateLimits, launcher, attachCgroup, cgroupMemory, recoveredCgroup, cleanCgroup
+- `packages/process/src/registry.ts` - RegistryEntry, Registry, src/registry.ts, record, strings, parseRegistry
+- `packages/process/src/resources.ts` - src/resources.ts, mountedCgroup, validateLimits, launcher, attachCgroup, cgroupMemory, recoveredCgroup, cleanCgroup
 - `packages/process/src/supervisor.ts` - ProcessStartupError, Pty, PtyModule, Active, src/supervisor.ts, terminalPid, info, validateFilter
 - `packages/process/src/types.ts` - ProcessLimits, SupervisorOptions, SpawnOptions, ProcessFilter, ProcessExit, ProcessInfo, ProcessHandle, PtyHandle
 - `packages/process/src/windows-helper.ts` - HelperChild, HelperSpawn, WindowsHelperOptions, Waiter, Batch, Flight, Snapshot, WindowsProcessHelper
@@ -3738,7 +4126,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/queue/src/drivers/bullmq.ts` - BullMQDriver, toKeepJobs, toSnapshot, closeWorker
 - `packages/queue/src/drivers/local-store.ts` - LocalJob, RetentionWindow, LocalStore, jsonCopy
 - `packages/queue/src/drivers/local.ts` - ActiveJob, LocalWorker, LocalDriver, drivers/local.ts, snapshot, newestFirst, positiveInteger, validateOptions
-- `packages/queue/src/drivers/memory-store.ts` - MemoryStore, READY_STATES
+- `packages/queue/src/drivers/memory-store.ts` - MemoryStore, drivers/memory-store.ts, READY_STATES
 - `packages/queue/src/drivers/sqlite-store.ts` - SqliteValue, SqliteRow, SqliteStatement, DatabaseSync, SqliteModule, SqliteStore, decode
 - `packages/queue/src/duration.ts` - UNIT_MILLISECONDS, toMilliseconds
 - `packages/queue/src/errors.ts` - QueueNotConfiguredError, InvalidDurationError, InvalidJobDefinitionError, FailedJobNotFoundError, QueueDashboardDependencyError, UnrecoverableJobError, JobTimeoutError, queue/src/errors.ts
@@ -3847,7 +4235,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/seal/src/rules/color/index.ts` - color/index.ts
 - `packages/seal/src/rules/common/enum.ts` - enumRule, inRule, allowedValuesRule, notAllowedValuesRule
 - `packages/seal/src/rules/common/equals-field-rules.ts` - equalsFieldRule, notEqualsFieldRule
-- `packages/seal/src/rules/common/index.ts` - common/index.ts
+- `packages/seal/src/rules/common/index.ts` - rules/common/index.ts
 - `packages/seal/src/rules/common/instanceof.ts` - instanceofRule
 - `packages/seal/src/rules/common/literal.ts` - literalRule
 - `packages/seal/src/rules/common/type-rules.ts` - stringRule, numberRule, booleanRule, intRule, floatRule, scalarRule, objectRule, plainObjectRule
@@ -3893,7 +4281,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/seal/src/rules/string/email.ts` - emailRule
 - `packages/seal/src/rules/string/id-formats.ts` - UUIDVersion, UUID_BY_VERSION, uuidRule, cuidRule, ulidRule, nanoidRule
 - `packages/seal/src/rules/string/index.ts` - string/index.ts
-- `packages/seal/src/rules/string/ip.ts` - IPv4Reg, IPv6Reg, isIPv4, isIPv6, isIP, ipRule, ip4Rule, ip6Rule
+- `packages/seal/src/rules/string/ip.ts` - string/ip.ts, IPv4Reg, IPv6Reg, isIPv4, isIPv6, isIP, ipRule, ip4Rule
 - `packages/seal/src/rules/string/matches.ts` - matchesRule
 - `packages/seal/src/rules/string/pattern.ts` - patternRule
 - `packages/seal/src/rules/string/string-comparison.ts` - startsWithRule, endsWithRule, containsRule, notContainsRule
@@ -4071,7 +4459,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/web/src/components/use-is-client.ts` - subscribe, getClientSnapshot, getServerSnapshot, useIsClient
 - `packages/web/src/configurations.ts` - CrawlerDetectionOptions, WebStreamingConfigurations, WebFormsConfigurations, WebConfigurations
 - `packages/web/src/connector/index.ts` - connector/index.ts
-- `packages/web/src/context.ts` - HttpContext, PageSite, PageRoute, PageContext
+- `packages/web/src/context.ts` - HttpContext, PageSite, PageRoute, PageContext, src/context.ts
 - `packages/web/src/entry/index.ts` - entry/index.ts
 - `packages/web/src/entry/parse-locale-routing-meta.ts` - VALID_STRATEGIES, isValidStrategy, isStringArray, parseLocaleRoutingMeta
 - `packages/web/src/entry/publish-document-locale-routing.ts` - publishDocumentLocaleRouting
@@ -4351,7 +4739,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/web/src/vite/ssr-client-view.ts` - SsrBoundaryState, ServerReachedClientEdge, createSsrBoundaryState, isClientBoundModule, clientBoundaryKey, isStatelessClientSurface, collectImportSpecifiers, walk
 - `packages/web/src/vite/tsconfig-path-aliases.ts` - TsconfigShape, vite/tsconfig-path-aliases.ts, stripJsonc, readTsconfig, collectPaths, escapeRegExp, tsconfigPathAliases
 - `packages/web/tests/acceptance/published-react-gate.mjs` - gateFile, gateDir, workspaceRoot, defaultArtifactRoot, args, artifactRoot, state, passed
-- `packages/web/vite.config.ts` - entryFiles, peerPackages, isExternalDependency
+- `packages/web/vite.config.ts` - web/vite.config.ts, entryFiles, peerPackages, isExternalDependency
 - `packages/web/vitest.config.ts` - web/vitest.config.ts, workspaceSource, exactAlias, alias
 
 ## scripts (7 test files not listed)
@@ -4389,7 +4777,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 
 - `skills/zero-edit-generator-matrix/SKILL.md` - zero-edit-generator-matrix - The 30-row release gate that scaffolds real apps from staged tarballs and runs them end t…
 
-## tools/release (28 test files not listed)
+## tools/release (29 test files not listed)
 
 - `tools/release/README.md`
 - `tools/release/ci/blog-check.mjs` - TIMEOUTS, SCRUBBED_ENV, SHADOWING_ENV_FILES, REQUIRED_DEV_PHASES, LINES, SMOKE_PAGES, GUARDED_PAGES, SMOKE_FORMS
@@ -4403,6 +4791,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `tools/release/scripts/artifact-entry-points.mjs` - collectArtifactEntryPoints, assertArtifactContainsItsEntryPoints, collectManifestPath, collectExportPaths, isLocalPathTarget, normalizeTarget, normalizeEntry, wildcardTargetExpression
 - `tools/release/scripts/check-feature-parity.ts` - KeyedOption, DELIBERATE_OMISSIONS, isKeyedList, scaffolderKeys, main
 - `tools/release/scripts/consumer-strictness-flags.ts` - ConsumerFlag, __filename, __dirname, REPO_ROOT, CONSUMER_TSCONFIG_PATH, CONSUMER_FLAG_ALLOWLIST, consumerStrictnessFlags
+- `tools/release/scripts/devtools-ui-gate.ts` - DevtoolsUiFileSize, DevtoolsUiSizes, DevtoolsUiGateResult, DevtoolsUiGateOptions, BuildInfo, __filename, __dirname, REPO_ROOT
 - `tools/release/scripts/dispatch-release.ts` - RunSummary, JobSummary, Annotation, DispatchArguments, parseArguments, pickDispatchedRun, failedJobs, readToken
 - `tools/release/scripts/local-registry-gate.ts` - CandidateArtifact, MatrixScope, LocalRegistryGateInput, PublishHandoff, GateEvent, CommandResult, CommandRequest, RegistryStartRequest
 - `tools/release/scripts/no-pnpm-in-shipped-docs.ts` - DocFile, Violation, GateReport, __filename, __dirname, REPO_ROOT, PACKAGES_ROOT, ALLOWLIST

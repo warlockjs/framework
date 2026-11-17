@@ -2678,7 +2678,7 @@ Run the app from `.warlock/current/staged` so a restart follows the pointer.
 
 ---
 name: encrypt-data
-description: 'Reversible AES-256-GCM `encrypt` / `decrypt` for secrets you need to read back; one-way HMAC-SHA256 `hmacHash` for deterministic fingerprints (lookup/dedup of encrypted columns). Keys come from `src/config/encryption.ts`. Triggers: `encrypt`, `decrypt`, `hmacHash`, `EncryptionConfigurations`, `APP_ENCRYPTION_KEY`, `APP_HMAC_KEY`; "store an API key reversibly", "fingerprint an encrypted column for lookup", "AES-256-GCM secret", "HMAC-SHA256 dedup key"; typical import `import { encrypt, decrypt, hmacHash } from "@warlock.js/core"`. Skip: password hashing — the `hash-password` topic; config wiring — the `configure-app` topic; competing libs Node `crypto` direct, `crypto-js`, `libsodium-wrappers`.'
+description: 'Reversible AES-256-GCM `encrypt` / `decrypt` for secrets you need to read back; one-way HMAC-SHA256 `hmacHash` for deterministic fingerprints (lookup/dedup of encrypted columns). Keys come from `src/config/encryption.ts`. Triggers: `encrypt`, `decrypt`, `hmacHash`, `EncryptionConfigurations`, `APP_ENCRYPTION_KEY`, `APP_HMAC_KEY`; "store an API key reversibly", "fingerprint an encrypted column for lookup", "AES-256-GCM secret", "HMAC-SHA256 dedup key"; typical import `import { encrypt, decrypt, hmacHash } from "@warlock.js/core"`. Also one-time codes: `generateTotpSecret`, `totpCode`, `verifyTotp`, `totpUri` (authenticator-app second factor). Skip: password hashing — the `hash-password` topic; config wiring — the `configure-app` topic; competing libs Node `crypto` direct, `crypto-js`, `libsodium-wrappers`.'
 ---
 
 # Warlock — encrypt and fingerprint
@@ -2866,6 +2866,28 @@ if (existing) return existing.get("result");
 ```
 
 Same payload → same key → returns the cached result. Different keys (because the HMAC is keyed) per environment if you set different `hmacKey` values.
+
+## One-time codes — `generateTotpSecret`, `totpCode`, `verifyTotp`, `totpUri`
+
+Authenticator-app codes (RFC 6238: HMAC-SHA1, 6 digits, 30-second steps). Pure functions, no config. Keep the secret with `encrypt`.
+
+```ts
+import { decrypt, encrypt, generateTotpSecret, totpUri, verifyTotp } from "@warlock.js/core";
+
+const secret = generateTotpSecret(); // base32, no padding
+const uri = totpUri({ secret, account: "ada@example.com", issuer: "My App" });
+const stored = encrypt(secret);
+
+const step = verifyTotp(decrypt(stored), "492039"); // matched step, or null
+const lastStep = 0 as number | null; // the last accepted step, saved with the account
+
+if (step === null || (lastStep !== null && step <= lastStep)) {
+  throw new Error("The code is not valid");
+}
+```
+
+- `verifyTotp` accepts `window` steps either side (default 1), compares in constant time, takes only `^\d{6}$` (spaces ignored) and returns the matched step. Save it and refuse a step that is not newer, so a code cannot be replayed.
+- `totpCode(secret, at?)` gives the code for a moment (tests, tooling). Count wrong codes toward a rate limit.
 
 ## Gotchas
 
@@ -4547,6 +4569,22 @@ warlock logs request <id> --json                       # one record in full
 These read the **default file channel** (`storage/logs/requests`). Custom
 `channels` are write-only from the framework's point of view.
 
+## Keep a private path out of the log
+
+```ts
+import { excludeFromRequestLog, isExcludedFromRequestLog } from "@warlock.js/core";
+
+const stopExcluding = excludeFromRequestLog("/ops-7f3k2q9x");
+
+isExcludedFromRequestLog("/ops-7f3k2q9x/api/auth/login"); // true
+isExcludedFromRequestLog("/ops-7f3k2q9xyz"); // false: whole path segments only
+
+stopExcluding();
+```
+
+Requests under the prefix write no record, and the one-line request summary
+(`http.log`) skips them too.
+
 ## Gotchas
 
 - A 4xx is not an error for `only: "errors"`; use `only: "all"` with a
@@ -4785,6 +4823,10 @@ type TracingHooks = {
   onPhase?(ctx: TracingContext, phase: TracingPhaseInfo): void;
 };
 ```
+
+`result.error` is the error a middleware or handler threw when the response is
+a 5xx, also when core caught it and answered the 500 itself; a thrown 4xx
+leaves it `undefined`.
 
 Every verb is optional — a hook that only wants phase spans need not implement
 `onRequestStart`/`onRequestEnd`. Register as many hooks as you like via
@@ -13257,7 +13299,7 @@ Some older modules still have a `validation/` folder instead of `schema/` — hi
 | ---------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `.controller.ts` | HTTP handler                                                                                 | `create-product.controller.ts`           |
 | `.service.ts`    | Stateless business logic                                                                     | `create-product.service.ts`              |
-| `.usecase.ts`    | `useCase()` pipeline                                                                         | `login.usecase.ts`                       |
+| `.use-case.ts`   | `useCase()` pipeline                                                                         | `login.use-case.ts`                      |
 | `.model.ts`      | Cascade model class                                                                          | `product.model.ts`                       |
 | `.repository.ts` | `RepositoryManager` subclass                                                                 | `products.repository.ts`                 |
 | `.resource.ts`   | `Resource` subclass                                                                          | `product.resource.ts`                    |
@@ -13683,6 +13725,8 @@ npx warlock inspect --json --section config | jq -r '.config[] | "\(.key): \(.ty
   "name": "posts.update",
   "sourceFile": "src/app/posts/routes.ts",
   "handler": "updatePostController",
+  "controller": null,
+  "action": null,
   "middleware": ["authMiddleware"],
   "auth": { "required": true, "sources": ["header"], "userTypes": ["user"] },
   "csrf": true,
@@ -13812,7 +13856,9 @@ npx warlock explain src/web/components/Post.tsx --json
 npx warlock explain WL3001 --json
 ```
 
-The `files` section reads every file under `src/`, without importing app modules or booting connectors. Each entry has `file`, `module`, `role`, `exports`, `imports` and `importedBy`. Paths are relative to the project root. Modules use `src/app/<module>` or the containing top-level `src` directory. Roles follow file names and directories: controller, service, repository, model, migration, schema, resource, routes, page, setup, layout, root, hook, component, util, type, config and spec; unmatched files use `source`. Non-code assets have empty exports and imports.
+The `files` section reads every file under `src/`, without importing app modules or booting connectors. Each entry has `file`, `module`, `role`, `exports`, `imports` and `importedBy`, and for code files `lines` (line count), `about` (first sentence of the comment block at the top of the file, before any import, or `null`), `tags` (the `@tag value` lines of that comment, such as `@feature checkout`, as arrays keyed by tag name) and `exportDocs` (first sentence of the doc comment above each export that has one). Paths are relative to the project root. Modules use `src/app/<module>` or the containing top-level `src` directory. Roles follow file names and directories: controller, service, repository, model, use-case, seed, request, mail, job, event, client, migration, schema, resource, routes, page, setup, layout, root, hook, component, util, type, config and spec (a `*.use-case.ts`, `*.seed.ts`, `*.request.ts`, `*.mail.ts`, `*.job.ts`, `*.event.ts` or `*.client.ts(x)` file gets that role in any folder; a file in `use-cases/`, `seeds/`, `requests/`, `mails/`, `jobs/` or `clients/` gets it too, but the `src/app/<module>` folder itself does not count, so a module named `events` or `jobs` keeps its folders' roles); unmatched files use `source`. Non-code assets have empty exports and imports and no `lines`. These fields were added in 5.55.0 without a new `schemaVersion`; a report from an older version lacks them.
+
+A route registered as `[controller, "action"]` carries `controller` (the class name, `null` for a plain object) and `action`; both are `null` for a function handler. `collectFiles(cwd)` and `fileRole(file)` are exported from `@warlock.js/core/tooling` for tools that need the file list without a full report. `collectFiles(cwd, warnings, { dirs })` (options type `CollectFilesOptions`) scans other project-relative folders, default `["src"]`; imports resolve across all of them. `node_modules` and hidden folders (`.expo`, `.git`) are skipped. A registered package code (`GR2001`) given to `warlock explain` is answered from `warlock.config.ts` without booting.
 
 Each code file is parsed once with OXC per inspection. Export names include types, aliases, destructured bindings, `default` and `*` for star re-exports; star exports are recorded rather than expanded. Imports include type imports, side effects, re-exports and literal dynamic imports. Each import is `{ specifier, file }`: `file` is the resolved local path, or `null` for external/unresolved imports. Resolution follows inherited tsconfig path aliases, fallback targets, baseUrl, extensionless files and directory indexes within `src/`. Computed dynamic imports and CommonJS `require()` calls are not graph edges. Parse/config failures appear in `warnings`.
 
@@ -13833,7 +13879,7 @@ For route/page reachability in code, call `inspectApp({ sections: ["files", "rou
 
 ---
 name: warlock-mcp
-description: 'Serve the app to a coding agent over the Model Context Protocol: `warlock mcp` (stdio, or `--http` on loopback with a bearer token required off loopback) and `warlock dev --mcp` / `devServer.mcp` (live registries) expose `inspect_app` + `inspect_<section>` (routes, models, resources, config, events, pages, jobs, schedules, packages), `db_schema`, `docs_search` / `docs_read` (installed @warlock.js skills, READMEs and llms files only, offline), `explain`, `check_run`, `test_run`, `requests_recent` (devtools: timeline, queries with nPlusOne, logs) and `generate_make` / `generate_add` (a unified diff from a throw-away copy; writes only with `--allow-writes`). Read-only by default. Needs `@warlock.js/ai-tools` (optional peer). Triggers: `warlock mcp`, `--allow-writes`, `--http`, `WARLOCK_MCP_TOKEN`, `warlock dev --mcp`, `devServer.mcp`, `startWarlockMcpServer`, `createMcpContext`, `createWarlockMcpTools`, `runTests`, `sandboxBackend`, `WL7003`, `WL7004`, `WL7005`, `.mcp.json`; "connect Claude Code / Cursor to my Warlock app", "let the agent ask the app", "MCP server for this project", "preview what a generator writes". Skip: the JSON report itself — the `warlock-inspect` topic; serving YOUR OWN agent tools over MCP — the `expose-as-mcp-server` topic of @warlock.js/ai-tools; one request''s timeline from the terminal — the `warlock-trace` topic.'
+description: 'Serve the app to a coding agent over the Model Context Protocol: `warlock mcp` (stdio, or `--http` on loopback with a bearer token required off loopback) and `warlock dev --mcp` / `devServer.mcp` (live registries) expose `inspect_app` + `inspect_<section>` (routes, models, resources, config, events, pages, jobs, schedules, packages), `db_schema`, `docs_search` / `docs_read` (installed @warlock.js skills, READMEs and llms files only, offline), `explain`, `check_run`, `test_run`, `requests_recent` (devtools: timeline, queries with nPlusOne, logs) and `generate_make` / `generate_add` (a unified diff from a throw-away copy; writes only with `--allow-writes`). Read-only by default. Packages and the app add tools with `withMcpTools()` on a `cli.commands` entry or `mcp.tools` in `warlock.config.ts`. Needs `@warlock.js/ai-tools` (optional peer). Triggers: `warlock mcp`, `--allow-writes`, `--http`, `WARLOCK_MCP_TOKEN`, `warlock dev --mcp`, `devServer.mcp`, `startWarlockMcpServer`, `createMcpContext`, `createWarlockMcpTools`, `withMcpTools`, `mcp.tools`, `resolveWarlockMcpTools`, `runTests`, `sandboxBackend`, `WL7003`, `WL7004`, `WL7005`, `.mcp.json`; "connect Claude Code / Cursor to my Warlock app", "let the agent ask the app", "MCP server for this project", "preview what a generator writes". Skip: the JSON report itself — the `warlock-inspect` topic; serving YOUR OWN agent tools over MCP — the `expose-as-mcp-server` topic of @warlock.js/ai-tools; one request''s timeline from the terminal — the `warlock-trace` topic.'
 ---
 
 # Warlock — `warlock mcp`
@@ -13898,6 +13944,56 @@ Without `--allow-writes`, `generate_make` / `generate_add` have no `write` argum
 
 A `write: true` sent to a read-only server is refused with `WL7005`. With `--allow-writes`, `write: true` runs the generator in the project and returns the same diff.
 
+## Add tools from a package or the app
+
+The built-in tools come first, then the tools `warlock.config.ts` registers; `warlock mcp` and `warlock dev --mcp` both read them. A package attaches tools to the command its register function returns with `withMcpTools()`, so the app's one `cli.commands` line brings the command and its tools. The app adds its own under `mcp.tools`.
+
+```ts
+import { command, defineConfig, inputSchema, withMcpTools } from "@warlock.js/core";
+
+// In the package: a tool, or a function of the server context (cwd, allowWrites, inspect(), docs()…).
+export function registerReportCommands() {
+  return withMcpTools(
+    command({ name: "report", description: "Print the report", action: () => undefined }),
+    [
+      (context) => ({
+        name: "report_routes",
+        description: "How many routes the app has. Read-only.",
+        input: inputSchema({ method: { type: "string", description: "Only this method." } }),
+        writes: false,
+        run: async (input) => {
+          const { routes = [] } = await context.inspect(["routes"]);
+
+          return routes.filter((route) => !input.method || route.method === input.method).length;
+        },
+      }),
+    ],
+  );
+}
+
+// In the app's warlock.config.ts:
+export default defineConfig({
+  cli: { commands: [registerReportCommands()] },
+  mcp: {
+    tools: [
+      {
+        name: "app_ping",
+        description: "Answer pong. Read-only.",
+        input: inputSchema({}),
+        writes: false,
+        run: async () => "pong",
+      },
+    ],
+  },
+});
+```
+
+- Names: `^[a-zA-Z0-9_-]{1,128}$`, prefixed with the package (`report_routes`). A name a built-in or another registered tool already has stops the server with a message naming the tool.
+- Input: `inputSchema()` only — strings (optional `enum`), integers (`minimum` / `maximum`), booleans, arrays of strings, each with a description. The schema is checked at start; every call's arguments are checked against it.
+- `writes: true` means a call changes project files: without `--allow-writes` the tool is listed but every call is refused with `WL7005` before `run`.
+- `warlock.config.ts` is part of the production build: keep a register function's imports light and load heavy modules inside `run`.
+- `startWarlockMcpServer({ context, tools })` takes the same list from code. `resolveWarlockMcpTools(context, tools)` returns what the server would serve (and throws on an invalid or clashing tool); `mcpToolsFromConfig(config)` and `mcpToolsOf(command)` read the registrations.
+
 ## HTTP rules
 
 - Binds `127.0.0.1` by default. Any other `--host` needs `--token` (or `WARLOCK_MCP_TOKEN`), otherwise `WL7004` before anything boots.
@@ -13944,6 +14040,7 @@ await server.close();
 - Over stdio, stdout is the JSON-RPC stream: `console.log` / `info` / `debug` are sent to stderr for the whole run.
 - `requests_recent` fails with `WL8008` when no dev server is recorded or reachable, and `WL8009` when devtools is not installed (`npx warlock add devtools`).
 - Missing `@warlock.js/ai-tools` / `@warlock.js/ai` → `WL7003` with the install line.
+- A registered tool with a taken name or an invalid schema stops `warlock mcp` with a message naming it; under `warlock dev --mcp` it prints `MCP server not started: …` and the dev server keeps running.
 
 ## See also
 
@@ -14637,6 +14734,31 @@ export default defineConfig({
 });
 ```
 
+A register function may return an array of commands. An entry of `cli.commands` is a `CLICommandEntry`: a command or an array of commands, and arrays are flattened.
+
+### Explaining a package's error codes
+
+`withExplainCodes(command, explainer)` attaches a `CodeExplainer` to a command. When that command is in `cli.commands`, `warlock explain <code>` asks the explainer for a code of two letters and four digits that is not a `WL` code (for example `GR2001`, upper-cased first), reading only `warlock.config.ts` and never booting the app. The explainer returns an `ExplainableCode` (`code`, `title`, `area`, `fix`, `skill`, `docs`) or `undefined` when the code is not the package's. `explainersOf(command)` lists the attached explainers and `explainRegisteredCode(entries, code)` asks them all; the first answer wins.
+
+```ts
+import { command, withExplainCodes } from "@warlock.js/core";
+
+export function registerReportCommands() {
+  return withExplainCodes(command({ name: "report", action: () => undefined }), (code) =>
+    code === "RP1001"
+      ? {
+          code,
+          title: "Report is empty",
+          area: "report",
+          fix: "Run the report with a wider date range.",
+          skill: "reports",
+          docs: "https://example.com/docs/RP1001",
+        }
+      : undefined,
+  );
+}
+```
+
 ## Output and exit codes
 
 By default, the framework prints `Executing <name>…`, runs your `action`, then prints `Done in <ms>ms` and `process.exit(0)`. Throwing exits with `1` and prints the error. If `persistent: true`, the framework keeps the process alive (no auto-exit on success; errors are logged but don't crash).
@@ -14705,27 +14827,28 @@ warlock generate                         (alias: g)      — interactive picker
 
 `warlock add <features...>` installs framework-adjacent features through a curated registry — bundles npm dependencies + scaffold files + tsconfig patches + package.json scripts in one call. Featured names (from `add-command.action.ts`):
 
-| Feature       | Installs                                                                                                                                                                               |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `react-email` | `react-email` + `@react-email/components` + `@react-email/render` + `@react-email/tailwind`; drops a `welcome-email.tsx` sample; patches `tsconfig.json`                               |
-| `web`         | Warlock Web + React stack; scaffolds the application page, localization, contact endpoint, and Web configuration                                                                       |
-| `react`       | `react` + `react-dom` + types                                                                                                                                                          |
-| `bull-board`  | `@bull-board/api` + `@bull-board/fastify`; writes a `dashboard` block to `src/config/queue.ts`. `requires: ["queue"]` — adds the `queue` feature first automatically when it's missing |
-| `image`       | `sharp` (for the `Image` class)                                                                                                                                                        |
-| `mail`        | `nodemailer` + types                                                                                                                                                                   |
-| `ses`         | `@aws-sdk/client-sesv2`                                                                                                                                                                |
-| `mongodb`     | `mongodb` driver                                                                                                                                                                       |
-| `postgres`    | `pg`                                                                                                                                                                                   |
-| `mysql`       | `mysql2`                                                                                                                                                                               |
-| `redis`       | `redis`                                                                                                                                                                                |
-| `s3`          | `@aws-sdk/client-s3` + `@aws-sdk/lib-storage` + `@aws-sdk/s3-request-presigner`                                                                                                        |
-| `scheduler`   | `@warlock.js/scheduler`                                                                                                                                                                |
-| `swagger`     | `@warlock.js/swagger`                                                                                                                                                                  |
-| `postman`     | `@warlock.js/postman`                                                                                                                                                                  |
-| `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                                                                                                          |
-| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts`                                                                                |
-| `process`     | `@warlock.js/process` pinned to installed Core; typed config, supervisor export, recovery/shutdown lifecycle and optional devtools process panel                                       |
-| `devtools`    | `@warlock.js/devtools` as a dev dependency; `warlock dev` auto-loads its development dashboard at `/__warlock`                                                                         |
+| Feature       | Installs                                                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `react-email` | `react-email` + `@react-email/components` + `@react-email/render` + `@react-email/tailwind`; drops a `welcome-email.tsx` sample; patches `tsconfig.json`                                                                 |
+| `web`         | Warlock Web + React stack; scaffolds the application page, localization, contact endpoint, and Web configuration                                                                                                         |
+| `react`       | `react` + `react-dom` + types                                                                                                                                                                                            |
+| `bull-board`  | `@bull-board/api` + `@bull-board/fastify`; writes a `dashboard` block to `src/config/queue.ts`. `requires: ["queue"]` — adds the `queue` feature first automatically when it's missing                                   |
+| `grimoire`    | `@warlock.js/grimoire` (experimental); registers `registerGrimoireCommands()` in `cli.commands` (creates the `cli` block when missing), adds `.gitignore` lines, the devtools panel and `grimoireReporter()`; idempotent |
+| `image`       | `sharp` (for the `Image` class)                                                                                                                                                                                          |
+| `mail`        | `nodemailer` + types                                                                                                                                                                                                     |
+| `ses`         | `@aws-sdk/client-sesv2`                                                                                                                                                                                                  |
+| `mongodb`     | `mongodb` driver                                                                                                                                                                                                         |
+| `postgres`    | `pg`                                                                                                                                                                                                                     |
+| `mysql`       | `mysql2`                                                                                                                                                                                                                 |
+| `redis`       | `redis`                                                                                                                                                                                                                  |
+| `s3`          | `@aws-sdk/client-s3` + `@aws-sdk/lib-storage` + `@aws-sdk/s3-request-presigner`                                                                                                                                          |
+| `scheduler`   | `@warlock.js/scheduler`                                                                                                                                                                                                  |
+| `swagger`     | `@warlock.js/swagger`                                                                                                                                                                                                    |
+| `postman`     | `@warlock.js/postman`                                                                                                                                                                                                    |
+| `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                                                                                                                                            |
+| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts`                                                                                                                  |
+| `process`     | `@warlock.js/process` pinned to installed Core; typed config, supervisor export, recovery/shutdown lifecycle and optional devtools process panel                                                                         |
+| `devtools`    | `@warlock.js/devtools` as a dev dependency; `warlock dev` auto-loads its development dashboard at `/__warlock`                                                                                                           |
 
 Run `warlock add --list` to see what's currently registered. Pass `--packageManager <yarn\|pnpm\|npm>` to override auto-detection (defaults to whichever lockfile is present).
 
@@ -15506,7 +15629,7 @@ A use case is a named, observable, transport-agnostic unit of business logic. Th
 
 ## The shape
 
-```ts title="src/app/orders/use-cases/place-order.usecase.ts"
+```ts title="src/app/orders/use-cases/place-order.use-case.ts"
 import { useCase } from "@warlock.js/core";
 import { v } from "@warlock.js/seal";
 import { placeOrderService } from "../services/place-order.service";
@@ -35655,6 +35778,10 @@ Boot fails for an unassigned page, a `$sites` folder without a matching `web.sit
 
 Out of scope: path- or session-selected tenants, sharing a root between sites, cross-site prefetch, API host scoping, and automatic Cascade query scoping.
 
+## Read the page graph from tooling
+
+A tool that needs each page's site, setup file and layout chain calls `discoverPageGraph` from `@warlock.js/web/build` with `appRoot` and the `web.sites` config, and filters the pages with `type` equal to `"page"`. `layout.tsx` files come back in `layouts`, outermost first, the same chain the build uses. `layoutChainFor` computes one page's chain. It only reads files and starts nothing. Import it lazily, never from page modules.
+
 ## Route dictionaries across sites
 
 A `locales.json` inside a site folder reaches only that site's pages. A `locales.json` above the site folders (`src/web/locales.json`, `src/web/$sites/locales.json`) reaches every page of every site and is merged before the site's own dictionaries. Each key is declared in one `locales.json` in the whole app, so put keys shared by several sites in a dictionary above the site folders instead of repeating them. The build warns about a `locales.json` that applies to no page; move it next to or above the pages that use it.
@@ -52380,7 +52507,7 @@ production and retains its socket-loopback guard.
 ## Package orientation
 
 ---
-description: 'Grimoire (experimental), the project map for Warlock.js apps: `warlock scry` and `warlock grimoire build|check|release` over a `grimoire/` folder of generated book entries and agent-written features, flows, apps, tasks and releases. Topics: use the map before searching code, write a feature, record a change and release, describe sites and mobile screens, document a file, backfill an existing app. Use at the start of every task in a project that has `grimoire/`.'
+description: "Grimoire (experimental), the project map for Warlock.js apps: `warlock scry` and `warlock grimoire build|check|release` over a `grimoire/` folder of generated book entries and agent-written features, flows, apps, tasks and releases. Topics: use the map before searching code, write a feature, record a change and release, describe sites and mobile screens, document a file, backfill an existing app. Use at the start of every task in a project that has `grimoire/`."
 ---
 
 # @warlock.js/grimoire
@@ -52411,7 +52538,7 @@ The Grimoire is experimental: its file structure and commands may still change.
 
 ---
 name: backfill-a-grimoire
-description: 'Write the Grimoire for a project that already has code but no `grimoire/` folder: build the book, propose features from the modules and routes, write them as inferred, and bring the owner the questions only they can answer. Use once per existing project, or when a large undescribed area is found.'
+description: "Write the Grimoire for a project that already has code but no `grimoire/` folder: build the book, propose features from the modules and routes, write them as inferred, and bring the owner the questions only they can answer. Use once per existing project, or when a large undescribed area is found."
 ---
 
 # Backfill a Grimoire
@@ -52437,15 +52564,18 @@ Start from the modules: a module is usually one feature. Then adjust.
 
 - Two modules that cannot be described without each other → one feature with both `folders`.
 - A module that does two unrelated things → two features; tag the files of the smaller one.
+- A folder shared by several features (a `components` folder with files of each) → list the files
+  each feature owns in its `folders`, one entry per file (`folders: [src/app/auth, src/web/components/login-form.tsx]`),
+  instead of tagging them in the code. A file entry wins over a folder of another feature.
 - Plumbing (config, shared utilities, the base layout) → no feature.
 - Mail, notifications, search: the machinery is a feature; each mail or notification belongs to
   the feature that sends it.
 
 Write the proposal as a table for the owner **before** writing files:
 
-| Feature | Folders | Flows you see | Apps | Unsure about |
-| --- | --- | --- | --- | --- |
-| auth | src/app/auth | sign-up, login, reset-password | web-client, mobile | is phone login still used? |
+| Feature | Folders      | Flows you see                  | Apps               | Unsure about               |
+| ------- | ------------ | ------------------------------ | ------------------ | -------------------------- |
+| auth    | src/app/auth | sign-up, login, reset-password | web-client, mobile | is phone login still used? |
 
 Wait for the owner's answer on the list. Features are the frame for everything else; a wrong
 frame costs the most to fix.
@@ -52457,19 +52587,47 @@ Follow `write-a-feature` for the shapes, with these differences:
 ```md
 ---
 id: auth
+title: Accounts
 status: shipped
 origin: inferred
 version: 1.0
+updated: 2026-11-16
+apps: [web-client, mobile]
+folders: [src/app/auth]
 ---
 ```
 
 - `origin: inferred` on the README and on each flow. The owner changes it to `confirmed`.
-- Start every feature at `1.0`. Do not reconstruct history; the changelog gets one line under `## Unreleased`:
-  `- 1.0  added  described from the existing code`.
-- **Steps:** take them from the routes and pages, in the order a user meets them.
-- **Cases:** write only the cases the code handles. For a question the code does not handle
-  (a double submit, an expired code), do not write a case. List it under `## Not handled` so
-  the owner sees the gap.
+- Start every feature at `1.0`. Do not reconstruct history; the changelog gets one line under `## Unreleased`
+  in the feature's own `CHANGELOG.md` (`grimoire/features/auth/CHANGELOG.md`), never in the README:
+
+  ```md
+  ## Unreleased
+
+  - 1.0 added described from the existing code
+  ```
+
+- **Steps:** take them from the routes and pages, in the order a user meets them. A mail is a
+  `*.mail.ts` or `*.email.ts` file (or a file in `mails/` or `emails/`), a job is a queue job or a
+  scheduled task. When two sites or apps have a page with one path, write the app after it:
+  `page   /support [web-admin]`.
+- **Flows:** a flow starts from a route, a page, a job or an event. Logic with no entry point of
+  its own (a guard, a calculation) is not a flow: write it in the cases or criteria of the flow
+  that reaches it.
+- **Cases:** answer the eight questions from what the code does. When the code answers a
+  question by doing nothing, that is still what happens: write it as a case with the result
+  (`duplicate   saved twice`, `double submit   two accounts`). List a question under
+  `## Not handled` only when the behaviour is a gap the owner should decide, in the same form as a
+  case (the question, then what happens today):
+
+  ```md
+  ## Not handled
+
+  - double submit two quick taps create two accounts
+  ```
+
+- **Read-only flows:** a flow that only reads answers the questions that cannot happen with one
+  line each, `does not apply: read-only`. That is expected, not a finding.
 - **Criteria:** one per case. Tag the existing tests with `@proves` where a test clearly proves
   one. Do not write new tests during a backfill.
 - **Intent you cannot see:** write `Unknown: why does a VIP skip the stock check?` in the flow.
@@ -52497,7 +52655,9 @@ no test, files with no header); fix errors first and list the warnings for the o
 - files inside a feature that no flow reaches (undescribed behaviour or dead code);
 - criteria with no test.
 
-Open one task per question that needs a decision. Do not fix code during a backfill; open a task
+Open one task per question that needs a decision, with `status: waiting for approval` and a
+`Decision needed:` line (see `write-a-feature`; any other word is `GR1004`). Mark every task you open
+for the owner this way, also when the owner is away. Do not fix code during a backfill; open a task
 for each bug you notice.
 
 ## Size
@@ -52510,7 +52670,7 @@ sessions; the task list says where you stopped.
 
 ---
 name: describe-an-app
-description: 'Describe where users meet the product in `grimoire/apps/`: one folder per site or mobile app, its named conditions (guest, customer, membership, preferences), shared layouts, and the pages or screens whose blocks point to feature flows. Use when adding a page, a screen or a block, or when what a page shows depends on who is looking.'
+description: "Describe where users meet the product in `grimoire/apps/`: one folder per site or mobile app, its named conditions (guest, customer, membership, preferences), shared layouts, and the pages or screens whose blocks point to feature flows. Use when adding a page, a screen or a block, or when what a page shows depends on who is looking."
 ---
 
 # Describe an app
@@ -52547,15 +52707,19 @@ root: src/web/$sites/client
 # The shop website
 
 ## Conditions
-- guest               not signed in
-- customer            signed in
-- vip                 customer with the vip membership
-- pref:personalised   the customer left personalised content on
+
+- guest not signed in
+- customer signed in
+- vip customer with the vip membership
+- pref:personalised the customer left personalised content on
 ```
 
-Every page and block of this app uses these names and no others. Add a condition here before
-using it. Name roles and permissions exactly as the access configuration does, so they can be
-checked.
+`origin` is optional (`inferred` or `confirmed`), on the README and on layouts, pages and screens,
+as on features. Mark files you wrote from the code `inferred`.
+
+Every page and block of this app uses these names and no others in **Who sees it**. Add a condition here before
+using it. Name roles and permissions exactly as the access configuration does, so a reader can
+find them in the code.
 
 A mobile app in the same repository is one more app: `type: mobile`, `root: mobile`.
 
@@ -52563,10 +52727,10 @@ A mobile app in the same repository is one more app: `type: mobile`, `root: mobi
 
 How a screen gets into the book depends on how the app navigates:
 
-| The mobile app | Screens come from | You write |
-| --- | --- | --- |
-| File-based routing (Expo Router) | The route file names under its `app` folder (`collectMobileFacts`) | A screen file only when it says something the route does not |
-| Navigation defined in code | Nowhere: the book cannot read it | One file per screen you describe, in `grimoire/apps/<app>/screens/<screen>/README.md` |
+| The mobile app                   | Screens come from                                                  | You write                                                                             |
+| -------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| File-based routing (Expo Router) | The route file names under its `app` folder (`collectMobileFacts`) | A screen file only when it says something the route does not                          |
+| Navigation defined in code       | Nowhere: the book cannot read it                                   | One file per screen you describe, in `grimoire/apps/<app>/screens/<screen>/README.md` |
 
 A declared screen has a `route` (or a `screen` name) in its front matter:
 
@@ -52578,9 +52742,10 @@ screen: order-tracking
 # Order tracking
 
 ## Blocks
-| Block         | Flow                | Who sees it | Changes with |
-| ------------- | ------------------- | ----------- | ------------ |
-| Courier stage | orders/track-order  | customer    | —            |
+
+| Block         | Flow               | Who sees it | Changes with |
+| ------------- | ------------------ | ----------- | ------------ |
+| Courier stage | orders/track-order | customer    | —            |
 ```
 
 When the app uses file-based routing, `warlock grimoire check` reports a screen whose route has no
@@ -52599,17 +52764,20 @@ layout: site
 The first page a visitor sees.
 
 ## Blocks
-| Block             | Flow                     | Who sees it | Changes with            |
-| ----------------- | ------------------------ | ----------- | ----------------------- |
-| Featured products | catalog/browse-products  | everyone    | vip: member prices      |
-| New arrivals      | catalog/new-arrivals     | everyone    | the customer's country  |
-| Recent orders     | orders/place-order       | customer    | —                       |
+
+| Block             | Flow                    | Who sees it | Changes with           |
+| ----------------- | ----------------------- | ----------- | ---------------------- |
+| Featured products | catalog/browse-products | everyone    | vip: member prices     |
+| New arrivals      | catalog/new-arrivals    | everyone    | the customer's country |
+| Recent orders     | orders/place-order      | customer    | —                      |
 ```
 
 - **One row per part of the page**, not one description per kind of user. Three roles and two
   preferences are a few rows, not six pages.
 - **Flow** is `feature/flow`. The rule for what the block shows lives there. Do not restate it.
-- **Who sees it** and **Changes with** use the app's condition names.
+- **Who sees it** uses the app's condition names, and the check reports a name the README does
+  not declare (`GR5002`). **Changes with** is free text: it is not checked, but starting an item
+  with a condition name (`vip: member prices`) keeps it readable.
 - Do not list blocks that come from the layout.
 
 ## A layout
@@ -52628,17 +52796,17 @@ flow: catalog/new-arrivals
 
 # New arrivals on the home page
 
-- position   second row, under Featured products
-- shows      a grid of up to 20 products
-- on phones  one row that scrolls sideways
+- position second row, under Featured products
+- shows a grid of up to 20 products
+- phones one row that scrolls sideways
 ```
 
 ## Where a difference between apps goes
 
-| The difference | Goes in |
-| --- | --- |
-| What the user gets (mobile uses the device location) | The flow, under `## Differs by app` |
-| How it looks or where it sits (a row on mobile, a grid on web) | That app's block file |
+| The difference                                                 | Goes in                             |
+| -------------------------------------------------------------- | ----------------------------------- |
+| What the user gets (mobile uses the device location)           | The flow, under `## Differs by app` |
+| How it looks or where it sits (a row on mobile, a grid on web) | That app's block file               |
 
 ## How a page is reached, and what it requires
 
@@ -52648,7 +52816,8 @@ cannot see it, such as a link in an email:
 
 ```md
 ## Also reached from
-- mail   order-confirmation
+
+- mail order-confirmation
 ```
 
 ## Check
@@ -52667,7 +52836,7 @@ feature that lists an app with no folder here. Its codes are `GR5001` to `GR5009
 
 ---
 name: document-a-file
-description: 'Write the one-sentence header and the public-export comments the Grimoire copies into its book, and tag a file with `@feature` when it lives outside its feature''s folders. Use whenever you create a source file or change what one is for.'
+description: "Write the one-sentence header and the public-export comments the Grimoire copies into its book, and tag a file with `@feature` when it lives outside its feature's folders. Use whenever you create a source file or change what one is for."
 ---
 
 # Document a file
@@ -52692,11 +52861,11 @@ export const NEW_ARRIVALS_LIMIT = 20;
 - Say what it is for, not what kind of file it is. The book already knows it is a service.
 - Change it when the file's purpose changes. A stale header misleads every reader after you.
 
-| Write | Not |
-| --- | --- |
-| `Creates a post for the signed-in author.` | `Controller for posts.` |
-| `Sends the order confirmation email.` | `This file contains the mail class.` |
-| `Decides the price a VIP customer pays.` | `Helper functions.` |
+| Write                                      | Not                                  |
+| ------------------------------------------ | ------------------------------------ |
+| `Creates a post for the signed-in author.` | `Controller for posts.`              |
+| `Sends the order confirmation email.`      | `This file contains the mail class.` |
+| `Decides the price a VIP customer pays.`   | `Helper functions.`                  |
 
 ## Public exports: one line each
 
@@ -52746,7 +52915,7 @@ them. `npx warlock grimoire check` reports a file with no header and a file with
 
 ---
 name: record-a-change
-description: 'Finish a change the Grimoire way: tie each test to the acceptance criterion it proves, reshape the feature README, add the changelog entry with the right version, move the task to done, run `warlock grimoire check`, and write the release brief. Use after building any change, including a bug fix.'
+description: "Finish a change the Grimoire way: tie each test to the acceptance criterion it proves, reshape the feature README, add the changelog entry with the right version, move the task to done, run `warlock grimoire check`, and write the release brief. Use after building any change, including a bug fix."
 ---
 
 # Record a change
@@ -52786,16 +52955,17 @@ this file; you write every line of it, including the release number and date whe
 
 ```md
 ## Unreleased
-- 2.1  fixed   new-arrivals: a customer with no country saw an empty list
-               instead of the global one (AC-2)
+
+- 2.1 fixed new-arrivals: a customer with no country saw an empty list
+  instead of the global one (AC-2)
 ```
 
-| The change | Version | Word |
-| --- | --- | --- |
-| A new flow or a new capability | next whole number (`3.0`) | `added` |
-| Behaviour of an existing flow changes | next decimal (`2.1`) | `changed` |
-| The code did not match the flow | next decimal (`2.1`) | `fixed` |
-| A flow is retired | next whole number | `removed` |
+| The change                            | Version                   | Word      |
+| ------------------------------------- | ------------------------- | --------- |
+| A new flow or a new capability        | next whole number (`3.0`) | `added`   |
+| Behaviour of an existing flow changes | next decimal (`2.1`)      | `changed` |
+| The code did not match the flow       | next decimal (`2.1`)      | `fixed`   |
+| A flow is retired                     | next whole number         | `removed` |
 
 One line per change, written for someone who uses the product. Name the flow, and the criterion
 when there is one. While the change is unreleased, write no date and no release number.
@@ -52810,7 +52980,8 @@ shipped: catalog 2.1
 ```
 
 Add two lines: how it was verified (which tests, which criteria) and anything left open. If
-something is left open, open a new task for it; do not leave it only in the done file.
+something is left open, open a new task for it; do not leave it only in the done file. A task
+that needs the owner's answer gets `status: waiting for approval` and a `Decision needed:` line.
 
 ## 5. Check
 
@@ -52818,15 +52989,15 @@ something is left open, open a new task for it; do not leave it only in the done
 npx warlock grimoire check
 ```
 
-| It reports | Do |
-| --- | --- |
-| A step names a route, page, mail or job that does not exist | Fix the name in the flow, or the code |
-| A criterion has no test | Write the test, or say in the task why not |
-| A test points at a criterion that does not exist | Fix the `@proves` line |
-| A file has no header, or no feature | `document-a-file` |
-| A file in the feature's folders that no flow reaches | Describe the behaviour in a flow, or delete dead code |
-| A README `updated` older than its newest changelog entry | Reshape the README |
-| A changelog version that does not fit the word (`added` with `2.1`) | Fix the version |
+| It reports                                                          | Do                                                    |
+| ------------------------------------------------------------------- | ----------------------------------------------------- |
+| A step names a route, page, mail or job that does not exist         | Fix the name in the flow, or the code                 |
+| A criterion has no test                                             | Write the test, or say in the task why not            |
+| A test points at a criterion that does not exist                    | Fix the `@proves` line                                |
+| A file has no header, or no feature                                 | `document-a-file`                                     |
+| A file in the feature's folders that no flow reaches                | Describe the behaviour in a flow, or delete dead code |
+| A README `updated` older than its newest changelog entry            | Reshape the README                                    |
+| A changelog version that does not fit the word (`added` with `2.1`) | Fix the version                                       |
 
 Fix every line it prints. Do not finish with problems you caused. Findings on a flow or feature
 with `status: proposed` print with `(expected)` and do not fail the check: leave them until the
@@ -52843,8 +53014,9 @@ Warlock does not edit your files at release. You do three things, in this order:
    ## Unreleased
 
    ## 1.4.1 (2026-11-20)
-   - 2.1  fixed   new-arrivals: a customer with no country saw an empty list
-                  instead of the global one (AC-2)
+
+   - 2.1 fixed new-arrivals: a customer with no country saw an empty list
+     instead of the global one (AC-2)
    ```
 
 2. **Write the release brief.** Create `grimoire/releases/1.4.1.md`:
@@ -52886,7 +53058,7 @@ reported, and what is left open with its task id.
 
 ---
 name: use-the-grimoire
-description: 'Find the right files before changing a Warlock.js project by asking the Grimoire (experimental): `warlock scry` for a file, a route, a feature, a flow or the impact of a change, and the `grimoire/` folder for what the product does. Use at the start of every task, before searching the code.'
+description: "Find the right files before changing a Warlock.js project by asking the Grimoire (experimental): `warlock scry` for a file, a route, a feature, a flow or the impact of a change, and the `grimoire/` folder for what the product does. Use at the start of every task, before searching the code."
 ---
 
 # Use the Grimoire
@@ -52896,13 +53068,13 @@ The Grimoire is experimental: its file structure and commands may still change.
 `grimoire/` is the map of this project. Read it before you search the code: it tells you where
 things are, what a feature is meant to do, and what a change will touch.
 
-| Folder | Holds | Written by |
-| --- | --- | --- |
-| `grimoire/book/` | One entry per source file, plus routes and pages | Warlock (never edit) |
-| `grimoire/features/` | What the product does: features, flows, cases, criteria | You and other agents |
-| `grimoire/apps/` | Where users meet it: sites, mobile apps, pages, blocks | You and other agents |
-| `grimoire/tasks/` | Open and finished work | You and other agents |
-| `grimoire/releases/` | What each release shipped | You write the brief, Warlock collects the list |
+| Folder               | Holds                                                   | Written by                                     |
+| -------------------- | ------------------------------------------------------- | ---------------------------------------------- |
+| `grimoire/book/`     | One entry per source file, plus routes and pages        | Warlock (never edit)                           |
+| `grimoire/features/` | What the product does: features, flows, cases, criteria | You and other agents                           |
+| `grimoire/apps/`     | Where users meet it: sites, mobile apps, pages, blocks  | You and other agents                           |
+| `grimoire/tasks/`    | Open and finished work                                  | You and other agents                           |
+| `grimoire/releases/` | What each release shipped                               | You write the brief, Warlock collects the list |
 
 Files named `index.json`, `bookmap.json` or ending in `.bookmap.json` are Warlock's. A feature's
 `bookmap.json` says what the feature owns and borrows, and each flow's `*.bookmap.json` says which
@@ -52946,7 +53118,8 @@ npx warlock scry --flow catalog/new-arrivals                        # one flow, 
 ```
 
 Add `--json` for machine-readable output. `--impact` lists API routes, pages, flows and features,
-including features that only borrow the file. Read the flows it names and run their tests after
+including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`
+prints every line. `--search` ranks exact matches first. Read the flows it names and run their tests after
 your change.
 
 A file's entry is also at a fixed path: `src/app/auth/controllers/login.controller.ts` is described
@@ -52954,13 +53127,13 @@ in `grimoire/book/app/auth/controllers/login.controller.json`.
 
 ## Commands
 
-| Command | Does |
-| --- | --- |
-| `warlock grimoire build` | Builds or refreshes the book. `scry` and `check` do it when it is stale |
-| `warlock grimoire check` | Reports broken names, untested criteria, files with no owner. Exit 1 on an error |
-| `warlock grimoire release <release>` | Writes the collected list into `grimoire/releases/<release>.md` |
-| `warlock grimoire export [dir]` | Writes the book as a static site |
-| `warlock explain GR2001` | Explains a finding code |
+| Command                                     | Does                                                                                                          |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `warlock grimoire build`                    | Builds or refreshes the book. `scry` and `check` do it when it is stale                                       |
+| `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`)                                          |
+| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error; `--all` lists every warning |
+| `warlock grimoire release <release>`        | Writes the collected list into `grimoire/releases/<release>.md`                                               |
+| `warlock explain GR2001`                    | Explains a finding code                                                                                       |
 
 Every finding has a code (`GR2001`) and a fix hint. A finding marked `(expected)` belongs to work
 that is still `proposed`; it does not fail the check.
@@ -53026,7 +53199,7 @@ tab for `@warlock.js/devtools`, listed in `panels` of `src/config/devtools.ts`;
 
 ---
 name: write-a-feature
-description: 'Describe a new feature, or a new version of one, in `grimoire/features/` before writing code: the task, the brief, the README front matter, each flow with its steps, cases and acceptance criteria. Use when the owner asks for something the product does not do yet.'
+description: "Describe a new feature, or a new version of one, in `grimoire/features/` before writing code: the task, the brief, the README front matter, each flow with its steps, cases and acceptance criteria. Use when the owner asks for something the product does not do yet."
 ---
 
 # Write a feature
@@ -53068,6 +53241,10 @@ status: waiting for approval
 - Decision needed: one wishlist per customer, or several named lists?
 ```
 
+A task that waits for the owner's answer has `status: waiting for approval` and a `Decision needed:` line.
+The other statuses are `open`, `approved`, `in progress`, `blocked`, `done` and `dropped`; any other
+word is an error (`GR1004`).
+
 ## 2. Write the brief
 
 `grimoire/features/catalog/versions/v3.md`: why, what changes (which flows are new or changed),
@@ -53091,14 +53268,20 @@ folders: [src/app/catalog, src/web/$sites/client/products]
 Customers browse products, search them and see what is new.
 
 ## Flows
-- browse-products   list and filter products
-- wishlist          save a product for later
+
+- browse-products list and filter products
+- new-arrivals the newest products sold in the customer's country
+- wishlist save a product for later
 
 ## Affects and affected by
+
 - affected by orders/place-order (lowers stock)
 ```
 
-`id` never changes. `folders` are the folders whose files belong to this feature. `apps` must
+`id` never changes. `folders` are the folders whose files belong to this feature. An entry with a
+code-file extension names one file (`src/web/components/client/home/pricing-table.tsx`), for a
+feature that owns a few files in a folder shared with others. A file entry wins over the folder
+of another feature; each file has one owner. `apps` must
 exist under `grimoire/apps/`. A feature whose folders hold no file yet is fine while it is
 `proposed`.
 
@@ -53117,34 +53300,44 @@ who: customer
 # Save a product to the wishlist
 
 ## Steps
-1. page           /products/:id
-2. route          POST /wishlist
-3. notification   wishlist-price-drop
-4. page           /wishlist
+
+1. page /products/:id
+2. route POST /wishlist
+3. notification wishlist-price-drop
+4. page /wishlist
 
 ## Differs by app
-- mobile   the save button is also on the product card in lists
+
+- mobile the save button is also on the product card in lists
 
 ## Cases
-- invalid input         a product id that is not an id → 422
-- not allowed           guest → sent to sign in, then back to the product
-- not found             the product does not exist → 404
-- duplicate             already saved → stays saved, no error
-- limits                at most 200 products
-- expiry                does not apply: saved products do not expire
-- double submit         two taps save once
-- outside service down  does not apply
+
+- invalid input a product id that is not an id → 422
+- not allowed guest → sent to sign in, then back to the product
+- not found the product does not exist → 404
+- duplicate already saved → stays saved, no error
+- limits at most 200 products
+- expiry does not apply: saved products do not expire
+- double submit two taps save once
+- outside service down does not apply: no outside service is called
 
 ## Acceptance criteria
-- AC-1            a saved product appears on /wishlist
-- AC-2            saving twice keeps one entry
-- AC-3            a guest is sent to sign in and returns to the product
-- AC-4 [mobile]   the product card has a save button
+
+- AC-1 a saved product appears on /wishlist
+- AC-2 saving twice keeps one entry
+- AC-3 a guest is sent to sign in and returns to the product
+- AC-4 [mobile] the product card has a save button
 ```
 
 **Steps.** Each step has a kind and the name used in code: `page`, `route`, `mail`,
 `notification`, `job`, `event`, `outside service`. Use `affects` for an effect on another
-feature (`affects   catalog/stock`). Warlock checks every name exists.
+feature (`affects   catalog/stock`). Warlock checks every name exists. A mail is a `*.mail.ts` or
+`*.email.ts` file, or a file in a `mails/` or `emails/` folder; a job is a queue job
+(`defineJob()`) or a scheduled task, by its name in code.
+
+When two sites, or a site and the mobile app, have a page with the same path, name the app after
+the path in brackets: `page   /support [web-admin]`. The step then looks in that app only (its
+pages, or its screens for a mobile app). Without brackets it looks in the apps the feature lists.
 
 **Cases.** Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
 expiry, double submit, outside service down), each with a case or "does not apply" and the
@@ -53521,14 +53714,17 @@ For generated form controls, return the save promise from `onSubmit` to finish t
 
 ---
 name: warlock-js-devtools
-description: 'Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines, middleware, validation, queries, N+1 warnings, logs, cache, mail, AI runs, routes and configuration. Use for "debug a slow endpoint", "inspect this request", "view captured mail" or "open devtools". Not this package → @warlock.js/core for `warlock trace`, CLI route inspection and OpenAPI; @warlock.js/ai-panoptic for AI tracing.'
+description: 'Dev dashboard and opt-in production monitor for Warlock apps via `devtoolsConnector`: request timelines, queries, N+1, errors, resources, health, jobs, mail, routes. Use for "debug a slow endpoint", "monitor production", "devtools DT00x error", "reset devtools admin" or "add a devtools panel". Not this package → @warlock.js/core for `warlock trace` and OpenAPI; @warlock.js/ai-panoptic for AI tracing.'
 ---
 
 # `@warlock.js/devtools` — overview
 
-A dashboard for **development only**, served by your own app at `/__warlock`.
-It shows what each request did: its timing waterfall, the queries it ran, the
-cache operations, the logs, and any mail it sent.
+A dashboard served by your own app. In **development** it lives at `/__warlock`
+and answers loopback clients only. In **production** it is an opt-in monitor at
+a secret path (see "Production monitor" below). It shows what each request did:
+its timing waterfall, the queries it ran, the cache operations, the logs, and
+any mail it sent, plus query and route statistics, errors, resources, health
+and jobs. The dashboard is a React app; panel view modules work as before.
 
 ## Install: one command, no config
 
@@ -53540,9 +53736,9 @@ warlock dev            # open http://localhost:<port>/__warlock
 There's nothing to register. `warlock dev` loads devtools automatically when
 the package is installed.
 
-**Do not** add `devtoolsConnector()` to `warlock.config.ts`. Devtools is a
-dev dependency, so a production install doesn't have it, and a config import
-of it would fail to resolve there.
+For development only, do not add `devtoolsConnector()` to `warlock.config.ts`:
+it is a dev dependency, so a production install doesn't have it. For the
+production monitor you do add it, as a regular dependency (next sections).
 
 ## Why it can't leak into production
 
@@ -53573,17 +53769,21 @@ export default {
 
 ## What each panel shows
 
-| Panel        | What you see                                                                                                                                                                                                                                      | Where it comes from                       |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| **Requests** | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis. | core `registerTracingHooks()`             |
-| **Queries**  | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`)                                                                                            | cascade `dataSourceRegistry.on("query")`  |
-| **N+1**      | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal                                                                                                    | same query shape ≥ 5 times in one request |
-| **Mail**     | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                              | core `mailEvents.onCaptured()`            |
-| **Logs**     | Log entries per request, filterable by level and module                                                                                                                                                                                           | a logger channel                          |
-| **Cache**    | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                   | cache `cache.on(...)`                     |
-| **Agents**   | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                      | `@warlock.js/ai` `agentTraces` store      |
-| **Routes**   | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                               |
-| **API**      | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`    |
+| Panel         | What you see                                                                                                                                                                                                                                      | Where it comes from                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **Requests**  | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis. | core `registerTracingHooks()`                |
+| **Queries**   | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`)                                                                                            | cascade `dataSourceRegistry.on("query")`     |
+| **N+1**       | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal                                                                                                    | same query shape ≥ 5 times in one request    |
+| **Mail**      | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                              | core `mailEvents.onCaptured()`               |
+| **Logs**      | Log entries per request, filterable by level and module                                                                                                                                                                                           | a logger channel                             |
+| **Cache**     | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                   | cache `cache.on(...)`                        |
+| **Resources** | Memory, CPU, event-loop delay and garbage collection, with a 10-minute history                                                                                                                                                                    | the process                                  |
+| **Health**    | Readiness checks over time                                                                                                                                                                                                                        | core `health.readiness()`                    |
+| **Errors**    | Failed requests grouped by cause with counts                                                                                                                                                                                                      | tracing and logger                           |
+| **Jobs**      | Registered scheduled jobs with schedule, last and next run (no run history, duration or error yet); queue counts only when the queue driver reports them (not available today)                                                                    | `@warlock.js/scheduler`, `@warlock.js/queue` |
+| **Agents**    | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                      | `@warlock.js/ai` `agentTraces` store         |
+| **Routes**    | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                                  |
+| **API**       | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`       |
 
 Work outside a request (boot, scheduler ticks, queue jobs) goes to a separate
 background list, so it never clutters a request's timeline.
@@ -53726,7 +53926,8 @@ phases, queries flagged `nPlusOne`, warnings, logs and timings. See the
 
 Query bindings and log context go through the logger's redaction rules
 before they're stored. The data is still real request data, which is exactly
-why the dashboard is development-only and loopback-only.
+why the development dashboard is loopback-only. The production monitor removes
+values before storing anything (see "Production monitor").
 
 ## Related
 
@@ -53745,6 +53946,187 @@ It excludes ownership tokens. Without registration the list is empty. The
 endpoint retains development/loopback guards and provides no stop action.
 Use the `warlock-js-process` skill for launch,
 recovery and stop APIs; configure one owner/registry per application instance.
+
+## Production monitor
+
+Opt in: nothing is mounted or captured in production unless
+`production.enabled` is `true`. Install the package as a regular dependency,
+then register it in `warlock.config.ts`. `@warlock.js/devtools/production`
+exports `devtoolsMigrations` and `registerDevtoolsCommands`, which adds the
+`devtools:enable` and `devtools:reset-admin` commands.
+
+```ts
+import { defineConfig } from "@warlock.js/core";
+import { devtoolsConnector } from "@warlock.js/devtools";
+import { devtoolsMigrations, registerDevtoolsCommands } from "@warlock.js/devtools/production";
+
+export default defineConfig({
+  connectors: [devtoolsConnector()],
+  cli: { commands: [registerDevtoolsCommands()] },
+  database: { migrations: [...devtoolsMigrations] },
+});
+```
+
+Then run `warlock migrate`, and enable it in `src/config/devtools.ts`:
+
+```ts
+export default {
+  panels: ["@warlock.js/grimoire/devtools"],
+  production: {
+    enabled: true,
+    trustedProxies: ["loopback"],
+    sampleRate: 0.1,
+  },
+};
+```
+
+Environment variables:
+
+- `DEVTOOLS_PATH`: the secret dashboard path (`/ops-7f3k2q9x`; at least 8 characters, never `/__warlock`).
+- `DEVTOOLS_ADMIN_EMAIL` with `DEVTOOLS_ADMIN_PASSWORD` (changed at first sign-in) or `DEVTOOLS_SETUP_TOKEN` (32+ characters; the admin opens `<origin><path>/#/setup/<token>`). Not both.
+- `encryption.key` (64 hex characters) must be set in `src/config/encryption.ts`.
+
+The accounts live in the app's database through Cascade. Roles are `viewer`
+and `admin`. Admins invite users with a 24-hour single-use link. Two-factor is
+required for admins by default (`twoFactor: "admins"`; or `"everyone"`): an
+authenticator app, or passkeys when `@simplewebauthn/server` is installed, plus
+10 recovery codes. Every closed case answers the app's own 404.
+
+Options under `production` (all optional, defaults in brackets):
+`enabled` [false], `path` [`DEVTOOLS_PATH`], `sampleRate` [0.1],
+`slowRequestMs` [1000], `slowQueryMs` [200], `maxRequests` [200],
+`requestRetentionHours` [24], `maxStoredSamplesPerMinute` [120],
+`reportIntervalMs` [10000], `trustedProxies` [[]], `requireHttps` [true],
+`allowedIps` [[]], `origin`, `session.idleMinutes` [30], `session.maxHours` [8],
+`twoFactor` ["admins"], `rateLimits.windowMinutes` [15], `rateLimits.account`
+[5], `rateLimits.ip` [20], `rateLimits.global` [100], `rateLimits.lockMinutes`
+[15], `explain.executing` [false], `panels` [{}], `logLevels` [warn, error],
+`auditRetentionDays` [90], `passkeys.rpName`, `passkeys.rpId`.
+
+- Redaction: queries are stored as their shape (no literals or bindings), logs
+  lose `context`, phases lose `attrs`, cache keys become counts, request error
+  messages and stacks, and error-level log lines, lose quoted values, emails and `{ … }` documents, headers
+  and bodies come only from core's request log. Paths are kept (no query
+  string): keep secrets out of URL paths.
+- EXPLAIN is admin-only and plain (`EXPLAIN (FORMAT JSON)`, MongoDB
+  `queryPlanner`), for one read statement only (a MongoDB aggregate with `$out`
+  or `$merge` never). PostgreSQL plans run in a read-only transaction that is
+  rolled back. `explain.executing: true` allows `EXPLAIN ANALYZE` and
+  `executionStats`; they run the query, so leave it off unless accepted.
+  Production plans show `?` in place of the query's values.
+- MongoDB: with `devtools.production.enabled` in `src/config/devtools.ts`, core
+  turns `queryEvents` on in processes that serve HTTP (command monitoring is off
+  in production by default); an explicit `queryEvents: false` wins. With the
+  option passed only to `devtoolsConnector()`, set `queryEvents: true` yourself.
+- A correct password does not reset an account's failed-try count; only a
+  completed sign-in (second factor included) does. A caller over the IP limit
+  costs no password check, and refused tries are audited at most once a minute
+  per address and account. The per-IP limit counts an IPv6 client by its /64
+  (an IPv4-mapped address as its IPv4 address).
+- From the account page, adding or removing a second factor needs the current
+  password (`current` in the JSON body, also on `DELETE api/account/totp` and
+  `DELETE api/account/passkeys/:id`); removing also accepts a passkey check
+  from the last five minutes. New recovery codes need a TOTP code or that
+  passkey check, which is single use.
+- Several instances share the database: each writes a report every 10 s, the
+  instance picker filters, the live stream is per instance.
+- Disable from the dashboard (admin); re-enable with `warlock devtools:enable`
+  or a new `DEVTOOLS_PATH`. Lost admin: `warlock devtools:reset-admin --email <email>`.
+- Behind a proxy set `trustedProxies`, set `origin`, and have the proxy set
+  (not pass through) `X-Forwarded-For`, `X-Forwarded-Proto` and
+  `X-Forwarded-Host`; turn off proxy buffering (or rely on
+  `X-Accel-Buffering: no`) for the live view.
+- Tabs on in production: requests, queries, routes, resources, health, errors,
+  logs, jobs. `mail`, `ai`, `agents`, `api`, `processes` need
+  `panels: { id: true }`. A package panel needs `production: true` or the same.
+- Panel writes in production need an admin and the `X-Devtools-Csrf` header
+  (`api()` adds it); they are audited.
+
+### When something fails
+
+The app refuses to boot with a `DevtoolsProductionConfigError`
+(`DEVTOOLS_CONFIG_CODES` holds the messages):
+
+| Code    | Fix                                                                                                                         |
+| ------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `DT001` | Set `DEVTOOLS_PATH` or `production.path`.                                                                                   |
+| `DT002` | Use a path of 8+ characters starting with `/`, with letters, digits and `- _ . ~ /` only; not `/__warlock`.                 |
+| `DT003` | No admin: set `DEVTOOLS_ADMIN_EMAIL` plus a password or setup token, or run `warlock devtools:reset-admin --email <email>`. |
+| `DT004` | The env password breaks the rules (8+ characters, at most 72 bytes, not common, not the email).                             |
+| `DT005` | Install `@warlock.js/cascade` and configure a database.                                                                     |
+| `DT006` | Set `encryption.key` (64 hex characters).                                                                                   |
+| `DT007` | An option is invalid; the message names it.                                                                                 |
+| `DT008` | Add `devtoolsMigrations` to `database.migrations` and run `warlock migrate`.                                                |
+| `DT009` | Set the password or the setup token, not both.                                                                              |
+| `DT010` | The setup token needs 32+ characters (`openssl rand -base64 32`).                                                           |
+
+Every dashboard URL gives a 404: check that `production.enabled` is true, the
+dashboard is not disabled or locked (`warlock devtools:enable`), the request is
+HTTPS (`trustedProxies`), the IP is in `allowedIps`, the tab is not turned off,
+and you opened the exact `DEVTOOLS_PATH`. Most closed cases log nothing on
+purpose. The boot line `devtools production monitor mounted at /ops-… (DEVTOOLS_PATH)`
+shows the monitor started; the audit log has `dashboard.disabled`,
+`dashboard.locked` and `login.blocked`; only an unreadable state or session
+store logs a warning (`devtools`, at most once a minute).
+
+Full pages: "Devtools in production" and "Devtools security" in the docs.
+
+## Registering a panel
+
+A package or the app adds a tab with one line in `src/config/devtools.ts`:
+
+```ts
+export default {
+  panels: ["@acme/queue/devtools"], // or "./src/devtools/queue-panel.ts"
+};
+```
+
+Devtools imports each entry only in development (a package export resolves
+from the app root, a `./` path is relative to it). The module's default export
+is a `DevtoolsPanelExport`: a `DevtoolsPanel`, a list, or a function (sync or
+async) receiving `{ root }` that returns either. Use `import type` so the
+module never needs devtools at runtime.
+
+```ts
+import type { DevtoolsPanelExport } from "@warlock.js/devtools";
+
+const queuePanel: DevtoolsPanelExport = ({ root }) => ({
+  id: "queue", // lower-case letters, digits, dashes
+  title: "Queue", // the tab label
+  view: new URL("./queue-view.js", import.meta.url), // served at /__warlock/panels/queue/view.js
+  assets: { "chart.js": new URL("./queue-chart.js", import.meta.url) }, // /__warlock/panels/queue/chart.js
+  routes: [
+    { path: "", handler: () => ({ root, jobs: [] }) }, // GET /__warlock/api/queue
+    { path: "/jobs/:id", handler: ({ params }) => ({ id: params.id }) },
+    { method: "POST", path: "/retry", handler: ({ body }) => ({ retried: body }) },
+  ],
+});
+
+export default queuePanel;
+```
+
+- A handler (`DevtoolsPanelRoute`) receives a `DevtoolsPanelRequest`
+  (`{ params, query, body }`); its return value is sent as JSON with
+  `Cache-Control: no-store`, `undefined` sends `204`, and a thrown error with a
+  `statusCode` answers that status with `{ error: message }`.
+- The view module is browser JavaScript. Its default export receives
+  `{ id, root, api, route, href, navigate, refresh, asset, el, svg, empty }`
+  and fills `root` or returns an element. `api("search?q=a")` fetches
+  `api/<id>/search?q=a` as JSON; `href("jobs/7")` is `#queue/jobs/7`, a link
+  that opens that view (`route` is then `"jobs/7"`); `svg()` builds SVG
+  elements for small graphs. Build text with `text`, never `innerHTML`.
+- Every panel route, view and asset sits behind the devtools guard
+  (in development: loopback socket and host, no foreign `Origin`, no proxy
+  headers; in production: sign-in). A reused id (the built-in `processes` included) or a dashboard id
+  such as `mail` is refused; devtools logs why and leaves the panel out.
+
+A panel can set `production: true` when it is safe in the production monitor
+(otherwise it needs `production.panels[id]: true`). The factory receives
+`{ root, mode }`; `mode` is `"development"` or `"production"`, and a panel must
+not write files in production. The ids `resources`, `health`, `errors`, `jobs`,
+`instances`, `auth`, `account` and `admin` are reserved.
+
+Full reference: the "Registering a panel" page of the devtools docs.
 
 
 ================================================================================

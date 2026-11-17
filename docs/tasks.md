@@ -4,58 +4,48 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Owner decisions waiting
 
-None.
+- T-148: keep request paths as served in production samples, or store only the route pattern.
 
-## 5.56.0: production monitor
+## After 5.56.0: production monitor follow-ups
 
-### T-145 [feature] Devtools in production: a secured monitor at a custom path, with accounts, and a React dashboard
+### T-146 [feature] Scheduler run history and queue counts for the Jobs tab
 
-- Source: owner request of 2026-11-17 (design agreed in conversation the same day).
-- What and why: the owner wants to see queries, their performance and plans, request states, bottlenecks, memory and
-  CPU, health checks and the Grimoire of a production app from the browser (for example `https://<app>/__monitor__`)
-  without logging in to the server. Today devtools is development-only (loopback guard, refuses proxy headers) and
-  the dashboard is plain HTML and JavaScript.
-- Agreed design:
-  - Off in production by default. Enabling needs an explicit custom path and a first admin, both from env at deploy
-    time (`DEVTOOLS_PATH`, `DEVTOOLS_ADMIN_EMAIL`, `DEVTOOLS_ADMIN_PASSWORD` or a one-time setup token); it refuses to
-    start without them. The env password works only until the admin changes it at first login.
-  - Its own accounts, separate from the app's users, stored through cascade (table or collection, migration). Roles:
-    admin (manage users, disable switch, EXPLAIN) and viewer (read-only). The admin adds users from the dashboard with a
-    one-time invite link (24 h); users set their own password.
-  - Passwords: minimum 8 characters, a small built-in list of common passwords refused, hashed with the framework's
-    password hashing. Rate limits per account, per IP and globally (lockout), with a trusted-proxy setting for the client
-    IP. HttpOnly, Secure, SameSite=Strict session with a short TTL; CSRF on every action; audit log of logins, failed
-    tries and actions. Two-factor sign-in (TOTP or passkey via `@warlock.js/auth`), on by default for admins.
-  - A "Disable dashboard" button: a shared flag (cache or database) that turns it off on every instance and survives
-    restarts; re-enabling only from config or `warlock devtools:enable`. `warlock devtools:reset-admin` for recovery.
-    The path answers a uniform 404 while disabled or locked; `noindex`; no CORS.
-  - Panels in production: requests (sampled by `sampleRate`, slow requests always kept, redacted headers and bodies,
-    bounded memory, plus the persistent request log), query stats per normalized query shape (count, p50/p95, slowest
-    example, N+1) and slowest routes and phases (tracing hooks), EXPLAIN on demand per query shape (never an executing
-    plan such as PostgreSQL `ANALYZE` or MongoDB `executionStats` unless the project allows it), resources per process
-    (RSS, heap, CPU, event-loop delay, GC, short history; each pm2 or cluster worker), health checks with history,
-    errors, logs, jobs and schedules, and Grimoire. Mail previews and process controls stay off in production unless a
-    project opts in per panel. Unsampled requests do no capture work; the mode costs nothing when off.
-  - Dashboard rebuilt with React, Tailwind and shadcn in `packages/devtools/ui-src/` (own Vite dev server); a build
-    step writes the bundle that devtools serves; the release gate rebuilds it and fails when the shipped bundle is
-    stale; size budget about 300 KB gzipped. The 5.55.0 panel registration API stays: the React shell mounts package
-    panel view modules (the Grimoire tab keeps working). SSR through `@warlock.js/web` was considered and rejected
-    (devtools must work in API-only apps).
-- Real-time: today the dashboard gets live `request`, `log`, `mail` and `ai` events over one SSE stream
-  (`/api/stream`, `packages/devtools/src/server/stream-route.ts`, a ping every 15 s); other panels load on demand.
-  In production the stream needs the session check, `X-Accel-Buffering: no` for nginx, a reconnect with backoff, and a
-  per-instance view: each process has its own collector, so either show the instance the browser reached or fan
-  events in from every instance through a shared bus (Redis pub/sub or `@warlock.js/herald`); decide in the design.
-  Resource and query-stat panels refresh on an interval.
-- Evidence: `packages/devtools/src/server/guard.ts` (development-only guard), `packages/devtools/ui/app.js` (plain DOM
-  UI), `packages/core/skills/request-log/SKILL.md` (`http.logging.requests` production settings),
-  `packages/core/skills/request-tracing/SKILL.md` (`http.tracing`), `packages/devtools/src/panels.ts` (panel API).
-- Acceptance: specs for every access rule (disabled by default, missing path or admin refuses to start, rate limits and
-  lockout, session and CSRF, roles, invite links, two-factor, disable switch across instances, uniform 404),
-  redaction and sampling specs, an overhead benchmark at the default sampling rate, UI specs for the React dashboard,
-  the bundle freshness and size gate, docs, skills, changelog and upgrade notes; a dedicated security review before
-  release.
-- Status: in progress (2026-11-17): architecture and contracts first, then module agents; private notes in `findings/5.56/`.
+- Source: 5.56.0 build, 2026-11-17.
+- What and why: the Jobs tab cannot show a schedule's last duration, last error, runs or failures (the scheduler keeps
+  no per-run history), and queue counts show "not available" because `QueueDriver` has no `counts()` method.
+- Evidence: `packages/devtools/src/production/insights/jobs.ts`; `packages/scheduler/src/`; `packages/queue/src/`.
+- Acceptance: the scheduler records a bounded per-job run history; queue drivers that can count expose `counts()`;
+  the Jobs tab shows both, with specs.
+- Status: open.
+
+### T-147 [chore] Real passkey sign-in in a browser
+
+- Source: 5.56.0 security review and end-to-end run, 2026-11-17.
+- What and why: passkey registration and sign-in were only tested against a fake adapter; no real WebAuthn ceremony
+  ran (headless Chromium can do it with a virtual authenticator through CDP).
+- Evidence: `packages/devtools/src/production/auth/passkeys.ts`, `findings/5.56/reports/E2E.md`.
+- Acceptance: a Playwright run with a CDP virtual authenticator registers a passkey, signs in with it, and uses it as
+  the step-up for recovery codes.
+- Status: open.
+
+### T-148 [decision] Request paths in production samples
+
+- Source: 5.56.0 security review, 2026-11-17.
+- What and why: sampled requests keep the path as served (query string dropped per the docs), so a path segment that
+  carries a token (`/reset/<token>`) reaches the monitor's table. Decision to take: keep the path, or store only the
+  route pattern with the parameters masked.
+- Evidence: `packages/devtools/src/production/capture/redact.ts`; `docs/src/content/docs/v/latest/devtools/security.mdx`.
+- Status: open.
+
+### T-149 [feature] Core sees the monitor's production flag when it is set only through connector options
+
+- Source: 5.56.0 final pass, 2026-11-17.
+- What and why: core turns on MongoDB `queryEvents` for the monitor only when `devtools.production.enabled` is set in
+  config; enabling production mode only through `devtoolsConnector({ production })` options leaves the Queries tab
+  empty unless the app sets `queryEvents: true` (documented).
+- Evidence: `packages/core/src/connectors/database-query-events.ts`.
+- Acceptance: both ways of enabling the monitor turn on query events; a spec covers each.
+- Status: open.
 
 ## After 5.55.0: Grimoire follow-ups
 

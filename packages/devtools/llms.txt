@@ -2,8 +2,8 @@
 
 > Package: `@warlock.js/devtools`
 
-> Development-only dashboard for Warlock.js apps at /__warlock: request timeline, queries with EXPLAIN, N+1 detection, dev mailbox, logs, cache operations and the route map. Refuses to run outside development.
+> Dashboard for Warlock.js apps: request timeline, queries with EXPLAIN, N+1 detection, resources, health, errors, logs and jobs. Loopback-only at /__warlock in development; an opt-in, signed-in monitor at a secret path in production.
 
 ## Skills
 
-- [devtools](@warlock.js/devtools/skills/SKILL.md): Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines, middleware, validation, queries, N+1 warnings, logs, cache, mail, AI runs, routes and configuration. Use for "debug a slow endpoint", "inspect this request", "view captured mail", "open devtools" or "add a devtools panel". Not this package → @warlock.js/core for `warlock trace`, CLI route inspection and OpenAPI; @warlock.js/ai-panoptic for AI tracing.
+- [devtools](@warlock.js/devtools/skills/SKILL.md): Dev dashboard and opt-in production monitor for Warlock apps via `devtoolsConnector`: request timelines, queries, N+1, errors, resources, health, jobs, mail, routes. Use for "debug a slow endpoint", "monitor production", "devtools DT00x error", "reset devtools admin" or "add a devtools panel". Not this package → @warlock.js/core for `warlock trace` and OpenAPI; @warlock.js/ai-panoptic for AI tracing.

@@ -77,14 +77,14 @@ Use `import type` only: the module must not need devtools at runtime.
 
 ### The panel fields
 
-| Field    | Required | What it is                                                                                                 |
-| -------- | -------- | ---------------------------------------------------------------------------------------------------------- |
-| `id`     | yes      | Lower-case letters, digits and dashes, starting with a letter. Names the tab, the URLs and the hash route. |
-| `title`  | yes      | The tab label.                                                                                             |
-| `view`   | yes      | The browser module: an absolute file path or a `file:` URL. It must exist when devtools starts.            |
-| `routes` | no       | Data routes: `{ method?, path, handler }`.                                                                 |
-| `assets` | no       | More files by served name: `{ "chart.js": <path or file: URL> }`. Plain file names, no folders.            |
-| `production` | no   | `true` when the panel is safe to show in the [production monitor](/v/latest/devtools/production/). Without it the panel is left out in production unless the project sets `production.panels[<id>]: true`. |
+| Field        | Required | What it is                                                                                                                                                                                                 |
+| ------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`         | yes      | Lower-case letters, digits and dashes, starting with a letter. Names the tab, the URLs and the hash route.                                                                                                 |
+| `title`      | yes      | The tab label.                                                                                                                                                                                             |
+| `view`       | yes      | The browser module: an absolute file path or a `file:` URL. It must exist when devtools starts.                                                                                                            |
+| `routes`     | no       | Data routes: `{ method?, path, handler }`.                                                                                                                                                                 |
+| `assets`     | no       | More files by served name: `{ "chart.js": <path or file: URL> }`. Plain file names, no folders.                                                                                                            |
+| `production` | no       | `true` when the panel is safe to show in the [production monitor](/v/latest/devtools/production/). Without it the panel is left out in production unless the project sets `production.panels[<id>]: true`. |
 
 An id that another panel already uses is refused with a message naming that
 panel. The dashboard's own ids (`requests`, `ai`, `agents`, `queries`, `mail`,

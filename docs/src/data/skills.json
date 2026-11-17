@@ -1,5 +1,5 @@
 {
-  "totalCharacters": 13998,
+  "totalCharacters": 13957,
   "skills": [
     {
       "package": "@warlock.js/access",
@@ -159,8 +159,8 @@
       "package": "@warlock.js/devtools",
       "slug": "warlock-js-devtools",
       "source": "packages/devtools/skills/SKILL.md",
-      "description": "Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines, middleware, validation, queries, N+1 warnings, logs, cache, mail, AI runs, routes and configuration. Use for \"debug a slow endpoint\", \"inspect this request\", \"view captured mail\", \"open devtools\" or \"add a devtools panel\". Not this package → @warlock.js/core for `warlock trace`, CLI route inspection and OpenAPI; @warlock.js/ai-panoptic for AI tracing.",
-      "characters": 444
+      "description": "Dev dashboard and opt-in production monitor for Warlock apps via `devtoolsConnector`: request timelines, queries, N+1, errors, resources, health, jobs, mail, routes. Use for \"debug a slow endpoint\", \"monitor production\", \"devtools DT00x error\", \"reset devtools admin\" or \"add a devtools panel\". Not this package → @warlock.js/core for `warlock trace` and OpenAPI; @warlock.js/ai-panoptic for AI tracing.",
+      "characters": 403
     },
     {
       "package": "@warlock.js/fs",

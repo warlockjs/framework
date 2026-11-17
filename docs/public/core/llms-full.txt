@@ -2669,7 +2669,7 @@ Run the app from `.warlock/current/staged` so a restart follows the pointer.
 
 ---
 name: encrypt-data
-description: 'Reversible AES-256-GCM `encrypt` / `decrypt` for secrets you need to read back; one-way HMAC-SHA256 `hmacHash` for deterministic fingerprints (lookup/dedup of encrypted columns). Keys come from `src/config/encryption.ts`. Triggers: `encrypt`, `decrypt`, `hmacHash`, `EncryptionConfigurations`, `APP_ENCRYPTION_KEY`, `APP_HMAC_KEY`; "store an API key reversibly", "fingerprint an encrypted column for lookup", "AES-256-GCM secret", "HMAC-SHA256 dedup key"; typical import `import { encrypt, decrypt, hmacHash } from "@warlock.js/core"`. Skip: password hashing — the `hash-password` topic; config wiring — the `configure-app` topic; competing libs Node `crypto` direct, `crypto-js`, `libsodium-wrappers`.'
+description: 'Reversible AES-256-GCM `encrypt` / `decrypt` for secrets you need to read back; one-way HMAC-SHA256 `hmacHash` for deterministic fingerprints (lookup/dedup of encrypted columns). Keys come from `src/config/encryption.ts`. Triggers: `encrypt`, `decrypt`, `hmacHash`, `EncryptionConfigurations`, `APP_ENCRYPTION_KEY`, `APP_HMAC_KEY`; "store an API key reversibly", "fingerprint an encrypted column for lookup", "AES-256-GCM secret", "HMAC-SHA256 dedup key"; typical import `import { encrypt, decrypt, hmacHash } from "@warlock.js/core"`. Also one-time codes: `generateTotpSecret`, `totpCode`, `verifyTotp`, `totpUri` (authenticator-app second factor). Skip: password hashing — the `hash-password` topic; config wiring — the `configure-app` topic; competing libs Node `crypto` direct, `crypto-js`, `libsodium-wrappers`.'
 ---
 
 # Warlock — encrypt and fingerprint
@@ -2857,6 +2857,28 @@ if (existing) return existing.get("result");
 ```
 
 Same payload → same key → returns the cached result. Different keys (because the HMAC is keyed) per environment if you set different `hmacKey` values.
+
+## One-time codes — `generateTotpSecret`, `totpCode`, `verifyTotp`, `totpUri`
+
+Authenticator-app codes (RFC 6238: HMAC-SHA1, 6 digits, 30-second steps). Pure functions, no config. Keep the secret with `encrypt`.
+
+```ts
+import { decrypt, encrypt, generateTotpSecret, totpUri, verifyTotp } from "@warlock.js/core";
+
+const secret = generateTotpSecret(); // base32, no padding
+const uri = totpUri({ secret, account: "ada@example.com", issuer: "My App" });
+const stored = encrypt(secret);
+
+const step = verifyTotp(decrypt(stored), "492039"); // matched step, or null
+const lastStep = 0 as number | null; // the last accepted step, saved with the account
+
+if (step === null || (lastStep !== null && step <= lastStep)) {
+  throw new Error("The code is not valid");
+}
+```
+
+- `verifyTotp` accepts `window` steps either side (default 1), compares in constant time, takes only `^\d{6}$` (spaces ignored) and returns the matched step. Save it and refuse a step that is not newer, so a code cannot be replayed.
+- `totpCode(secret, at?)` gives the code for a moment (tests, tooling). Count wrong codes toward a rate limit.
 
 ## Gotchas
 
@@ -4538,6 +4560,22 @@ warlock logs request <id> --json                       # one record in full
 These read the **default file channel** (`storage/logs/requests`). Custom
 `channels` are write-only from the framework's point of view.
 
+## Keep a private path out of the log
+
+```ts
+import { excludeFromRequestLog, isExcludedFromRequestLog } from "@warlock.js/core";
+
+const stopExcluding = excludeFromRequestLog("/ops-7f3k2q9x");
+
+isExcludedFromRequestLog("/ops-7f3k2q9x/api/auth/login"); // true
+isExcludedFromRequestLog("/ops-7f3k2q9xyz"); // false: whole path segments only
+
+stopExcluding();
+```
+
+Requests under the prefix write no record, and the one-line request summary
+(`http.log`) skips them too.
+
 ## Gotchas
 
 - A 4xx is not an error for `only: "errors"`; use `only: "all"` with a
@@ -4776,6 +4814,10 @@ type TracingHooks = {
   onPhase?(ctx: TracingContext, phase: TracingPhaseInfo): void;
 };
 ```
+
+`result.error` is the error a middleware or handler threw when the response is
+a 5xx, also when core caught it and answered the 500 itself; a thrown 4xx
+leaves it `undefined`.
 
 Every verb is optional — a hook that only wants phase spans need not implement
 `onRequestStart`/`onRequestEnd`. Register as many hooks as you like via
@@ -13248,7 +13290,7 @@ Some older modules still have a `validation/` folder instead of `schema/` — hi
 | ---------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `.controller.ts` | HTTP handler                                                                                 | `create-product.controller.ts`           |
 | `.service.ts`    | Stateless business logic                                                                     | `create-product.service.ts`              |
-| `.usecase.ts`    | `useCase()` pipeline                                                                         | `login.usecase.ts`                       |
+| `.use-case.ts`   | `useCase()` pipeline                                                                         | `login.use-case.ts`                      |
 | `.model.ts`      | Cascade model class                                                                          | `product.model.ts`                       |
 | `.repository.ts` | `RepositoryManager` subclass                                                                 | `products.repository.ts`                 |
 | `.resource.ts`   | `Resource` subclass                                                                          | `product.resource.ts`                    |
@@ -13674,6 +13716,8 @@ npx warlock inspect --json --section config | jq -r '.config[] | "\(.key): \(.ty
   "name": "posts.update",
   "sourceFile": "src/app/posts/routes.ts",
   "handler": "updatePostController",
+  "controller": null,
+  "action": null,
   "middleware": ["authMiddleware"],
   "auth": { "required": true, "sources": ["header"], "userTypes": ["user"] },
   "csrf": true,
@@ -13803,7 +13847,9 @@ npx warlock explain src/web/components/Post.tsx --json
 npx warlock explain WL3001 --json
 ```
 
-The `files` section reads every file under `src/`, without importing app modules or booting connectors. Each entry has `file`, `module`, `role`, `exports`, `imports` and `importedBy`. Paths are relative to the project root. Modules use `src/app/<module>` or the containing top-level `src` directory. Roles follow file names and directories: controller, service, repository, model, migration, schema, resource, routes, page, setup, layout, root, hook, component, util, type, config and spec; unmatched files use `source`. Non-code assets have empty exports and imports.
+The `files` section reads every file under `src/`, without importing app modules or booting connectors. Each entry has `file`, `module`, `role`, `exports`, `imports` and `importedBy`, and for code files `lines` (line count), `about` (first sentence of the comment block at the top of the file, before any import, or `null`), `tags` (the `@tag value` lines of that comment, such as `@feature checkout`, as arrays keyed by tag name) and `exportDocs` (first sentence of the doc comment above each export that has one). Paths are relative to the project root. Modules use `src/app/<module>` or the containing top-level `src` directory. Roles follow file names and directories: controller, service, repository, model, use-case, seed, request, mail, job, event, client, migration, schema, resource, routes, page, setup, layout, root, hook, component, util, type, config and spec (a `*.use-case.ts`, `*.seed.ts`, `*.request.ts`, `*.mail.ts`, `*.job.ts`, `*.event.ts` or `*.client.ts(x)` file gets that role in any folder; a file in `use-cases/`, `seeds/`, `requests/`, `mails/`, `jobs/` or `clients/` gets it too, but the `src/app/<module>` folder itself does not count, so a module named `events` or `jobs` keeps its folders' roles); unmatched files use `source`. Non-code assets have empty exports and imports and no `lines`. These fields were added in 5.55.0 without a new `schemaVersion`; a report from an older version lacks them.
+
+A route registered as `[controller, "action"]` carries `controller` (the class name, `null` for a plain object) and `action`; both are `null` for a function handler. `collectFiles(cwd)` and `fileRole(file)` are exported from `@warlock.js/core/tooling` for tools that need the file list without a full report. `collectFiles(cwd, warnings, { dirs })` (options type `CollectFilesOptions`) scans other project-relative folders, default `["src"]`; imports resolve across all of them. `node_modules` and hidden folders (`.expo`, `.git`) are skipped. A registered package code (`GR2001`) given to `warlock explain` is answered from `warlock.config.ts` without booting.
 
 Each code file is parsed once with OXC per inspection. Export names include types, aliases, destructured bindings, `default` and `*` for star re-exports; star exports are recorded rather than expanded. Imports include type imports, side effects, re-exports and literal dynamic imports. Each import is `{ specifier, file }`: `file` is the resolved local path, or `null` for external/unresolved imports. Resolution follows inherited tsconfig path aliases, fallback targets, baseUrl, extensionless files and directory indexes within `src/`. Computed dynamic imports and CommonJS `require()` calls are not graph edges. Parse/config failures appear in `warnings`.
 
@@ -13824,7 +13870,7 @@ For route/page reachability in code, call `inspectApp({ sections: ["files", "rou
 
 ---
 name: warlock-mcp
-description: 'Serve the app to a coding agent over the Model Context Protocol: `warlock mcp` (stdio, or `--http` on loopback with a bearer token required off loopback) and `warlock dev --mcp` / `devServer.mcp` (live registries) expose `inspect_app` + `inspect_<section>` (routes, models, resources, config, events, pages, jobs, schedules, packages), `db_schema`, `docs_search` / `docs_read` (installed @warlock.js skills, READMEs and llms files only, offline), `explain`, `check_run`, `test_run`, `requests_recent` (devtools: timeline, queries with nPlusOne, logs) and `generate_make` / `generate_add` (a unified diff from a throw-away copy; writes only with `--allow-writes`). Read-only by default. Needs `@warlock.js/ai-tools` (optional peer). Triggers: `warlock mcp`, `--allow-writes`, `--http`, `WARLOCK_MCP_TOKEN`, `warlock dev --mcp`, `devServer.mcp`, `startWarlockMcpServer`, `createMcpContext`, `createWarlockMcpTools`, `runTests`, `sandboxBackend`, `WL7003`, `WL7004`, `WL7005`, `.mcp.json`; "connect Claude Code / Cursor to my Warlock app", "let the agent ask the app", "MCP server for this project", "preview what a generator writes". Skip: the JSON report itself — the `warlock-inspect` topic; serving YOUR OWN agent tools over MCP — the `expose-as-mcp-server` topic of @warlock.js/ai-tools; one request''s timeline from the terminal — the `warlock-trace` topic.'
+description: 'Serve the app to a coding agent over the Model Context Protocol: `warlock mcp` (stdio, or `--http` on loopback with a bearer token required off loopback) and `warlock dev --mcp` / `devServer.mcp` (live registries) expose `inspect_app` + `inspect_<section>` (routes, models, resources, config, events, pages, jobs, schedules, packages), `db_schema`, `docs_search` / `docs_read` (installed @warlock.js skills, READMEs and llms files only, offline), `explain`, `check_run`, `test_run`, `requests_recent` (devtools: timeline, queries with nPlusOne, logs) and `generate_make` / `generate_add` (a unified diff from a throw-away copy; writes only with `--allow-writes`). Read-only by default. Packages and the app add tools with `withMcpTools()` on a `cli.commands` entry or `mcp.tools` in `warlock.config.ts`. Needs `@warlock.js/ai-tools` (optional peer). Triggers: `warlock mcp`, `--allow-writes`, `--http`, `WARLOCK_MCP_TOKEN`, `warlock dev --mcp`, `devServer.mcp`, `startWarlockMcpServer`, `createMcpContext`, `createWarlockMcpTools`, `withMcpTools`, `mcp.tools`, `resolveWarlockMcpTools`, `runTests`, `sandboxBackend`, `WL7003`, `WL7004`, `WL7005`, `.mcp.json`; "connect Claude Code / Cursor to my Warlock app", "let the agent ask the app", "MCP server for this project", "preview what a generator writes". Skip: the JSON report itself — the `warlock-inspect` topic; serving YOUR OWN agent tools over MCP — the `expose-as-mcp-server` topic of @warlock.js/ai-tools; one request''s timeline from the terminal — the `warlock-trace` topic.'
 ---
 
 # Warlock — `warlock mcp`
@@ -13889,6 +13935,56 @@ Without `--allow-writes`, `generate_make` / `generate_add` have no `write` argum
 
 A `write: true` sent to a read-only server is refused with `WL7005`. With `--allow-writes`, `write: true` runs the generator in the project and returns the same diff.
 
+## Add tools from a package or the app
+
+The built-in tools come first, then the tools `warlock.config.ts` registers; `warlock mcp` and `warlock dev --mcp` both read them. A package attaches tools to the command its register function returns with `withMcpTools()`, so the app's one `cli.commands` line brings the command and its tools. The app adds its own under `mcp.tools`.
+
+```ts
+import { command, defineConfig, inputSchema, withMcpTools } from "@warlock.js/core";
+
+// In the package: a tool, or a function of the server context (cwd, allowWrites, inspect(), docs()…).
+export function registerReportCommands() {
+  return withMcpTools(
+    command({ name: "report", description: "Print the report", action: () => undefined }),
+    [
+      (context) => ({
+        name: "report_routes",
+        description: "How many routes the app has. Read-only.",
+        input: inputSchema({ method: { type: "string", description: "Only this method." } }),
+        writes: false,
+        run: async (input) => {
+          const { routes = [] } = await context.inspect(["routes"]);
+
+          return routes.filter((route) => !input.method || route.method === input.method).length;
+        },
+      }),
+    ],
+  );
+}
+
+// In the app's warlock.config.ts:
+export default defineConfig({
+  cli: { commands: [registerReportCommands()] },
+  mcp: {
+    tools: [
+      {
+        name: "app_ping",
+        description: "Answer pong. Read-only.",
+        input: inputSchema({}),
+        writes: false,
+        run: async () => "pong",
+      },
+    ],
+  },
+});
+```
+
+- Names: `^[a-zA-Z0-9_-]{1,128}$`, prefixed with the package (`report_routes`). A name a built-in or another registered tool already has stops the server with a message naming the tool.
+- Input: `inputSchema()` only — strings (optional `enum`), integers (`minimum` / `maximum`), booleans, arrays of strings, each with a description. The schema is checked at start; every call's arguments are checked against it.
+- `writes: true` means a call changes project files: without `--allow-writes` the tool is listed but every call is refused with `WL7005` before `run`.
+- `warlock.config.ts` is part of the production build: keep a register function's imports light and load heavy modules inside `run`.
+- `startWarlockMcpServer({ context, tools })` takes the same list from code. `resolveWarlockMcpTools(context, tools)` returns what the server would serve (and throws on an invalid or clashing tool); `mcpToolsFromConfig(config)` and `mcpToolsOf(command)` read the registrations.
+
 ## HTTP rules
 
 - Binds `127.0.0.1` by default. Any other `--host` needs `--token` (or `WARLOCK_MCP_TOKEN`), otherwise `WL7004` before anything boots.
@@ -13935,6 +14031,7 @@ await server.close();
 - Over stdio, stdout is the JSON-RPC stream: `console.log` / `info` / `debug` are sent to stderr for the whole run.
 - `requests_recent` fails with `WL8008` when no dev server is recorded or reachable, and `WL8009` when devtools is not installed (`npx warlock add devtools`).
 - Missing `@warlock.js/ai-tools` / `@warlock.js/ai` → `WL7003` with the install line.
+- A registered tool with a taken name or an invalid schema stops `warlock mcp` with a message naming it; under `warlock dev --mcp` it prints `MCP server not started: …` and the dev server keeps running.
 
 ## See also
 
@@ -14628,6 +14725,31 @@ export default defineConfig({
 });
 ```
 
+A register function may return an array of commands. An entry of `cli.commands` is a `CLICommandEntry`: a command or an array of commands, and arrays are flattened.
+
+### Explaining a package's error codes
+
+`withExplainCodes(command, explainer)` attaches a `CodeExplainer` to a command. When that command is in `cli.commands`, `warlock explain <code>` asks the explainer for a code of two letters and four digits that is not a `WL` code (for example `GR2001`, upper-cased first), reading only `warlock.config.ts` and never booting the app. The explainer returns an `ExplainableCode` (`code`, `title`, `area`, `fix`, `skill`, `docs`) or `undefined` when the code is not the package's. `explainersOf(command)` lists the attached explainers and `explainRegisteredCode(entries, code)` asks them all; the first answer wins.
+
+```ts
+import { command, withExplainCodes } from "@warlock.js/core";
+
+export function registerReportCommands() {
+  return withExplainCodes(command({ name: "report", action: () => undefined }), (code) =>
+    code === "RP1001"
+      ? {
+          code,
+          title: "Report is empty",
+          area: "report",
+          fix: "Run the report with a wider date range.",
+          skill: "reports",
+          docs: "https://example.com/docs/RP1001",
+        }
+      : undefined,
+  );
+}
+```
+
 ## Output and exit codes
 
 By default, the framework prints `Executing <name>…`, runs your `action`, then prints `Done in <ms>ms` and `process.exit(0)`. Throwing exits with `1` and prints the error. If `persistent: true`, the framework keeps the process alive (no auto-exit on success; errors are logged but don't crash).
@@ -14696,27 +14818,28 @@ warlock generate                         (alias: g)      — interactive picker
 
 `warlock add <features...>` installs framework-adjacent features through a curated registry — bundles npm dependencies + scaffold files + tsconfig patches + package.json scripts in one call. Featured names (from `add-command.action.ts`):
 
-| Feature       | Installs                                                                                                                                                                               |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `react-email` | `react-email` + `@react-email/components` + `@react-email/render` + `@react-email/tailwind`; drops a `welcome-email.tsx` sample; patches `tsconfig.json`                               |
-| `web`         | Warlock Web + React stack; scaffolds the application page, localization, contact endpoint, and Web configuration                                                                       |
-| `react`       | `react` + `react-dom` + types                                                                                                                                                          |
-| `bull-board`  | `@bull-board/api` + `@bull-board/fastify`; writes a `dashboard` block to `src/config/queue.ts`. `requires: ["queue"]` — adds the `queue` feature first automatically when it's missing |
-| `image`       | `sharp` (for the `Image` class)                                                                                                                                                        |
-| `mail`        | `nodemailer` + types                                                                                                                                                                   |
-| `ses`         | `@aws-sdk/client-sesv2`                                                                                                                                                                |
-| `mongodb`     | `mongodb` driver                                                                                                                                                                       |
-| `postgres`    | `pg`                                                                                                                                                                                   |
-| `mysql`       | `mysql2`                                                                                                                                                                               |
-| `redis`       | `redis`                                                                                                                                                                                |
-| `s3`          | `@aws-sdk/client-s3` + `@aws-sdk/lib-storage` + `@aws-sdk/s3-request-presigner`                                                                                                        |
-| `scheduler`   | `@warlock.js/scheduler`                                                                                                                                                                |
-| `swagger`     | `@warlock.js/swagger`                                                                                                                                                                  |
-| `postman`     | `@warlock.js/postman`                                                                                                                                                                  |
-| `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                                                                                                          |
-| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts`                                                                                |
-| `process`     | `@warlock.js/process` pinned to installed Core; typed config, supervisor export, recovery/shutdown lifecycle and optional devtools process panel                                       |
-| `devtools`    | `@warlock.js/devtools` as a dev dependency; `warlock dev` auto-loads its development dashboard at `/__warlock`                                                                         |
+| Feature       | Installs                                                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `react-email` | `react-email` + `@react-email/components` + `@react-email/render` + `@react-email/tailwind`; drops a `welcome-email.tsx` sample; patches `tsconfig.json`                                                                 |
+| `web`         | Warlock Web + React stack; scaffolds the application page, localization, contact endpoint, and Web configuration                                                                                                         |
+| `react`       | `react` + `react-dom` + types                                                                                                                                                                                            |
+| `bull-board`  | `@bull-board/api` + `@bull-board/fastify`; writes a `dashboard` block to `src/config/queue.ts`. `requires: ["queue"]` — adds the `queue` feature first automatically when it's missing                                   |
+| `grimoire`    | `@warlock.js/grimoire` (experimental); registers `registerGrimoireCommands()` in `cli.commands` (creates the `cli` block when missing), adds `.gitignore` lines, the devtools panel and `grimoireReporter()`; idempotent |
+| `image`       | `sharp` (for the `Image` class)                                                                                                                                                                                          |
+| `mail`        | `nodemailer` + types                                                                                                                                                                                                     |
+| `ses`         | `@aws-sdk/client-sesv2`                                                                                                                                                                                                  |
+| `mongodb`     | `mongodb` driver                                                                                                                                                                                                         |
+| `postgres`    | `pg`                                                                                                                                                                                                                     |
+| `mysql`       | `mysql2`                                                                                                                                                                                                                 |
+| `redis`       | `redis`                                                                                                                                                                                                                  |
+| `s3`          | `@aws-sdk/client-s3` + `@aws-sdk/lib-storage` + `@aws-sdk/s3-request-presigner`                                                                                                                                          |
+| `scheduler`   | `@warlock.js/scheduler`                                                                                                                                                                                                  |
+| `swagger`     | `@warlock.js/swagger`                                                                                                                                                                                                    |
+| `postman`     | `@warlock.js/postman`                                                                                                                                                                                                    |
+| `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                                                                                                                                            |
+| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts`                                                                                                                  |
+| `process`     | `@warlock.js/process` pinned to installed Core; typed config, supervisor export, recovery/shutdown lifecycle and optional devtools process panel                                                                         |
+| `devtools`    | `@warlock.js/devtools` as a dev dependency; `warlock dev` auto-loads its development dashboard at `/__warlock`                                                                                                           |
 
 Run `warlock add --list` to see what's currently registered. Pass `--packageManager <yarn\|pnpm\|npm>` to override auto-detection (defaults to whichever lockfile is present).
 
@@ -15497,7 +15620,7 @@ A use case is a named, observable, transport-agnostic unit of business logic. Th
 
 ## The shape
 
-```ts title="src/app/orders/use-cases/place-order.usecase.ts"
+```ts title="src/app/orders/use-cases/place-order.use-case.ts"
 import { useCase } from "@warlock.js/core";
 import { v } from "@warlock.js/seal";
 import { placeOrderService } from "../services/place-order.service";

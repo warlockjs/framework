@@ -30,7 +30,10 @@ const SOURCES: Record<string, string> = {
   "ui-src/README.md": "# readme\n",
   "src/production/contracts.ts": "export type Shape = { id: string };\n",
   "package.json": JSON.stringify(
-    { name: "@warlock.js/devtools", devDependencies: { react: "19.2.8", vite: "8.3.3", zod: "4.0.0" } },
+    {
+      name: "@warlock.js/devtools",
+      devDependencies: { react: "19.2.8", vite: "8.3.3", zod: "4.0.0" },
+    },
     null,
     2,
   ),
@@ -97,7 +100,10 @@ describe("runDevtoolsUiGate", () => {
 
   it("reports a stale bundle when a source changed after the build", async () => {
     const fixture = await createFixture();
-    await writeFile(path.join(fixture.packageDir, "ui-src/src/main.tsx"), "export const boot = () => 'changed';\n");
+    await writeFile(
+      path.join(fixture.packageDir, "ui-src/src/main.tsx"),
+      "export const boot = () => 'changed';\n",
+    );
     const result = await gate(fixture);
     assert.equal(result.ok, false);
     assert.equal(result.problems.length, 1);
@@ -110,7 +116,9 @@ describe("runDevtoolsUiGate", () => {
     await writeFile(path.join(fixture.shippedDir, "assets/app.js"), "console.log('hand edit');\n");
     const result = await gate(fixture);
     assert.equal(result.ok, false);
-    assert.ok(result.problems.some((problem) => /assets\/app\.js does not match its hash/.test(problem)));
+    assert.ok(
+      result.problems.some((problem) => /assets\/app\.js does not match its hash/.test(problem)),
+    );
   });
 
   it("reports a stale bundle when a fresh build differs from the shipped files", async () => {
@@ -152,7 +160,9 @@ describe("runDevtoolsUiGate", () => {
       throw new Error("vite exploded");
     });
     assert.equal(result.ok, false);
-    assert.ok(result.problems.some((problem) => /fresh build .* failed: vite exploded/.test(problem)));
+    assert.ok(
+      result.problems.some((problem) => /fresh build .* failed: vite exploded/.test(problem)),
+    );
   });
 });
 
@@ -179,12 +189,17 @@ describe("dashboardSourceHash", () => {
   it("changes when a covered source, the contracts or a pinned dependency changes", async () => {
     const fixture = await createFixture();
     const before = await dashboardSourceHash(fixture.packageDir);
-    await writeFile(path.join(fixture.packageDir, "src/production/contracts.ts"), "export type Shape = {};\n");
+    await writeFile(
+      path.join(fixture.packageDir, "src/production/contracts.ts"),
+      "export type Shape = {};\n",
+    );
     const afterContracts = await dashboardSourceHash(fixture.packageDir);
     assert.notEqual(afterContracts, before);
 
     const manifestPath = path.join(fixture.packageDir, "package.json");
-    const manifest = JSON.parse(SOURCES["package.json"]!) as { devDependencies: Record<string, string> };
+    const manifest = JSON.parse(SOURCES["package.json"]!) as {
+      devDependencies: Record<string, string>;
+    };
     manifest.devDependencies["react"] = "19.2.9";
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
     assert.notEqual(await dashboardSourceHash(fixture.packageDir), afterContracts);
@@ -194,7 +209,9 @@ describe("dashboardSourceHash", () => {
     const fixture = await createFixture();
     const before = await dashboardSourceHash(fixture.packageDir);
     const manifestPath = path.join(fixture.packageDir, "package.json");
-    const manifest = JSON.parse(SOURCES["package.json"]!) as { devDependencies: Record<string, string> };
+    const manifest = JSON.parse(SOURCES["package.json"]!) as {
+      devDependencies: Record<string, string>;
+    };
     manifest.devDependencies["zod"] = "4.1.0";
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
     assert.equal(await dashboardSourceHash(fixture.packageDir), before);

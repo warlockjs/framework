@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.56.0 - 2026-11-17
+
+### Added
+
+- New devtools pages: "Devtools in production" (setup, environment variables, accounts, two-factor sign-in, the disable switch, sampling, redaction, several instances, error codes) and "Devtools security" (how the dashboard path is protected and what each control does).
+- The core encryption page documents the TOTP helpers, and the request log page documents `excludeFromRequestLog()`.
+
+### Changed
+
+- The devtools pages describe the React dashboard, the new Resources, Health, Errors and Jobs tabs, and the `production` flag for package panels.
+
 ## 5.55.0 - 2026-11-17
 
 ### Added

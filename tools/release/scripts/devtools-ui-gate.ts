@@ -145,9 +145,7 @@ async function buildWithLocalVite(packageDir: string, outDir: string): Promise<v
         return;
       }
       const reason =
-        signal === "SIGTERM"
-          ? "did not finish within 10 minutes"
-          : `exited with ${code ?? signal}`;
+        signal === "SIGTERM" ? "did not finish within 10 minutes" : `exited with ${code ?? signal}`;
       reject(new Error(`vite build ${reason}:\n${output.trim()}`));
     });
   });
@@ -177,7 +175,9 @@ export async function runDevtoolsUiGate(
   for (const file of DASHBOARD_FILES) {
     const record = buildInfo?.files[file];
     if (buildInfo !== undefined && record === undefined) {
-      problems.push(`build-info.json does not list ${file}. Run \`${BUILD_COMMAND}\` and commit ui/dashboard.`);
+      problems.push(
+        `build-info.json does not list ${file}. Run \`${BUILD_COMMAND}\` and commit ui/dashboard.`,
+      );
       continue;
     }
     if (record === undefined) continue;
