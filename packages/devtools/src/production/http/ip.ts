@@ -115,3 +115,46 @@ export function ipMatches(address: string, entries: readonly string[]): boolean 
 
   return compile(entries).check(ip, family === 4 ? "ipv4" : "ipv6");
 }
+
+/** The eight 16-bit groups of an IPv6 address, or `null` when it is not one. */
+function ipv6Groups(address: string): number[] | null {
+  if (isIP(address) !== 6) return null;
+
+  // A trailing dotted IPv4 part (`::ffff:1.2.3.4`, `64:ff9b::1.2.3.4`) becomes two hex groups.
+  const text = address.replace(/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/, (_, a, b, c, d) =>
+    `${((Number(a) << 8) | Number(b)).toString(16)}:${((Number(c) << 8) | Number(d)).toString(16)}`,
+  );
+  const parse = (part: string) => (part === "" ? [] : part.split(":").map((group) => parseInt(group, 16)));
+  const [head = "", rest] = text.split("::");
+  const left = parse(head);
+  const right = rest === undefined ? [] : parse(rest);
+  const zeros = Array.from({ length: Math.max(0, 8 - left.length - right.length) }, () => 0);
+
+  return [...left, ...zeros, ...right];
+}
+
+/**
+ * The client an address counts as for the sign-in rate limits. An IPv4
+ * address counts as itself (an IPv4-mapped IPv6 address as its IPv4 address),
+ * an IPv6 address by its /64 network, because one host is usually given a
+ * whole /64 and can change the rest at will. Anything else is returned as is.
+ */
+export function rateLimitClient(address: string): string {
+  const ip = normalizeIp(address);
+  const groups = ipv6Groups(ip);
+
+  if (groups === null) return ip;
+
+  // ::ffff:a.b.c.d written any other way (0:0:0:0:0:ffff:…, hex groups).
+  if (groups.slice(0, 5).every((group) => group === 0) && groups[5] === 0xffff) {
+    const high = groups[6] ?? 0;
+    const low = groups[7] ?? 0;
+
+    return [high >> 8, high & 0xff, low >> 8, low & 0xff].join(".");
+  }
+
+  return `${groups
+    .slice(0, 4)
+    .map((group) => group.toString(16))
+    .join(":")}::/64`;
+}

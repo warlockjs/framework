@@ -328,7 +328,9 @@ async function bootProduction(
     taken: new Map([[builtIn.id, builtIn.title]]),
     mode: "production",
   });
-  const postmanBuilder = await findPostmanBuilder();
+  // `warlock start` registers no development OpenAPI provider: the API tab, when turned on, builds its own.
+  const { createProductionOpenApi } = await import("./production/openapi");
+  const openApi = createProductionOpenApi(core);
 
   return bootProductionDevtools({
     options: resolved,
@@ -339,10 +341,8 @@ async function bootProduction(
       ...(processPanel ? { processPanel } : {}),
       ...(requestLog ? { requestLog } : {}),
       listRoutes: () => listRoutes(),
-      getOpenApiDocument: () => getOpenApiDocument(),
-      ...(postmanBuilder
-        ? { getPostmanCollection: async () => unwrapCollection(await postmanBuilder()) }
-        : {}),
+      getOpenApiDocument: openApi.getOpenApiDocument,
+      getPostmanCollection: openApi.getPostmanCollection,
     },
     log,
   });

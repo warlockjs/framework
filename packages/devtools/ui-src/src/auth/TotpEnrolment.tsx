@@ -23,13 +23,16 @@ export type TotpEnrolmentProps = {
 export function TotpEnrolment({ base, onConfirmed }: TotpEnrolmentProps) {
   const [enrolment, setEnrolment] = useState<DevtoolsTotpEnrolment | null>(null);
   const [code, setCode] = useState("");
+  const [current, setCurrent] = useState("");
+  // From the account page the server asks for the password again before a factor is added.
+  const askPassword = base === "api/account";
   const start = useAction(async () => {
     setEnrolment(await apiFetch<DevtoolsTotpEnrolment>(`${base}/totp/start`, { method: "POST" }));
   });
   const confirm = useAction(async () => {
     const result = await apiFetch<AuthStepWithCodes | undefined>(`${base}/totp/confirm`, {
       method: "POST",
-      body: { code: code.trim() },
+      body: { code: code.trim(), ...(askPassword ? { current } : {}) },
     });
 
     onConfirmed(result ?? { stage: "active", csrf: null });
@@ -78,6 +81,19 @@ export function TotpEnrolment({ base, onConfirmed }: TotpEnrolmentProps) {
           onChange={(event) => setCode(event.target.value)}
         />
       </div>
+      {askPassword ? (
+        <div className="grid gap-2">
+          <Label htmlFor="totp-current">Current password</Label>
+          <Input
+            id="totp-current"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={current}
+            onChange={(event) => setCurrent(event.target.value)}
+          />
+        </div>
+      ) : null}
       <ErrorMessage error={confirm.error} />
       <Button type="submit" disabled={confirm.pending}>
         {confirm.pending ? "Checking…" : "Confirm the code"}

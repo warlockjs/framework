@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveClient } from "../../../src/production/http/client";
-import { ipMatches, isValidNetworkEntry, normalizeIp } from "../../../src/production/http/ip";
+import { ipMatches, isValidNetworkEntry, normalizeIp, rateLimitClient } from "../../../src/production/http/ip";
 import { createApp, HOST, PATH } from "./harness";
 
 type Headers = Record<string, string | string[] | undefined>;
@@ -50,6 +50,20 @@ describe("ipMatches", () => {
     for (const entry of ["", "1.2.3", "1.2.3.4/33", "x/8", "10.0.0.0/", 5, null]) {
       expect(isValidNetworkEntry(entry), String(entry)).toBe(false);
     }
+  });
+});
+
+describe("rateLimitClient", () => {
+  it("is the IPv4 address, or the /64 of an IPv6 address in any spelling", () => {
+    expect(rateLimitClient("198.51.100.4")).toBe("198.51.100.4");
+    expect(rateLimitClient("::ffff:198.51.100.4")).toBe("198.51.100.4");
+    expect(rateLimitClient("0:0:0:0:0:ffff:c633:6404")).toBe("198.51.100.4");
+    expect(rateLimitClient("2001:DB8::1")).toBe("2001:db8:0:0::/64");
+    expect(rateLimitClient("2001:db8:0:0:ffff:1:2:3")).toBe("2001:db8:0:0::/64");
+    expect(rateLimitClient("2001:db8:1:2:3:4:5:6")).toBe("2001:db8:1:2::/64");
+    expect(rateLimitClient("64:ff9b::198.51.100.4")).toBe("64:ff9b:0:0::/64");
+    expect(rateLimitClient("fe80::1%eth0")).toBe("fe80:0:0:0::/64");
+    expect(rateLimitClient("not an ip")).toBe("not an ip");
   });
 });
 

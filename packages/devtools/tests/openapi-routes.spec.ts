@@ -102,6 +102,32 @@ describe("GET /docs", () => {
   });
 });
 
+describe("framing the docs pages", () => {
+  it("lets the API tab frame both pages even when the app forbids framing", async () => {
+    const server = Fastify();
+
+    // Core's security headers stamp these on the raw response of every request.
+    server.addHook("onRequest", async (_request, reply) => {
+      reply.raw.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+      reply.raw.setHeader("X-Frame-Options", "DENY");
+    });
+    mountDevtoolsRoutes(server, {
+      collector: {} as DevtoolsCollector,
+      options,
+      isDevelopment: () => true,
+      getOpenApiDocument: async () => document,
+    });
+
+    for (const url of ["/__warlock/docs", "/__warlock/docs/swagger"]) {
+      const response = await server.inject({ method: "GET", url, remoteAddress: loopback });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["x-frame-options"]).toBe("SAMEORIGIN");
+      expect(response.headers["content-security-policy"]).toBe("frame-ancestors 'self'");
+    }
+  });
+});
+
 describe("Scalar asset", () => {
   it("serves the vendored Scalar bundle as JavaScript", async () => {
     const server = buildServer();

@@ -9,7 +9,7 @@ export const DEVTOOLS_CONFIG_CODES = {
   DT001:
     "Devtools production mode needs a dashboard path. Set DEVTOOLS_PATH (for example /ops-7f3k2q) or devtools.production.path.",
   DT002:
-    'The devtools dashboard path must start with "/", be at least 8 characters, use only letters, digits, "-", "_", "." and "/", and not be "/__warlock".',
+    'The devtools dashboard path must start with "/", be at least 8 characters, use only letters, digits, "-", "_", ".", "~" and "/", and not be "/__warlock".',
   DT003:
     "Devtools production mode has no admin yet. Set DEVTOOLS_ADMIN_EMAIL with DEVTOOLS_ADMIN_PASSWORD or DEVTOOLS_SETUP_TOKEN, or run `warlock devtools:reset-admin --email <email>`.",
   DT004:

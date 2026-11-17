@@ -1,4 +1,5 @@
 import type { DevtoolsAuditEntry, DevtoolsInstanceReport } from "../contracts";
+import { rateLimitClient } from "../http/ip";
 import type {
   DevtoolsAccountPatch,
   DevtoolsAccountRecord,
@@ -203,6 +204,8 @@ export function auditToRow(entry: DevtoolsAuditEntry): Row {
     account_id: entry.accountId,
     email: entry.email,
     ip: entry.ip,
+    // What the per-IP limit counts by: the address, or its /64 for IPv6.
+    ip_bucket: entry.ip === null ? null : rateLimitClient(entry.ip),
     user_agent: entry.userAgent,
     detail: entry.detail,
     ref: entry.ref,

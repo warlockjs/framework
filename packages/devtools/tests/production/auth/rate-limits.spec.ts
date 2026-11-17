@@ -71,6 +71,33 @@ describe("rate limits", () => {
     ).toBe("active");
   });
 
+  it("counts an IPv6 client by its /64, and an IPv4-mapped address as its IPv4 address", async () => {
+    const world = createWorld();
+
+    await world.addAccount("viewer@example.com");
+
+    // One host rotating through its /64.
+    for (let index = 0; index < 20; index++) await fail(world, `ghost${index}@example.com`, `2001:db8:1:2::${index + 1}`);
+
+    const sameNetwork = await world.auth
+      .login({ email: "viewer@example.com", password: PASSWORD }, meta("2001:db8:1:2:ffff:abcd:1234:5678"))
+      .catch((error) => error);
+
+    expect(sameNetwork.code).toBe("auth.invalid-credentials");
+    // The next /64 is another client.
+    expect(
+      (await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta("2001:db8:1:3::1"))).stage,
+    ).toBe("active");
+
+    for (let index = 0; index < 20; index++) await fail(world, `mapped${index}@example.com`, "::ffff:198.51.100.40");
+
+    const asIpv4 = await world.auth
+      .login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.40"))
+      .catch((error) => error);
+
+    expect(asIpv4.code).toBe("auth.invalid-credentials");
+  });
+
   it("locks the whole dashboard at the global limit and audits it once", async () => {
     const world = createWorld({ options: { rateLimits: { windowMinutes: 15, account: 50, ip: 50, global: 6, lockMinutes: 15 } } });
 

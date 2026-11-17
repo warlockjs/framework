@@ -317,11 +317,14 @@ const QUOTED = /'(?:''|[^'])*'|"(?:\\.|[^"\\])*"/g;
 const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const HEX_ID = /\b0x[0-9a-f]+\b|\b(?=[0-9a-f]*\d)[0-9a-f]{8,}\b/gi;
+/** A random id of letters and digits (request ids, tokens): 16+ characters with both. */
+const TOKEN_ID = /\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{16,}\b/g;
 const NUMBER = /\d+(?:\.\d+)?/g;
 
 /**
  * Replaces the parts of an error message that change between occurrences
- * (quoted strings, emails, UUIDs, hex ids, numbers) so equal errors group.
+ * (quoted strings, emails, UUIDs, hex ids, random ids such as request ids,
+ * numbers) so equal errors group.
  */
 export function normalizeErrorMessage(message: string): string {
   return message
@@ -329,6 +332,7 @@ export function normalizeErrorMessage(message: string): string {
     .replace(UUID, "<uuid>")
     .replace(EMAIL, "<email>")
     .replace(HEX_ID, "<hex>")
+    .replace(TOKEN_ID, "<id>")
     .replace(NUMBER, "<n>");
 }
 

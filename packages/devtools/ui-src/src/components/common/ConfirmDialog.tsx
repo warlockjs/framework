@@ -24,8 +24,10 @@ export type ConfirmDialogProps = {
   destructive?: boolean;
   /** When set, the confirm button stays disabled until the user types exactly this word. */
   requireText?: string;
+  /** Asks for the current password first and passes it to `onConfirm` (second-factor changes). */
+  requirePassword?: boolean;
   /** Runs on confirm. The dialog closes when it resolves and stays open, showing the error, when it throws. */
-  onConfirm: () => Promise<unknown> | unknown;
+  onConfirm: (input: { password: string }) => Promise<unknown> | unknown;
 };
 
 /**
@@ -41,16 +43,19 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   destructive = false,
   requireText,
+  requirePassword = false,
   onConfirm,
 }: ConfirmDialogProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [typed, setTyped] = useState("");
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     if (open) {
       setError(null);
       setTyped("");
+      setPassword("");
     }
   }, [open]);
 
@@ -59,7 +64,7 @@ export function ConfirmDialog({
     setError(null);
 
     try {
-      await onConfirm();
+      await onConfirm({ password });
       onOpenChange(false);
     } catch (reason) {
       setError(reason);
@@ -90,6 +95,18 @@ export function ConfirmDialog({
             />
           </div>
         ) : null}
+        {requirePassword ? (
+          <div className="grid gap-2">
+            <Label htmlFor="confirm-password">Current password</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </div>
+        ) : null}
         <ErrorMessage error={error} />
         <DialogFooter>
           <Button variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>
@@ -97,7 +114,11 @@ export function ConfirmDialog({
           </Button>
           <Button
             variant={destructive ? "destructive" : "default"}
-            disabled={pending || (requireText !== undefined && typed !== requireText)}
+            disabled={
+              pending ||
+              (requireText !== undefined && typed !== requireText) ||
+              (requirePassword && password === "")
+            }
             onClick={confirm}
           >
             {pending ? "Working…" : confirmLabel}

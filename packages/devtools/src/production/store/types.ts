@@ -201,6 +201,10 @@ export type DevtoolsAuditCountFilter = {
   /** Entries at or after this time. */
   since: number;
   accountId?: string;
+  /**
+   * Entries from the same client as this address: the same IPv4 address, or
+   * the same IPv6 /64 network (`rateLimitClient`).
+   */
   ip?: string;
 };
 

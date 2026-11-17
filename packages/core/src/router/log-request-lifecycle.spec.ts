@@ -5,6 +5,7 @@
  */
 import config from "@mongez/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { noteHandledRequestError } from "../http/tracing/handled-request-error";
 import { resetTracingConfigForTests } from "../http/tracing/tracing-dispatcher";
 import type { TracingHooks } from "../http/tracing/tracing.type";
 import { logRequestLifecycle, type RequestLogPorts } from "./log-request-lifecycle";
@@ -136,6 +137,33 @@ describe("error handler path — onRequestEnd receives the error and the status"
     );
 
     expect(results).toEqual([{ status: 500, durationMs: 10, error: undefined }]);
+  });
+
+  it("carries the error core answered with a 5xx when the handler threw", async () => {
+    const results: unknown[] = [];
+    const hook: TracingHooks = { onRequestEnd: (_ctx, result) => results.push(result) };
+    config.set("http.tracing", { enabled: true, hooks: [hook] });
+
+    const boom = new Error("handler exploded");
+
+    await logRequestLifecycle(
+      fakePorts(),
+      {
+        module: "route",
+        action: "GET /x",
+        requestId: "req-1",
+        statusCode: () => 500,
+        request: fakeRequest,
+      },
+      async () => {
+        // What createRequestStore does when it answers a thrown error itself.
+        noteHandledRequestError(fakeRequest, boom);
+
+        return "handled";
+      },
+    );
+
+    expect(results).toEqual([{ status: 500, durationMs: 10, error: boom }]);
   });
 
   it("carries the error object when the run itself throws (unhandled)", async () => {

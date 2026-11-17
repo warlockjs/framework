@@ -16,6 +16,7 @@ import {
   DevtoolsProductionConfigError,
   DevtoolsStoreConflictError,
 } from "../errors";
+import { rateLimitClient } from "../http/ip";
 import type {
   DevtoolsAccountPatch,
   DevtoolsAccountRecord,
@@ -255,7 +256,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     meta: DevtoolsRequestMeta;
     detail?: AuditDetail;
   }): Promise<string> {
-    const key = `${input.meta.ip}|${input.accountId ?? input.auth?.account.id ?? ""}`;
+    const key = `${rateLimitClient(input.meta.ip)}|${input.accountId ?? input.auth?.account.id ?? ""}`;
     const at = now();
     const last = blockedAudits.get(key);
 
@@ -332,12 +333,14 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
   // Rate limits
   // -------------------------------------------------------------------------
 
+  /** Whether the client of `ip` (the address, or its /64 for IPv6) is over the per-IP limit. */
   async function ipOverLimit(
     ip: string,
     since: number,
     stateResetAt: number,
   ): Promise<boolean> {
-    const cached = blockedIps.get(ip);
+    const client = rateLimitClient(ip);
+    const cached = blockedIps.get(client);
 
     if (cached && now() < cached.until && cached.checkedAt >= stateResetAt) return true;
 
@@ -348,7 +351,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     });
 
     if (count < limits.ip) {
-      blockedIps.delete(ip);
+      blockedIps.delete(client);
 
       return false;
     }
@@ -359,7 +362,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
       if (!oldest.done) blockedIps.delete(oldest.value);
     }
 
-    blockedIps.set(ip, { until: now() + IP_BLOCK_CACHE_MS, checkedAt: now() });
+    blockedIps.set(client, { until: now() + IP_BLOCK_CACHE_MS, checkedAt: now() });
 
     return true;
   }
@@ -951,6 +954,79 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
   }
 
   // -------------------------------------------------------------------------
+  // Proving the owner again
+  // -------------------------------------------------------------------------
+
+  /**
+   * Checks the current password of an active session. A wrong one counts
+   * toward the sign-in limits like a failed sign-in.
+   */
+  async function requireCurrentPassword(
+    auth: DevtoolsAuthenticated,
+    given: string | undefined,
+    meta: DevtoolsRequestMeta,
+  ): Promise<void> {
+    const current = passwordInput(given);
+    const stored = auth.account.passwordHash;
+    const verifiable = !stored.startsWith("!") && current !== "";
+
+    if (await isBlocked(auth.account, meta.ip)) {
+      await verifyPassword(current, await dummyHash());
+
+      const ref = await auditBlocked({ auth, meta, detail: { step: "password" } });
+
+      fail("auth.wrong-current-password", ref);
+    }
+
+    const matches = await withSlot(async () =>
+      verifyPassword(current, verifiable ? stored : await dummyHash()),
+    );
+
+    if (!verifiable || !matches) {
+      const ref = await audit("login.failed", { auth, meta, detail: { step: "password" } });
+
+      await lockWhenOverGlobalLimit(meta);
+
+      fail("auth.wrong-current-password", ref);
+    }
+  }
+
+  /**
+   * Spends the session's step-up (a passkey check passed in this session in
+   * the last five minutes). Compare-and-set, so two requests racing on one
+   * step-up cannot both use it. Returns whether it was there to spend.
+   */
+  async function consumeStepUp(session: DevtoolsSessionRecord): Promise<boolean> {
+    const spent = await casSession(session, (fresh) =>
+      fresh.challenge === STEP_UP_CHALLENGE &&
+      fresh.challengeExpiresAt !== null &&
+      fresh.challengeExpiresAt > now()
+        ? { challenge: null, challengeExpiresAt: null }
+        : null,
+    );
+
+    return spent !== null;
+  }
+
+  /**
+   * Before an active session adds or removes a second factor: the current
+   * password, or, when none is given, a fresh step-up, so a stolen session
+   * cookie alone cannot change how the account signs in. Not asked while
+   * enrolling the first factor at sign-in, which follows the password.
+   */
+  async function requireOwner(
+    auth: DevtoolsAuthenticated,
+    current: string | undefined,
+    meta: DevtoolsRequestMeta,
+  ): Promise<void> {
+    if (auth.stage !== "active") return;
+
+    if ((current === undefined || current === "") && (await consumeStepUp(auth.session))) return;
+
+    await requireCurrentPassword(auth, current, meta);
+  }
+
+  // -------------------------------------------------------------------------
   // Password change
   // -------------------------------------------------------------------------
 
@@ -963,31 +1039,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
 
     const password = passwordInput(input?.password);
 
-    if (auth.stage === "active") {
-      const current = passwordInput(input?.current);
-      const stored = auth.account.passwordHash;
-      const verifiable = !stored.startsWith("!") && current !== "";
-
-      if (await isBlocked(auth.account, meta.ip)) {
-        await verifyPassword(current, await dummyHash());
-
-        const ref = await auditBlocked({ auth, meta, detail: { step: "password" } });
-
-        fail("auth.wrong-current-password", ref);
-      }
-
-      const matches = await withSlot(async () =>
-        verifyPassword(current, verifiable ? stored : await dummyHash()),
-      );
-
-      if (!verifiable || !matches) {
-        const ref = await audit("login.failed", { auth, meta, detail: { step: "password" } });
-
-        await lockWhenOverGlobalLimit(meta);
-
-        fail("auth.wrong-current-password", ref);
-      }
-    }
+    if (auth.stage === "active") await requireCurrentPassword(auth, input?.current, meta);
 
     requirePolicy(password, auth.account.email);
 
@@ -1042,14 +1094,16 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     auth: DevtoolsAuthenticated,
     code: string,
     meta: DevtoolsRequestMeta,
+    current?: string,
   ): Promise<{ step: DevtoolsAuthStep; recoveryCodes: string[] | null }> {
     requireStage(auth, "mfa-enrol", "active");
-
-    await guardSecondFactor(auth, meta);
 
     const pending = auth.session.pendingTotpSecret;
 
     if (pending === null) fail("input.invalid");
+
+    await requireOwner(auth, current, meta);
+    await guardSecondFactor(auth, meta);
 
     let secret: string;
 
@@ -1099,7 +1153,11 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     };
   }
 
-  async function removeTotp(auth: DevtoolsAuthenticated, meta: DevtoolsRequestMeta): Promise<void> {
+  async function removeTotp(
+    auth: DevtoolsAuthenticated,
+    meta: DevtoolsRequestMeta,
+    current?: string,
+  ): Promise<void> {
     requireStage(auth, "active");
 
     if (auth.account.totpSecret === null) return;
@@ -1107,6 +1165,8 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     if (twoFactorRequired(auth.account) && auth.account.passkeys.length === 0) {
       fail("account.last-factor");
     }
+
+    await requireOwner(auth, current, meta);
 
     const updated = await casAccount(auth.account, (account) => ({
       totpSecret: null,
@@ -1181,11 +1241,6 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     requireStage(auth, "active");
     await guardSecondFactor(auth, meta);
 
-    const session = auth.session;
-    const steppedUp =
-      session.challenge === STEP_UP_CHALLENGE &&
-      session.challengeExpiresAt !== null &&
-      session.challengeExpiresAt > now();
     let account = auth.account;
 
     if (typeof code === "string" && code !== "" && account.totpSecret !== null) {
@@ -1195,9 +1250,8 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
       if (!consumed) return failSecondFactor(auth, meta, "totp");
 
       account = consumed;
-    } else if (steppedUp) {
-      await casSession(session, () => ({ challenge: null, challengeExpiresAt: null }));
-    } else {
+    } else if (!(await consumeStepUp(auth.session))) {
+      // No step-up, or a parallel request spent it first.
       return failSecondFactor(auth, meta, "totp");
     }
 
@@ -1263,6 +1317,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     purpose: "register" | "login",
     response: unknown,
     meta: DevtoolsRequestMeta,
+    current?: string,
   ): Promise<{ step: DevtoolsAuthStep | null; recoveryCodes: string[] | null }> {
     const adapter = requirePasskeys();
 
@@ -1270,6 +1325,8 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     else requireStage(auth, "mfa-verify", "active");
 
     if (purpose === "login") await guardSecondFactor(auth, meta, "passkey.failed");
+    // The registration challenge replaced any step-up, so an active session gives its password here.
+    else if (auth.stage === "active") await requireCurrentPassword(auth, current, meta);
 
     const challenge = auth.session.challenge;
     const live =
@@ -1394,6 +1451,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     auth: DevtoolsAuthenticated,
     passkeyId: string,
     meta: DevtoolsRequestMeta,
+    current?: string,
   ): Promise<void> {
     requireStage(auth, "active");
 
@@ -1406,6 +1464,8 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     ) {
       fail("account.last-factor");
     }
+
+    await requireOwner(auth, current, meta);
 
     const updated = await casAccount(auth.account, (account) => {
       const remaining = account.passkeys.filter((passkey) => passkey.id !== passkeyId);

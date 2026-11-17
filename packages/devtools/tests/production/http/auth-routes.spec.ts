@@ -308,6 +308,12 @@ describe("account routes", () => {
 
     expect(wrong.statusCode).toBe(401);
 
+    // No code at all reaches the service (a passkey step-up may stand in) and is refused there.
+    const none = await t.send("POST", "/api/account/recovery-codes", { session: admin, body: {} });
+
+    expect(none.statusCode).toBe(401);
+    expect(none.json()).toMatchObject({ code: "auth.invalid-code" });
+
     // The sign-in used this time step's code; the next step's code is valid and unused.
     const response = await t.send("POST", "/api/account/recovery-codes", {
       session: admin,
@@ -318,7 +324,7 @@ describe("account routes", () => {
     expect(response.json<{ codes: string[] }>().codes).toHaveLength(10);
   });
 
-  it("starts an authenticator enrolment for a signed-in viewer", async () => {
+  it("starts an authenticator enrolment for a signed-in viewer and confirms it with the password", async () => {
     const t = await createApp();
     const viewer = await t.signIn("viewer@example.com");
     const start = await t.send("POST", "/api/account/totp/start", { session: viewer });
@@ -326,13 +332,34 @@ describe("account routes", () => {
     expect(start.statusCode).toBe(200);
     expect(start.json()).toMatchObject({ secret: TOTP_SECRET });
 
-    const confirm = await t.send("POST", "/api/account/totp/confirm", {
+    const noPassword = await t.send("POST", "/api/account/totp/confirm", {
       session: viewer,
       body: { code: totpCode(TOTP_SECRET, Date.now()) },
     });
 
+    expect(noPassword.statusCode).toBe(401);
+    expect(noPassword.json()).toMatchObject({ code: "auth.wrong-current-password" });
+
+    const confirm = await t.send("POST", "/api/account/totp/confirm", {
+      session: viewer,
+      body: { code: totpCode(TOTP_SECRET, Date.now()), current: PASSWORD },
+    });
+
     expect(confirm.statusCode).toBe(200);
     expect(confirm.json<{ recoveryCodes: string[] }>().recoveryCodes).toHaveLength(10);
+
+    // Removing it needs the password too; a DELETE carries it as a JSON body.
+    const removeBare = await t.send("DELETE", "/api/account/totp", { session: viewer });
+
+    expect(removeBare.statusCode).toBe(401);
+    expect(removeBare.json()).toMatchObject({ code: "auth.wrong-current-password" });
+
+    const remove = await t.send("DELETE", "/api/account/totp", {
+      session: viewer,
+      body: { current: PASSWORD },
+    });
+
+    expect(remove.statusCode).toBe(204);
   });
 });
 

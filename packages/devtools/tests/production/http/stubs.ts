@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 type Module = Record<string, unknown>;
 
@@ -53,11 +53,20 @@ export const explainRoute = {
 export function uiAssets(original: Module): Module {
   return {
     ...original,
-    registerUiAssets(server: FastifyInstance): void {
+    registerUiAssets(
+      server: FastifyInstance,
+      options: { notFound?: (request: FastifyRequest, reply: FastifyReply) => FastifyReply } = {},
+    ): void {
       server.get("/", (_request, reply) => {
         reply.header("Content-Type", "text/html; charset=utf-8").send("<html>shell</html>");
       });
-      server.get("/assets/:name", (_request, reply) => {
+      server.get<{ Params: { name: string } }>("/assets/:name", (request, reply) => {
+        // The real registrar answers an unknown name through `notFound` the same way.
+        if (request.params.name !== "app.js" && options.notFound) {
+          options.notFound(request, reply);
+          return;
+        }
+
         reply.header("Content-Type", "text/javascript; charset=utf-8").send("export {}");
       });
     },

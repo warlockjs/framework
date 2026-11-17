@@ -66,6 +66,8 @@ type TracingHooks = {
 
 Every verb is optional — a hook that only wants phase spans need not implement `onRequestStart`/`onRequestEnd`. Register as many hooks as you like via `hooks: TracingHooks[]`; each fires independently.
 
+`result.error` is the error a middleware or handler threw when the response is a 5xx, including the usual case where core catches it and answers the 500 itself. A thrown 4xx (a `ResourceNotFoundError`, a validation error) leaves it `undefined`; `status` says what was answered.
+
 ## Register at runtime
 
 Packages and application code that should not own `src/config/http.ts` can

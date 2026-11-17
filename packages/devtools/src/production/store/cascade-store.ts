@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DevtoolsAuditEntry, DevtoolsInstanceReport } from "../contracts";
 import { DevtoolsProductionConfigError, DevtoolsStoreConflictError } from "../errors";
+import { rateLimitClient } from "../http/ip";
 import {
   accountPatchToRow,
   accountToRow,
@@ -349,7 +350,7 @@ export async function createCascadeStore(
           .where("occurred_at", ">=", filter.since);
 
         if (filter.accountId !== undefined) target.where("account_id", "=", filter.accountId);
-        if (filter.ip !== undefined) target.where("ip", "=", filter.ip);
+        if (filter.ip !== undefined) target.where("ip_bucket", "=", rateLimitClient(filter.ip));
 
         return target.count();
       },

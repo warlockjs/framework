@@ -79,6 +79,10 @@ type TracingHooks = {
 };
 ```
 
+`result.error` is the error a middleware or handler threw when the response is
+a 5xx, also when core caught it and answered the 500 itself; a thrown 4xx
+leaves it `undefined`.
+
 Every verb is optional — a hook that only wants phase spans need not implement
 `onRequestStart`/`onRequestEnd`. Register as many hooks as you like via
 `hooks: TracingHooks[]`; each fires independently. Use `registerTracingHooks()`

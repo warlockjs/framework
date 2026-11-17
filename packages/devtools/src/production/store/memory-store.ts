@@ -5,6 +5,7 @@ import type {
   DevtoolsSampleSummary,
 } from "../contracts";
 import { DevtoolsStoreConflictError } from "../errors";
+import { rateLimitClient } from "../http/ip";
 import type {
   DevtoolsAccountRecord,
   DevtoolsInviteRecord,
@@ -308,7 +309,8 @@ export function createMemoryStore(options: { now?: () => number } = {}): Devtool
             filter.types.includes(entry.type) &&
             entry.at >= filter.since &&
             (filter.accountId === undefined || entry.accountId === filter.accountId) &&
-            (filter.ip === undefined || entry.ip === filter.ip),
+            (filter.ip === undefined ||
+              (entry.ip !== null && rateLimitClient(entry.ip) === rateLimitClient(filter.ip))),
         ).length;
       },
       async prune(before) {

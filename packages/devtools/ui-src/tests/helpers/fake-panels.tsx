@@ -6,9 +6,12 @@ import { vi } from "vitest";
  * must be hoisted, so the spec calls `fakeRegistry()` inside the factory.
  */
 export async function fakeRegistry() {
-  const ids = ["requests", "queries", "routes", "resources", "health", "errors", "logs", "jobs", "mail", "ai", "agents", "api"];
+  const ids = ["requests", "queries", "routes", "resources", "health", "errors", "logs", "jobs", "mail", "ai", "agents", "api", "broken"];
   const make = (id: string) =>
     function FakePanel(props: { route: string; instance: string }) {
+      // A tab that fails while drawing, for the shell's error boundary.
+      if (id === "broken") throw new Error("Objects are not valid as a React child");
+
       return <p>{`tab:${id} route:${props.route} instance:${props.instance}`}</p>;
     };
 

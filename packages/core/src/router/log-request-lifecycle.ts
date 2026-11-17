@@ -39,6 +39,7 @@
  */
 import type { Request } from "../http/request";
 import { isRequestLogEnabled, recordRequestLogError } from "../http/request-log";
+import { takeHandledRequestError } from "../http/tracing/handled-request-error";
 import {
   buildTracingContext,
   dispatchRequestEnd,
@@ -160,10 +161,13 @@ export async function logRequestLifecycle<TResult>(
     write(level, `Completed Request: ${descriptor.requestId} — ${outcome} in ${duration}ms`);
 
     if (tracingEnabled && descriptor.request) {
+      // A 5xx core answered itself (the handler threw) carries the error it answered for.
+      const handled = takeHandledRequestError(descriptor.request);
+
       dispatchRequestEnd(buildTracingContext(descriptor.request), {
         status: descriptor.statusCode(),
         durationMs: duration,
-        error,
+        error: error ?? handled,
       });
     }
   };

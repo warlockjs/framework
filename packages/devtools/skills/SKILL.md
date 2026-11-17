@@ -299,10 +299,19 @@ Options under `production` (all optional, defaults in brackets):
   or `$merge` never). PostgreSQL plans run in a read-only transaction that is
   rolled back. `explain.executing: true` allows `EXPLAIN ANALYZE` and
   `executionStats`; they run the query, so leave it off unless accepted.
+  Production plans show `?` in place of the query's values.
+- MongoDB: set `queryEvents: true` on the data source for the Queries tab in
+  production (command monitoring is off there by default).
 - A correct password does not reset an account's failed-try count; only a
   completed sign-in (second factor included) does. A caller over the IP limit
   costs no password check, and refused tries are audited at most once a minute
-  per address and account.
+  per address and account. The per-IP limit counts an IPv6 client by its /64
+  (an IPv4-mapped address as its IPv4 address).
+- From the account page, adding or removing a second factor needs the current
+  password (`current` in the JSON body, also on `DELETE api/account/totp` and
+  `DELETE api/account/passkeys/:id`); removing also accepts a passkey check
+  from the last five minutes. New recovery codes need a TOTP code or that
+  passkey check, which is single use.
 - Several instances share the database: each writes a report every 10 s, the
   instance picker filters, the live stream is per instance.
 - Disable from the dashboard (admin); re-enable with `warlock devtools:enable`

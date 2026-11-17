@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { resolveUiRoot } from "../ui-root";
 import type { MountDevtoolsRoutesDeps } from "./types";
 import { sendFile } from "./ui-assets";
@@ -41,11 +41,20 @@ export function registerOpenApiRoutes(
     return deps.getPostmanCollection();
   });
 
+  // The API tab shows these pages in a frame. The app's own headers (core's security headers forbid framing) are
+  // replaced on the reply; production sets its full docs policy on top.
+  const frameable = (reply: FastifyReply): FastifyReply =>
+    reply.header("X-Frame-Options", "SAMEORIGIN").header("Content-Security-Policy", "frame-ancestors 'self'");
+
   server.get("/docs", (_request, reply) => {
-    sendFile(reply, path.join(resolveUiRoot(), "docs.html"), "text/html; charset=utf-8");
+    sendFile(frameable(reply), path.join(resolveUiRoot(), "docs.html"), "text/html; charset=utf-8");
   });
 
   server.get("/docs/swagger", (_request, reply) => {
-    sendFile(reply, path.join(resolveUiRoot(), "docs-swagger.html"), "text/html; charset=utf-8");
+    sendFile(
+      frameable(reply),
+      path.join(resolveUiRoot(), "docs-swagger.html"),
+      "text/html; charset=utf-8",
+    );
   });
 }

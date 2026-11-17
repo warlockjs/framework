@@ -156,21 +156,34 @@ export interface DevtoolsAuthService {
   ): Promise<DevtoolsAuthStep>;
   /** Starts (or restarts) TOTP enrolment: stage `mfa-enrol`, or an active session adding an app. */
   startTotp(auth: DevtoolsAuthenticated, meta: DevtoolsRequestMeta): Promise<DevtoolsTotpEnrolment>;
-  /** Confirms the pending secret with a code; returns new recovery codes when the account had none. */
+  /**
+   * Confirms the pending secret with a code; returns new recovery codes when
+   * the account had none. An active session also gives its `current` password
+   * (or has a fresh passkey step-up), else `auth.wrong-current-password`.
+   */
   confirmTotp(
     auth: DevtoolsAuthenticated,
     code: string,
     meta: DevtoolsRequestMeta,
+    current?: string,
   ): Promise<{ step: DevtoolsAuthStep; recoveryCodes: string[] | null }>;
-  /** Removes the authenticator app (`account.last-factor` when it is the only factor and one is required). */
-  removeTotp(auth: DevtoolsAuthenticated, meta: DevtoolsRequestMeta): Promise<void>;
+  /**
+   * Removes the authenticator app (`account.last-factor` when it is the only
+   * factor and one is required). Needs the `current` password or a fresh
+   * passkey step-up.
+   */
+  removeTotp(auth: DevtoolsAuthenticated, meta: DevtoolsRequestMeta, current?: string): Promise<void>;
   /** Stage `mfa-verify`: a TOTP code or a recovery code. Failures count toward the limits. */
   verifySecondFactor(
     auth: DevtoolsAuthenticated,
     input: { code?: string; recoveryCode?: string },
     meta: DevtoolsRequestMeta,
   ): Promise<DevtoolsAuthStep>;
-  /** Replaces the recovery codes; needs a current TOTP code (or a passkey step done in this session within 5 minutes). */
+  /**
+   * Replaces the recovery codes; needs a current TOTP code, or a passkey step
+   * done in this session within 5 minutes (single use: of two racing calls,
+   * one is refused).
+   */
   regenerateRecoveryCodes(
     auth: DevtoolsAuthenticated,
     code: string,
@@ -183,17 +196,24 @@ export interface DevtoolsAuthService {
     purpose: "register" | "login",
     meta: DevtoolsRequestMeta,
   ): Promise<unknown>;
-  /** Verifies a passkey answer; for `login` and for the first factor at enrolment, returns the next step. */
+  /**
+   * Verifies a passkey answer; for `login` and for the first factor at
+   * enrolment, returns the next step. Registering from an active session
+   * needs the `current` password.
+   */
   verifyPasskey(
     auth: DevtoolsAuthenticated,
     purpose: "register" | "login",
     response: unknown,
     meta: DevtoolsRequestMeta,
+    current?: string,
   ): Promise<{ step: DevtoolsAuthStep | null; recoveryCodes: string[] | null }>;
+  /** Removes a passkey; needs the `current` password or a fresh passkey step-up. */
   removePasskey(
     auth: DevtoolsAuthenticated,
     passkeyId: string,
     meta: DevtoolsRequestMeta,
+    current?: string,
   ): Promise<void>;
 
   logout(auth: DevtoolsAuthenticated, meta: DevtoolsRequestMeta): Promise<void>;

@@ -313,6 +313,62 @@ const runOnDataSource: ExplainRunner = async (query, statement) => {
   return driver.getDatabase().command(statement.command);
 };
 
+/** Keys of a MongoDB plan whose values come from the query (filters, bounds, the echoed command). */
+const MONGO_VALUE_KEYS = new Set([
+  "parsedQuery",
+  "filter",
+  "indexBounds",
+  "command",
+  "originalCommand",
+  "query",
+  "pipeline",
+]);
+/** SQL literals inside a PostgreSQL plan's condition text: `'text'` (with `''`), `E'…'` and numbers. */
+const SQL_LITERAL = /(?:(?<!\w)[Ee])?'(?:''|\\.|[^'])*'|(?<![\w.$])-?\d+(?:\.\d+)?(?![\w.])/g;
+
+function maskMongoValues(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(maskMongoValues);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, inner]) => [key, maskMongoValues(inner)]),
+    );
+  }
+
+  return value === null || value === undefined ? value : "?";
+}
+
+function redactMongoPlan(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactMongoPlan);
+  if (value === null || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, inner]) => [
+      key,
+      MONGO_VALUE_KEYS.has(key) ? maskMongoValues(inner) : redactMongoPlan(inner),
+    ]),
+  );
+}
+
+function redactSqlPlan(value: unknown): unknown {
+  if (typeof value === "string") return value.replace(SQL_LITERAL, "?");
+  if (Array.isArray(value)) return value.map(redactSqlPlan);
+  if (value === null || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, inner]) => [key, redactSqlPlan(inner)]),
+  );
+}
+
+/**
+ * A plan without the query's values. Plans repeat them: MongoDB echoes the
+ * filter (`parsedQuery`, `indexBounds`, the command), PostgreSQL writes them
+ * into conditions (`Filter: (email = 'a@b.c'::text)`). Values become `?`;
+ * the plan's shape, costs, row counts and index choices stay.
+ */
+export function redactExplainPlan(plan: unknown, driver: string): unknown {
+  return driver === "mongodb" ? redactMongoPlan(plan) : redactSqlPlan(plan);
+}
+
 /**
  * EXPLAIN by shape id from the examples `queries` kept, used by the production
  * capture and by development (`POST /api/queries/:shapeId/explain`). Plain
@@ -328,6 +384,8 @@ export function createShapeExplainer(input: {
   executing: boolean;
   instance: string;
   run?: ExplainRunner;
+  /** Remove the query's values from the plan (`redactExplainPlan`); production sets it. */
+  redact?: boolean;
 }): (shapeId: string) => Promise<DevtoolsExplainResult> {
   const run = input.run ?? runOnDataSource;
 
@@ -347,7 +405,7 @@ export function createShapeExplainer(input: {
         shapeId,
         driver: example.driver,
         executing: input.executing,
-        plan,
+        plan: input.redact === true ? redactExplainPlan(plan, example.driver) : plan,
         instance: input.instance,
       };
     } catch (cause) {

@@ -92,7 +92,7 @@ describe("authenticator app", () => {
     const world = createWorld();
     const { auth } = await enrolled(world);
 
-    await world.auth.removeTotp(auth, meta()).catch(() => undefined);
+    await world.auth.removeTotp(auth, meta(), PASSWORD).catch(() => undefined);
 
     // A passkey keeps the account compliant, so the app can be removed and re-added.
     const account = await world.store.accounts.findById(auth.account.id);
@@ -100,12 +100,12 @@ describe("authenticator app", () => {
     await world.store.accounts.update(account!.id, account!.version, {
       passkeys: [{ id: "pk1", publicKey: "k", counter: 0, transports: [], name: "p", createdAt: 1, lastUsedAt: null }],
     });
-    await world.auth.removeTotp(await reload(world, auth), meta());
+    await world.auth.removeTotp(await reload(world, auth), meta(), PASSWORD);
     await world.auth.startTotp(await reload(world, auth), meta());
 
     world.advance(60_000);
 
-    const result = await world.auth.confirmTotp(await reload(world, auth), world.code(), meta());
+    const result = await world.auth.confirmTotp(await reload(world, auth), world.code(), meta(), PASSWORD);
 
     expect(result.recoveryCodes).toBeNull();
   });
@@ -292,7 +292,7 @@ describe("authenticator app", () => {
       const pending = await authOf(world, await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta()));
       const auth = await authOf(world, await world.auth.verifySecondFactor(pending, { code: world.code() }, meta()));
 
-      await world.auth.removeTotp(auth, meta());
+      await world.auth.removeTotp(auth, meta(), PASSWORD);
 
       const account = await world.store.accounts.findById(auth.account.id);
 
@@ -503,7 +503,7 @@ describe("passkeys", () => {
       const account = await world.store.accounts.findById(auth.account.id);
 
       await world.store.accounts.update(account!.id, account!.version, { totpSecret: `enc:${FAKE_SECRET}` });
-      await world.auth.removePasskey(await reload(world, auth), "cred-1", meta());
+      await world.auth.removePasskey(await reload(world, auth), "cred-1", meta(), PASSWORD);
 
       expect((await world.store.accounts.findById(auth.account.id))?.passkeys).toEqual([]);
       expect(await world.store.audit.list({ types: ["passkey.removed"], limit: 5 })).toHaveLength(1);

@@ -11,6 +11,8 @@ import {
   ServerError,
 } from "../errors";
 import { tagRequestError } from "../report-request-error";
+import { takeHandledRequestError } from "../tracing/handled-request-error";
+import { resetTracingConfigForTests } from "../tracing/tracing-dispatcher";
 import type { Request } from "../request";
 import type { Response } from "../response";
 
@@ -143,6 +145,54 @@ describe("createRequestStore error logging", () => {
     expect(warnLevel(logs)).toHaveLength(0);
     expect(errorLevel(logs)).toEqual([[error, "error"]]);
     expect((onlyEntry(errorLevel(logs))[0] as Error).stack).toBeTruthy();
+  });
+});
+
+describe("the error a 5xx was answered for", () => {
+  afterEach(() => {
+    config.set("http.tracing", undefined);
+    resetTracingConfigForTests();
+  });
+
+  async function runWithRequest(error: unknown) {
+    const request = {
+      id: "req-1",
+      route: {},
+      log: vi.fn(),
+      runMiddleware: vi.fn(async () => {
+        throw error;
+      }),
+      trigger: vi.fn(),
+    } as unknown as Request;
+    const response = {
+      header: vi.fn(),
+      setStatusCode: vi.fn().mockReturnThis(),
+      send: vi.fn((payload: unknown) => payload),
+      serverError: vi.fn((payload: unknown) => payload),
+    } as unknown as Response;
+
+    await createRequestStore(request, response);
+
+    return request;
+  }
+
+  it("is kept for onRequestEnd when tracing is on", async () => {
+    config.set("http.tracing", { enabled: true, hooks: [{}] });
+    resetTracingConfigForTests();
+
+    const boom = new Error("controller exploded");
+
+    expect(takeHandledRequestError(await runWithRequest(boom))).toBe(boom);
+  });
+
+  it("is not kept for a 4xx, nor when tracing is off", async () => {
+    config.set("http.tracing", { enabled: true, hooks: [{}] });
+    resetTracingConfigForTests();
+    expect(takeHandledRequestError(await runWithRequest(new ForbiddenError("no")))).toBeUndefined();
+
+    config.set("http.tracing", undefined);
+    resetTracingConfigForTests();
+    expect(takeHandledRequestError(await runWithRequest(new Error("boom")))).toBeUndefined();
   });
 });
 

@@ -349,6 +349,9 @@ export function mountProductionDevtools(
           return payload;
         }
 
+        // The API docs pages are shown in a frame by the dashboard's API tab.
+        if (DOCS_PATTERNS.has(pattern)) reply.header("X-Frame-Options", "SAMEORIGIN");
+
         // Always the dashboard's policy: the app's own (core's security headers set one on every response) is not
         // written for this page and must not replace it.
         if (String(reply.getHeader("content-type") ?? "").startsWith("text/html")) {
@@ -421,7 +424,7 @@ export function mountProductionDevtools(
       );
 
       // ---- Routes ---------------------------------------------------------
-      registerUiAssets(instance);
+      registerUiAssets(instance, { notFound });
       registerAuthRoutes(instance, deps);
 
       instance.get("/api/panels", async () => listPanelInfos(deps.panels, deps.builtInPanels));

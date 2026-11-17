@@ -79,6 +79,13 @@ function idParam(request: FastifyRequest): string {
   return id;
 }
 
+/** The `current` password of a request that may have no body (a DELETE). */
+function currentOf(request: FastifyRequest): string | undefined {
+  return request.body === undefined || request.body === null
+    ? undefined
+    : optionalText(bodyOf(request), "current");
+}
+
 /** What the gate stored, for a route that is never reached without it. */
 function contextOf(request: FastifyRequest): {
   meta: DevtoolsRequestMeta;
@@ -214,10 +221,12 @@ export function registerAuthRoutes(
 
   const confirmTotp = async (request: FastifyRequest, reply: FastifyReply) => {
     const { auth: authenticated, meta } = contextOf(request);
+    const body = bodyOf(request);
     const result = await auth.confirmTotp(
       authenticated,
-      text(bodyOf(request), "code", MAX_CODE),
+      text(body, "code", MAX_CODE),
       meta,
+      optionalText(body, "current"),
     );
 
     return answerStep(reply, result.step, result.recoveryCodes);
@@ -237,7 +246,13 @@ export function registerAuthRoutes(
       throw new DevtoolsApiError("input.invalid");
     }
 
-    const result = await auth.verifyPasskey(authenticated, purpose(body), body.response, meta);
+    const result = await auth.verifyPasskey(
+      authenticated,
+      purpose(body),
+      body.response,
+      meta,
+      optionalText(body, "current"),
+    );
 
     if (result.step === null) {
       return {
@@ -310,16 +325,17 @@ export function registerAuthRoutes(
   server.delete("/api/account/totp", async (request, reply) => {
     const { auth: authenticated, meta } = contextOf(request);
 
-    await auth.removeTotp(authenticated, meta);
+    await auth.removeTotp(authenticated, meta, currentOf(request));
 
     return reply.code(204).send();
   });
 
   server.post("/api/account/recovery-codes", async (request) => {
     const { auth: authenticated, meta } = contextOf(request);
+    // No code: a passkey step-up in this session stands in for it.
     const codes = await auth.regenerateRecoveryCodes(
       authenticated,
-      text(bodyOf(request), "code", MAX_CODE),
+      optionalText(bodyOf(request), "code", MAX_CODE) ?? "",
       meta,
     );
 
@@ -332,7 +348,7 @@ export function registerAuthRoutes(
   server.delete("/api/account/passkeys/:id", async (request, reply) => {
     const { auth: authenticated, meta } = contextOf(request);
 
-    await auth.removePasskey(authenticated, idParam(request), meta);
+    await auth.removePasskey(authenticated, idParam(request), meta, currentOf(request));
 
     return reply.code(204).send();
   });

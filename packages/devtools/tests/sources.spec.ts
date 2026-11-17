@@ -268,6 +268,20 @@ describe("attachLogSource", () => {
     expect(logs).toHaveLength(1);
   });
 
+  it("keeps an Error or another value logged as the message as text", async () => {
+    const { collector, logs } = createFakeCollector();
+    const dispose = await attachLogSource(collector);
+
+    await log.error("devtools-test", "thrown", new TypeError("o.input is not a function") as never);
+    await log.info("devtools-test", "object", { step: 2 } as never);
+    dispose();
+
+    expect(logs.map((item) => item.entry.message)).toEqual([
+      "TypeError: o.input is not a function",
+      '{"step":2}',
+    ]);
+  });
+
   // A framework log whose context held the live request made the request
   // detail route answer 500 ("Converting circular structure to JSON").
   it("keeps a JSON-safe snapshot of a context that holds a live, circular object", async () => {

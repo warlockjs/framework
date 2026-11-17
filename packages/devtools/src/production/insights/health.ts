@@ -2,9 +2,15 @@ import type { DevtoolsHealthReport } from "../contracts";
 import type { DevtoolsHealthStatusReader } from "./readiness";
 import type { DevtoolsHealthHistory } from "./types";
 
+/** While the app boots, the first check is tried again this often. */
+const BOOT_RETRY_MS = 1000;
+
 /** Core's readiness, imported on first use so devtools never loads core at import time. */
 const coreReadiness: DevtoolsHealthStatusReader = async () => {
-  const { health } = await import("@warlock.js/core");
+  const { health, Application } = await import("@warlock.js/core");
+
+  // The monitor starts while the app boots, when readiness is `error` with no failed check.
+  if (!Application.isBooted && !Application.isShuttingDown) return null;
 
   return health.readiness();
 };
@@ -22,6 +28,7 @@ export function createHealthHistory(
   let checks: Record<string, boolean> = {};
   const history: DevtoolsHealthReport["history"] = [];
   let timer: ReturnType<typeof setInterval> | undefined;
+  let retry: ReturnType<typeof setTimeout> | undefined;
   let running: Promise<DevtoolsHealthReport> | undefined;
 
   function report(): DevtoolsHealthReport {
@@ -31,6 +38,20 @@ export function createHealthHistory(
   async function run(): Promise<DevtoolsHealthReport> {
     try {
       const result = await readiness();
+
+      if (result === null) {
+        // Still booting: nothing to record yet. Until the first answer, try again soon instead of a whole interval later.
+        if (timer && checkedAt === null && retry === undefined) {
+          retry = setTimeout(() => {
+            retry = undefined;
+            void check();
+          }, BOOT_RETRY_MS);
+          retry.unref();
+        }
+
+        return report();
+      }
+
       const now = Date.now();
       const failed = Object.entries(result.checks ?? {})
         .filter(([, passed]) => !passed)
@@ -69,8 +90,10 @@ export function createHealthHistory(
 
     stop() {
       if (timer) clearInterval(timer);
+      if (retry) clearTimeout(retry);
 
       timer = undefined;
+      retry = undefined;
     },
 
     check,

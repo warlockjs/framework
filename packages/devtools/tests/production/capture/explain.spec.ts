@@ -182,3 +182,86 @@ describe("error codes", () => {
     expect(JSON.stringify(error.toBody())).not.toContain("secret_table");
   });
 });
+
+describe("values in production plans", () => {
+  const pgPlan = [
+    {
+      Plan: {
+        "Node Type": "Seq Scan",
+        "Relation Name": "users_2024",
+        "Total Cost": 12.5,
+        Filter: "((email = 'a@b.c'::text) AND (age > 30) AND (id = $1))",
+      },
+    },
+  ];
+
+  function explainer(query: DevtoolsQuery, plan: unknown, redact?: boolean) {
+    const queries = createQueryStats({ maxShapes: 10, instance: "me" });
+
+    queries.rememberExample(query);
+
+    return {
+      explain: createShapeExplainer({
+        queries,
+        executing: false,
+        instance: "me",
+        run: async () => plan,
+        ...(redact === undefined ? {} : { redact }),
+      }),
+      id: shortId(query.shape),
+    };
+  }
+
+  it("are replaced by ? in a PostgreSQL plan, keeping names, costs and placeholders", async () => {
+    const { explain, id } = explainer(sqlQuery("SELECT * FROM users_2024 WHERE id = $1"), pgPlan, true);
+    const result = await explain(id);
+
+    expect(result.plan).toEqual([
+      {
+        Plan: {
+          "Node Type": "Seq Scan",
+          "Relation Name": "users_2024",
+          "Total Cost": 12.5,
+          Filter: "((email = ?::text) AND (age > ?) AND (id = $1))",
+        },
+      },
+    ]);
+  });
+
+  it("are replaced by ? in a MongoDB plan: the parsed query, the bounds and the echoed command", async () => {
+    const plan = {
+      queryPlanner: {
+        namespace: "app.notes",
+        parsedQuery: { title: { $not: { $eq: "hidden" } } },
+        winningPlan: {
+          stage: "IXSCAN",
+          keyPattern: { title: 1 },
+          indexBounds: { title: ['[MinKey, "hidden")'] },
+          inputStage: { filter: { age: { $gt: 30 } } },
+        },
+      },
+      command: { aggregate: "notes", pipeline: [{ $match: { title: "hidden" } }] },
+      ok: 1,
+    };
+    const query = sqlQuery("notes.aggregate", {
+      driver: "mongodb",
+      command: "aggregate",
+      collection: "notes",
+      pipeline: [{ $match: { title: "hidden" } }],
+    });
+    const { explain, id } = explainer(query, plan, true);
+    const redacted = (await explain(id)).plan as typeof plan;
+
+    expect(JSON.stringify(redacted)).not.toContain("hidden");
+    expect(JSON.stringify(redacted)).not.toContain("30");
+    expect(redacted.queryPlanner.namespace).toBe("app.notes");
+    expect(redacted.queryPlanner.winningPlan.keyPattern).toEqual({ title: 1 });
+    expect(redacted.ok).toBe(1);
+  });
+
+  it("stay in development, where the queries are shown in full anyway", async () => {
+    const { explain, id } = explainer(sqlQuery("SELECT * FROM users_2024 WHERE id = $1"), pgPlan);
+
+    expect((await explain(id)).plan).toEqual(pgPlan);
+  });
+});

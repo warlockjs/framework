@@ -15,12 +15,14 @@ export const DevtoolsAuditMigration = migrate(DevtoolsAuditRow, {
     this.string("account_id", 64).nullable();
     this.string("email", 320).nullable();
     this.string("ip", 64).nullable();
+    // The per-IP sign-in limit counts by this: the address, or its /64 for IPv6.
+    this.string("ip_bucket", 64).nullable();
     this.string("user_agent", 255).nullable();
     this.json("detail");
     this.string("ref", 16);
 
     this.index(["type", "occurred_at"]);
-    this.index(["ip", "occurred_at"]);
+    this.index(["ip_bucket", "occurred_at"]);
     this.index(["account_id", "occurred_at"]);
   },
   down() {

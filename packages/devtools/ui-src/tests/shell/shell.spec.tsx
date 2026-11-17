@@ -27,6 +27,27 @@ describe("shell", () => {
     expect(await screen.findByText("tab:requests route: instance:all")).toBeInTheDocument();
   });
 
+  it("keeps the header and the other tabs when one tab fails to draw", async () => {
+    window.location.hash = "#broken";
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockApi({
+      "api/auth/session": { body: sessionView() },
+      "api/panels": { body: [...panels, { id: "broken", title: "Broken", type: "built-in" }] },
+    });
+    render(<App />);
+
+    expect(await screen.findByText("The Broken view could not be shown")).toBeInTheDocument();
+    expect(screen.getByText(/Objects are not valid as a React child/)).toBeInTheDocument();
+
+    await act(async () => {
+      window.location.hash = "#queries";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+
+    expect(await screen.findByText("tab:queries route: instance:all")).toBeInTheDocument();
+    expect(screen.queryByText("The Broken view could not be shown")).not.toBeInTheDocument();
+  });
+
   it("builds the tabs from api/panels and passes the tab's route", async () => {
     window.location.hash = "#queries/abc/def";
     mockApi({

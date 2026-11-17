@@ -116,4 +116,17 @@ describe("registerUiAssets", () => {
 
     expect(response.statusCode).toBe(404);
   });
+
+  it("hands an unknown asset to the given not-found answer", async () => {
+    const server = Fastify();
+
+    server.setNotFoundHandler((_request, reply) => reply.code(404).send("app not found"));
+    registerUiAssets(server, { notFound: (_request, reply) => reply.callNotFound() });
+    await server.ready();
+
+    const response = await server.inject({ method: "GET", url: "/assets/nope.js" });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.body).toBe("app not found");
+  });
 });

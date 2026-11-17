@@ -114,7 +114,11 @@ requires it for all accounts.
 - **Passkeys**: install `@simplewebauthn/server` (the same optional package `@warlock.js/auth` uses). Without it the
   dashboard offers the authenticator app only. Set `passkeys.rpId` and `origin` when the app is served on more than one
   host.
-- **Recovery codes**: 10 single-use codes. Regenerate them from the account page.
+- **Recovery codes**: 10 single-use codes. Regenerate them from the account page with a current code from the
+  authenticator app, or with a passkey.
+
+Adding or removing an authenticator app or a passkey from the account page asks for your current password, so a stolen
+session alone cannot change your second factors.
 
 An admin can reset another user's second factors. If the last admin loses theirs, see [Recovery](#recovery).
 
@@ -167,6 +171,10 @@ One random draw per request decides whether it is **sampled** (`sampleRate`, 0.1
 - A query that is at least `slowQueryMs` (200) outside a sampled request only updates the slowest example of its shape.
 - Work outside a request is sampled per query at `sampleRate`.
 
+MongoDB reports its queries only when command monitoring is on, which it is not in production by default. For the
+Queries tab, set `queryEvents: true` on the data source in `src/config/database.ts`; it adds a small cost to every query.
+Without it the boot log says that query events are off and the Queries tab stays empty. PostgreSQL needs nothing.
+
 Memory is bounded per process: 200 sampled requests, 200 queries per request, 500 query shapes, 300 routes and 100 error
 groups. The oldest are dropped first. Each process writes at most `maxStoredSamplesPerMinute` (120) samples per minute.
 
@@ -201,6 +209,9 @@ EXPLAIN asks that process; from another one it answers that the example is elsew
 - MongoDB: `explain` with `queryPlanner` verbosity for `find`, `aggregate` and `count`. An aggregate with `$out` or
   `$merge` is never explained.
 
+A plan repeats the query's values (MongoDB echoes the filter, PostgreSQL writes values into conditions), so the
+dashboard shows `?` in their place. The plan's steps, indexes, costs and row counts stay.
+
 These plans do not run the query. Plans that do (PostgreSQL `EXPLAIN ANALYZE`, MongoDB `executionStats`) run only with
 `explain: { executing: true }`, and only for those read statements. They run the real query against your production
 database, so turn them on only when you accept the load. In PostgreSQL the read-only transaction also stops a function
@@ -213,6 +224,9 @@ the query calls from writing. Every run is audited.
 | Requests, Queries, Routes, Resources, Health, Errors, Logs, Jobs | On                                            |
 | Mail, AI, Agents, API, Processes                                 | Off unless `panels` sets the id to `true`     |
 | A package panel (such as Grimoire)                               | On when it declares `production: true`, or `panels` sets its id to `true` |
+
+The API tab builds its OpenAPI document from the routes the process registered. Under `warlock start` there are no
+source files to read, so response resources are named `Resource1`, `Resource2`, … instead of their class names.
 
 `panels: { mail: false }` turns any tab off. In a package panel, GET routes need a signed-in user; every other method
 needs an admin, the CSRF header, and is audited. The Grimoire tab is read-only in production. See
@@ -304,7 +318,7 @@ A deploy fails at once instead of exposing a half-protected dashboard. `DEVTOOLS
 | Code    | Message and fix                                                                                                                                                     |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DT001` | Needs a dashboard path. Set `DEVTOOLS_PATH` (for example `/ops-7f3k2q`) or `devtools.production.path`.                                                               |
-| `DT002` | The path must start with `/`, be at least 8 characters, use only letters, digits, `-`, `_`, `.` and `/`, and not be `/__warlock`.                                    |
+| `DT002` | The path must start with `/`, be at least 8 characters, use only letters, digits, `-`, `_`, `.`, `~` and `/`, and not be `/__warlock`.                               |
 | `DT003` | No admin yet. Set `DEVTOOLS_ADMIN_EMAIL` with `DEVTOOLS_ADMIN_PASSWORD` or `DEVTOOLS_SETUP_TOKEN`, or run `warlock devtools:reset-admin --email <email>`.            |
 | `DT004` | `DEVTOOLS_ADMIN_PASSWORD` breaks the password rules (at least 8 characters, at most 72 bytes, not a common password, not the email). Choose another one.            |
 | `DT005` | The accounts are stored in the database. Install `@warlock.js/cascade` and configure a database connection.                                                         |

@@ -644,6 +644,8 @@ export function createCaptureEngine(deps: DevtoolsCaptureDeps): DevtoolsCaptureE
     queries,
     executing: production.explain.executing,
     instance: instance.id,
+    // Values never leave the process, and plans repeat them.
+    redact: true,
     ...(deps.run === undefined ? {} : { run: deps.run }),
   });
 

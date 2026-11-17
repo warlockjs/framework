@@ -554,6 +554,23 @@ export function describeStoreContract(name: string, makeStore: MakeStore): void 
         ).toBe(1);
       });
 
+      it("counts IPv6 addresses by their /64 and IPv4-mapped addresses as IPv4", async () => {
+        await store.audit.append(auditEntry(10, { type: "login.failed", ip: "2001:db8:1:2::1" }));
+        await store.audit.append(auditEntry(20, { type: "login.failed", ip: "2001:db8:1:2:ffff::9" }));
+        await store.audit.append(auditEntry(30, { type: "login.failed", ip: "2001:db8:1:3::1" }));
+        await store.audit.append(auditEntry(40, { type: "login.failed", ip: "::ffff:1.1.1.1" }));
+        await store.audit.append(auditEntry(50, { type: "login.failed", ip: "1.1.1.1" }));
+
+        expect(
+          await store.audit.count({ types: ["login.failed"], since: 0, ip: "2001:DB8:1:2::abcd" }),
+        ).toBe(2);
+        expect(await store.audit.count({ types: ["login.failed"], since: 0, ip: "1.1.1.1" })).toBe(2);
+        // The full address is kept for the Audit screen.
+        expect((await store.audit.list({ limit: 10 })).map((entry) => entry.ip)).toContain(
+          "2001:db8:1:2:ffff::9",
+        );
+      });
+
       it("prunes entries before a time", async () => {
         await store.audit.append(auditEntry(10));
         await store.audit.append(auditEntry(20));

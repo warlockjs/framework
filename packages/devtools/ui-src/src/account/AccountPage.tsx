@@ -8,7 +8,7 @@ import type {
 import { apiFetch, setCsrfToken } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import { PasswordForm } from "@/auth/PasswordForm";
-import { registerPasskey } from "@/auth/passkeys";
+import { authenticateWithPasskey, registerPasskey } from "@/auth/passkeys";
 import { RecoveryCodes } from "@/auth/RecoveryCodes";
 import { TotpEnrolment } from "@/auth/TotpEnrolment";
 import { Badge } from "@/components/ui/badge";
@@ -105,8 +105,9 @@ function TotpSection({ account, reload }: { account: DevtoolsAccountView } & Rel
         description="You will no longer be asked for its code. If it is your only second factor, the server refuses and says what to add first."
         confirmLabel="Remove"
         destructive
-        onConfirm={async () => {
-          await apiFetch("api/account/totp", { method: "DELETE" });
+        requirePassword
+        onConfirm={async ({ password }) => {
+          await apiFetch("api/account/totp", { method: "DELETE", body: { current: password } });
           reload();
         }}
       />
@@ -116,10 +117,7 @@ function TotpSection({ account, reload }: { account: DevtoolsAccountView } & Rel
 
 function PasskeysSection({ account, reload }: { account: DevtoolsAccountView } & Reload) {
   const [removeId, setRemoveId] = useState<string | null>(null);
-  const add = useAction(async () => {
-    await registerPasskey("api/account");
-    reload();
-  });
+  const [adding, setAdding] = useState(false);
   const passkeys = account.twoFactor.passkeys;
 
   return (
@@ -148,13 +146,22 @@ function PasskeysSection({ account, reload }: { account: DevtoolsAccountView } &
             ))}
           </ul>
         )}
-        <ErrorMessage error={add.error} />
         <div>
-          <Button disabled={add.pending} onClick={() => void add.run()}>
-            {add.pending ? "Waiting for the passkey…" : "Add a passkey"}
-          </Button>
+          <Button onClick={() => setAdding(true)}>Add a passkey</Button>
         </div>
       </CardContent>
+      <ConfirmDialog
+        open={adding}
+        onOpenChange={setAdding}
+        title="Add a passkey"
+        description="Enter your current password, then follow your browser's passkey prompt."
+        confirmLabel="Continue"
+        requirePassword
+        onConfirm={async ({ password }) => {
+          await registerPasskey("api/account", password);
+          reload();
+        }}
+      />
       <ConfirmDialog
         open={removeId !== null}
         onOpenChange={(open) => !open && setRemoveId(null)}
@@ -162,8 +169,12 @@ function PasskeysSection({ account, reload }: { account: DevtoolsAccountView } &
         description="It will stop working for sign-in. If it is your only second factor, the server refuses and says what to add first."
         confirmLabel="Remove"
         destructive
-        onConfirm={async () => {
-          await apiFetch(`api/account/passkeys/${removeId ?? ""}`, { method: "DELETE" });
+        requirePassword
+        onConfirm={async ({ password }) => {
+          await apiFetch(`api/account/passkeys/${encodeURIComponent(removeId ?? "")}`, {
+            method: "DELETE",
+            body: { current: password },
+          });
           reload();
         }}
       />
@@ -183,6 +194,19 @@ function RecoverySection({ account, reload }: { account: DevtoolsAccountView } &
     setCode("");
     setCodes(result.codes);
   });
+  // A passkey check in this session stands in for the code (once, for five minutes).
+  const withPasskey = useAction(async () => {
+    await authenticateWithPasskey("api/account");
+
+    const result = await apiFetch<DevtoolsRecoveryCodes>("api/account/recovery-codes", {
+      method: "POST",
+      body: {},
+    });
+
+    setCodes(result.codes);
+  });
+  const hasTotp = account.twoFactor.totp;
+  const hasPasskeys = account.twoFactor.passkeys.length > 0;
 
   return (
     <Card>
@@ -202,29 +226,52 @@ function RecoverySection({ account, reload }: { account: DevtoolsAccountView } &
             }}
           />
         ) : (
-          <form
-            className="grid gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void regenerate.run();
-            }}
-          >
-            <Label htmlFor="regen-code">Current code from your authenticator app</Label>
-            <Input
-              id="regen-code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              required
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-            />
-            <ErrorMessage error={regenerate.error} />
-            <div>
-              <Button type="submit" disabled={regenerate.pending}>
-                {regenerate.pending ? "Working…" : "Make new recovery codes"}
-              </Button>
-            </div>
-          </form>
+          <>
+            {hasTotp ? (
+              <form
+                className="grid gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void regenerate.run();
+                }}
+              >
+                <Label htmlFor="regen-code">Current code from your authenticator app</Label>
+                <Input
+                  id="regen-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                />
+                <ErrorMessage error={regenerate.error} />
+                <div>
+                  <Button type="submit" disabled={regenerate.pending}>
+                    {regenerate.pending ? "Working…" : "Make new recovery codes"}
+                  </Button>
+                </div>
+              </form>
+            ) : null}
+            {hasPasskeys ? (
+              <div className="grid gap-2">
+                <ErrorMessage error={withPasskey.error} />
+                <div>
+                  <Button
+                    variant={hasTotp ? "outline" : "default"}
+                    disabled={withPasskey.pending}
+                    onClick={() => void withPasskey.run()}
+                  >
+                    {withPasskey.pending ? "Waiting for the passkey…" : "Make new recovery codes with a passkey"}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+            {!hasTotp && !hasPasskeys ? (
+              <p className="text-sm text-muted-foreground">
+                Add an authenticator app or a passkey first; recovery codes come with it.
+              </p>
+            ) : null}
+          </>
         )}
       </CardContent>
     </Card>

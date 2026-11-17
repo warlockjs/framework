@@ -122,17 +122,26 @@ describe("dashboard response headers", () => {
     expect(response.headers["x-robots-tag"]).toBe("noindex, nofollow, noarchive");
   });
 
-  it("gives the API documentation pages the policy they need and still blocks framing elsewhere", async () => {
+  it("lets the API tab frame the documentation pages, with scripts from the dashboard only", async () => {
     const t = await createApp({ builtInPanels: ["requests", "api"] });
     const session = await t.signIn("viewer@example.com");
-    const docs = await t.send("GET", "/docs", { session });
 
-    expect(docs.statusCode).toBe(200);
-    expect(String(docs.headers["content-security-policy"])).toContain(
-      "script-src 'self' 'unsafe-inline'",
-    );
-    expect(String(docs.headers["content-security-policy"])).toContain("frame-ancestors 'none'");
-    expect(docs.headers["x-frame-options"]).toBe("DENY");
+    for (const page of ["/docs", "/docs/swagger"]) {
+      const docs = await t.send("GET", page, { session });
+      const policy = String(docs.headers["content-security-policy"]);
+
+      expect(docs.statusCode).toBe(200);
+      expect(policy).toContain("script-src 'self';");
+      expect(policy).not.toContain("unsafe-eval");
+      expect(policy).toContain("frame-ancestors 'self'");
+      expect(docs.headers["x-frame-options"]).toBe("SAMEORIGIN");
+    }
+
+    // Every other page still refuses to be framed.
+    const shell = await t.send("GET", "/", { session });
+
+    expect(String(shell.headers["content-security-policy"])).toContain("frame-ancestors 'none'");
+    expect(shell.headers["x-frame-options"]).toBe("DENY");
     expect(ORIGIN).toBe("https://app.example.com");
   });
 });

@@ -59,9 +59,14 @@ const NOT_BUILT_HTML =
  * plus their init script). The asset name is matched against a fixed
  * whitelist — never joined into a filesystem path — so no request can
  * traverse outside it. Before the first `build:ui` the root answers 503 with
- * a note that says how to build.
+ * a note that says how to build. `notFound` answers an unknown asset (the
+ * production gate passes its uniform 404, so the public asset route answers
+ * like any unknown URL of the app); without it the answer is a bare 404.
  */
-export function registerUiAssets(server: FastifyInstance): void {
+export function registerUiAssets(
+  server: FastifyInstance,
+  options: { notFound?: (request: FastifyRequest, reply: FastifyReply) => FastifyReply } = {},
+): void {
   const serveIndex = (request: FastifyRequest, reply: FastifyReply): void => {
     // The address as sent: core's server drops a trailing slash before routing.
     const [pathname = "", search] = (request.originalUrl ?? request.url).split("?");
@@ -104,6 +109,11 @@ export function registerUiAssets(server: FastifyInstance): void {
     const file = asset?.file();
 
     if (!asset || !file || !existsSync(file)) {
+      if (options.notFound) {
+        options.notFound(request, reply);
+        return;
+      }
+
       reply.code(404).header("Cache-Control", "no-store").send();
       return;
     }

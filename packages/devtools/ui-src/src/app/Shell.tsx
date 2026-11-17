@@ -4,6 +4,7 @@ import { useApi } from "@/api/hooks";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { LoadingRows } from "@/components/common/LoadingRows";
+import { ViewBoundary } from "@/components/common/ViewBoundary";
 import { AccountPage } from "@/account/AccountPage";
 import { AdminPage } from "@/admin/AdminPage";
 import { PanelHost } from "@/panel-host/PanelHost";
@@ -27,6 +28,13 @@ export function Shell() {
   };
 
   let content;
+  const viewKey = route.type === "admin" ? `admin:${route.page}` : route.type === "tab" ? `tab:${tabId ?? ""}` : route.type;
+  const viewName =
+    route.type === "account"
+      ? "Account"
+      : route.type === "admin"
+        ? "Admin"
+        : (list.find((panel) => panel.id === tabId)?.title ?? "tab");
 
   if (route.type === "account") {
     content = <AccountPage />;
@@ -67,7 +75,11 @@ export function Shell() {
   return (
     <div className="min-h-screen">
       <Header panels={list} activeTab={tabId} instance={instance} onInstanceChange={setInstance} />
-      <main className="p-4">{content}</main>
+      <main className="p-4">
+        <ViewBoundary key={viewKey} name={viewName}>
+          {content}
+        </ViewBoundary>
+      </main>
     </div>
   );
 }

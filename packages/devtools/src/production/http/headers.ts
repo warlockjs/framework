@@ -15,6 +15,11 @@ export const DASHBOARD_HEADERS: Readonly<Record<string, string>> = {
 export const DASHBOARD_CSP =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'";
 
-/** The policy of the opt-in API documentation pages, which need inline scripts and styles. */
+/**
+ * The policy of the opt-in API documentation pages: scripts from the dashboard
+ * only (Scalar and Swagger UI probe `Function` in a try/catch and work without
+ * `'unsafe-eval'`), inline styles, and framing by the dashboard itself, whose
+ * API tab shows them in a frame.
+ */
 export const DOCS_CSP =
-  "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'";
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'; object-src 'none'";

@@ -55,6 +55,25 @@ describe("createHealthHistory", () => {
     expect(report.history).toHaveLength(1);
   });
 
+  it("records nothing while the app boots, and checks again a second later", async () => {
+    let booted = false;
+    const readiness = vi.fn(async () => (booted ? { status: "ok" as const, checks: { db: true } } : null));
+    const history = createHealthHistory({ intervalMs: 30_000, readiness });
+
+    history.start();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(history.report()).toMatchObject({ status: "unknown", history: [] });
+
+    booted = true;
+    await vi.advanceTimersByTimeAsync(1000);
+    history.stop();
+
+    expect(history.report().status).toBe("ok");
+    expect(history.report().history).toHaveLength(1);
+    expect(readiness).toHaveBeenCalledTimes(2);
+  });
+
   it("stays unknown when the reader never works", async () => {
     const history = createHealthHistory({
       readiness: async () => {

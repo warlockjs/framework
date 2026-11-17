@@ -17,8 +17,14 @@ function passkeyFailure(error: unknown): Error {
   );
 }
 
-/** Registers a passkey: `base` is `api/auth` while enrolling at sign-in, `api/account` from the account page. */
-export async function registerPasskey(base: "api/auth" | "api/account"): Promise<AuthStepWithCodes> {
+/**
+ * Registers a passkey: `base` is `api/auth` while enrolling at sign-in,
+ * `api/account` from the account page, which also sends the `current` password.
+ */
+export async function registerPasskey(
+  base: "api/auth" | "api/account",
+  current?: string,
+): Promise<AuthStepWithCodes> {
   const options = await apiFetch<RegistrationOptions>(`${base}/passkey/options`, {
     method: "POST",
     body: { purpose: "register" },
@@ -34,14 +40,20 @@ export async function registerPasskey(base: "api/auth" | "api/account"): Promise
   return (
     (await apiFetch<AuthStepWithCodes | undefined>(`${base}/passkey/verify`, {
       method: "POST",
-      body: { purpose: "register", response },
+      body: { purpose: "register", response, ...(current ? { current } : {}) },
     })) ?? { stage: "active", csrf: null }
   );
 }
 
-/** Signs in with a passkey at the second-factor step. */
-export async function authenticateWithPasskey(): Promise<DevtoolsAuthStepResult> {
-  const options = await apiFetch<AuthenticationOptions>("api/auth/passkey/options", {
+/**
+ * Checks a passkey: at the second-factor step (`api/auth`), or from the
+ * account page (`api/account`) to prove it is you again before making new
+ * recovery codes.
+ */
+export async function authenticateWithPasskey(
+  base: "api/auth" | "api/account" = "api/auth",
+): Promise<DevtoolsAuthStepResult> {
+  const options = await apiFetch<AuthenticationOptions>(`${base}/passkey/options`, {
     method: "POST",
     body: { purpose: "login" },
   });
@@ -53,7 +65,7 @@ export async function authenticateWithPasskey(): Promise<DevtoolsAuthStepResult>
     throw passkeyFailure(error);
   }
 
-  return apiFetch<DevtoolsAuthStepResult>("api/auth/passkey/verify", {
+  return apiFetch<DevtoolsAuthStepResult>(`${base}/passkey/verify`, {
     method: "POST",
     body: { purpose: "login", response },
   });

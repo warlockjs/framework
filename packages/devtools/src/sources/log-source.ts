@@ -8,6 +8,21 @@ function toDevtoolsLevel(type: LoggingData["type"]): DevtoolsLogEntry["level"] {
   return type === "fatal" ? "error" : type;
 }
 
+/**
+ * The entry's message as text. `request.log(error)` and friends log an Error
+ * (or any value) as the message; kept as is, it reached the dashboard as `{}`.
+ */
+function messageText(message: unknown): string {
+  if (typeof message === "string") return message;
+  if (message instanceof Error) return `${message.name}: ${message.message}`;
+
+  try {
+    return JSON.stringify(message) ?? String(message);
+  } catch {
+    return String(message);
+  }
+}
+
 class DevtoolsLogChannel extends LogChannel {
   public override name = "devtools";
   public active = true;
@@ -27,7 +42,7 @@ class DevtoolsLogChannel extends LogChannel {
       level: toDevtoolsLevel(data.type),
       module: data.module,
       action: data.action,
-      message: data.message,
+      message: messageText(data.message),
       at: Date.now(),
       context: toSafeValue(data.context),
     };

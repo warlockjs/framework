@@ -22,6 +22,7 @@ import { type Request } from "../request";
 import { reportRequestServerError, type RequestErrorPhase } from "../report-request-error";
 import { type Response } from "../response";
 import { buildTracingContext, dispatchPhase, isTracingEnabled } from "../tracing";
+import { noteHandledRequestError } from "../tracing/handled-request-error";
 import { type ReturnedResponse } from "./../types";
 
 // Contexts are now registered in core/context/init-contexts.ts via initializeContexts()
@@ -137,15 +138,13 @@ export function createRequestStore(
       return output as ReturnedResponse;
     } catch (thrown) {
       const error = mapRequestError(thrown, request);
+      const status = resolveRequestErrorStatus(error) ?? 500;
 
       logRequestError(error, request);
-      reportRequestServerError({
-        error,
-        thrown,
-        request,
-        status: resolveRequestErrorStatus(error) ?? 500,
-        phase,
-      });
+      reportRequestServerError({ error, thrown, request, status, phase });
+
+      // Answered here, so it never reaches the request lifecycle as a throw: `onRequestEnd` reads it from here.
+      if (status >= 500 && isTracingEnabled()) noteHandledRequestError(request, thrown);
 
       return handleRequestError(error, response, request);
     }

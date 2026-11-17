@@ -241,6 +241,18 @@ describe("error groups", () => {
     expect(normalizeErrorMessage("retry in 2.5s at 0xdeadbeef")).toBe("retry in <n>s at <hex>");
   });
 
+  it("groups lines that carry a request id, such as core's request summary", () => {
+    const errors = createErrorGroups({ maxGroups: 10 });
+
+    errors.record(error("Completed Request: R9DyP5UlXSbfpkQvevfulOl6dB64Shua — 500 in 8ms", { source: "log" }));
+    errors.record(error("Completed Request: BKmOaSe05kfa70JZ0wfvPFUloNsUcFtF — 500 in 1ms", { source: "log" }));
+
+    expect(errors.snapshot(10)).toHaveLength(1);
+    expect(errors.snapshot(1)[0]?.count).toBe(2);
+    // A plain word with no digit is not an id.
+    expect(normalizeErrorMessage("ConnectionRefusedByUpstream")).toBe("ConnectionRefusedByUpstream");
+  });
+
   it("keeps the previous stack when a later occurrence has none", () => {
     const errors = createErrorGroups({ maxGroups: 10 });
 

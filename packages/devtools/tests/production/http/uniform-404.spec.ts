@@ -69,6 +69,16 @@ describe("the uniform 404", () => {
     expect(comparable(response)).toEqual(comparable(await appNotFound(t)));
   });
 
+  it("answers the app's own 404 for an unknown asset, which needs no session", async () => {
+    const t = await createApp({ notFound: "custom", cors: true });
+    const response = await t.send("GET", "/assets/nope.js");
+    const reference = await appNotFound(t);
+
+    expect(response.statusCode).toBe(404);
+    expect(response.body).toBe("app not found");
+    expect(comparable(response)).toEqual(comparable(reference));
+  });
+
   it("answers the same bytes as Fastify's default 404 for the same URL shape", async () => {
     const t = await createApp();
 
