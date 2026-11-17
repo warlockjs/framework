@@ -29,6 +29,7 @@ describe("database connection queryEvents", () => {
   afterEach(() => {
     config.set("http", undefined);
     config.set("database", undefined);
+    config.set("devtools", undefined);
     connectToDatabase.mockClear();
 
     if (originalRoles === undefined) delete process.env.WARLOCK_ROLES;
@@ -64,6 +65,22 @@ describe("database connection queryEvents", () => {
     process.env.WARLOCK_ROLES = "worker";
     resetRolesCacheForTests();
     config.set("http", { logging: { requests: { enabled: true } } });
+
+    expect(resolveDatabaseConnectionConfig(database)).toEqual(database);
+  });
+
+  it("turns query events on for the devtools production monitor even with the request log off", () => {
+    config.set("http", { logging: { requests: { enabled: false } } });
+    config.set("devtools", { production: { enabled: true } });
+
+    expect(resolveDatabaseConnectionConfig(database)).toEqual({ ...database, queryEvents: true });
+    expect(resolveDatabaseConnectionConfig({ ...database, queryEvents: false })).toEqual({
+      ...database,
+      queryEvents: false,
+    });
+
+    process.env.WARLOCK_ROLES = "worker";
+    resetRolesCacheForTests();
 
     expect(resolveDatabaseConnectionConfig(database)).toEqual(database);
   });

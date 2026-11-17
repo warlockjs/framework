@@ -1,7 +1,11 @@
 import { LogChannel, log, type LoggingData } from "@warlock.js/logger";
 import type { DevtoolsDisposer, DevtoolsLogEntry } from "../../types";
+import { scrubErrorText } from "./redact";
 import { createCaptureEngine, type DevtoolsQueryEvent } from "./engine";
 import type { DevtoolsCaptureDeps, DevtoolsProductionCapture } from "./types";
+
+/** Longest log message kept, as in the capture engine. */
+const LOG_MESSAGE_MAX = 1000;
 
 /** Cache events counted for sampled requests. */
 const CACHE_EVENT_TYPES = ["hit", "miss", "set", "removed", "invalidated", "flushed"] as const;
@@ -100,11 +104,15 @@ export function createProductionCapture(deps: DevtoolsCaptureDeps): DevtoolsProd
           public log(data: LoggingData): void {
             if (!this.active) return;
 
+            const level = toLevel(data.type);
+            const text = typeof data.message === "string" ? data.message : String(data.message);
+
             hooks.onLog(currentRequestId(), {
-              level: toLevel(data.type),
+              level,
               module: data.module,
               action: data.action,
-              message: typeof data.message === "string" ? data.message : String(data.message),
+              // Error lines feed the Errors tab's groups: they lose quoted values, emails and documents.
+              message: level === "error" ? scrubErrorText(text, LOG_MESSAGE_MAX) : text,
               at: Date.now(),
             });
           }
@@ -121,8 +129,14 @@ export function createProductionCapture(deps: DevtoolsCaptureDeps): DevtoolsProd
 
       try {
         let cache: {
-          on(event: (typeof CACHE_EVENT_TYPES)[number], handler: (data: CacheEventData) => void): unknown;
-          off(event: (typeof CACHE_EVENT_TYPES)[number], handler: (data: CacheEventData) => void): unknown;
+          on(
+            event: (typeof CACHE_EVENT_TYPES)[number],
+            handler: (data: CacheEventData) => void,
+          ): unknown;
+          off(
+            event: (typeof CACHE_EVENT_TYPES)[number],
+            handler: (data: CacheEventData) => void,
+          ): unknown;
         };
 
         ({ cache } = await import("@warlock.js/cache"));

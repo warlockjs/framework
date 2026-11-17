@@ -8,7 +8,9 @@ import type { HttpRequestLogConfig } from "../http/request-log/request-log.types
  * request's queries from the ORM's query events, which a MongoDB data source
  * emits in production only with `queryEvents: true`. When this process serves
  * HTTP with the request log on and `include.queries` capturing, and the app
- * did not set `queryEvents` itself, it is turned on; in every other case the
+ * did not set `queryEvents` itself, it is turned on. It is also turned on in
+ * a process that serves HTTP when `devtools.production.enabled` is `true`
+ * (the devtools production monitor's Queries tab needs the events); in every other case the
  * configuration is passed as it is and the driver's own default applies. An
  * explicit `queryEvents` (true or false) always wins.
  *
@@ -17,6 +19,11 @@ import type { HttpRequestLogConfig } from "../http/request-log/request-log.types
 export function resolveDatabaseConnectionConfig<T extends object>(databaseConfig: T): T {
   if ((databaseConfig as { queryEvents?: unknown }).queryEvents !== undefined) {
     return databaseConfig;
+  }
+
+  // The key the devtools connector reads; core cannot import devtools.
+  if (config.get("devtools.production.enabled") === true && servesHttp()) {
+    return { ...databaseConfig, queryEvents: true };
   }
 
   const requestLog = resolveRequestLogConfig(

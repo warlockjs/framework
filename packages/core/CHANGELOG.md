@@ -13,6 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - TOTP helpers for authenticator-app codes: `generateTotpSecret()`, `totpCode()`, `verifyTotp()` and `totpUri()`.
 - `excludeFromRequestLog(prefix)` keeps a URL prefix out of the persistent request log, and `isExcludedFromRequestLog(path)` tells whether a path is excluded. The request log writes nothing for a request under an excluded prefix.
 
+### Changed
+
+- `onRequestEnd`'s `error` is now set for a 5xx that core answered after a middleware or handler threw.
+- The one-line request summary (`http.log`) and the request lifecycle log skip paths registered with `excludeFromRequestLog`.
+- Core turns `queryEvents` on for a MongoDB data source in a process that serves HTTP when `devtools.production.enabled` is `true`, so the devtools Queries tab works in production. An explicit `queryEvents` in `src/config/database.ts` still wins.
+
 
 ## 5.55.0 - 2026-11-17
 

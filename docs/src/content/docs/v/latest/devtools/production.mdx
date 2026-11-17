@@ -171,9 +171,11 @@ One random draw per request decides whether it is **sampled** (`sampleRate`, 0.1
 - A query that is at least `slowQueryMs` (200) outside a sampled request only updates the slowest example of its shape.
 - Work outside a request is sampled per query at `sampleRate`.
 
-MongoDB reports its queries only when command monitoring is on, which it is not in production by default. For the
-Queries tab, set `queryEvents: true` on the data source in `src/config/database.ts`; it adds a small cost to every query.
-Without it the boot log says that query events are off and the Queries tab stays empty. PostgreSQL needs nothing.
+MongoDB reports its queries only when command monitoring is on, which it is not in production by default. With
+`devtools.production.enabled` set in `src/config/devtools.ts`, core turns `queryEvents` on for you in a process that
+serves HTTP; it adds a small cost to every query. An explicit `queryEvents: false` on the data source wins, and then the
+boot log says that query events are off and the Queries tab stays empty. (Enabling the monitor only through options passed
+to `devtoolsConnector()` is not seen by core: set `queryEvents: true` yourself in that case.) PostgreSQL needs nothing.
 
 Memory is bounded per process: 200 sampled requests, 200 queries per request, 500 query shapes, 300 routes and 100 error
 groups. The oldest are dropped first. Each process writes at most `maxStoredSamplesPerMinute` (120) samples per minute.
@@ -186,7 +188,7 @@ Nothing that leaves the process (the API, the database, the live stream) carries
 | -------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | Request  | Id, method, path (no query string), route pattern, status, timing, error message and stack | Headers, body, query string, params; quoted values, emails and `{ … }` documents in the error |
 | Query    | Connection, driver, shape (SQL with placeholders), collection, command, timing, row count, error message | SQL literals, bindings, Mongo filter and pipeline values, caller file path |
-| Log      | Level, module, action, message, time                                                       | `context`                                            |
+| Log      | Level, module, action, message, time                                                       | `context`; quoted values, emails and `{ … }` documents in `error` messages |
 | Phase    | Name, start, duration                                                                      | `attrs`                                              |
 | Cache    | Hit, miss and write counts                                                                 | Keys and tags                                        |
 | N+1      | Shape, count, message                                                                      | Caller location                                      |

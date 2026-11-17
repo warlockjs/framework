@@ -11,7 +11,15 @@ import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it } from "vitest";
 import { createProductionCapture } from "../../../src/production/capture";
 import { createMemoryStore } from "../../../src/production/store/memory-store";
-import { createEngine, instance, productionOptions, queryEvent, runRequest, SECRET, traced } from "./helpers";
+import {
+  createEngine,
+  instance,
+  productionOptions,
+  queryEvent,
+  runRequest,
+  SECRET,
+  traced,
+} from "./helpers";
 
 /** A random source that returns the scripted values, then 0.99 (never sampled at 0.1). */
 function script(...values: number[]) {
@@ -40,7 +48,11 @@ describe("sampling", () => {
   });
 
   it("samples every request at 1 and none at 0", () => {
-    const always = createEngine({ production: { sampleRate: 1 }, random: () => 0.999, store: null });
+    const always = createEngine({
+      production: { sampleRate: 1 },
+      random: () => 0.999,
+      store: null,
+    });
     const never = createEngine({ production: { sampleRate: 0 }, random: () => 0, store: null });
 
     for (let index = 0; index < 20; index++) {
@@ -140,13 +152,20 @@ describe("sampling", () => {
 
     engine.hooks.onQuery(undefined, queryEvent({ durationMs: 900 }));
 
-    expect(engine.queries.snapshot(10)[0]).toMatchObject({ count: 0, slowest: { durationMs: 900 } });
+    expect(engine.queries.snapshot(10)[0]).toMatchObject({
+      count: 0,
+      slowest: { durationMs: 900 },
+    });
   });
 
   it("never captures the dashboard path", () => {
     const { engine } = createEngine({ production: { sampleRate: 1 }, random: () => 0 });
 
-    runRequest(engine, "dash", { path: "/ops-secret-path/api/requests", durationMs: 5000, status: 500 });
+    runRequest(engine, "dash", {
+      path: "/ops-secret-path/api/requests",
+      durationMs: 5000,
+      status: 500,
+    });
 
     expect(engine.counters()).toMatchObject({ requests: 0, sampled: 0, keptUnsampled: 0 });
     expect(engine.collector.listRequests()).toEqual([]);
@@ -168,11 +187,32 @@ describe("sampling", () => {
   it("ignores log lines below logLevels outside a sampled request", () => {
     const { engine } = createEngine({ random: () => 0.99 });
 
-    engine.hooks.onLog(undefined, { level: "info", module: "app", action: "x", message: "hi", at: 1 });
-    engine.hooks.onLog(undefined, { level: "warn", module: "app", action: "x", message: "careful", at: 2 });
-    engine.hooks.onLog(undefined, { level: "error", module: "app", action: "x", message: "failed 42", at: 3 });
+    engine.hooks.onLog(undefined, {
+      level: "info",
+      module: "app",
+      action: "x",
+      message: "hi",
+      at: 1,
+    });
+    engine.hooks.onLog(undefined, {
+      level: "warn",
+      module: "app",
+      action: "x",
+      message: "careful",
+      at: 2,
+    });
+    engine.hooks.onLog(undefined, {
+      level: "error",
+      module: "app",
+      action: "x",
+      message: "failed 42",
+      at: 3,
+    });
 
-    expect(engine.logs.snapshot(10).map((entry) => entry.message)).toEqual(["failed 42", "careful"]);
+    expect(engine.logs.snapshot(10).map((entry) => entry.message)).toEqual([
+      "failed 42",
+      "careful",
+    ]);
     expect(engine.errors.snapshot(10)).toMatchObject([{ source: "log", message: "failed 42" }]);
   });
 });
@@ -193,7 +233,11 @@ describe("registration with core, cascade and the logger", () => {
       warn: () => {},
     });
     const dispose = await capture.attach();
-    const driver = new EventEmitter() as unknown as { on: unknown; off: unknown; emit: (...a: unknown[]) => void };
+    const driver = new EventEmitter() as unknown as {
+      on: unknown;
+      off: unknown;
+      emit: (...a: unknown[]) => void;
+    };
     const source = dataSourceRegistry.register({ name: "capture-test", driver: driver as never });
     const ctx: TracingContext = {
       traceId: "t1",
@@ -204,7 +248,12 @@ describe("registration with core, cascade and the logger", () => {
     };
 
     dispatchRequestStart(ctx);
-    dispatchPhase(ctx, { name: "handler", durationMs: 3, startedAt: 10, attrs: { secret: SECRET } });
+    dispatchPhase(ctx, {
+      name: "handler",
+      durationMs: 3,
+      startedAt: 10,
+      attrs: { secret: SECRET },
+    });
     // No request context here, so the query is background work: it is sampled at 1.
     driver.emit("query", { driver: "postgres", sql: "SELECT 1", startedAt: 1, durationMs: 2 });
     await log.error("capture-test", "boom", "it failed", { password: SECRET });
@@ -218,6 +267,16 @@ describe("registration with core, cascade and the logger", () => {
     expect(JSON.stringify(await capture.requests.get("real-1"))).not.toContain(SECRET);
     expect(JSON.stringify(capture.logs.snapshot(5))).not.toContain(SECRET);
 
+    await log.error("capture-test", "scrub", 'Request failed: Boom for user "alice@example.com"');
+    await log.warn("capture-test", "scrub", "kept as is for alice@example.com");
+    await capture.flush();
+
+    const messages = capture.logs.snapshot(10).map((entry) => entry.message);
+
+    expect(messages).toContain("Request failed: Boom for user ?");
+    expect(messages).toContain("kept as is for alice@example.com");
+    expect(JSON.stringify(capture.errors.snapshot(10))).not.toContain("alice");
+
     await capture.dispose();
 
     dispatchRequestStart({ ...ctx, requestId: "real-2" });
@@ -225,7 +284,7 @@ describe("registration with core, cascade and the logger", () => {
     await log.error("capture-test", "boom", "after dispose");
 
     expect(capture.counters().requests).toBe(1);
-    expect(capture.logs.snapshot(5)).toHaveLength(1);
+    expect(capture.logs.snapshot(10)).toHaveLength(3);
     dispose();
     dataSourceRegistry.unregister(source);
   });

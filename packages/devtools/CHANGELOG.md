@@ -16,19 +16,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Production monitor: a dashboard at a secret path that answers your app's own 404 to anyone who is not signed in. It has its own accounts (admin and viewer roles) stored through Cascade, forced password change, authenticator-app and passkey two-factor, recovery codes, invite links, sign-in rate limits, an audit log, and a switch to disable it from the dashboard. It refuses to start without a path, a first admin and an encryption key (`DT001` to `DT010`).
-- Production capture: sampled requests, query shapes, routes, error groups and warn and error logs are kept per process with bounded memory and written to the database as redacted samples (shapes only, never values). Slow and failed requests outside the sample are kept as summaries. At the default sample rate the added cost is about 1.3 µs per request.
+- Production monitor: a dashboard at a secret path that answers your app's own 404 to anyone who is not signed in. It has its own accounts (admin and viewer roles) stored through Cascade, forced password change, authenticator-app and passkey two-factor, recovery codes, invite links, sign-in rate limits, an audit log, and a switch to disable it from the dashboard. It refuses to start without a path, a first admin and an encryption key (`DT001` to `DT010`). A correct password does not reset the failed-try count (only a completed sign-in does), the per-IP limit counts an IPv6 client by its /64, and a caller over the IP limit costs no password check. Adding or removing an authenticator app or a passkey, and making new recovery codes, asks for the current password or a fresh passkey check.
+- Production capture: sampled requests, query shapes, routes, error groups and warn and error logs are kept per process with bounded memory and written to the database as redacted samples (shapes only, never values). Request errors and `error` log lines lose quoted values, emails and `{ … }` documents before they are grouped, stored or shown, and a request that fails in a handler shows its message and stack in the Errors tab. Slow and failed requests outside the sample are kept as summaries. At the default sample rate the added cost is about 1.3 µs per request.
 - Several instances share one view: each process writes a report, and the dashboard merges them with an instance picker.
-- EXPLAIN by query shape: plain `EXPLAIN` for PostgreSQL reads and `queryPlanner` for MongoDB reads. Executing plans run only with `explain.executing: true`, and never for statements that write.
+- EXPLAIN by query shape: plain `EXPLAIN` for PostgreSQL reads and `queryPlanner` for MongoDB reads. Executing plans run only with `explain.executing: true`, and never for statements that write. PostgreSQL plans run in a read-only transaction that is rolled back, a MongoDB aggregate with `$out` or `$merge` is never explained, and production plans show `?` in place of the query's values.
 - New tabs: Resources (memory, CPU, event loop, garbage collection), Health, Errors and Jobs. Queries and Routes show latency statistics with histograms, in development too.
 - `warlock devtools:enable` and `warlock devtools:reset-admin` (`registerDevtoolsCommands()`), and `devtoolsMigrations`, from `@warlock.js/devtools/production`.
+- Error groups group log lines that carry a request id, and the Health tab records no error while the app boots.
 - Panels can set `production: true`, and the panel factory receives `mode` (`"development"` or `"production"`). In production a panel's GET routes need a signed-in user, and every other method needs an admin, the CSRF header, and is written to the audit log.
 
 ### Changed
 
-- The dashboard tabs are rebuilt in React with the same features: requests with filters, waterfall, EXPLAIN and curl, queries, routes, logs, mail, AI runs, agent traces and API docs.
+- The dashboard tabs are rebuilt in React with the same features: requests with filters, waterfall, EXPLAIN and curl, queries, routes, logs, mail, AI runs, agent traces and API docs. The API docs tab works under `warlock start` (it builds the OpenAPI document from the registered routes). The dashboard shell loads in apps that drop a trailing slash before routing, its Content-Security-Policy replaces the app's own, an unknown asset under the dashboard path answers the app's own 404, and a dashboard error is logged with the route relative to the dashboard path.
 - The live stream sends `retry` and `hello` first, and request and log events carry `instance`.
 - Query shapes drop dollar-quoted strings.
+- In development, a value logged as the message (such as an Error) shows as text, and a tab that fails to draw no longer blanks the dashboard.
 - The server answers 503 with a build hint when `ui/dashboard/` is missing.
 
 

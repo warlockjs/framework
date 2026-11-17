@@ -291,7 +291,7 @@ Options under `production` (all optional, defaults in brackets):
 
 - Redaction: queries are stored as their shape (no literals or bindings), logs
   lose `context`, phases lose `attrs`, cache keys become counts, request error
-  messages and stacks lose quoted values, emails and `{ … }` documents, headers
+  messages and stacks, and error-level log lines, lose quoted values, emails and `{ … }` documents, headers
   and bodies come only from core's request log. Paths are kept (no query
   string): keep secrets out of URL paths.
 - EXPLAIN is admin-only and plain (`EXPLAIN (FORMAT JSON)`, MongoDB
@@ -300,8 +300,10 @@ Options under `production` (all optional, defaults in brackets):
   rolled back. `explain.executing: true` allows `EXPLAIN ANALYZE` and
   `executionStats`; they run the query, so leave it off unless accepted.
   Production plans show `?` in place of the query's values.
-- MongoDB: set `queryEvents: true` on the data source for the Queries tab in
-  production (command monitoring is off there by default).
+- MongoDB: with `devtools.production.enabled` in `src/config/devtools.ts`, core
+  turns `queryEvents` on in processes that serve HTTP (command monitoring is off
+  in production by default); an explicit `queryEvents: false` wins. With the
+  option passed only to `devtoolsConnector()`, set `queryEvents: true` yourself.
 - A correct password does not reset an account's failed-try count; only a
   completed sign-in (second factor included) does. A caller over the IP limit
   costs no password check, and refused tries are audited at most once a minute
