@@ -8,3 +8,4 @@ export * from "./request-log.types";
 export * from "./resolve-request-log-config";
 export * from "./should-keep-request-log";
 export * from "./track-request-log";
+export * from "./request-log-exclusions";

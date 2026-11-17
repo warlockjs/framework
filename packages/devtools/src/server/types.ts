@@ -1,4 +1,11 @@
 import type { RequestLogFilter, RequestLogRecord, RequestLogSummary } from "@warlock.js/core";
+import type { DevtoolsRequestSource } from "../production/capture/types";
+import type {
+  DevtoolsExplainResult,
+  DevtoolsInstanceInfo,
+  DevtoolsMode,
+} from "../production/contracts";
+import type { DevtoolsInsights } from "../production/insights/types";
 import type { DevtoolsAgentTraceSource } from "../sources/agent-trace-source";
 import type { DevtoolsAiSource } from "../sources/ai-source";
 import type { ProcessPanel } from "../process-panel";
@@ -61,4 +68,16 @@ export type MountDevtoolsRoutesDeps = {
   getOpenApiDocument?: () => Promise<object>;
   /** Builds the Postman collection (v2.1) for the registered routes; injected so devtools never imports core at load. */
   getPostmanCollection?: () => Promise<object>;
+  /** Where the dashboard runs. @default "development" */
+  mode?: DevtoolsMode;
+  /** The answering process; set in both modes once the insights are wired. */
+  instance?: DevtoolsInstanceInfo;
+  /** Resources, statistics, health, errors, logs and jobs (`src/server/insights-routes.ts`). */
+  insights?: DevtoolsInsights;
+  /** Production: request rows and details from stored samples instead of the collector. */
+  requests?: DevtoolsRequestSource;
+  /** Production: EXPLAIN by query shape id (`POST /api/queries/:shapeId/explain`). */
+  explainShape?: (shapeId: string) => Promise<DevtoolsExplainResult>;
+  /** Built-in tab ids to list in `GET /api/panels` (default: every built-in tab). */
+  builtInPanels?: readonly string[];
 };

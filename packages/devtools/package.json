@@ -2,7 +2,7 @@
   "name": "@warlock.js/devtools",
   "version": "5.55.0",
   "type": "module",
-  "description": "Development-only dashboard for Warlock.js apps at /__warlock: request timeline, queries with EXPLAIN, N+1 detection, dev mailbox, logs, cache operations and the route map. Refuses to run outside development.",
+  "description": "Dashboard for Warlock.js apps: request timeline, queries with EXPLAIN, N+1 detection, resources, health, errors, logs and jobs. Loopback-only at /__warlock in development; an opt-in, signed-in monitor at a secret path in production.",
   "main": "./src/index.ts",
   "warlock": {
     "environment": "server"
@@ -14,6 +14,11 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./production": {
+      "types": "./src/production/index.ts",
+      "import": "./src/production/index.ts",
+      "default": "./src/production/index.ts"
     }
   },
   "files": [
@@ -27,18 +32,27 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "test": "vitest run && vitest run --config vitest.ui.config.ts",
+    "test:ui": "vitest run --config vitest.ui.config.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p ui-src/tsconfig.json",
+    "build:ui": "vite build --config ui-src/vite.config.ts && node ui-src/scripts/write-build-info.mjs",
+    "dev:ui": "vite --config ui-src/vite.config.ts",
     "generate:llms": "node scripts/generate-llms.mjs"
   },
   "peerDependencies": {
+    "@simplewebauthn/server": "^13.1.0",
     "@warlock.js/ai-panoptic": "5.55.0",
     "@warlock.js/cache": "5.55.0",
     "@warlock.js/cascade": "5.55.0",
     "@warlock.js/core": "5.55.0",
-    "@warlock.js/logger": "5.55.0"
+    "@warlock.js/logger": "5.55.0",
+    "@warlock.js/queue": "5.55.0",
+    "@warlock.js/scheduler": "5.55.0"
   },
   "peerDependenciesMeta": {
+    "@simplewebauthn/server": {
+      "optional": true
+    },
     "@warlock.js/ai-panoptic": {
       "optional": true
     },
@@ -47,17 +61,44 @@
     },
     "@warlock.js/cascade": {
       "optional": true
+    },
+    "@warlock.js/queue": {
+      "optional": true
+    },
+    "@warlock.js/scheduler": {
+      "optional": true
     }
   },
   "devDependencies": {
-    "@warlock.js/ai-panoptic": "workspace:^",
+    "@simplewebauthn/browser": "13.1.0",
+    "@simplewebauthn/server": "13.3.3",
+    "@tailwindcss/vite": "4.3.3",
+    "@testing-library/dom": "10.4.0",
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.3.0",
+    "@testing-library/user-event": "14.6.1",
     "@types/node": "^25.6.2",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "@vitejs/plugin-react": "6.1.2",
+    "@warlock.js/ai-panoptic": "workspace:^",
     "@warlock.js/cache": "workspace:^",
     "@warlock.js/cascade": "workspace:^",
     "@warlock.js/core": "workspace:^",
     "@warlock.js/logger": "workspace:^",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
     "fastify": "^5.12.6",
+    "jsdom": "30.0.1",
+    "lucide-react": "1.52.0",
+    "radix-ui": "1.7.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tailwind-merge": "3.7.0",
+    "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
+    "uqr": "0.1.2",
+    "vite": "8.3.3",
     "vitest": "5.0.3"
   },
   "repository": {
@@ -72,7 +113,9 @@
     "profiler",
     "n+1",
     "timeline",
-    "mailbox"
+    "mailbox",
+    "monitoring",
+    "production"
   ],
   "author": "hassanzohdy",
   "license": "MIT",

@@ -55,7 +55,7 @@ None.
   redaction and sampling specs, an overhead benchmark at the default sampling rate, UI specs for the React dashboard,
   the bundle freshness and size gate, docs, skills, changelog and upgrade notes; a dedicated security review before
   release.
-- Status: open; planned as 5.56.0.
+- Status: in progress (2026-11-17): architecture and contracts first, then module agents; private notes in `findings/5.56/`.
 
 ## After 5.55.0: Grimoire follow-ups
 

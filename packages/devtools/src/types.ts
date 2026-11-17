@@ -1,6 +1,9 @@
 import type { RequestLogRecord } from "@warlock.js/core";
 import type { DevtoolsAgentTraceEvent } from "./sources/agent-trace-source";
 import type { DevtoolsAiEvent } from "./sources/ai-source";
+import type { DevtoolsMode, DevtoolsRole } from "./production/contracts";
+
+export type * from "./production/contracts";
 
 /**
  * The records the devtools collector keeps and the dashboard API returns.
@@ -61,13 +64,187 @@ export type DevtoolsOptions = {
    * @default []
    */
   panels?: readonly (string | DevtoolsPanel)[];
+  /**
+   * The production monitor: a signed-in dashboard at a secret path. Off
+   * unless `enabled` is `true`; read only when the app runs in production
+   * (development keeps the loopback dashboard and ignores this block).
+   * Secrets come from the environment, never from this object in source
+   * control: `DEVTOOLS_PATH`, `DEVTOOLS_ADMIN_EMAIL`, and
+   * `DEVTOOLS_ADMIN_PASSWORD` or `DEVTOOLS_SETUP_TOKEN`.
+   *
+   * @default undefined (off)
+   */
+  production?: DevtoolsProductionOptions;
+};
+
+/**
+ * Options of the production monitor (`devtools.production`). Every value has
+ * a safe default; only `enabled` must be set, and the path and first admin
+ * come from the environment.
+ */
+export type DevtoolsProductionOptions = {
+  /**
+   * Turn the monitor on in production. Without it nothing is mounted and
+   * nothing is captured.
+   *
+   * @default false
+   */
+  enabled?: boolean;
+  /**
+   * The dashboard path. Prefer the `DEVTOOLS_PATH` environment variable; at
+   * least 8 characters, never `/__warlock`.
+   *
+   * @default process.env.DEVTOOLS_PATH
+   */
+  path?: string;
+  /**
+   * Share of requests captured with a full timeline, 0–1. Slow and failed
+   * requests outside the sample are kept as a summary.
+   *
+   * @default 0.1
+   */
+  sampleRate?: number;
+  /**
+   * A request at least this slow is kept even when not sampled.
+   *
+   * @default 1000
+   */
+  slowRequestMs?: number;
+  /**
+   * A query at least this slow counts in the query statistics even outside a
+   * sampled request.
+   *
+   * @default 200
+   */
+  slowQueryMs?: number;
+  /**
+   * Sampled requests kept in memory per process (the live view).
+   *
+   * @default 200
+   */
+  maxRequests?: number;
+  /**
+   * How long stored request samples are kept, in hours.
+   *
+   * @default 24
+   */
+  requestRetentionHours?: number;
+  /**
+   * The most samples one process writes to the database per minute; the rest
+   * stay in memory only.
+   *
+   * @default 120
+   */
+  maxStoredSamplesPerMinute?: number;
+  /**
+   * How often each process writes its report (resources, statistics, health)
+   * to the database, in ms.
+   *
+   * @default 10000
+   */
+  reportIntervalMs?: number;
+  /**
+   * Proxies whose `X-Forwarded-For`, `X-Forwarded-Proto` and
+   * `X-Forwarded-Host` headers are believed: IP addresses, CIDR ranges, or
+   * `"loopback"` and `"private"`. Without an entry the socket address is the
+   * client.
+   *
+   * @default []
+   */
+  trustedProxies?: readonly string[];
+  /**
+   * Answer only requests that arrived over HTTPS (directly or through a
+   * trusted proxy). Turn off only to try the monitor on a local machine.
+   *
+   * @default true
+   */
+  requireHttps?: boolean;
+  /**
+   * When set, only these client IPs or CIDR ranges reach the dashboard;
+   * everyone else gets a 404.
+   *
+   * @default [] (any client)
+   */
+  allowedIps?: readonly string[];
+  /**
+   * The public origin of the app (`https://app.example.com`), used for the
+   * CSRF origin check and passkeys. Without it the request's own origin is
+   * used.
+   *
+   * @default null
+   */
+  origin?: string;
+  /** Session lifetime. */
+  session?: {
+    /** Signed out after this many idle minutes. @default 30 */
+    idleMinutes?: number;
+    /** Signed out after this many hours whatever happens. @default 8 */
+    maxHours?: number;
+  };
+  /**
+   * Who must use a second factor (an authenticator app or a passkey).
+   *
+   * @default "admins"
+   */
+  twoFactor?: "admins" | "everyone";
+  /** Failed sign-in limits, counted over the audit log in a sliding window. */
+  rateLimits?: {
+    /** @default 15 */
+    windowMinutes?: number;
+    /** Failures per account before it is refused for the window. @default 5 */
+    account?: number;
+    /** Failures per client IP before it is refused for the window. @default 20 */
+    ip?: number;
+    /** Failures in total before the whole dashboard answers 404 for `lockMinutes`. @default 100 */
+    global?: number;
+    /** @default 15 */
+    lockMinutes?: number;
+  };
+  /** EXPLAIN in production. */
+  explain?: {
+    /**
+     * Allow executing plans (PostgreSQL `EXPLAIN ANALYZE`, MongoDB
+     * `executionStats`). They run the query; leave off unless you accept that.
+     *
+     * @default false
+     */
+    executing?: boolean;
+  };
+  /**
+   * Turn tabs on or off by id. Built-in tabs `mail`, `ai`, `agents`, `api`
+   * and `processes` are off in production unless set to `true`; a package
+   * panel shows only when it declares `production: true` or is set to `true`
+   * here.
+   *
+   * @default {}
+   */
+  panels?: Readonly<Record<string, boolean>>;
+  /**
+   * Log levels the Logs tab keeps outside sampled requests.
+   *
+   * @default ["warn", "error"]
+   */
+  logLevels?: readonly DevtoolsLogEntry["level"][];
+  /**
+   * How long audit entries are kept, in days.
+   *
+   * @default 90
+   */
+  auditRetentionDays?: number;
+  /** Passkeys as a second factor (needs `@simplewebauthn/server`). */
+  passkeys?: {
+    /** The name authenticators show. @default "Warlock monitor" */
+    rpName?: string;
+    /** The WebAuthn relying party id. @default the host of `origin`, else of the request */
+    rpId?: string;
+  };
 };
 
 /** `DevtoolsOptions` with every default applied. */
 export type ResolvedDevtoolsOptions = Required<
   Pick<DevtoolsOptions, "path" | "maxRequests" | "nPlusOneThreshold">
 > &
-  Pick<DevtoolsOptions, "allowedHosts" | "allowProxied" | "panels">;
+  Pick<DevtoolsOptions, "allowedHosts" | "allowProxied" | "panels" | "production">;
 
 /** HTTP methods a panel data route may answer. */
 export type DevtoolsPanelMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -113,6 +290,16 @@ export type DevtoolsPanel = {
   /** Data routes the view calls. */
   routes?: readonly DevtoolsPanelRoute[];
   /**
+   * Whether the panel is safe to show in the production monitor. Without it
+   * the panel is left out in production unless the project sets
+   * `production.panels[<id>]: true`. In production its GET routes are open to
+   * viewers and every other method to admins only (with the CSRF check and an
+   * audit entry).
+   *
+   * @default false
+   */
+  production?: boolean;
+  /**
    * More files the view loads, by served name: `{ "graph.js": "/abs/graph.js" }`
    * is served at `<path>/panels/<id>/graph.js`, so the view can
    * `import "./graph.js"`. Names are plain file names (no folders).
@@ -124,6 +311,11 @@ export type DevtoolsPanel = {
 export type DevtoolsPanelFactoryContext = {
   /** The app's root directory. */
   root: string;
+  /**
+   * Where the dashboard runs. In `production` a panel must not write files
+   * or run anything costly per request. Absent means `development`.
+   */
+  mode?: DevtoolsMode;
 };
 
 /** One panel or several. */
@@ -269,6 +461,10 @@ export type DevtoolsRequestSummary = {
   warningCount: number;
   /** Read from the persisted request log only: the request is no longer in memory. */
   persisted?: true;
+  /** The instance that served the request (production monitor). */
+  instance?: string;
+  /** Kept because it was slow or failed, without a timeline: the request was not sampled (production monitor). */
+  partial?: true;
 };
 
 /**
@@ -302,6 +498,10 @@ export type DevtoolsBackground = {
 
 /** Server-sent events on `GET <path>/api/stream`. */
 export type DevtoolsStreamEvent =
+  | {
+      type: "hello";
+      data: { mode: DevtoolsMode; instance: string | null; role: DevtoolsRole | null };
+    }
   | { type: "request"; data: DevtoolsRequestSummary }
   | { type: "mail"; data: DevtoolsMailSummary }
   | { type: "log"; data: DevtoolsLogEntry }

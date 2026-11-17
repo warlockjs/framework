@@ -403,14 +403,17 @@ export default defineConfig({
         },
         {
           /**
-           * Development-only dashboard at `/__warlock`, new in 5.25. Installed
-           * as a devDependency (`warlock add devtools`). `ui` is cloned, not
-           * bundled: the static dashboard is served from files, and
-           * `resolveUiRoot()` walks up from the built module to find it.
+           * The dashboard at `/__warlock` (development, new in 5.25) and the
+           * opt-in production monitor (5.56). `production/index.ts` is the
+           * `@warlock.js/devtools/production` subpath an app's
+           * `warlock.config.ts` imports (migrations, CLI commands). `ui` is
+           * cloned, not bundled: the React dashboard is built by Vite from
+           * `ui-src/` (never shipped) into `ui/dashboard/`, served from files,
+           * and `resolveUiRoot()` walks up from the built module to find it.
            */
           name: "@warlock.js/devtools",
           root: "../../packages/devtools",
-          entries: ["index.ts"],
+          entries: ["index.ts", "production/index.ts"],
           clone: [
             "README.md",
             "LICENSE",

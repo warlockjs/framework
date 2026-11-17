@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node", "vite/client", "@testing-library/jest-dom"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@contracts": ["../src/production/contracts.ts"]
+    }
+  },
+  "include": ["src", "tests", "vite.config.ts", "../vitest.ui.config.ts"]
+}

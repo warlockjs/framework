@@ -25,7 +25,8 @@ export default defineConfig({
     environment: "node",
     globals: false,
     include: ["tests/**/*.spec.ts"],
-    exclude: ["**/node_modules/**", "**/dist/**"],
+    // Database-backed specs run with vitest.integration.config.ts.
+    exclude: ["**/node_modules/**", "**/dist/**", "**/*.integration.spec.ts"],
     testTimeout: 30_000,
     hookTimeout: 30_000,
   },
