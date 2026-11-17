@@ -41,6 +41,12 @@ None.
     stale; size budget about 300 KB gzipped. The 5.55.0 panel registration API stays: the React shell mounts package
     panel view modules (the Grimoire tab keeps working). SSR through `@warlock.js/web` was considered and rejected
     (devtools must work in API-only apps).
+- Real-time: today the dashboard gets live `request`, `log`, `mail` and `ai` events over one SSE stream
+  (`/api/stream`, `packages/devtools/src/server/stream-route.ts`, a ping every 15 s); other panels load on demand.
+  In production the stream needs the session check, `X-Accel-Buffering: no` for nginx, a reconnect with backoff, and a
+  per-instance view: each process has its own collector, so either show the instance the browser reached or fan
+  events in from every instance through a shared bus (Redis pub/sub or `@warlock.js/herald`); decide in the design.
+  Resource and query-stat panels refresh on an interval.
 - Evidence: `packages/devtools/src/server/guard.ts` (development-only guard), `packages/devtools/ui/app.js` (plain DOM
   UI), `packages/core/skills/request-log/SKILL.md` (`http.logging.requests` production settings),
   `packages/core/skills/request-tracing/SKILL.md` (`http.tracing`), `packages/devtools/src/panels.ts` (panel API).
