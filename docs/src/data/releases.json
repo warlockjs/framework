@@ -1,4 +1,22 @@
 {
+  "5.56.0": {
+    "publishedAt": "2026-11-17T15:17:48.849Z",
+    "matrix": "none",
+    "headline": "Devtools in production: a secured monitor at a path you choose, with its own accounts and two-factor sign-in, and a dashboard rebuilt with React.",
+    "highlights": [
+      "Turn it on with `devtools.production.enabled` plus `DEVTOOLS_PATH` and a first admin from env; it refuses to boot when anything is missing, and every URL under the path answers the app's own 404 to anyone not signed in.",
+      "Accounts are the monitor's own (admin and viewer, invite links), stored in your database through Cascade on MongoDB or SQL, with two-factor sign-in (authenticator app, passkeys, recovery codes) required for admins by default.",
+      "Rate limits per account, per IP (IPv6 by /64) and overall with a lockout, CSRF on every action, an audit log, and a disable switch that closes the dashboard on every instance until `warlock devtools:enable`.",
+      "Production tabs: sampled requests with redaction, query and route statistics per shape, EXPLAIN without executing plans by default, resources per process, health checks, grouped errors, logs, jobs and Grimoire, merged across instances.",
+      "The dashboard is rebuilt with React and Tailwind (123.6 KB gzipped); package panels keep the same registration API.",
+      "Core adds TOTP helpers and `excludeFromRequestLog()`, and passes the error to `onRequestEnd` for a 5xx it answered."
+    ],
+    "upgradeNotes": [
+      "Nothing changes for an app that does not turn the production monitor on, apart from the React dashboard: the old `ui/app.js` files are gone, a panel view that relied on their CSS classes may look different, and `GET /__warlock` now redirects to `/__warlock/`.",
+      "Panel ids `resources`, `health`, `errors`, `jobs`, `instances`, `auth`, `account` and `admin` are reserved for devtools.",
+      "To use the monitor in production, move `@warlock.js/devtools` to `dependencies`, add `devtoolsMigrations` to `database.migrations` and run `warlock migrate`; see the Devtools in production page."
+    ]
+  },
   "5.55.0": {
     "publishedAt": "2026-11-16T22:40:50.794Z",
     "matrix": "none",
