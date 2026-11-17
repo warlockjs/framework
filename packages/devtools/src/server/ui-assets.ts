@@ -1,11 +1,7 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { FastifyInstance, FastifyReply } from "fastify";
-import type { MountedDevtoolsPanel } from "../panels";
 import { resolveUiRoot } from "../ui-root";
-
-/** Where `index.html` takes the registered panels' tab buttons. */
-const PANEL_TABS_MARKER = "<!-- devtools:panel-tabs -->";
 
 /**
  * Where an asset's bytes come from: a file in this package's `ui/` folder.
@@ -22,8 +18,11 @@ const uiFile = (name: string) => () => path.join(resolveUiRoot(), name);
  * up here and never joined into a filesystem path.
  */
 const UI_ASSETS: Record<string, UiAsset> = {
-  "app.js": { contentType: "text/javascript; charset=utf-8", file: uiFile("app.js") },
-  "app.css": { contentType: "text/css; charset=utf-8", file: uiFile("app.css") },
+  "app.js": {
+    contentType: "text/javascript; charset=utf-8",
+    file: uiFile("dashboard/assets/app.js"),
+  },
+  "app.css": { contentType: "text/css; charset=utf-8", file: uiFile("dashboard/assets/app.css") },
   "scalar.js": {
     contentType: "text/javascript; charset=utf-8",
     file: uiFile("vendor/scalar/standalone.js"),
@@ -50,45 +49,36 @@ export function sendFile(reply: FastifyReply, file: string, contentType: string)
     .send(readFileSync(file));
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-/** `index.html` with one tab button per registered panel, in registration order. */
-export function renderIndexHtml(html: string, panels: readonly MountedDevtoolsPanel[]): string {
-  const buttons = panels
-    .map(
-      (panel) =>
-        `<button class="tab" data-tab="${panel.id}" data-panel="${panel.id}">${escapeHtml(panel.title)}</button>`,
-    )
-    .join("\n        ");
-
-  return html.replace(PANEL_TABS_MARKER, buttons);
-}
+const NOT_BUILT_HTML =
+  "<!doctype html><title>Warlock Devtools</title><p>The devtools dashboard has not been built. Run <code>pnpm --filter @warlock.js/devtools build:ui</code>.</p>";
 
 /**
- * Serves the static dashboard: `index.html` at the dashboard root (with a
- * tab per registered panel) and the whitelisted assets (`app.js`, `app.css`,
- * the vendored Scalar bundle as `scalar.js`, and the vendored Swagger UI
- * files plus their init script). The asset name is matched against a fixed
+ * Serves the static dashboard: the built `ui/dashboard/index.html` at the
+ * dashboard root and the whitelisted assets (`app.js`, `app.css`, the
+ * vendored Scalar bundle as `scalar.js`, and the vendored Swagger UI files
+ * plus their init script). The asset name is matched against a fixed
  * whitelist — never joined into a filesystem path — so no request can
- * traverse outside it.
+ * traverse outside it. Before the first `build:ui` the root answers 503 with
+ * a note that says how to build. The second parameter is ignored (tabs now
+ * come from `GET api/panels`).
  */
-export function registerUiAssets(
-  server: FastifyInstance,
-  panels: readonly MountedDevtoolsPanel[] = [],
-): void {
+export function registerUiAssets(server: FastifyInstance, _panels?: unknown): void {
   const serveIndex = (_request: unknown, reply: FastifyReply): void => {
-    const html = readFileSync(path.join(resolveUiRoot(), "index.html"), "utf8");
+    const index = path.join(resolveUiRoot(), "dashboard", "index.html");
+
+    if (!existsSync(index)) {
+      reply
+        .code(503)
+        .header("Cache-Control", "no-store")
+        .header("Content-Type", "text/html; charset=utf-8")
+        .send(NOT_BUILT_HTML);
+      return;
+    }
 
     reply
       .header("Cache-Control", "no-store")
       .header("Content-Type", "text/html; charset=utf-8")
-      .send(renderIndexHtml(html, panels));
+      .send(readFileSync(index));
   };
 
   server.get("/", serveIndex);
@@ -97,12 +87,13 @@ export function registerUiAssets(
     const asset = Object.hasOwn(UI_ASSETS, request.params.name)
       ? UI_ASSETS[request.params.name]
       : undefined;
+    const file = asset?.file();
 
-    if (!asset) {
+    if (!asset || !file || !existsSync(file)) {
       reply.code(404).header("Cache-Control", "no-store").send();
       return;
     }
 
-    sendFile(reply, asset.file(), asset.contentType);
+    sendFile(reply, file, asset.contentType);
   });
 }

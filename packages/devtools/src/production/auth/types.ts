@@ -109,8 +109,6 @@ export type DevtoolsAuthDeps = {
  * Accounts, sessions, two-factor, invites, rate limits and the audit log.
  * Plain async functions over the store: no HTTP. Every rejection throws a
  * `DevtoolsApiError` with the code the route answers with.
- *
- * Owner: WP-2.
  */
 export interface DevtoolsAuthService {
   /**

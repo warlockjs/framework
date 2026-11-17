@@ -576,10 +576,13 @@ describe("mountDevtoolsRoutes SSE stream", () => {
 
       const frame = await new Promise<string>((resolve, reject) => {
         req.on("response", (res) => {
+          expect(res.headers["x-accel-buffering"]).toBe("no");
+          expect(res.headers["cache-control"]).toBe("no-store");
+
           let received = "";
           res.on("data", (chunk) => {
             received += chunk.toString();
-            if (received.includes("\n\n")) resolve(received);
+            if (received.includes("event: log") && received.endsWith("\n\n")) resolve(received);
           });
           res.on("error", reject);
         });
@@ -594,7 +597,8 @@ describe("mountDevtoolsRoutes SSE stream", () => {
       });
 
       expect(frame).toBe(
-        `event: log\ndata: ${JSON.stringify({ level: "info", module: "test", action: "x", message: "hi", at: 1 })}\n\n`,
+        `retry: 5000\n\nevent: hello\ndata: ${JSON.stringify({ mode: "development", instance: null, role: "admin" })}\n\n` +
+          `event: log\ndata: ${JSON.stringify({ level: "info", module: "test", action: "x", message: "hi", at: 1 })}\n\n`,
       );
 
       req.destroy();

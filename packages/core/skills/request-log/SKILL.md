@@ -75,6 +75,22 @@ warlock logs request <id> --json                       # one record in full
 These read the **default file channel** (`storage/logs/requests`). Custom
 `channels` are write-only from the framework's point of view.
 
+## Keep a private path out of the log
+
+```ts
+import { excludeFromRequestLog, isExcludedFromRequestLog } from "@warlock.js/core";
+
+const stopExcluding = excludeFromRequestLog("/ops-7f3k2q9x");
+
+isExcludedFromRequestLog("/ops-7f3k2q9x/api/auth/login"); // true
+isExcludedFromRequestLog("/ops-7f3k2q9xyz"); // false: whole path segments only
+
+stopExcluding();
+```
+
+Requests under the prefix write no record. The per-request lifecycle log line is
+not affected.
+
 ## Gotchas
 
 - A 4xx is not an error for `only: "errors"`; use `only: "all"` with a

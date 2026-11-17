@@ -2,6 +2,8 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { DEVTOOLS_BUILT_IN_PANELS } from "./production/contracts";
+import type { DevtoolsMode, DevtoolsPanelInfo } from "./production/contracts";
 import type {
   DevtoolsPanel,
   DevtoolsPanelExport,
@@ -19,6 +21,8 @@ export type MountedDevtoolsPanel = {
   view: string;
   routes: readonly (DevtoolsPanelRoute & { method: DevtoolsPanelMethod })[];
   assets: Readonly<Record<string, string>>;
+  /** Whether the panel declared itself safe for the production monitor. */
+  production: boolean;
 };
 
 /**
@@ -26,18 +30,26 @@ export type MountedDevtoolsPanel = {
  * panel's routes live under `<path>/api/<id>`, so these would collide.
  */
 const RESERVED_PANEL_IDS = new Set([
+  "account",
+  "admin",
   "agents",
   "ai",
   "api",
   "assets",
+  "auth",
   "background",
   "docs",
+  "errors",
+  "health",
+  "instances",
+  "jobs",
   "logs",
   "mail",
   "mails",
   "panels",
   "queries",
   "requests",
+  "resources",
   "routes",
   "stream",
 ]);
@@ -177,7 +189,7 @@ export function checkDevtoolsPanel(
 
   taken.set(id, panel.title);
 
-  return { id, title: panel.title, view, routes, assets };
+  return { id, title: panel.title, view, routes, assets, production: panel.production === true };
 }
 
 /** Validates a list of panels; the first invalid or duplicate one throws. */
@@ -197,6 +209,8 @@ export type LoadDevtoolsPanelsOptions = {
   taken?: ReadonlyMap<string, string>;
   /** Imports a module URL or specifier; defaults to a dynamic `import()`. */
   importModule?: (specifier: string) => Promise<unknown>;
+  /** Where the dashboard runs; panel factories receive it as `context.mode`. @default "development" */
+  mode?: DevtoolsMode;
 };
 
 /** The URL or specifier to import for a `panels` entry. */
@@ -306,8 +320,12 @@ function resolveWithRequire(entry: string, root: string): string | undefined {
 }
 
 /** The panels a module's default export describes. */
-async function panelsOf(exported: DevtoolsPanelExport, root: string): Promise<readonly unknown[]> {
-  const value = typeof exported === "function" ? await exported({ root }) : exported;
+async function panelsOf(
+  exported: DevtoolsPanelExport,
+  root: string,
+  mode: DevtoolsMode,
+): Promise<readonly unknown[]> {
+  const value = typeof exported === "function" ? await exported({ root, mode }) : exported;
 
   return Array.isArray(value) ? value : [value];
 }
@@ -332,6 +350,7 @@ export async function loadDevtoolsPanels(
   }
 
   const importModule = options.importModule ?? ((specifier: string) => import(specifier));
+  const mode = options.mode ?? "development";
   const taken = new Map<string, string>(options.taken ?? []);
   const panels: MountedDevtoolsPanel[] = [];
 
@@ -348,7 +367,7 @@ export async function loadDevtoolsPanels(
           throw new Error("the module has no default export");
         }
 
-        candidates = await panelsOf(module.default, options.root);
+        candidates = await panelsOf(module.default, options.root, mode);
       } else {
         candidates = [entry];
       }
@@ -373,4 +392,50 @@ export async function loadDevtoolsPanels(
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** What `productionPanels` decides. */
+export type DevtoolsProductionPanels = {
+  /** Built-in tab ids shown, in display order. */
+  builtIn: string[];
+  /** Package panels shown. */
+  panels: MountedDevtoolsPanel[];
+};
+
+/**
+ * Which tabs the production monitor shows. A built-in tab follows
+ * `DEVTOOLS_BUILT_IN_PANELS` unless `overrides[id]` says otherwise. A package
+ * panel (the Processes panel included) shows when it declares
+ * `production: true` or `overrides[id]` is `true`; `overrides[id]: false` turns
+ * any tab off.
+ */
+export function productionPanels(
+  packagePanels: readonly MountedDevtoolsPanel[],
+  overrides: Readonly<Record<string, boolean>> = {},
+): DevtoolsProductionPanels {
+  const builtIn = DEVTOOLS_BUILT_IN_PANELS.filter((tab) => overrides[tab.id] ?? tab.production).map(
+    (tab) => tab.id,
+  );
+  const panels = packagePanels.filter((panel) => overrides[panel.id] ?? panel.production);
+
+  return { builtIn, panels };
+}
+
+/**
+ * The tab list `GET api/panels` answers with: the built-in tabs in
+ * `builtIn` (default: every one), in display order, then the package panels
+ * in registration order.
+ */
+export function listPanelInfos(
+  panels: readonly Pick<MountedDevtoolsPanel, "id" | "title">[],
+  builtIn?: readonly string[],
+): DevtoolsPanelInfo[] {
+  const tabs: DevtoolsPanelInfo[] = DEVTOOLS_BUILT_IN_PANELS.filter(
+    (tab) => builtIn === undefined || builtIn.includes(tab.id),
+  ).map((tab) => ({ id: tab.id, title: tab.title, type: "built-in" as const }));
+
+  for (const panel of panels)
+    tabs.push({ id: panel.id, title: panel.title, type: "package" as const });
+
+  return tabs;
 }

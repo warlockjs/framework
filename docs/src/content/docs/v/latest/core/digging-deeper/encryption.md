@@ -13,6 +13,7 @@ Three different jobs, three different tools. Picking the right one is the differ
 | `hashPassword` / `verifyPassword` | one-way    | bcrypt (slow) | User-typed passwords. **Only** passwords.                        |
 | `encrypt` / `decrypt`             | reversible | AES-256-GCM   | Secrets you need to read back — API keys, OAuth tokens.          |
 | `hmacHash`                        | one-way    | HMAC-SHA256   | Deterministic fingerprints for lookup / dedup of encrypted data. |
+| `verifyTotp`                      | one-way    | HMAC-SHA1     | Six-digit codes from an authenticator app (second factor).       |
 
 All three live in `@warlock.js/core`. Configure them with `src/config/encryption.ts`.
 
@@ -302,6 +303,42 @@ log.info("api-key", "used", { fingerprint: hmacHash(apiKey).slice(0, 8) });
 ```
 
 **Do not use `hmacHash` for passwords.** It's fast — a brute-force attack with a stolen database would clear common passwords in minutes. That's exactly what bcrypt protects against.
+
+## One-time codes — `generateTotpSecret` / `verifyTotp`
+
+The six-digit codes an authenticator app shows (RFC 6238: HMAC-SHA1, 30-second steps). They are plain functions over Node's `crypto`; no config is read and nothing is stored for you.
+
+```ts
+import {
+  encrypt,
+  decrypt,
+  generateTotpSecret,
+  totpCode,
+  totpUri,
+  verifyTotp,
+} from "@warlock.js/core";
+
+// Enrolment: make a secret, show the URI as a QR code, keep the secret encrypted.
+const secret = generateTotpSecret(); // base32, 160 bits
+const uri = totpUri({ secret, account: "ada@example.com", issuer: "My App" });
+const stored = encrypt(secret);
+
+// Sign-in: check the code the user typed.
+const step = verifyTotp(decrypt(stored), "492039");
+const lastStep = account.totpLastStep; // the last accepted step, saved with the account
+
+if (step === null) {
+  // wrong code
+} else if (lastStep !== null && step <= lastStep) {
+  // a code from this step or an earlier one was already used: refuse it
+}
+```
+
+- `verifyTotp(secret, code, { at?, window?, period?, digits? })` accepts the current step and `window` steps either side (default 1, so clock drift of 30 seconds is fine). It compares in constant time and takes only exactly six digits (spaces are ignored). It returns the matched time step, or `null`.
+- Save the returned step and refuse any code whose step is not greater than the saved one. Without that, a code someone saw over your shoulder works again for up to a minute and a half.
+- `totpCode(secret, at?, options?)` returns the code for a moment. It is for tests and tooling, not for sign-in.
+- Secrets are base32 without padding. Decoding ignores case and spaces. Store them with `encrypt`, never in plain text.
+- Count wrong codes like wrong passwords: they can be guessed at a rate of one million to one per try, so limit the tries.
 
 ## Common patterns
 

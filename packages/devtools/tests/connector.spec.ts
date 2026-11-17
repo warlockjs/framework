@@ -265,3 +265,63 @@ describe("devtoolsConnector options from src/config/devtools.ts", () => {
     await connector.shutdown();
   });
 });
+
+describe("devtoolsConnector development insights", () => {
+  afterEach(() => {
+    vi.doUnmock("../src/production/insights");
+    vi.resetModules();
+  });
+
+  it("mounts without insights, and says why, when the statistics cannot start", async () => {
+    const core = await import("@warlock.js/core");
+    (core.Application as { runtimeStrategy: string }).runtimeStrategy = "development";
+    vi.doMock("../src/production/insights", () => ({
+      createInstanceInfo: () => {
+        throw new Error("no insights today");
+      },
+    }));
+    mountDevtoolsRoutes.mockClear();
+
+    const { log } = await import("@warlock.js/logger");
+    const warn = vi.spyOn(log, "warn");
+    const { devtoolsConnector } = await import("../src/devtools-connector");
+    const connector = devtoolsConnector();
+
+    await connector.boot();
+
+    expect(mountDevtoolsRoutes).toHaveBeenCalledOnce();
+
+    const deps = mountDevtoolsRoutes.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(deps.insights).toBeUndefined();
+    expect(deps.instance).toBeUndefined();
+    expect(deps.explainShape).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      "devtools",
+      "insights-failed",
+      expect.stringContaining("no insights today"),
+    );
+    expect(connector.isActive()).toBe(true);
+
+    await connector.shutdown();
+  });
+
+  it("wires the instance, insights and shape explainer when the statistics start", async () => {
+    const core = await import("@warlock.js/core");
+    (core.Application as { runtimeStrategy: string }).runtimeStrategy = "development";
+    mountDevtoolsRoutes.mockClear();
+
+    const { devtoolsConnector } = await import("../src/devtools-connector");
+    const connector = devtoolsConnector();
+
+    await connector.boot();
+
+    const deps = mountDevtoolsRoutes.mock.calls[0][1] as Record<string, unknown>;
+
+    expect(deps.instance).toMatchObject({ id: expect.any(String), pid: process.pid });
+    expect(deps.insights).toBeDefined();
+    expect(deps.explainShape).toBeTypeOf("function");
+
+    await connector.shutdown();
+  });
+});

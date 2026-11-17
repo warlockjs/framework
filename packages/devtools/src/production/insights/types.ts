@@ -59,8 +59,6 @@ export type DevtoolsInsightQuery = {
  * read. Development: this process only. Production: the reports every
  * instance wrote to the database (fresh in the last 60 s; instances list:
  * last 5 min), with the answering instance's own report taken live.
- *
- * Owner: WP-5.
  */
 export interface DevtoolsInsights {
   instances(): Promise<DevtoolsInstancesView>;

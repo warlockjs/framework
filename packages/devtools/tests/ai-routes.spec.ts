@@ -142,7 +142,7 @@ describe("AI metadata API", () => {
           response.on("error", reject);
           response.on("data", (chunk) => {
             received += chunk.toString();
-            if (received.includes("\n\n")) resolve(received);
+            if (received.includes("event: ai") && received.endsWith("\n\n")) resolve(received);
           });
         });
       });
@@ -155,7 +155,10 @@ describe("AI metadata API", () => {
       };
       await waitFor(() => listeners.size === 1);
       for (const listener of listeners) listener({ traceId: "run", requestId: "http-a" });
-      expect(await frame).toBe('event: ai\ndata: {"traceId":"run","requestId":"http-a"}\n\n');
+      // The stream opens with its retry and hello frames, then forwards the AI event.
+      expect(await frame).toMatch(
+        /^retry: 5000\n\nevent: hello\ndata: [^\n]+\n\nevent: ai\ndata: \{"traceId":"run","requestId":"http-a"\}\n\n$/,
+      );
       request.destroy();
       await waitFor(() => listeners.size === 0);
     } finally {

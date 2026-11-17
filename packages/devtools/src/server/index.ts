@@ -3,7 +3,8 @@ import { checkDevtoolsPanels } from "../panels";
 import { processesDevtoolsPanel } from "../process-panel";
 import { registerAiRoutes } from "./ai-routes";
 import { registerBackgroundRoutes } from "./background-routes";
-import { registerExplainRoute } from "./explain-route";
+import { registerExplainRoute, registerShapeExplainRoute } from "./explain-route";
+import { registerInsightsRoutes } from "./insights-routes";
 import { registerDevtoolsGuard } from "./guard";
 import { registerLogRoutes } from "./log-routes";
 import { registerMailRoutes } from "./mail-routes";
@@ -11,6 +12,7 @@ import { registerOpenApiRoutes } from "./openapi-routes";
 import { registerPanelRoutes } from "./panel-routes";
 import { registerRequestsRoutes } from "./requests-routes";
 import { registerRouteRoutes } from "./route-routes";
+import { registerSessionRoutes } from "./session-routes";
 import { registerStreamRoute } from "./stream-route";
 import type { MountDevtoolsRoutesDeps } from "./types";
 import { registerUiAssets } from "./ui-assets";
@@ -40,6 +42,7 @@ export function mountDevtoolsRoutes(server: FastifyInstance, deps: MountDevtools
       });
 
       registerUiAssets(instance, panels);
+      registerSessionRoutes(instance, deps, panels);
       registerRequestsRoutes(instance, deps);
       registerAiRoutes(instance, deps);
       registerBackgroundRoutes(instance, deps);
@@ -49,6 +52,8 @@ export function mountDevtoolsRoutes(server: FastifyInstance, deps: MountDevtools
       registerPanelRoutes(instance, panels);
       registerOpenApiRoutes(instance, deps);
       registerExplainRoute(instance, deps);
+      registerShapeExplainRoute(instance, deps);
+      if (deps.insights) registerInsightsRoutes(instance, deps);
       registerStreamRoute(instance, deps);
     },
     { prefix: deps.options.path },

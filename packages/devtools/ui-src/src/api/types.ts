@@ -3,7 +3,10 @@
  * come from the server's contracts (`src/production/contracts.ts`, imported
  * as `@contracts`, which has no imports of its own). The development payloads
  * that live in `src/types.ts` are restated here where a tab needs them.
- *
- * Owner: WP-6 (add the restated development shapes the tabs need).
  */
+import type { DevtoolsAuthStepResult } from "@contracts";
+
 export type * from "@contracts";
+
+/** A sign-in step answer that may carry recovery codes (the first factor was just confirmed). */
+export type AuthStepWithCodes = DevtoolsAuthStepResult & { recoveryCodes?: string[] };

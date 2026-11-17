@@ -22,6 +22,7 @@ import {
   resetRequestLogWriterForTests,
   trackRequestLog,
 } from "./track-request-log";
+import { excludeFromRequestLog } from "./request-log-exclusions";
 import type { RequestLogRecord } from "./request-log.types";
 
 class CaptureChannel extends LogChannel {
@@ -82,6 +83,24 @@ afterEach(() => {
   resetRequestLogScopesForTests();
   resetRequestLogWriterForTests();
   vi.restoreAllMocks();
+});
+
+describe("excluded paths", () => {
+  it("writes no record for an excluded path and still writes other paths", () => {
+    useConfig({ enabled: true, only: "all", channels: [capture] });
+
+    const remove = excludeFromRequestLog("/secret-ops");
+    const excluded = { ...fakeRequest(), baseRequest: { method: "POST", url: "/secret-ops/api/auth/login?x=1" } };
+    const partial = { ...fakeRequest(), baseRequest: { method: "GET", url: "/secret-opsx" } };
+
+    finishRequestLog(excluded as unknown as Request, { statusCode: 200 }, undefined, 1, 1);
+    expect(capture.records).toHaveLength(0);
+
+    finishRequestLog(partial as unknown as Request, { statusCode: 200 }, undefined, 1, 1);
+    expect(capture.records).toHaveLength(1);
+
+    remove();
+  });
 });
 
 describe("finishRequestLog", () => {

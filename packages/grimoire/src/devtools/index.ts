@@ -38,12 +38,19 @@ export type GrimoireDevtoolsPanel = {
     handler: (request: GrimoirePanelRequest) => unknown;
   }[];
   assets?: Readonly<Record<string, string | URL>>;
+  /** Safe for the production monitor: the tab only reads (see `GrimoirePanelContext.mode`). */
+  production?: boolean;
 };
 
-/** What the panel factory takes: devtools passes `{ root }`; the rest is for tests and custom setups. */
+/** What the panel factory takes: devtools passes `{ root, mode }`; the rest is for tests and custom setups. */
 export type GrimoirePanelContext = {
   /** The app root. */
   root: string;
+  /**
+   * Where the dashboard runs. In `"production"` the tab writes no files:
+   * it reads the book as it is on disk. Default: development.
+   */
+  mode?: "development" | "production";
   /** The adapter to open the book with. Default: the Warlock adapter, loaded on first request. */
   adapter?: BookAdapter | (() => Promise<BookAdapter>);
   /** How long an opened snapshot is reused when the book manifest did not change (ms). Default 2000, longer after a slow open. */
@@ -61,10 +68,11 @@ function one(query: GrimoirePanelRequest["query"], name: string): string | undef
 export async function grimoireDevtoolsPanel(
   context: GrimoirePanelContext,
 ): Promise<GrimoireDevtoolsPanel> {
-  // The tab keeps Warlock's generated files (book, book maps, indexes) up to date, so the next
-  // open is incremental. Agent-written files are only read, and cached routes never boot the app.
+  // In development the tab keeps Warlock's generated files (book, book maps, indexes) up to date, so
+  // the next open is incremental. In production it writes nothing. Agent-written files are only read,
+  // and cached routes never boot the app.
   const source = createSnapshotSource(context.root, {
-    write: true,
+    write: context.mode !== "production",
     ...(context.adapter === undefined ? {} : { adapter: context.adapter }),
     ...(context.ttlMs === undefined ? {} : { ttlMs: context.ttlMs }),
   });
@@ -76,6 +84,7 @@ export async function grimoireDevtoolsPanel(
   return {
     id: "grimoire",
     title: "Grimoire",
+    production: true,
     view: new URL("../../ui/grimoire-view.js", import.meta.url),
     assets: { "grimoire.css": new URL("../../ui/grimoire.css", import.meta.url) },
     routes: [

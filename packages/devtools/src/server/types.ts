@@ -1,9 +1,11 @@
 import type { RequestLogFilter, RequestLogRecord, RequestLogSummary } from "@warlock.js/core";
+import type { FastifyRequest } from "fastify";
 import type { DevtoolsRequestSource } from "../production/capture/types";
 import type {
   DevtoolsExplainResult,
   DevtoolsInstanceInfo,
   DevtoolsMode,
+  DevtoolsRole,
 } from "../production/contracts";
 import type { DevtoolsInsights } from "../production/insights/types";
 import type { DevtoolsAgentTraceSource } from "../sources/agent-trace-source";
@@ -39,6 +41,22 @@ export type DevtoolsRequestLogSource = {
   curl(record: RequestLogRecord, baseUrl?: string): string;
   /** Compile a filter into a predicate over list rows; throws on a bad value. */
   compile(filter: RequestLogFilter): (row: RequestLogSummary) => boolean;
+};
+
+/**
+ * One open live stream of a signed-in session (production). Opening it
+ * counts against the per-session and per-instance limits; `release` frees the
+ * slot when the stream ends.
+ */
+export type DevtoolsStreamSession = {
+  role: DevtoolsRole;
+  /** Log levels the stream forwards. */
+  logLevels: readonly string[];
+  /** Headers the dashboard adds to every answer (the stream reply is hijacked, so the route sets them). */
+  headers: Readonly<Record<string, string>>;
+  /** Whether the dashboard is still open and the session still signed in; checked at every ping. */
+  revalidate(): Promise<boolean>;
+  release(): void;
 };
 
 /**
@@ -80,4 +98,10 @@ export type MountDevtoolsRoutesDeps = {
   explainShape?: (shapeId: string) => Promise<DevtoolsExplainResult>;
   /** Built-in tab ids to list in `GET /api/panels` (default: every built-in tab). */
   builtInPanels?: readonly string[];
+  /**
+   * Production: reserves a stream slot for the request's session (throws a
+   * `DevtoolsApiError` `stream.too-many` over the limits). Absent in
+   * development.
+   */
+  streamSession?: (request: FastifyRequest) => Promise<DevtoolsStreamSession>;
 };

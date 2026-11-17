@@ -232,6 +232,12 @@ function fixture(overrides: Partial<ReleaseFamilyDependencies> = {}): {
       text: "strictness-gate: owned diagnostics / allowance\n  (fixture) 0 / 0 OK",
       packages: [],
     }),
+    // The devtools dashboard gate is faked too: the real one rebuilds Vite.
+    runDevtoolsUiGate: async () => ({
+      ok: true,
+      problems: [],
+      sizes: { files: {}, gzipBytes: 0, budgetGzipBytes: 307200 },
+    }),
     ...overrides,
   };
   return { dependencies, commands, handoffs, gateInputs };
@@ -3291,6 +3297,34 @@ describe("public text release gate", () => {
       runReleaseFamily({ mode: "gate", version: VERSION, ...FULL_MATRIX }, control.dependencies),
       /Private references in public text/,
     );
+    assert.ok(!control.commands.some((request) => request.args.includes("build")));
+  });
+});
+
+describe("devtools dashboard gate wiring", () => {
+  it("a stale or over-budget dashboard bundle refuses the gate, lists the problems, and produces no handoff", async () => {
+    const control = fixture({
+      runDevtoolsUiGate: async () => ({
+        ok: false,
+        problems: [
+          "The shipped devtools dashboard is stale: its sources changed since the last build.",
+          "The devtools dashboard is 310.0 KB gzipped, over the 300 KB budget.",
+        ],
+        sizes: { files: {}, gzipBytes: 317440, budgetGzipBytes: 307200 },
+      }),
+    });
+
+    await assert.rejects(
+      runReleaseFamily({ mode: "gate", version: VERSION, ...FULL_MATRIX }, control.dependencies),
+      (error) => {
+        const message = (error as Error).message;
+        assert.match(message, /devtools dashboard bundle is not ready/);
+        assert.match(message, /is stale/);
+        assert.match(message, /over the 300 KB budget/);
+        return true;
+      },
+    );
+    assert.equal(control.handoffs.length, 0);
     assert.ok(!control.commands.some((request) => request.args.includes("build")));
   });
 });

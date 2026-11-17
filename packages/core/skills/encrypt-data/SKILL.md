@@ -1,6 +1,6 @@
 ---
 name: encrypt-data
-description: 'Reversible AES-256-GCM `encrypt` / `decrypt` for secrets you need to read back; one-way HMAC-SHA256 `hmacHash` for deterministic fingerprints (lookup/dedup of encrypted columns). Keys come from `src/config/encryption.ts`. Triggers: `encrypt`, `decrypt`, `hmacHash`, `EncryptionConfigurations`, `APP_ENCRYPTION_KEY`, `APP_HMAC_KEY`; "store an API key reversibly", "fingerprint an encrypted column for lookup", "AES-256-GCM secret", "HMAC-SHA256 dedup key"; typical import `import { encrypt, decrypt, hmacHash } from "@warlock.js/core"`. Skip: password hashing — the `hash-password` topic; config wiring — the `configure-app` topic; competing libs Node `crypto` direct, `crypto-js`, `libsodium-wrappers`.'
+description: 'Reversible AES-256-GCM `encrypt` / `decrypt` for secrets you need to read back; one-way HMAC-SHA256 `hmacHash` for deterministic fingerprints (lookup/dedup of encrypted columns). Keys come from `src/config/encryption.ts`. Triggers: `encrypt`, `decrypt`, `hmacHash`, `EncryptionConfigurations`, `APP_ENCRYPTION_KEY`, `APP_HMAC_KEY`; "store an API key reversibly", "fingerprint an encrypted column for lookup", "AES-256-GCM secret", "HMAC-SHA256 dedup key"; typical import `import { encrypt, decrypt, hmacHash } from "@warlock.js/core"`. Also one-time codes: `generateTotpSecret`, `totpCode`, `verifyTotp`, `totpUri` (authenticator-app second factor). Skip: password hashing — the `hash-password` topic; config wiring — the `configure-app` topic; competing libs Node `crypto` direct, `crypto-js`, `libsodium-wrappers`.'
 ---
 
 # Warlock — encrypt and fingerprint
@@ -188,6 +188,28 @@ if (existing) return existing.get("result");
 ```
 
 Same payload → same key → returns the cached result. Different keys (because the HMAC is keyed) per environment if you set different `hmacKey` values.
+
+## One-time codes — `generateTotpSecret`, `totpCode`, `verifyTotp`, `totpUri`
+
+Authenticator-app codes (RFC 6238: HMAC-SHA1, 6 digits, 30-second steps). Pure functions, no config. Keep the secret with `encrypt`.
+
+```ts
+import { decrypt, encrypt, generateTotpSecret, totpUri, verifyTotp } from "@warlock.js/core";
+
+const secret = generateTotpSecret(); // base32, no padding
+const uri = totpUri({ secret, account: "ada@example.com", issuer: "My App" });
+const stored = encrypt(secret);
+
+const step = verifyTotp(decrypt(stored), "492039"); // matched step, or null
+const lastStep = 0 as number | null; // the last accepted step, saved with the account
+
+if (step === null || (lastStep !== null && step <= lastStep)) {
+  throw new Error("The code is not valid");
+}
+```
+
+- `verifyTotp` accepts `window` steps either side (default 1), compares in constant time, takes only `^\d{6}$` (spaces ignored) and returns the matched step. Save it and refuse a step that is not newer, so a code cannot be replayed.
+- `totpCode(secret, at?)` gives the code for a moment (tests, tooling). Count wrong codes toward a rate limit.
 
 ## Gotchas
 

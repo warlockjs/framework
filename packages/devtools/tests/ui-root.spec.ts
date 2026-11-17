@@ -9,7 +9,7 @@ describe("resolveUiRoot", () => {
     const uiRoot = resolveUiRoot();
 
     expect(uiRoot).toBe(path.resolve(__dirname, "../ui"));
-    expect(existsSync(path.join(uiRoot, "index.html"))).toBe(true);
+    expect(existsSync(path.join(uiRoot, "panels", "processes.js"))).toBe(true);
   });
 
   it("caches the resolved path across calls", () => {

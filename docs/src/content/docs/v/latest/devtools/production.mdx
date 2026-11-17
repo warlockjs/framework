@@ -1,0 +1,324 @@
+---
+title: Devtools in production
+description: Run the devtools monitor in production at a secret path, behind accounts with two-factor sign-in, with sampled capture, shared state across instances and a disable switch.
+---
+
+The production monitor shows a running app's requests, queries, errors, resources, health and jobs in the browser,
+without a shell on the server. It is **off unless you turn it on**. With no production configuration, nothing is
+mounted and nothing is captured, so it costs nothing. Development is unchanged: see [Devtools](/v/latest/devtools/).
+
+How it is protected is in [Devtools security](/v/latest/devtools/security/). Read it before you turn the monitor on.
+
+## Install
+
+In production the package must be installed, so it is a regular dependency (not a development one):
+
+```bash
+npm install @warlock.js/devtools
+```
+
+Register the connector, the migrations and the commands in `warlock.config.ts`:
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+import { devtoolsConnector } from "@warlock.js/devtools";
+import { devtoolsMigrations, registerDevtoolsCommands } from "@warlock.js/devtools/production";
+
+export default defineConfig({
+  connectors: [devtoolsConnector()],
+  cli: { commands: [registerDevtoolsCommands()] },
+  database: { migrations: [...devtoolsMigrations] },
+});
+```
+
+`warlock dev` skips its own automatic registration when a `devtools` connector is configured, so development works as
+before.
+
+Turn the monitor on in `src/config/devtools.ts`. It stays a plain object that reads the environment:
+
+```ts title="src/config/devtools.ts"
+import { env } from "@warlock.js/core";
+
+export default {
+  panels: ["@warlock.js/grimoire/devtools"],
+  production: {
+    enabled: env("DEVTOOLS_ENABLED", false),
+    trustedProxies: ["loopback"],
+  },
+};
+```
+
+`DEVTOOLS_ENABLED` is your own variable here; devtools reads only the `production` object. Run the migrations once per
+database:
+
+```bash
+npx warlock migrate
+```
+
+The accounts, sessions, audit log, request samples and instance reports live in your app's database through Cascade
+(MongoDB or SQL). No cache driver is needed. The monitor needs `encryption.key` (64 hex characters) in
+`src/config/encryption.ts`, because two-factor secrets are stored encrypted with it.
+
+## Environment variables
+
+| Variable                 | Required                                     | Meaning                                                                                                                        |
+| ------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `DEVTOOLS_PATH`          | Yes                                          | The dashboard path, for example `/ops-7f3k2q9x`. Starts with `/`, at least 8 characters, only letters, digits, `-_./`.        |
+| `DEVTOOLS_ADMIN_EMAIL`   | While no admin exists                        | The first admin.                                                                                                               |
+| `DEVTOOLS_ADMIN_PASSWORD` | One of these two while no admin exists      | A first password. It works until it is changed at the first sign-in, which is forced. It must pass the password rules.         |
+| `DEVTOOLS_SETUP_TOKEN`   | One of these two while no admin exists       | At least 32 characters (`openssl rand -base64 32`). The admin opens `<origin><path>/#/setup/<token>` and chooses a password.   |
+
+Set either the password or the setup token, not both. The path is never logged in full: the boot log shows only
+its first characters. Pick a path nobody can guess; it is one layer of protection, not the only one.
+
+## First sign-in
+
+With `DEVTOOLS_ADMIN_PASSWORD`:
+
+1. Open `https://<your-app><path>/` and sign in with `DEVTOOLS_ADMIN_EMAIL` and the password.
+2. The dashboard asks you to choose a new password. The environment password is never applied again.
+3. Scan the QR code with an authenticator app and enter the 6-digit code. Or add a passkey, if passkeys are available.
+4. Save the 10 recovery codes shown once. Each works one time.
+
+With `DEVTOOLS_SETUP_TOKEN`, open the setup link instead, choose a password, then continue from step 3.
+
+After the first admin exists, you can remove both variables from the environment.
+
+## Users and roles
+
+| Role     | Can do                                                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `viewer` | Read every enabled tab. Manage their own account, password, second factors and sessions.                                 |
+| `admin`  | Everything a viewer can, plus: invite and remove users, change roles, reset a user's second factors, read the audit log, run EXPLAIN, clear requests, disable the dashboard and use write actions of package panels. |
+
+An admin invites a user from **Admin, Users**: enter the email and role, then copy the link and send it yourself.
+No mail is sent. The link:
+
+- is valid for 24 hours and works once,
+- is tied to the invited email,
+- can be revoked from the same screen,
+- keeps its token after the `#`, so the token never appears in server logs.
+
+The last admin cannot be removed or demoted, and nobody can remove or demote their own account.
+
+## Two-factor sign-in
+
+`twoFactor: "admins"` (the default) requires a second factor for admins and lets viewers add one. `"everyone"`
+requires it for all accounts.
+
+- **Authenticator app**: any TOTP app. A code cannot be used twice.
+- **Passkeys**: install `@simplewebauthn/server` (the same optional package `@warlock.js/auth` uses). Without it the
+  dashboard offers the authenticator app only. Set `passkeys.rpId` and `origin` when the app is served on more than one
+  host.
+- **Recovery codes**: 10 single-use codes. Regenerate them from the account page.
+
+An admin can reset another user's second factors. If the last admin loses theirs, see [Recovery](#recovery).
+
+## Disable and re-enable
+
+An admin can close the dashboard from **Admin, Settings, Disable**. Every instance reads the switch within 5 seconds,
+and it survives restarts. While disabled, every dashboard URL answers a plain 404.
+
+To open it again:
+
+- run `npx warlock devtools:enable`, or
+- deploy with a new `DEVTOOLS_PATH`. A disable switch matches only the path it was set for. Use this after a leak.
+
+## Recovery
+
+If no admin can sign in, run on the server:
+
+```bash
+npx warlock devtools:reset-admin --email you@example.com
+```
+
+It creates or resets that account as an admin, prints a temporary password you must change at sign-in, removes its
+second factors and recovery codes, unlocks it and signs out its sessions. Without `--email` it uses
+`DEVTOOLS_ADMIN_EMAIL`. It talks to the database only and writes an audit entry from `cli`.
+
+`devtools:enable` also clears a global sign-in lock and resets the failure counts.
+
+## Several instances
+
+Many apps run as several processes (pm2 cluster workers, several machines). Everything shared lives in the database:
+
+| Shared by every instance                                       | Per instance                                              |
+| -------------------------------------------------------------- | --------------------------------------------------------- |
+| Accounts, sessions, invites, audit log, the disable switch      | The live event stream (new requests and logs as they happen) |
+| Stored request samples                                          | The in-memory list of sampled requests                    |
+| Resource history, query and route statistics, errors, health, jobs, merged from each instance's report | The query text kept for EXPLAIN                |
+
+Each process writes one report row every 10 seconds (`reportIntervalMs`). The dashboard merges the reports. The
+**instance picker** in the header selects *All instances* (the default) or one process. The live stream follows the
+instance that served your connection.
+
+## What is captured
+
+One random draw per request decides whether it is **sampled** (`sampleRate`, 0.1 by default).
+
+- A sampled request is captured fully: phases, queries, cache counts and logs. It feeds the query, route and error
+  statistics, and is stored for `requestRetentionHours` (24).
+- An unsampled request does no capture work. If it is slow (`slowRequestMs`, 1000) or fails (5xx or thrown), it is kept
+  as a summary without a timeline, and its error is recorded.
+- A query that is at least `slowQueryMs` (200) outside a sampled request only updates the slowest example of its shape.
+- Work outside a request is sampled per query at `sampleRate`.
+
+Memory is bounded per process: 200 sampled requests, 200 queries per request, 500 query shapes, 300 routes and 100 error
+groups. The oldest are dropped first. Each process writes at most `maxStoredSamplesPerMinute` (120) samples per minute.
+
+### What is removed
+
+Nothing that leaves the process (the API, the database, the live stream) carries a value:
+
+| Item     | Kept                                                                                      | Removed                                              |
+| -------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Request  | Id, method, path (no query string), route pattern, status, timing, error message          | Headers, body, query string, params                  |
+| Query    | Connection, driver, shape (SQL with placeholders), collection, command, timing, row count, error message | SQL literals, bindings, Mongo filter and pipeline values, caller file path |
+| Log      | Level, module, action, message, time                                                       | `context`                                            |
+| Phase    | Name, start, duration                                                                      | `attrs`                                              |
+| Cache    | Hit, miss and write counts                                                                 | Keys and tags                                        |
+| N+1      | Shape, count, message                                                                      | Caller location                                      |
+
+Headers and bodies appear only through core's [request log](/v/latest/core/digging-deeper/request-log/), which
+applies its own allowlist and redaction. The dashboard's own requests are never captured and never written to that log.
+
+## EXPLAIN
+
+Admins can explain a query shape from the **Queries** tab. Only the process that ran the query holds the example, so
+EXPLAIN asks that process; from another one it answers that the example is elsewhere, and you can try again.
+
+- PostgreSQL: `EXPLAIN (FORMAT JSON)` for `SELECT` and `WITH`.
+- MongoDB: `explain` with `queryPlanner` verbosity for `find`, `aggregate` and `count`.
+
+These plans do not run the query. Plans that do (PostgreSQL `EXPLAIN ANALYZE`, MongoDB `executionStats`) run only with
+`explain: { executing: true }`, and only for those read statements. They run the real query against your production
+database, so turn them on only when you accept the load. Every run is audited.
+
+## Tabs in production
+
+| Tab                                                              | In production                                 |
+| ---------------------------------------------------------------- | --------------------------------------------- |
+| Requests, Queries, Routes, Resources, Health, Errors, Logs, Jobs | On                                            |
+| Mail, AI, Agents, API, Processes                                 | Off unless `panels` sets the id to `true`     |
+| A package panel (such as Grimoire)                               | On when it declares `production: true`, or `panels` sets its id to `true` |
+
+`panels: { mail: false }` turns any tab off. In a package panel, GET routes need a signed-in user; every other method
+needs an admin, the CSRF header, and is audited. The Grimoire tab is read-only in production. See
+[Registering a panel](/v/latest/devtools/panels/).
+
+## Behind a proxy
+
+By default the socket address is the client and the request's own protocol and host are used. A forwarded header is
+read only when the socket peer is listed in `trustedProxies`. Without it, `requireHttps` fails behind a TLS-terminating
+proxy and the dashboard answers 404. Example for nginx on the same machine:
+
+```nginx
+location / {
+  proxy_pass http://127.0.0.1:3000;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_buffering off;
+}
+```
+
+Set `trustedProxies: ["loopback"]` for this. Entries can be IP addresses, CIDR ranges, `"loopback"` or `"private"`.
+`proxy_buffering off` lets the live view reach the browser at once. The dashboard also sends `X-Accel-Buffering: no`,
+which nginx honours when buffering is on.
+
+## Performance
+
+TODO(coordinator): add the benchmark numbers from the overhead benchmark (unsampled cost per request, blended cost at the
+default sample rate, throughput change with the monitor off and on) and the version they were measured on.
+
+With the monitor off, nothing is attached. With it on, a request that is not sampled does one random draw and a timing
+check.
+
+## Options
+
+All of them are optional. Only `enabled` must be set; the path and first admin come from the environment.
+
+| Option                      | Default               | Meaning                                                                                                   |
+| --------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------- |
+| `enabled`                   | `false`               | Turn the monitor on in production.                                                                        |
+| `path`                      | `DEVTOOLS_PATH`       | The dashboard path. Prefer the environment variable.                                                      |
+| `sampleRate`                | `0.1`                 | Share of requests captured fully, 0 to 1.                                                                 |
+| `slowRequestMs`             | `1000`                | An unsampled request at least this slow is kept as a summary.                                             |
+| `slowQueryMs`               | `200`                 | A query this slow updates its shape's slowest example even outside a sampled request.                     |
+| `maxRequests`               | `200`                 | Sampled requests kept in memory per process.                                                              |
+| `requestRetentionHours`     | `24`                  | How long stored samples are kept.                                                                         |
+| `maxStoredSamplesPerMinute` | `120`                 | Most samples one process writes per minute.                                                               |
+| `reportIntervalMs`          | `10000`               | How often each process writes its report.                                                                 |
+| `trustedProxies`            | `[]`                  | Proxies whose forwarded headers are believed.                                                             |
+| `requireHttps`              | `true`                | Answer only HTTPS requests. Turn off only to try it locally.                                              |
+| `allowedIps`                | `[]`                  | When set, only these IPs or CIDR ranges reach the dashboard.                                              |
+| `origin`                    | `null`                | The public origin (`https://app.example.com`), for the CSRF check and passkeys.                           |
+| `session.idleMinutes`       | `30`                  | Signed out after this many idle minutes.                                                                  |
+| `session.maxHours`          | `8`                   | Signed out after this many hours.                                                                         |
+| `twoFactor`                 | `"admins"`            | `"admins"` or `"everyone"`.                                                                               |
+| `rateLimits.windowMinutes`  | `15`                  | The sliding window for failed sign-ins.                                                                   |
+| `rateLimits.account`        | `5`                   | Failures per account before it is refused for the window.                                                 |
+| `rateLimits.ip`             | `20`                  | Failures per IP before it is refused for the window.                                                      |
+| `rateLimits.global`         | `100`                 | Failures in total before the whole dashboard answers 404.                                                 |
+| `rateLimits.lockMinutes`    | `15`                  | How long that lock lasts.                                                                                 |
+| `explain.executing`         | `false`               | Allow executing plans. See [EXPLAIN](#explain).                                                           |
+| `panels`                    | `{}`                  | Turn tabs on or off by id.                                                                                |
+| `logLevels`                 | `["warn", "error"]`   | Log levels the Logs tab keeps outside sampled requests.                                                   |
+| `auditRetentionDays`        | `90`                  | How long audit entries are kept.                                                                          |
+| `passkeys.rpName`           | `"Warlock monitor"`   | The name authenticators show.                                                                             |
+| `passkeys.rpId`             | host of `origin`      | The WebAuthn relying party id.                                                                            |
+
+An invalid value stops the boot with `DT007`, naming the option.
+
+## Startup errors
+
+When the monitor is enabled but cannot start safely, the app refuses to boot with a `DevtoolsProductionConfigError`.
+A deploy fails at once instead of exposing a half-protected dashboard. `DEVTOOLS_CONFIG_CODES` lists the messages.
+
+| Code    | Message and fix                                                                                                                                                     |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DT001` | Needs a dashboard path. Set `DEVTOOLS_PATH` (for example `/ops-7f3k2q`) or `devtools.production.path`.                                                               |
+| `DT002` | The path must start with `/`, be at least 8 characters, use only letters, digits, `-`, `_`, `.` and `/`, and not be `/__warlock`.                                    |
+| `DT003` | No admin yet. Set `DEVTOOLS_ADMIN_EMAIL` with `DEVTOOLS_ADMIN_PASSWORD` or `DEVTOOLS_SETUP_TOKEN`, or run `warlock devtools:reset-admin --email <email>`.            |
+| `DT004` | `DEVTOOLS_ADMIN_PASSWORD` breaks the password rules (at least 8 characters, at most 72 bytes, not a common password, not the email). Choose another one.            |
+| `DT005` | The accounts are stored in the database. Install `@warlock.js/cascade` and configure a database connection.                                                         |
+| `DT006` | Two-factor secrets are encrypted with the app key. Set `encryption.key` (64 hex characters) in `src/config/encryption.ts`.                                           |
+| `DT007` | An option has an invalid value. The message names the option and the accepted values.                                                                               |
+| `DT008` | The devtools tables are missing. Add `devtoolsMigrations` to `database.migrations` in `warlock.config.ts` and run `warlock migrate`.                                 |
+| `DT009` | Set either `DEVTOOLS_ADMIN_PASSWORD` or `DEVTOOLS_SETUP_TOKEN`, not both.                                                                                           |
+| `DT010` | `DEVTOOLS_SETUP_TOKEN` must be at least 32 characters. Generate one with `openssl rand -base64 32`.                                                                 |
+
+## Troubleshooting
+
+### Every dashboard URL answers 404
+
+That is by design: the dashboard hides itself. A 404 can mean:
+
+- The monitor is **not enabled** (`production.enabled` is not `true`) or the app was not restarted after changing it.
+- The dashboard is **disabled** by an admin. Run `warlock devtools:enable`.
+- The dashboard is **locked** after too many failed sign-ins. It reopens after `rateLimits.lockMinutes`, or run
+  `warlock devtools:enable`.
+- The request is **not HTTPS**. Behind a proxy, set `trustedProxies` and forward `X-Forwarded-Proto`.
+- The client IP is **not in `allowedIps`**, or the proxy hides the real IP. Check `trustedProxies` and
+  `X-Forwarded-For`.
+- You have **no session**. Only the login page is public; open `<path>/`, not a deeper URL.
+- The **path is wrong**. It must match `DEVTOOLS_PATH` exactly.
+
+Check the server log first (the boot line says whether the monitor mounted), then the audit log (**Admin, Audit**) for
+`dashboard.disabled`, `dashboard.locked` and `login.blocked` entries.
+
+TODO(coordinator): confirm which of these cases the server log names once the gate is implemented, and add the exact
+log lines.
+
+### The live view does not update
+
+A proxy is buffering the stream. Turn buffering off for the dashboard path (see
+[Behind a proxy](#behind-a-proxy)). The other tabs refresh by polling and keep working.
+
+### Explain says the query is on another instance
+
+Only the process that ran the query can explain it. Try again, or pick that process in the instance picker.
+
+### Passkeys are not offered
+
+Install `@simplewebauthn/server`. Without it the dashboard offers the authenticator app only.

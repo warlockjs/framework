@@ -15,6 +15,17 @@ describe("queryShape", () => {
     );
   });
 
+  it("removes dollar-quoted strings and gives the same shape again from the remembered answer", () => {
+    const sql = "SELECT * FROM t WHERE a = $tag$ s3cr3t $tag$ AND b = $$ other $$ AND c = $1";
+
+    expect(queryShape({ driver: "postgres", sql })).toBe(
+      "SELECT * FROM t WHERE a = ? AND b = ? AND c = $1",
+    );
+    expect(queryShape({ driver: "postgres", sql })).toBe(
+      "SELECT * FROM t WHERE a = ? AND b = ? AND c = $1",
+    );
+  });
+
   it("normalizes Mongo leaf values and collapses leaf arrays", () => {
     expect(
       queryShape({

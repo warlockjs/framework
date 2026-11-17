@@ -1,0 +1,139 @@
+---
+title: Devtools security
+description: How the production monitor is protected, what it logs, what it keeps and for how long, and what admins and package panels can do.
+---
+
+The production monitor shows real data from a running app, so every layer assumes the one before it can fail. This page
+explains the layers. To set it up, see [Devtools in production](/v/latest/devtools/production/).
+
+## What a request goes through
+
+Every request under the dashboard path passes these checks in order. The first one that fails ends it.
+
+1. **Production mode.** In development the loopback guard applies instead, unchanged.
+2. **Open state.** If an admin disabled the dashboard, or it is locked after too many failed sign-ins, it answers 404.
+3. **HTTPS.** With `requireHttps` (the default), a request that did not arrive over HTTPS answers 404.
+4. **Allowed IPs.** When `allowedIps` is set, other clients get 404.
+5. **Route access.** Each route is public, for signed-in users, or for admins. An unknown route is treated as admin-only.
+6. **Session.** Anything but the public routes needs a valid session at the final sign-in stage. Without one, the answer is 404. A
+   viewer calling an admin route gets a `403` with `role.forbidden`, because they are signed in and hiding the route gains
+   nothing.
+7. **Unsafe methods** (POST, PUT, PATCH, DELETE): the origin check, a JSON body, and the CSRF header.
+8. **The handler.** An unexpected error answers `500` with a short reference id and no stack. The stack goes to the server log
+   with the same reference.
+
+## The uniform 404
+
+When the dashboard is closed to a request, it answers through your app's own not-found handler, with none of the
+dashboard's headers. The answer is the same as for any unknown URL of your app. A scanner cannot tell the dashboard
+exists. The login page is the one public exception, and only while the gate above is open.
+
+## Threats and controls
+
+| Threat                                | Control                                                                                                                                         |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scanners find the dashboard           | A secret path, the uniform 404, `noindex`, no full path in logs, exclusion from core's request log, `Referrer-Policy: no-referrer`.             |
+| Password guessing                     | Limits per account (5), per IP (20) and in total (100, which closes the whole path for 15 minutes), a common-password list, and two-factor for admins. |
+| Telling which accounts exist          | One message and the same response time for an unknown email, a wrong password and a locked account.                                            |
+| Sign-in used to burn CPU              | At most 4 password checks at once per process; beyond that the answer is a retry message. Blocked IPs are remembered in memory.                  |
+| Stolen session                        | The session cookie is `HttpOnly`, `Secure`, `SameSite=Strict`, limited to the dashboard path, and ends after 30 idle minutes or 8 hours. It is stored hashed. |
+| Session fixation                      | A new token is issued at sign-in and again when sign-in is complete.                                                                            |
+| Cross-site requests (CSRF)            | An origin check on every unsafe request, a per-session token in the `X-Devtools-Csrf` header, and JSON-only bodies. GET routes never change anything. |
+| Clickjacking                          | `frame-ancestors 'none'` and `X-Frame-Options: DENY`.                                                                                           |
+| Reading the API from another site     | Every CORS header is removed and preflights are never approved.                                                                                 |
+| A forged client IP or protocol        | Forwarded headers are read only from `trustedProxies`, which is empty by default.                                                               |
+| A viewer acting as an admin           | Unknown routes need an admin, the role is checked again inside every admin action, and the last admin cannot be removed or demoted.             |
+| A leaked invite link                  | The token is in the URL fragment, stored hashed, valid 24 hours, usable once, tied to the email, and revocable.                                  |
+| A leaked first password or setup link | The environment password must be changed at first sign-in and is never applied again. The setup token needs 32 characters.                       |
+| A stolen database                     | Passwords are hashed, tokens and recovery codes are stored as SHA-256 hashes, and two-factor secrets are encrypted with the app key.             |
+| A replayed one-time code              | A code from the same or an earlier time step is refused.                                                                                        |
+| A lost second factor                  | Ten recovery codes, a reset by another admin, and `warlock devtools:reset-admin` for shell access.                                              |
+| Personal data in captured requests    | Values are removed before storage (see the table in the production page). Samples are kept 24 hours by default.                                |
+| EXPLAIN running a statement           | Plain EXPLAIN only. Executing plans are opt-in, read statements only, admin only and audited.                                                   |
+| Script injection from captured text   | The dashboard escapes captured text. Mail HTML shows only in a sandboxed frame. The page policy allows scripts only from the dashboard itself.   |
+| A forgotten open dashboard            | Admins can disable it at any time. Re-enabling needs the CLI or a new path.                                                                     |
+| Someone triggering the global lock    | Accepted: the dashboard closes, which is the safe side. `warlock devtools:enable` opens it again.                                               |
+| The monitor slowing the app           | Sampling, bounded memory, a write budget for samples, a size cap on reports, and limits on live streams (3 per session, 50 per instance).      |
+| Audit tampering                       | No route removes audit entries. Only the retention clean-up does.                                                                               |
+| Weak configuration                    | The app refuses to boot (codes `DT001` to `DT010`).                                                                                             |
+
+## Cookies
+
+The cookie is named `__Secure-warlock-devtools` (`warlock-devtools` when `requireHttps` is `false`). It holds 32 random
+bytes, has no `Domain`, and has no expiry, so it ends with the browser session. The server also ends sessions after 30
+idle minutes (`session.idleMinutes`) and 8 hours (`session.maxHours`). Sign-in steps expire after 10 minutes.
+
+## Response headers
+
+Every dashboard response that is not a 404 carries `Cache-Control: no-store`, `X-Robots-Tag: noindex, nofollow,
+noarchive`, `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy: same-origin` and a restrictive
+`Permissions-Policy`. The HTML page also carries a `Content-Security-Policy` that allows scripts only from the dashboard's
+own origin. The API docs pages keep the policy they need.
+
+## Rate limits
+
+Failed sign-ins and failed second-factor checks are counted in the audit log over a sliding window (15 minutes):
+
+- 5 per account: that account is refused until the window clears,
+- 20 per IP,
+- 100 in total: the whole path answers 404 for 15 minutes.
+
+`warlock devtools:enable` resets the counts. The limits are options under `rateLimits`.
+
+## Audit log
+
+Admins read it from **Admin, Audit**. These events are written:
+
+| Group             | Events                                                                                                                       |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| First admin       | `admin.seeded`, `admin.reset`, `setup.completed`                                                                             |
+| Sign-in           | `login.succeeded`, `login.failed`, `login.blocked`, `mfa.succeeded`, `mfa.failed`, `logout`, `session.revoked`               |
+| Second factor     | `mfa.enrolled`, `mfa.removed`, `recovery-code.used`, `recovery-codes.regenerated`, `passkey.added`, `passkey.removed`       |
+| Account           | `password.changed`, `account.role-changed`, `account.removed`, `account.mfa-reset`, `account.signed-out`                     |
+| Invites           | `invite.created`, `invite.revoked`, `invite.accepted`                                                                        |
+| Dashboard state   | `dashboard.disabled`, `dashboard.enabled`, `dashboard.locked`                                                                |
+| Actions           | `explain.run`, `requests.cleared`, `panel.action`                                                                            |
+
+Entries hold the time, the event, the account, the client IP and short details. They never hold passwords, tokens, codes or
+query values.
+
+## What is kept, and for how long
+
+| Data                          | Where             | Kept                                                  |
+| ----------------------------- | ----------------- | ----------------------------------------------------- |
+| Accounts and hashed secrets   | Your database     | Until removed                                         |
+| Sessions                      | Your database     | Until they expire                                     |
+| Invites                       | Your database     | Until used, revoked or expired                        |
+| Audit entries                 | Your database     | `auditRetentionDays` (90)                             |
+| Request samples               | Your database     | `requestRetentionHours` (24)                          |
+| Instance reports              | Your database     | Replaced every 10 seconds; dropped when not seen for 5 minutes |
+| Sampled requests, query examples | Process memory | Until restart; bounded                                |
+
+A clean-up runs every 10 minutes in each process.
+
+## What admins can and cannot do
+
+Admins can invite, remove and demote other users, reset another user's second factors, sign users out, read the audit
+log, run EXPLAIN, clear stored requests, use the write actions of package panels, and disable the dashboard.
+
+Admins cannot read anyone's password or second-factor secret, remove or demote themselves, remove or demote the last
+admin, delete audit entries, or re-enable a disabled dashboard from the browser.
+
+## Package panels
+
+A package panel is code your project chose to install. Its view runs in the dashboard with the signed-in user's session
+and can call the dashboard's API. Install panels only from packages you trust. In production:
+
+- a panel appears only when it declares `production: true` or you set `panels[<id>]: true`,
+- its GET routes need a signed-in user,
+- every other method needs an admin and the CSRF header, and is written to the audit log as `panel.action`.
+
+See [Registering a panel](/v/latest/devtools/panels/).
+
+## Known limits
+
+- The live stream is per instance. Shared tabs read the database and refresh by polling.
+- EXPLAIN works only on the instance that holds the query example.
+- Anyone who can send many failed sign-ins can close the dashboard. That is the safe failure; an admin reopens it with
+  the CLI.

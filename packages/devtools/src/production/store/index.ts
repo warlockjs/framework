@@ -1,4 +1,4 @@
-export { createCascadeStore } from "./cascade-store";
+export { createCascadeStore, type CascadeStoreOptions } from "./cascade-store";
 export {
   createMemoryStore,
   defaultStateRecord,

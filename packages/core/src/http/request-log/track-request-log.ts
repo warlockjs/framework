@@ -3,6 +3,7 @@ import { log, type LogChannel } from "@warlock.js/logger";
 import type { Request } from "../request";
 import { buildRequestLogRecord, type RequestLogInput } from "./build-request-log-record";
 import { RequestLogFileChannel } from "./request-log-file-channel";
+import { isExcludedFromRequestLog } from "./request-log-exclusions";
 import { startRequestLog } from "./request-log-runtime";
 import {
   beginRequestLogScope,
@@ -113,6 +114,17 @@ export function writeRequestLogRecord(
   }
 }
 
+/** Whether the request's URL path is under a prefix registered with `excludeFromRequestLog`. */
+function isExcludedRequest(request: Request): boolean {
+  const url = (request.baseRequest as { url?: string } | undefined)?.url;
+
+  if (!url) return false;
+
+  const queryAt = url.indexOf("?");
+
+  return isExcludedFromRequestLog(queryAt === -1 ? url : url.slice(0, queryAt));
+}
+
 /**
  * Start tracking a request for the request log. Call once per request, and
  * only when {@link isRequestLogEnabled}. Collection runs while the request
@@ -125,6 +137,8 @@ export function trackRequestLog(request: Request, reply: FastifyReply): void {
   const id = request.id;
 
   try {
+    if (isExcludedRequest(request)) return;
+
     void startRequestLog();
     beginRequestLogScope(id);
 
@@ -149,6 +163,8 @@ export function finishRequestLog(
   durationMs: number,
 ): void {
   try {
+    if (isExcludedRequest(request)) return;
+
     const config = getRequestLogConfig();
     const status = reply.statusCode;
     const thrown = scope?.thrown !== undefined;

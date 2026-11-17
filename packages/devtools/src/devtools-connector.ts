@@ -8,11 +8,12 @@
  * this mirrors.
  */
 import type { Connector, ConnectorLifecyclePhase } from "@warlock.js/core";
-import { loadDevtoolsPanels } from "./panels";
+import { checkDevtoolsPanels, loadDevtoolsPanels } from "./panels";
 import { loadProcessPanel, processesDevtoolsPanel } from "./process-panel";
 import { createCollector } from "./collector";
 import { resolveDevtoolsOptions } from "./options";
-import type { DevtoolsRequestLogSource, DevtoolsRouteRow } from "./server";
+import { DEVTOOLS_PRODUCTION_DEFAULTS } from "./production/options";
+import type { DevtoolsRequestLogSource, DevtoolsRouteRow, MountDevtoolsRoutesDeps } from "./server";
 import { attachAgentTraceSource } from "./sources/agent-trace-source";
 import { attachAiSource } from "./sources/ai-source";
 import { attachCacheSource } from "./sources/cache-source";
@@ -49,21 +50,24 @@ export type DevtoolsConnectorOptions = DevtoolsOptions;
 /**
  * Construct the devtools connector.
  *
- * Refuses to run outside development: `boot()` checks
- * `Application.runtimeStrategy` and, when it isn't `"development"`, logs one
+ * Outside development, `boot()` checks `Application.runtimeStrategy` and
+ * `devtools.production.enabled`: unless both say production, it logs one
  * warning and returns without mounting a route or subscribing to anything.
- * In development it attaches every source (tracing, queries, cache, mail,
- * logs), loads the panels listed in the `panels` option, then mounts the
- * dashboard's routes on the HTTP server — before it
- * starts listening, the only point in the boot sequence where mounting is
- * possible (see `queue/src/dashboard-boot.ts` for the same constraint).
+ * With `enabled: true` in production it starts the signed-in production
+ * monitor (`bootProductionDevtools`), which refuses to boot when its
+ * configuration is incomplete. In development it attaches every source
+ * (tracing, queries, cache, mail, logs), loads the panels listed in the
+ * `panels` option, then mounts the dashboard's routes on the HTTP server —
+ * before it starts listening, the only point in the boot sequence where
+ * mounting is possible (see `queue/src/dashboard-boot.ts` for the same
+ * constraint).
  *
- * Apps don't call this: `warlock dev` registers it automatically when the
- * package is installed (`warlock add devtools`). Keep it OUT of
- * `warlock.config.ts` — devtools is a dev dependency, so a production
- * install doesn't have it and a config import of it would fail there.
- * Options come from the app's `src/config/devtools.ts` instead (a plain
- * object, no import of this package); options passed here win over it.
+ * In development apps don't call this: `warlock dev` registers it
+ * automatically when the package is installed (`warlock add devtools`). To
+ * run the production monitor, list `devtoolsConnector()` in
+ * `warlock.config.ts > connectors` (and keep the package in `dependencies`).
+ * Options come from the app's `src/config/devtools.ts` (a plain object, no
+ * import of this package); options passed here win over it.
  */
 export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Connector {
   let active = false;
@@ -81,19 +85,27 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
       const { Application, getHttpServer } = core;
       const { log } = await import("@warlock.js/logger");
 
-      if (Application.runtimeStrategy !== "development") {
-        log.warn(
-          "devtools",
-          "disabled",
-          "@warlock.js/devtools only runs in development; it is not mounted",
-        );
-        return;
-      }
-
       const resolved = resolveDevtoolsOptions({
         ...readConfiguredOptions(() => core.config),
         ...options,
       });
+
+      if (Application.runtimeStrategy === "production" && resolved.production?.enabled === true) {
+        disposers.push(await bootProduction(core, log, resolved));
+        active = true;
+
+        return;
+      }
+
+      if (Application.runtimeStrategy !== "development") {
+        log.warn(
+          "devtools",
+          "disabled",
+          "@warlock.js/devtools only runs in development unless devtools.production.enabled is true; it is not mounted",
+        );
+        return;
+      }
+
       const collector = createCollector(resolved);
 
       await attachSource(log, "tracing", () => attachTracingSource(collector, resolved));
@@ -121,6 +133,8 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
         taken: new Map([[builtIn.id, builtIn.title]]),
       });
 
+      const insightsWiring = await wireDevelopmentInsights(collector, resolved, log, disposers);
+
       mountDevtoolsRoutes(getHttpServer(), {
         collector,
         ai,
@@ -128,6 +142,7 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
         ...(processPanel ? { processPanel } : {}),
         panels,
         options: resolved,
+        ...insightsWiring,
         requestLog,
         isDevelopment: () => Application.runtimeStrategy === "development",
         warn: (message) => log.warn("devtools", "refused", message),
@@ -192,6 +207,145 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
   }
 
   return connector;
+}
+
+type ConnectorLogger = {
+  info: (module: string, action: string, message: string) => unknown;
+  warn: (module: string, action: string, message: string) => unknown;
+  error: (module: string, action: string, message: string) => unknown;
+};
+
+/**
+ * Development: the statistics, resources, health and jobs behind the
+ * Resources, Queries (statistics), Routes (statistics), Errors, Health and
+ * Jobs tabs. Wrapped as a whole: when anything fails to start, one line is
+ * logged and the dashboard mounts without insights (those tabs then say they
+ * are not available). It never stops the dashboard.
+ */
+async function wireDevelopmentInsights(
+  collector: ReturnType<typeof createCollector>,
+  resolved: ReturnType<typeof resolveDevtoolsOptions>,
+  log: ConnectorLogger,
+  disposers: DevtoolsDisposer[],
+): Promise<Pick<MountDevtoolsRoutesDeps, "instance" | "insights" | "explainShape">> {
+  const stops: DevtoolsDisposer[] = [];
+
+  try {
+    const capture = await import("./production/capture");
+    const insights = await import("./production/insights");
+    const instance = insights.createInstanceInfo();
+    const queries = capture.createQueryStats({
+      maxShapes: DEVTOOLS_PRODUCTION_DEFAULTS.maxShapes,
+      instance: instance.id,
+    });
+    const routes = capture.createRouteStats({
+      maxRoutes: DEVTOOLS_PRODUCTION_DEFAULTS.maxRoutes,
+      instance: instance.id,
+    });
+    const errors = capture.createErrorGroups({
+      maxGroups: DEVTOOLS_PRODUCTION_DEFAULTS.maxErrorGroups,
+    });
+    const logs = capture.createRecentLogs({ maxEntries: 200 });
+
+    stops.push(
+      capture.attachDevelopmentStats(collector, {
+        queries,
+        routes,
+        errors,
+        logs,
+        nPlusOneThreshold: resolved.nPlusOneThreshold,
+      }),
+    );
+
+    const resources = insights.createResourceMonitor();
+    const health = insights.createHealthHistory();
+
+    resources.start();
+    health.start();
+    stops.push(
+      () => resources.stop(),
+      () => health.stop(),
+    );
+
+    const reporter = insights.createLocalReporter({
+      instance,
+      resources,
+      health,
+      jobs: insights.createJobsReader(),
+      queries,
+      routes,
+      errors,
+      logs,
+      counters: null,
+    });
+    const explainShape = capture.createShapeExplainer({
+      queries,
+      executing: false,
+      instance: instance.id,
+    });
+
+    disposers.push(...stops);
+
+    return { instance, insights: insights.createLocalInsights(reporter), explainShape };
+  } catch (error) {
+    for (const stop of stops) {
+      try {
+        stop();
+      } catch {
+        // Cleanup after a failed start must not hide the reason.
+      }
+    }
+
+    log.warn(
+      "devtools",
+      "insights-failed",
+      `devtools' statistics could not start, so the Resources, Queries, Routes, Errors, Health and Jobs tabs are not available: ${error instanceof Error ? error.message : String(error)}`,
+    );
+
+    return {};
+  }
+}
+
+/**
+ * Starts the production monitor: loads the panels in production mode and
+ * hands everything to `bootProductionDevtools`, which refuses to boot (throws
+ * `DevtoolsProductionConfigError`) when the configuration is incomplete.
+ */
+async function bootProduction(
+  core: typeof import("@warlock.js/core"),
+  log: ConnectorLogger,
+  resolved: ReturnType<typeof resolveDevtoolsOptions>,
+): Promise<DevtoolsDisposer> {
+  const { bootProductionDevtools } = await import("./production/boot");
+  const requestLog = await findRequestLogSource();
+  // The Processes panel reads an app file; load it only when the project turned that tab on.
+  const processPanel =
+    resolved.production?.panels?.processes === true ? await loadProcessPanel() : undefined;
+  const builtIn = processesDevtoolsPanel(processPanel);
+  const packagePanels = await loadDevtoolsPanels(resolved.panels ?? [], {
+    root: "rootPath" in core ? core.rootPath() : process.cwd(),
+    warn: (message) => log.warn("devtools", "panel", message),
+    taken: new Map([[builtIn.id, builtIn.title]]),
+    mode: "production",
+  });
+  const postmanBuilder = await findPostmanBuilder();
+
+  return bootProductionDevtools({
+    options: resolved,
+    env: process.env,
+    server: core.getHttpServer(),
+    panels: [...checkDevtoolsPanels([builtIn]), ...packagePanels],
+    routes: {
+      ...(processPanel ? { processPanel } : {}),
+      ...(requestLog ? { requestLog } : {}),
+      listRoutes: () => listRoutes(),
+      getOpenApiDocument: () => getOpenApiDocument(),
+      ...(postmanBuilder
+        ? { getPostmanCollection: async () => unwrapCollection(await postmanBuilder()) }
+        : {}),
+    },
+    log,
+  });
 }
 
 /** Runs `EXPLAIN (FORMAT JSON)` for a stored Postgres query on its own connection. */

@@ -1,14 +1,19 @@
 # @warlock.js/devtools
 
-A development-only dashboard for Warlock.js apps, served at `/__warlock`:
+A dashboard for Warlock.js apps. It runs in two modes:
+
+- **Development**: served at `/__warlock`, for loopback clients only, with no sign-in.
+- **Production monitor**: opt-in, served at a secret path behind accounts and two-factor sign-in.
+
+It shows:
 
 - a **request timeline**: router and page middleware, loaders, page cache, render and deferred values;
-- every **SQL and Mongo query**, with `EXPLAIN` for Postgres;
+- every **SQL and Mongo query**, with `EXPLAIN`, and per-shape statistics;
 - **N+1 warnings** that name the file and line;
-- a **dev mailbox** with every mail your app sent;
-- **logs**, **cache operations** and the **route map**.
+- **routes**, **errors**, **logs**, **resources**, **health** and **jobs**;
+- a **dev mailbox**, **cache operations**, and AI and agent traces in development.
 
-## Install
+## Install for development
 
 ```bash
 warlock add devtools
@@ -16,17 +21,25 @@ warlock dev
 # open http://localhost:<port>/__warlock
 ```
 
-That's all: `warlock dev` loads it automatically. Don't add it to
-`warlock.config.ts`; it's a dev dependency, so a production install doesn't
-have it.
+`warlock dev` loads it automatically. In development, nothing needs configuring.
+
+## Production in five lines
+
+1. Install it as a regular dependency: `npm install @warlock.js/devtools`.
+2. Add `devtoolsConnector()`, `registerDevtoolsCommands()` and `devtoolsMigrations` to `warlock.config.ts`
+   (from `@warlock.js/devtools` and `@warlock.js/devtools/production`), then run `warlock migrate`.
+3. Set `production: { enabled: true }` in `src/config/devtools.ts`.
+4. Set `DEVTOOLS_PATH`, `DEVTOOLS_ADMIN_EMAIL` and `DEVTOOLS_ADMIN_PASSWORD` (or `DEVTOOLS_SETUP_TOKEN`) in the environment.
+5. Open `https://<your-app><DEVTOOLS_PATH>/` and sign in.
+
+Without `production.enabled`, nothing is mounted and nothing is captured. The app refuses to start when the monitor
+is enabled but misconfigured. Full guide: https://warlock.js.org/v/latest/devtools/production/
 
 ## Safe by construction
 
-- It isn't installed in production (it's a dev dependency).
-- If it is present anyway, it refuses to run outside development.
-- It answers loopback clients only. Anything else gets a 404, and
-  `X-Forwarded-For` can't unlock it.
-- Everything lives in memory, and nothing is written to disk.
+- In development it answers loopback clients only. Anything else gets a 404, and `X-Forwarded-For` cannot unlock it.
+- In production it is off until you enable it, answers a plain 404 to anyone without a session, and removes
+  request values before anything is stored.
 
 Full guide: [`skills/SKILL.md`](skills/SKILL.md).
 

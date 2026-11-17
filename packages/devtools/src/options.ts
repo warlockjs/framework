@@ -25,5 +25,6 @@ export function resolveDevtoolsOptions(options: DevtoolsOptions = {}): ResolvedD
     allowedHosts: options.allowedHosts ?? [],
     allowProxied: options.allowProxied ?? false,
     panels: options.panels ?? [],
+    ...(options.production === undefined ? {} : { production: options.production }),
   };
 }

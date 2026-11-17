@@ -3,7 +3,7 @@ title: Registering a panel
 description: Add your own tab to the devtools dashboard, with data routes behind the devtools guard and a browser view module that devtools serves.
 ---
 
-A package or an app can add its own tab to the dashboard at `/__warlock`. A
+A package or an app can add its own tab to the dashboard at `/__warlock` (or at the secret path in production). A
 panel declares three things:
 
 - an **id** and a **title**: the tab,
@@ -13,6 +13,10 @@ panel declares three things:
   when the tab opens.
 
 The built-in **Processes** tab is registered this way.
+
+The dashboard is a React app. It mounts every panel's view module inside its shell and passes the same context as
+before, so existing panels keep working unchanged. The page styles of a view that relied on the old dashboard's CSS
+classes may look different.
 
 ## Turn a panel on: one line
 
@@ -25,9 +29,9 @@ export default {
 ```
 
 The config stays a plain object: devtools imports the listed module itself,
-only in development, after it has checked that the app runs in development.
-Nothing is imported in production, and the production build bundles nothing
-from it.
+after it has checked where the app runs. Without the
+[production monitor](/v/latest/devtools/production/) nothing is imported in
+production, and the build bundles nothing from it.
 
 An entry is one of:
 
@@ -69,8 +73,7 @@ const queuePanel: DevtoolsPanelExport = ({ root }) => ({
 export default queuePanel;
 ```
 
-Use `import type` only: the module must not need devtools at runtime, because
-devtools is a development dependency.
+Use `import type` only: the module must not need devtools at runtime.
 
 ### The panel fields
 
@@ -81,11 +84,13 @@ devtools is a development dependency.
 | `view`   | yes      | The browser module: an absolute file path or a `file:` URL. It must exist when devtools starts.            |
 | `routes` | no       | Data routes: `{ method?, path, handler }`.                                                                 |
 | `assets` | no       | More files by served name: `{ "chart.js": <path or file: URL> }`. Plain file names, no folders.            |
+| `production` | no   | `true` when the panel is safe to show in the [production monitor](/v/latest/devtools/production/). Without it the panel is left out in production unless the project sets `production.panels[<id>]: true`. |
 
 An id that another panel already uses is refused with a message naming that
 panel. The dashboard's own ids (`requests`, `ai`, `agents`, `queries`, `mail`,
 `logs`, `routes`, `api`, and the API names `mails`, `background`, `stream`,
-`docs`, `assets`, `panels`) and the built-in `processes` are taken.
+`docs`, `assets`, `panels`, and the newer `resources`, `health`, `errors`, `jobs`, `instances`, `auth`, `account`,
+`admin`) and the built-in `processes` are taken.
 
 ### Data routes
 
@@ -158,6 +163,37 @@ Hash routes make views linkable: `#<id>/<route>` in the address bar opens the
 panel on that view, and the browser's Back button returns to the previous one.
 Clicking a tab opens its first view. Build text with `text` (never
 `innerHTML`) so data from the app cannot inject markup.
+
+## The factory receives `mode`
+
+A panel function receives `{ root, mode }`. `mode` is `"development"` or `"production"`. Use it to avoid side effects
+in production: a panel must not write files there. Grimoire opens its book read-only when `mode` is `"production"`.
+
+```ts title="src/devtools/queue-panel.ts"
+import type { DevtoolsPanelExport } from "@warlock.js/devtools";
+
+const queuePanel: DevtoolsPanelExport = ({ mode }) => ({
+  id: "queue",
+  title: "Queue",
+  view: new URL("./queue-view.js", import.meta.url),
+  // Safe to show in the production monitor: it only reads.
+  production: true,
+  routes: [{ path: "", handler: () => ({ readOnly: mode === "production", jobs: [] }) }],
+});
+
+export default queuePanel;
+```
+
+## Writes in production
+
+In the production monitor, a panel's GET routes need a signed-in user. Every other method needs an **admin**, an
+origin check and the CSRF header `X-Devtools-Csrf`, and is written to the audit log as `panel.action`. The view
+context's `api()` adds the header for you. If your view calls `fetch` directly for a write, it must send
+`X-Devtools-Csrf` itself and a JSON body with `Content-Type: application/json`. Read the token from the `csrf` field of
+`GET api/auth/session`. A write without the header is refused with `csrf.invalid`.
+
+Turn a panel off in production with `production.panels[<id>]: false`; see
+[Devtools in production](/v/latest/devtools/production/#tabs-in-production).
 
 ## Security
 

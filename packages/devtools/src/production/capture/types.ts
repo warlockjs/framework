@@ -106,6 +106,17 @@ export interface DevtoolsRequestSource {
   clear(): Promise<number>;
 }
 
+/** What EXPLAIN executes: a SQL statement or a MongoDB command, on the query's own connection. */
+export type DevtoolsExplainStatement =
+  | { type: "sql"; sql: string }
+  | { type: "mongo"; command: Record<string, unknown> };
+
+/** Executes an EXPLAIN statement and returns the database's answer. */
+export type DevtoolsExplainRunner = (
+  query: DevtoolsQuery,
+  statement: DevtoolsExplainStatement,
+) => Promise<unknown>;
+
 /** What `createProductionCapture` needs. */
 export type DevtoolsCaptureDeps = {
   options: ResolvedDevtoolsOptions;
@@ -118,6 +129,8 @@ export type DevtoolsCaptureDeps = {
   random?: () => number;
   now?: () => number;
   warn?: (message: string) => void;
+  /** Runs an EXPLAIN statement; defaults to cascade's data source registry (injected for specs). */
+  run?: DevtoolsExplainRunner;
 };
 
 /**
@@ -127,8 +140,6 @@ export type DevtoolsCaptureDeps = {
  *
  * Unsampled requests cost one random draw at start and one comparison at
  * end; they add nothing to the statistics.
- *
- * Owner: WP-4.
  */
 export interface DevtoolsProductionCapture {
   /** The ring of sampled requests (`maxRequests`), feeding the live stream. */

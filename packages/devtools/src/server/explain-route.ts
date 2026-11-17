@@ -1,4 +1,6 @@
+import { log } from "@warlock.js/logger";
 import type { FastifyInstance } from "fastify";
+import { createErrorRef, DevtoolsApiError } from "../production/errors";
 import type { MountDevtoolsRoutesDeps } from "./types";
 
 /**
@@ -40,6 +42,43 @@ export function registerExplainRoute(server: FastifyInstance, deps: MountDevtool
         return { plan };
       } catch (error) {
         reply.code(500).send({ error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+  );
+}
+
+/**
+ * Registers `POST /api/queries/:shapeId/explain`: EXPLAIN for a query shape,
+ * run by the process that kept an example of it (development and production).
+ * A failure answers `{ error, code, ref?, instance? }` with the code's status.
+ */
+export function registerShapeExplainRoute(
+  server: FastifyInstance,
+  deps: MountDevtoolsRoutesDeps,
+): void {
+  const explainShape = deps.explainShape;
+
+  if (!explainShape) return;
+
+  server.post<{ Params: { shapeId: string } }>(
+    "/api/queries/:shapeId/explain",
+    async (request, reply) => {
+      try {
+        return await explainShape(request.params.shapeId);
+      } catch (error) {
+        if (error instanceof DevtoolsApiError) {
+          reply.code(error.statusCode).send(error.toBody());
+          return;
+        }
+
+        const failure = new DevtoolsApiError("server.error", { ref: createErrorRef() });
+
+        log.error(
+          "devtools",
+          "explain",
+          `EXPLAIN route failed (ref ${failure.ref}): ${error instanceof Error ? error.message : String(error)}`,
+        );
+        reply.code(failure.statusCode).send(failure.toBody());
       }
     },
   );

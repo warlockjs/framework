@@ -124,22 +124,18 @@ describe("registered panels", () => {
     }
   });
 
-  it("adds a tab per panel after the built-in Processes tab and before API", async () => {
-    const response = await mount().inject({ url: "/__warlock/", ...local });
-    const html = response.body;
+  it("lists the built-in tabs, then the Processes tab and each registered panel", async () => {
+    const response = await mount().inject({ url: "/__warlock/api/panels", ...local });
+    const tabs = response.json() as { id: string; title: string; type: string }[];
+    const ids = tabs.map((tab) => tab.id);
 
-    expect(html).toContain(
-      '<button class="tab" data-tab="processes" data-panel="processes">Processes</button>',
-    );
-    expect(html).toContain(
-      '<button class="tab" data-tab="test-panel" data-panel="test-panel">Test &lt;panel&gt;</button>',
-    );
-    expect(html.indexOf('data-tab="routes"')).toBeLessThan(html.indexOf('data-tab="processes"'));
-    expect(html.indexOf('data-tab="processes"')).toBeLessThan(
-      html.indexOf('data-tab="test-panel"'),
-    );
-    expect(html.indexOf('data-tab="test-panel"')).toBeLessThan(html.indexOf('data-tab="api"'));
-    expect(html).not.toContain("devtools:panel-tabs");
+    expect(response.statusCode).toBe(200);
+    expect(ids.slice(0, 3)).toEqual(["requests", "queries", "routes"]);
+    expect(tabs.find((tab) => tab.id === "api")).toMatchObject({ type: "built-in" });
+    expect(tabs.slice(-2)).toEqual([
+      { id: "processes", title: "Processes", type: "package" },
+      { id: "test-panel", title: "Test <panel>", type: "package" },
+    ]);
   });
 
   it("serves the built-in Processes view module", async () => {

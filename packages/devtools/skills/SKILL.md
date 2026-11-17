@@ -1,13 +1,16 @@
 ---
 name: warlock-js-devtools
-description: 'Development dashboard for Warlock apps via `devtoolsConnector`. Inspect request timelines, middleware, validation, queries, N+1 warnings, logs, cache, mail, AI runs, routes and configuration. Use for "debug a slow endpoint", "inspect this request", "view captured mail", "open devtools" or "add a devtools panel". Not this package → @warlock.js/core for `warlock trace`, CLI route inspection and OpenAPI; @warlock.js/ai-panoptic for AI tracing.'
+description: 'Dev dashboard and opt-in production monitor for Warlock apps via `devtoolsConnector`: request timelines, queries, N+1, errors, resources, health, jobs, mail, routes. Use for "debug a slow endpoint", "monitor production", "devtools DT00x error", "reset devtools admin" or "add a devtools panel". Not this package → @warlock.js/core for `warlock trace` and OpenAPI; @warlock.js/ai-panoptic for AI tracing.'
 ---
 
 # `@warlock.js/devtools` — overview
 
-A dashboard for **development only**, served by your own app at `/__warlock`.
-It shows what each request did: its timing waterfall, the queries it ran, the
-cache operations, the logs, and any mail it sent.
+A dashboard served by your own app. In **development** it lives at `/__warlock`
+and answers loopback clients only. In **production** it is an opt-in monitor at
+a secret path (see "Production monitor" below). It shows what each request did:
+its timing waterfall, the queries it ran, the cache operations, the logs, and
+any mail it sent, plus query and route statistics, errors, resources, health
+and jobs. The dashboard is a React app; panel view modules work as before.
 
 ## Install: one command, no config
 
@@ -19,9 +22,9 @@ warlock dev            # open http://localhost:<port>/__warlock
 There's nothing to register. `warlock dev` loads devtools automatically when
 the package is installed.
 
-**Do not** add `devtoolsConnector()` to `warlock.config.ts`. Devtools is a
-dev dependency, so a production install doesn't have it, and a config import
-of it would fail to resolve there.
+For development only, do not add `devtoolsConnector()` to `warlock.config.ts`:
+it is a dev dependency, so a production install doesn't have it. For the
+production monitor you do add it, as a regular dependency (next sections).
 
 ## Why it can't leak into production
 
@@ -60,6 +63,10 @@ export default {
 | **Mail**     | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                              | core `mailEvents.onCaptured()`            |
 | **Logs**     | Log entries per request, filterable by level and module                                                                                                                                                                                           | a logger channel                          |
 | **Cache**    | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                   | cache `cache.on(...)`                     |
+| **Resources** | Memory, CPU, event-loop delay and garbage collection, with a 10-minute history | the process |
+| **Health**   | Readiness checks over time | core `health.readiness()` |
+| **Errors**   | Failed requests grouped by cause with counts | tracing and logger |
+| **Jobs**     | Scheduled jobs and queue counts (when those packages are used) | `@warlock.js/scheduler`, `@warlock.js/queue` |
 | **Agents**   | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                      | `@warlock.js/ai` `agentTraces` store      |
 | **Routes**   | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                               |
 | **API**      | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`    |
@@ -205,7 +212,8 @@ phases, queries flagged `nPlusOne`, warnings, logs and timings. See the
 
 Query bindings and log context go through the logger's redaction rules
 before they're stored. The data is still real request data, which is exactly
-why the dashboard is development-only and loopback-only.
+why the development dashboard is loopback-only. The production monitor removes
+values before storing anything (see "Production monitor").
 
 ## Related
 
@@ -224,6 +232,106 @@ It excludes ownership tokens. Without registration the list is empty. The
 endpoint retains development/loopback guards and provides no stop action.
 Use the `warlock-js-process` skill for launch,
 recovery and stop APIs; configure one owner/registry per application instance.
+
+## Production monitor
+
+Opt in: nothing is mounted or captured in production unless
+`production.enabled` is `true`. Install the package as a regular dependency,
+then register it in `warlock.config.ts`. `@warlock.js/devtools/production`
+exports `devtoolsMigrations` and `registerDevtoolsCommands`, which adds the
+`devtools:enable` and `devtools:reset-admin` commands.
+
+```ts
+import { defineConfig } from "@warlock.js/core";
+import { devtoolsConnector } from "@warlock.js/devtools";
+import { devtoolsMigrations, registerDevtoolsCommands } from "@warlock.js/devtools/production";
+
+export default defineConfig({
+  connectors: [devtoolsConnector()],
+  cli: { commands: [registerDevtoolsCommands()] },
+  database: { migrations: [...devtoolsMigrations] },
+});
+```
+
+Then run `warlock migrate`, and enable it in `src/config/devtools.ts`:
+
+```ts
+export default {
+  panels: ["@warlock.js/grimoire/devtools"],
+  production: {
+    enabled: true,
+    trustedProxies: ["loopback"],
+    sampleRate: 0.1,
+  },
+};
+```
+
+Environment variables:
+
+- `DEVTOOLS_PATH`: the secret dashboard path (`/ops-7f3k2q9x`; at least 8 characters, never `/__warlock`).
+- `DEVTOOLS_ADMIN_EMAIL` with `DEVTOOLS_ADMIN_PASSWORD` (changed at first sign-in) or `DEVTOOLS_SETUP_TOKEN` (32+ characters; the admin opens `<origin><path>/#/setup/<token>`). Not both.
+- `encryption.key` (64 hex characters) must be set in `src/config/encryption.ts`.
+
+The accounts live in the app's database through Cascade. Roles are `viewer`
+and `admin`. Admins invite users with a 24-hour single-use link. Two-factor is
+required for admins by default (`twoFactor: "admins"`; or `"everyone"`): an
+authenticator app, or passkeys when `@simplewebauthn/server` is installed, plus
+10 recovery codes. Every closed case answers the app's own 404.
+
+Options under `production` (all optional, defaults in brackets):
+`enabled` [false], `path` [`DEVTOOLS_PATH`], `sampleRate` [0.1],
+`slowRequestMs` [1000], `slowQueryMs` [200], `maxRequests` [200],
+`requestRetentionHours` [24], `maxStoredSamplesPerMinute` [120],
+`reportIntervalMs` [10000], `trustedProxies` [[]], `requireHttps` [true],
+`allowedIps` [[]], `origin`, `session.idleMinutes` [30], `session.maxHours` [8],
+`twoFactor` ["admins"], `rateLimits.windowMinutes` [15], `rateLimits.account`
+[5], `rateLimits.ip` [20], `rateLimits.global` [100], `rateLimits.lockMinutes`
+[15], `explain.executing` [false], `panels` [{}], `logLevels` [warn, error],
+`auditRetentionDays` [90], `passkeys.rpName`, `passkeys.rpId`.
+
+- Redaction: queries are stored as their shape (no literals or bindings), logs
+  lose `context`, phases lose `attrs`, cache keys become counts, headers and
+  bodies come only from core's request log.
+- EXPLAIN is admin-only and plain (`EXPLAIN (FORMAT JSON)`, MongoDB
+  `queryPlanner`). `explain.executing: true` allows `EXPLAIN ANALYZE` and
+  `executionStats`; they run the query, so leave it off unless accepted.
+- Several instances share the database: each writes a report every 10 s, the
+  instance picker filters, the live stream is per instance.
+- Disable from the dashboard (admin); re-enable with `warlock devtools:enable`
+  or a new `DEVTOOLS_PATH`. Lost admin: `warlock devtools:reset-admin --email <email>`.
+- Behind a proxy set `trustedProxies` and forward `X-Forwarded-For` and
+  `X-Forwarded-Proto`; turn off proxy buffering (or rely on
+  `X-Accel-Buffering: no`) for the live view.
+- Tabs on in production: requests, queries, routes, resources, health, errors,
+  logs, jobs. `mail`, `ai`, `agents`, `api`, `processes` need
+  `panels: { id: true }`. A package panel needs `production: true` or the same.
+- Panel writes in production need an admin and the `X-Devtools-Csrf` header
+  (`api()` adds it); they are audited.
+
+### When something fails
+
+The app refuses to boot with a `DevtoolsProductionConfigError`
+(`DEVTOOLS_CONFIG_CODES` holds the messages):
+
+| Code | Fix |
+| ---- | --- |
+| `DT001` | Set `DEVTOOLS_PATH` or `production.path`. |
+| `DT002` | Use a path of 8+ characters starting with `/`, with letters, digits, `-_./` only; not `/__warlock`. |
+| `DT003` | No admin: set `DEVTOOLS_ADMIN_EMAIL` plus a password or setup token, or run `warlock devtools:reset-admin --email <email>`. |
+| `DT004` | The env password breaks the rules (8+ characters, at most 72 bytes, not common, not the email). |
+| `DT005` | Install `@warlock.js/cascade` and configure a database. |
+| `DT006` | Set `encryption.key` (64 hex characters). |
+| `DT007` | An option is invalid; the message names it. |
+| `DT008` | Add `devtoolsMigrations` to `database.migrations` and run `warlock migrate`. |
+| `DT009` | Set the password or the setup token, not both. |
+| `DT010` | The setup token needs 32+ characters (`openssl rand -base64 32`). |
+
+Every dashboard URL gives a 404: check that `production.enabled` is true, the
+dashboard is not disabled or locked (`warlock devtools:enable`), the request is
+HTTPS (`trustedProxies`), the IP is in `allowedIps`, and you opened the exact
+`DEVTOOLS_PATH`.
+
+Full pages: "Devtools in production" and "Devtools security" in the docs.
 
 ## Registering a panel
 
@@ -270,8 +378,14 @@ export default queuePanel;
   that opens that view (`route` is then `"jobs/7"`); `svg()` builds SVG
   elements for small graphs. Build text with `text`, never `innerHTML`.
 - Every panel route, view and asset sits behind the devtools guard
-  (development only, loopback socket and host, no foreign `Origin`, no proxy
-  headers). A reused id (the built-in `processes` included) or a dashboard id
+  (in development: loopback socket and host, no foreign `Origin`, no proxy
+  headers; in production: sign-in). A reused id (the built-in `processes` included) or a dashboard id
   such as `mail` is refused; devtools logs why and leaves the panel out.
+
+A panel can set `production: true` when it is safe in the production monitor
+(otherwise it needs `production.panels[id]: true`). The factory receives
+`{ root, mode }`; `mode` is `"development"` or `"production"`, and a panel must
+not write files in production. The ids `resources`, `health`, `errors`, `jobs`,
+`instances`, `auth`, `account` and `admin` are reserved.
 
 Full reference: the "Registering a panel" page of the devtools docs.

@@ -30,6 +30,7 @@ import {
 import { assertReleaseSummaryExists } from "./release-summary-gate.ts";
 import { runZeroEditGeneratorGate, type GeneratorGateContext } from "./zero-edit-generator-gate.ts";
 import { runStrictnessGate, type StrictnessGateRunResult } from "./strictness-gate.ts";
+import { runDevtoolsUiGate, type DevtoolsUiGateResult } from "./devtools-ui-gate.ts";
 import { assertSourceMapsSelfContained } from "./strip-source-map-sources.ts";
 
 export const NPM_ORIGIN = "https://registry.npmjs.org";
@@ -263,6 +264,12 @@ export interface ReleaseFamilyDependencies {
    * real packages.
    */
   runStrictnessGate?(): Promise<StrictnessGateRunResult>;
+  /**
+   * The shipped devtools dashboard gate (`devtools-ui-gate.ts`): the bundle is
+   * fresh, unmodified and within its gzip budget. Injectable so tests substitute
+   * a fake result instead of running Vite.
+   */
+  runDevtoolsUiGate?(): Promise<DevtoolsUiGateResult>;
   /**
    * Refuse a version whose `releases/<version>-summary.md` (and its copy in
    * `packages/core/releases/`) is missing. Injectable so tests need not touch
@@ -561,6 +568,7 @@ async function prepareAndGate(
   });
 
   const strictness = await runStrictnessRatchet(options.skipStrictness, runtime);
+  await runDevtoolsUiRatchet(runtime);
 
   // Typecheck the whole family before deciding whether to reuse artifacts or
   // begin any build. Reuse still skips the per-member test/build work below,
@@ -677,6 +685,21 @@ async function runStrictnessRatchet(
       "",
       `Fix: bring the offending package(s) back within their strictness allowance, or pass ` +
         '--skip-strictness "<reason>" to explicitly waive this run (recorded in the handoff).',
+    ].join("\n"),
+  );
+}
+
+/**
+ * Run the devtools dashboard gate. A stale, hand-edited or over-budget bundle
+ * refuses the gate with every problem listed, like the strictness ratchet.
+ */
+async function runDevtoolsUiRatchet(runtime: Runtime): Promise<void> {
+  const result = await runtime.runDevtoolsUiGate();
+  if (result.ok) return;
+  throw new Error(
+    [
+      "Refusing to gate: the devtools dashboard bundle is not ready.",
+      ...result.problems.map((problem) => `  - ${problem}`),
     ].join("\n"),
   );
 }
@@ -3164,6 +3187,7 @@ function withDefaults(dependencies: ReleaseFamilyDependencies): Runtime {
     resolvePackageScript: dependencies.resolvePackageScript ?? resolveLocalPackageScript,
     runLocalGate: dependencies.runLocalGate ?? runLocalRegistryPreGate,
     runStrictnessGate: dependencies.runStrictnessGate ?? defaultRunStrictnessGate,
+    runDevtoolsUiGate: dependencies.runDevtoolsUiGate ?? defaultRunDevtoolsUiGate,
     now: dependencies.now ?? (() => new Date()),
     report: dependencies.report ?? ((line) => console.log(line)),
     sleep:
@@ -3174,6 +3198,10 @@ function withDefaults(dependencies: ReleaseFamilyDependencies): Runtime {
 
 async function defaultRunStrictnessGate(): Promise<StrictnessGateRunResult> {
   return runStrictnessGate();
+}
+
+async function defaultRunDevtoolsUiGate(): Promise<DevtoolsUiGateResult> {
+  return runDevtoolsUiGate();
 }
 
 const MAX_COMMAND_FAILURE_STREAM_CHARS = 32_000;

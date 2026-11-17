@@ -167,6 +167,18 @@ Each channel receives `{ type, module: "http", action: "request", message, conte
 - The [`request_log` MCP tool](/v/latest/core/cli/mcp/) lists and opens records for coding agents (read-only).
 - From code: `listRequestLogs(filter?)`, `getRequestLog(id)` and `requestLogToCurl(record)` are exported from `@warlock.js/core`, and the record type is `RequestLogRecord`.
 
+## Keep a private path out of the log
+
+A package that serves its own private routes can keep them out of the request log. `excludeFromRequestLog(prefix)` stops records for URLs equal to `prefix` or under `prefix/`, and returns a function that removes the rule. `/ops` does not exclude `/opsx`. `isExcludedFromRequestLog(urlPath)` tells whether a path is covered.
+
+```ts
+import { excludeFromRequestLog } from "@warlock.js/core";
+
+const stopExcluding = excludeFromRequestLog("/ops-7f3k2q9x");
+```
+
+Nothing is written for an excluded request: not the URL, not the body. The lifecycle log line of the request is not affected.
+
 ## Good to know
 
 - The record is built after the response is sent. A request killed with the process (`SIGKILL`) before its record is flushed is lost; a graceful exit flushes.

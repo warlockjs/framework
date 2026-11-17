@@ -1,2 +1,4 @@
 # Vendored third-party bundles are stored and checked out byte-for-byte.
 ui/vendor/** -text
+# The built dashboard is checked against its build-info hashes byte-for-byte.
+ui/dashboard/** -text

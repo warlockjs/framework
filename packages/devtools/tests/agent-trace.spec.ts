@@ -319,7 +319,10 @@ describe("agent trace routes", () => {
           response.on("error", reject);
           response.on("data", (chunk) => {
             received += chunk.toString();
-            if (received.includes("\n\n")) resolve(received);
+            // The stream opens with `retry` and `hello` frames; wait for the trace frame itself.
+            const frame = received.split("\n\n").find((part) => part.startsWith("event: agent-trace"));
+
+            if (frame !== undefined && received.includes(`${frame}\n\n`)) resolve(`${frame}\n\n`);
           });
         });
       });

@@ -1,11 +1,12 @@
 ---
 title: Devtools
-description: A loopback-only development dashboard for request timing, database queries, N+1 warnings, mail, logs, cache activity, routes, AI traces, and API docs.
+description: A React dashboard for request timing, database queries, N+1 warnings, resources, health, errors, jobs, mail, logs, routes, AI traces and API docs. Loopback-only in development, and an opt-in signed-in monitor in production.
 ---
 
 `@warlock.js/devtools` is an in-app dashboard for understanding what a request
 did while you develop. It is served at `/__warlock` and keeps its data only in
-memory.
+memory. It is a React app, and the same dashboard can run in production at a
+secret path behind sign-in: see [Use it in production](#use-it-in-production).
 
 ## Install
 
@@ -18,9 +19,12 @@ warlock dev
 The command adds `@warlock.js/devtools` as a development dependency. There is
 nothing to configure: `warlock dev` discovers and loads it automatically.
 
-Do **not** add it to `warlock.config.ts`. Production installs omit development
-dependencies, so importing devtools from application configuration would make
-the production process fail to resolve that import.
+For development nothing else is needed. If you also want the
+[production monitor](/v/latest/devtools/production/), install the package as a
+regular dependency and register `devtoolsConnector()` in `warlock.config.ts`;
+the production page has the steps. Without that, do not import devtools from
+application configuration: a production install that omits development
+dependencies could not resolve it.
 
 ## The dashboard
 
@@ -36,10 +40,27 @@ The default dashboard retains the latest 200 requests at `/__warlock`.
 | Logs     | Request-associated log entries, filterable by level and module.                                                                                                                                                                                                           |
 | Cache    | Hit, miss, set, removed, and tag-invalidation activity.                                                                                                                                                                                                                   |
 | Routes   | Registered HTTP routes with their method, path, name, and middleware.                                                                                                                                                                                                     |
+| Resources | Memory, CPU, event-loop delay and garbage collection of the process, with a short history. |
+| Health   | The app's readiness checks over time. |
+| Errors   | Failed requests grouped by cause, with counts, the first and last time seen, and the route. |
+| Jobs     | Scheduled jobs and queue counts, when `@warlock.js/scheduler` or `@warlock.js/queue` is in use. |
 | API      | The app's API reference, rendered from its OpenAPI 3.1 document. See [API docs](#api-docs).                                                                                                                                                                               |
+
+**Queries** also lists query statistics: each query shape with its count,
+total and mean time, and p50 and p95. **Routes** lists the same for each route.
+In development these come from this process's memory.
 
 Work that is not part of a request, such as boot work or a scheduler tick,
 appears separately so it does not distort a request timeline.
+
+## Use it in production
+
+Development is unchanged: loopback only, no sign-in. The production monitor is
+a separate, opt-in mode. It shows requests, query and route statistics,
+errors, resources, health and jobs of the running app at a secret path, behind
+accounts with two-factor sign-in, and is off until you enable it. See
+[Devtools in production](/v/latest/devtools/production/) to set it up and
+[Devtools security](/v/latest/devtools/security/) for how it is protected.
 
 ## Request history
 
@@ -109,8 +130,10 @@ The document is built in-process, on every request to `GET /__warlock/api/openap
 
 ## Safe by construction
 
+In development:
+
 - The package is not installed in a production dependency install.
-- If it is present anyway, devtools refuses to mount outside development.
+- If it is present anyway, devtools mounts nothing outside development unless you enabled the production monitor.
 - Dashboard and API routes answer only loopback clients (`127.0.0.1` and
   `::1`). The check uses the socket address; `X-Forwarded-For` cannot unlock
   it.
