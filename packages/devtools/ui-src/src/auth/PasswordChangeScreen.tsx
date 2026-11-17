@@ -26,7 +26,11 @@ export function PasswordChangeScreen({ onStep, onSignOut }: PasswordChangeScreen
           await onStep(result);
         }}
       />
-      <button type="button" className="text-sm text-muted-foreground underline" onClick={() => void onSignOut()}>
+      <button
+        type="button"
+        className="text-sm text-muted-foreground underline"
+        onClick={() => void onSignOut()}
+      >
         Sign out
       </button>
     </AuthLayout>

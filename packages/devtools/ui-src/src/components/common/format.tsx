@@ -51,7 +51,9 @@ export type DurationProps = {
 
 /** A duration in milliseconds as "12 ms" or "1.4 s"; "—" when absent. */
 export function Duration({ ms, className }: DurationProps) {
-  return <span className={className}>{ms === null || ms === undefined ? "—" : formatDuration(ms)}</span>;
+  return (
+    <span className={className}>{ms === null || ms === undefined ? "—" : formatDuration(ms)}</span>
+  );
 }
 
 export type BytesProps = {
@@ -61,7 +63,11 @@ export type BytesProps = {
 
 /** A size in bytes as "1.5 KB" or "20.3 MB"; "—" when absent. */
 export function Bytes({ bytes, className }: BytesProps) {
-  return <span className={className}>{bytes === null || bytes === undefined ? "—" : formatBytes(bytes)}</span>;
+  return (
+    <span className={className}>
+      {bytes === null || bytes === undefined ? "—" : formatBytes(bytes)}
+    </span>
+  );
 }
 
 export type RelativeTimeProps = {
@@ -85,7 +91,11 @@ export function RelativeTime({ at, fallback = "never", className }: RelativeTime
   if (at === null || at === undefined) return <span className={className}>{fallback}</span>;
 
   return (
-    <time className={className} dateTime={new Date(at).toISOString()} title={new Date(at).toLocaleString()}>
+    <time
+      className={className}
+      dateTime={new Date(at).toISOString()}
+      title={new Date(at).toLocaleString()}
+    >
       {formatRelativeTime(at, now)}
     </time>
   );

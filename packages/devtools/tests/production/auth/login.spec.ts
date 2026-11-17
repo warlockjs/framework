@@ -9,7 +9,10 @@ describe("login", () => {
 
     await world.addAccount("viewer@example.com");
 
-    const step = await world.auth.login({ email: "  Viewer@Example.com ", password: PASSWORD }, meta());
+    const step = await world.auth.login(
+      { email: "  Viewer@Example.com ", password: PASSWORD },
+      meta(),
+    );
 
     expect(step.stage).toBe("active");
     expect(step.token).toMatch(/^[\w-]{43}$/);
@@ -26,7 +29,10 @@ describe("login", () => {
 
     await world.addAccount("viewer@example.com");
 
-    const step = await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta());
+    const step = await world.auth.login(
+      { email: "viewer@example.com", password: PASSWORD },
+      meta(),
+    );
     const sessions = await world.store.sessions.listForAccount(step.session.accountId);
 
     expect(JSON.stringify(sessions)).not.toContain(step.token ?? "never");
@@ -55,8 +61,12 @@ describe("login", () => {
     const world = createWorld();
 
     await world.addAccount("viewer@example.com");
-    await world.auth.login({ email: "viewer@example.com", password: "secret-guess-1" }, meta()).catch(() => undefined);
-    await world.auth.login({ email: "nobody@example.com", password: "secret-guess-2" }, meta()).catch(() => undefined);
+    await world.auth
+      .login({ email: "viewer@example.com", password: "secret-guess-1" }, meta())
+      .catch(() => undefined);
+    await world.auth
+      .login({ email: "nobody@example.com", password: "secret-guess-2" }, meta())
+      .catch(() => undefined);
 
     const entries = await world.store.audit.list({ limit: 10 });
 
@@ -68,9 +78,15 @@ describe("login", () => {
   it("puts a forced password change first", async () => {
     const world = createWorld();
 
-    await world.addAccount("viewer@example.com", { mustChangePassword: true, passwordSource: "env" });
+    await world.addAccount("viewer@example.com", {
+      mustChangePassword: true,
+      passwordSource: "env",
+    });
 
-    const step = await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta());
+    const step = await world.auth.login(
+      { email: "viewer@example.com", password: PASSWORD },
+      meta(),
+    );
 
     expect(step.stage).toBe("password-change");
     expect(step.session.expiresAt).toBe(world.now() + 10 * 60_000);
@@ -81,9 +97,9 @@ describe("login", () => {
 
     await world.addAccount("boss@example.com", { role: "admin" });
 
-    expect((await world.auth.login({ email: "boss@example.com", password: PASSWORD }, meta())).stage).toBe(
-      "mfa-enrol",
-    );
+    expect(
+      (await world.auth.login({ email: "boss@example.com", password: PASSWORD }, meta())).stage,
+    ).toBe("mfa-enrol");
   });
 
   it("asks every account to enrol when twoFactor is everyone", async () => {
@@ -111,7 +127,10 @@ describe("login", () => {
 
     await world.addAccount("viewer@example.com", { totpSecret: `enc:${FAKE_SECRET}` });
 
-    const first = await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta());
+    const first = await world.auth.login(
+      { email: "viewer@example.com", password: PASSWORD },
+      meta(),
+    );
     const pending = await authOf(world, first);
     const second = await world.auth.verifySecondFactor(pending, { code: world.code() }, meta());
 
@@ -141,19 +160,25 @@ describe("login", () => {
     const world = createWorld();
 
     await world.addAccount("viewer@example.com");
-    await world.auth.login({ email: "viewer@example.com", password: "x".repeat(100_000) }, meta()).catch(() => undefined);
+    await world.auth
+      .login({ email: "viewer@example.com", password: "x".repeat(100_000) }, meta())
+      .catch(() => undefined);
 
-    expect(Math.max(...world.crypto.verifyCalls.map((call) => call.password.length))).toBeLessThanOrEqual(1024);
+    expect(
+      Math.max(...world.crypto.verifyCalls.map((call) => call.password.length)),
+    ).toBeLessThanOrEqual(1024);
   });
 
   it("truncates the user agent in sessions and audit entries", async () => {
     const world = createWorld();
 
     await world.addAccount("viewer@example.com");
-    await world.auth.login(
-      { email: "viewer@example.com", password: "wrong password" },
-      { ...meta(), userAgent: "u".repeat(500) },
-    ).catch(() => undefined);
+    await world.auth
+      .login(
+        { email: "viewer@example.com", password: "wrong password" },
+        { ...meta(), userAgent: "u".repeat(500) },
+      )
+      .catch(() => undefined);
 
     const [entry] = await world.store.audit.list({ limit: 1 });
 

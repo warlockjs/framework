@@ -19,7 +19,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The one-line request summary (`http.log`) and the request lifecycle log skip paths registered with `excludeFromRequestLog`.
 - Core turns `queryEvents` on for a MongoDB data source in a process that serves HTTP when `devtools.production.enabled` is `true`, so the devtools Queries tab works in production. An explicit `queryEvents` in `src/config/database.ts` still wins.
 
-
 ## 5.55.0 - 2026-11-17
 
 ### Upgrading

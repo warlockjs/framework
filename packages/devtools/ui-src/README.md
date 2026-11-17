@@ -43,18 +43,18 @@ data, the empty state, an API error with its message and reference, and its main
 
 ## Where things live
 
-| Folder                      | What                                                                    |
-| --------------------------- | ----------------------------------------------------------------------- |
-| `src/app/`                  | The shell, router, header, instance picker.                             |
-| `src/auth/`                 | Sign-in, setup, invite, password, two-factor enrolment, recovery codes. |
-| `src/admin/`, `src/account/` | Users and invites, audit, settings, the account page.                  |
-| `src/panel-host/`           | Mounts package panel view modules with the original context.            |
-| `src/panels/<id>/`          | One folder per built-in tab, registered in `src/panels/registry.ts`.    |
-| `src/components/ui/`        | shadcn components.                                                      |
-| `src/components/common/`    | Shared pieces such as the error message with its reference id.          |
-| `src/components/charts/`    | SVG charts.                                                             |
-| `src/api/`                  | `apiFetch`, the data hooks, and types.                                  |
-| `tests/`                    | UI specs.                                                               |
+| Folder                       | What                                                                    |
+| ---------------------------- | ----------------------------------------------------------------------- |
+| `src/app/`                   | The shell, router, header, instance picker.                             |
+| `src/auth/`                  | Sign-in, setup, invite, password, two-factor enrolment, recovery codes. |
+| `src/admin/`, `src/account/` | Users and invites, audit, settings, the account page.                   |
+| `src/panel-host/`            | Mounts package panel view modules with the original context.            |
+| `src/panels/<id>/`           | One folder per built-in tab, registered in `src/panels/registry.ts`.    |
+| `src/components/ui/`         | shadcn components.                                                      |
+| `src/components/common/`     | Shared pieces such as the error message with its reference id.          |
+| `src/components/charts/`     | SVG charts.                                                             |
+| `src/api/`                   | `apiFetch`, the data hooks, and types.                                  |
+| `tests/`                     | UI specs.                                                               |
 
 The wire types come from `src/production/contracts.ts` (imported as `@contracts`). That file has no imports so the UI
 can use it.

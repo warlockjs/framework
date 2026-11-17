@@ -48,7 +48,9 @@ describe("authenticator app", () => {
     const auth = await enrolling(world);
 
     await world.auth.startTotp(auth, meta());
-    await expect(world.auth.confirmTotp(await reload(world, auth), "000000", meta())).rejects.toMatchObject({
+    await expect(
+      world.auth.confirmTotp(await reload(world, auth), "000000", meta()),
+    ).rejects.toMatchObject({
       code: "auth.invalid-code",
     });
     expect((await reload(world, auth)).account.totpSecret).toBeNull();
@@ -70,7 +72,11 @@ describe("authenticator app", () => {
 
     await world.auth.startTotp(auth, meta());
 
-    const { step, recoveryCodes } = await world.auth.confirmTotp(await reload(world, auth), world.code(), meta());
+    const { step, recoveryCodes } = await world.auth.confirmTotp(
+      await reload(world, auth),
+      world.code(),
+      meta(),
+    );
 
     expect(step.stage).toBe("active");
     expect(step.token).not.toBeNull();
@@ -98,14 +104,29 @@ describe("authenticator app", () => {
     const account = await world.store.accounts.findById(auth.account.id);
 
     await world.store.accounts.update(account!.id, account!.version, {
-      passkeys: [{ id: "pk1", publicKey: "k", counter: 0, transports: [], name: "p", createdAt: 1, lastUsedAt: null }],
+      passkeys: [
+        {
+          id: "pk1",
+          publicKey: "k",
+          counter: 0,
+          transports: [],
+          name: "p",
+          createdAt: 1,
+          lastUsedAt: null,
+        },
+      ],
     });
     await world.auth.removeTotp(await reload(world, auth), meta(), PASSWORD);
     await world.auth.startTotp(await reload(world, auth), meta());
 
     world.advance(60_000);
 
-    const result = await world.auth.confirmTotp(await reload(world, auth), world.code(), meta(), PASSWORD);
+    const result = await world.auth.confirmTotp(
+      await reload(world, auth),
+      world.code(),
+      meta(),
+      PASSWORD,
+    );
 
     expect(result.recoveryCodes).toBeNull();
   });
@@ -114,7 +135,9 @@ describe("authenticator app", () => {
     const world = createWorld();
     const { auth } = await enrolled(world);
 
-    await expect(world.auth.startTotp(auth, meta())).rejects.toMatchObject({ code: "input.invalid" });
+    await expect(world.auth.startTotp(auth, meta())).rejects.toMatchObject({
+      code: "input.invalid",
+    });
   });
 
   describe("sign-in", () => {
@@ -126,7 +149,10 @@ describe("authenticator app", () => {
     }
 
     async function verifying(world: World) {
-      const step = await world.auth.login({ email: "boss@example.com", password: PASSWORD }, meta());
+      const step = await world.auth.login(
+        { email: "boss@example.com", password: PASSWORD },
+        meta(),
+      );
 
       expect(step.stage).toBe("mfa-verify");
 
@@ -137,7 +163,9 @@ describe("authenticator app", () => {
       const { world } = await signedOutAdmin();
       const pending = await verifying(world);
 
-      await expect(world.auth.verifySecondFactor(pending, { code: world.code() }, meta())).rejects.toMatchObject({
+      await expect(
+        world.auth.verifySecondFactor(pending, { code: world.code() }, meta()),
+      ).rejects.toMatchObject({
         code: "auth.invalid-code",
       });
     });
@@ -146,7 +174,9 @@ describe("authenticator app", () => {
       const { world } = await signedOutAdmin();
       const pending = await verifying(world);
 
-      await expect(world.auth.verifySecondFactor(pending, { code: world.code(-1) }, meta())).rejects.toMatchObject({
+      await expect(
+        world.auth.verifySecondFactor(pending, { code: world.code(-1) }, meta()),
+      ).rejects.toMatchObject({
         code: "auth.invalid-code",
       });
 
@@ -173,7 +203,9 @@ describe("authenticator app", () => {
       const pending = await verifying(world);
 
       for (const code of ["12345", "1234567", "abcdef", "12 34"]) {
-        await expect(world.auth.verifySecondFactor(pending, { code }, meta())).rejects.toMatchObject({
+        await expect(
+          world.auth.verifySecondFactor(pending, { code }, meta()),
+        ).rejects.toMatchObject({
           code: "auth.invalid-code",
         });
       }
@@ -193,8 +225,12 @@ describe("authenticator app", () => {
       );
 
       expect(step.stage).toBe("active");
-      expect((await world.store.accounts.findByEmail("boss@example.com"))?.recoveryCodes).toHaveLength(9);
-      expect(await world.store.audit.list({ types: ["recovery-code.used"], limit: 5 })).toHaveLength(1);
+      expect(
+        (await world.store.accounts.findByEmail("boss@example.com"))?.recoveryCodes,
+      ).toHaveLength(9);
+      expect(
+        await world.store.audit.list({ types: ["recovery-code.used"], limit: 5 }),
+      ).toHaveLength(1);
 
       await expect(
         world.auth.verifySecondFactor(await verifying(world), { recoveryCode: first }, meta()),
@@ -226,19 +262,29 @@ describe("authenticator app", () => {
       const { world } = await signedOutAdmin();
 
       await expect(
-        world.auth.verifySecondFactor(await verifying(world), { recoveryCode: "AAAAA-AAAAA" }, meta()),
+        world.auth.verifySecondFactor(
+          await verifying(world),
+          { recoveryCode: "AAAAA-AAAAA" },
+          meta(),
+        ),
       ).rejects.toMatchObject({ code: "auth.invalid-code" });
       expect(await world.store.audit.list({ types: ["mfa.failed"], limit: 5 })).toHaveLength(1);
     });
 
     it("cannot be verified from a stage other than mfa-verify", async () => {
-      const { world, } = await signedOutAdmin();
+      const { world } = await signedOutAdmin();
       const auth = await authOf(
         world,
-        await world.auth.verifySecondFactor(await verifying(world), { code: world.code(1) }, meta()),
+        await world.auth.verifySecondFactor(
+          await verifying(world),
+          { code: world.code(1) },
+          meta(),
+        ),
       );
 
-      await expect(world.auth.verifySecondFactor(auth, { code: world.code(1) }, meta())).rejects.toMatchObject({
+      await expect(
+        world.auth.verifySecondFactor(auth, { code: world.code(1) }, meta()),
+      ).rejects.toMatchObject({
         code: "input.invalid",
       });
     });
@@ -256,15 +302,21 @@ describe("authenticator app", () => {
 
       expect(codes).toHaveLength(10);
       expect(codes.some((code) => old.includes(code))).toBe(false);
-      expect((await world.store.accounts.findById(auth.account.id))?.recoveryCodes).toHaveLength(10);
-      expect(await world.store.audit.list({ types: ["recovery-codes.regenerated"], limit: 5 })).toHaveLength(1);
+      expect((await world.store.accounts.findById(auth.account.id))?.recoveryCodes).toHaveLength(
+        10,
+      );
+      expect(
+        await world.store.audit.list({ types: ["recovery-codes.regenerated"], limit: 5 }),
+      ).toHaveLength(1);
     });
 
     it("needs a valid current code", async () => {
       const world = createWorld();
       const { auth, result } = await enrolled(world);
 
-      await expect(world.auth.regenerateRecoveryCodes(auth, "000000", meta())).rejects.toMatchObject({
+      await expect(
+        world.auth.regenerateRecoveryCodes(auth, "000000", meta()),
+      ).rejects.toMatchObject({
         code: "auth.invalid-code",
       });
       await expect(world.auth.regenerateRecoveryCodes(auth, "", meta())).rejects.toMatchObject({
@@ -281,16 +333,27 @@ describe("authenticator app", () => {
       const world = createWorld();
       const { auth } = await enrolled(world);
 
-      await expect(world.auth.removeTotp(auth, meta())).rejects.toMatchObject({ code: "account.last-factor" });
+      await expect(world.auth.removeTotp(auth, meta())).rejects.toMatchObject({
+        code: "account.last-factor",
+      });
     });
 
     it("lets a viewer remove the app when two-factor is only for admins", async () => {
       const world = createWorld();
 
-      await world.addAccount("viewer@example.com", { totpSecret: `enc:${FAKE_SECRET}`, recoveryCodes: ["a"] });
+      await world.addAccount("viewer@example.com", {
+        totpSecret: `enc:${FAKE_SECRET}`,
+        recoveryCodes: ["a"],
+      });
 
-      const pending = await authOf(world, await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta()));
-      const auth = await authOf(world, await world.auth.verifySecondFactor(pending, { code: world.code() }, meta()));
+      const pending = await authOf(
+        world,
+        await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta()),
+      );
+      const auth = await authOf(
+        world,
+        await world.auth.verifySecondFactor(pending, { code: world.code() }, meta()),
+      );
 
       await world.auth.removeTotp(auth, meta(), PASSWORD);
 
@@ -305,10 +368,18 @@ describe("authenticator app", () => {
 
       await world.addAccount("viewer@example.com", { totpSecret: `enc:${FAKE_SECRET}` });
 
-      const pending = await authOf(world, await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta()));
-      const auth = await authOf(world, await world.auth.verifySecondFactor(pending, { code: world.code() }, meta()));
+      const pending = await authOf(
+        world,
+        await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta()),
+      );
+      const auth = await authOf(
+        world,
+        await world.auth.verifySecondFactor(pending, { code: world.code() }, meta()),
+      );
 
-      await expect(world.auth.removeTotp(auth, meta())).rejects.toMatchObject({ code: "account.last-factor" });
+      await expect(world.auth.removeTotp(auth, meta())).rejects.toMatchObject({
+        code: "account.last-factor",
+      });
     });
   });
 });
@@ -323,7 +394,9 @@ describe("passkeys", () => {
     await expect(world.auth.passkeyOptions(auth, "register", meta())).rejects.toMatchObject({
       code: "passkey.unavailable",
     });
-    await expect(world.auth.verifyPasskey(auth, "register", credential("a"), meta())).rejects.toMatchObject({
+    await expect(
+      world.auth.verifyPasskey(auth, "register", credential("a"), meta()),
+    ).rejects.toMatchObject({
       code: "passkey.unavailable",
     });
   });
@@ -332,10 +405,17 @@ describe("passkeys", () => {
     const world = createWorld({ passkeys: true });
     const auth = await enrolling(world);
 
-    await expect(world.auth.passkeyOptions(auth, "register", meta())).resolves.toEqual({ kind: "register" });
+    await expect(world.auth.passkeyOptions(auth, "register", meta())).resolves.toEqual({
+      kind: "register",
+    });
     expect((await reload(world, auth)).session.challenge).toBe("reg-challenge");
 
-    const { step, recoveryCodes } = await world.auth.verifyPasskey(await reload(world, auth), "register", credential("cred-1"), meta());
+    const { step, recoveryCodes } = await world.auth.verifyPasskey(
+      await reload(world, auth),
+      "register",
+      credential("cred-1"),
+      meta(),
+    );
 
     expect(step?.stage).toBe("active");
     expect(step?.token).not.toBeNull();
@@ -376,9 +456,19 @@ describe("passkeys", () => {
     const auth = await enrolling(world);
 
     await world.auth.passkeyOptions(auth, "register", meta());
-    await world.auth.verifyPasskey(await reload(world, auth), "register", credential("cred-1"), meta());
+    await world.auth.verifyPasskey(
+      await reload(world, auth),
+      "register",
+      credential("cred-1"),
+      meta(),
+    );
     await expect(
-      world.auth.verifyPasskey(await reload(world, auth).catch(() => auth), "register", credential("cred-2"), meta()),
+      world.auth.verifyPasskey(
+        await reload(world, auth).catch(() => auth),
+        "register",
+        credential("cred-2"),
+        meta(),
+      ),
     ).rejects.toMatchObject({ code: "passkey.failed" });
   });
 
@@ -386,7 +476,9 @@ describe("passkeys", () => {
     const world = createWorld({ passkeys: true });
     const auth = await enrolling(world);
 
-    await expect(world.auth.verifyPasskey(auth, "register", credential("a"), meta())).rejects.toMatchObject({
+    await expect(
+      world.auth.verifyPasskey(auth, "register", credential("a"), meta()),
+    ).rejects.toMatchObject({
       code: "passkey.failed",
     });
 
@@ -414,10 +506,23 @@ describe("passkeys", () => {
       await world.addAccount("boss@example.com", {
         role: "admin",
         recoveryCodes: ["h"],
-        passkeys: [{ id: "cred-1", publicKey: "pk", counter: 3, transports: [], name: "Laptop", createdAt: 1, lastUsedAt: null }],
+        passkeys: [
+          {
+            id: "cred-1",
+            publicKey: "pk",
+            counter: 3,
+            transports: [],
+            name: "Laptop",
+            createdAt: 1,
+            lastUsedAt: null,
+          },
+        ],
       });
 
-      return authOf(world, await world.auth.login({ email: "boss@example.com", password: PASSWORD }, meta()));
+      return authOf(
+        world,
+        await world.auth.login({ email: "boss@example.com", password: PASSWORD }, meta()),
+      );
     }
 
     it("verifies, advances the counter, and goes active with a new token", async () => {
@@ -428,7 +533,12 @@ describe("passkeys", () => {
 
       await world.auth.passkeyOptions(pending, "login", meta());
 
-      const { step } = await world.auth.verifyPasskey(await reload(world, pending), "login", credential("cred-1"), meta());
+      const { step } = await world.auth.verifyPasskey(
+        await reload(world, pending),
+        "login",
+        credential("cred-1"),
+        meta(),
+      );
 
       expect(step?.stage).toBe("active");
 
@@ -445,7 +555,12 @@ describe("passkeys", () => {
       await world.auth.passkeyOptions(pending, "login", meta());
       world.passkeys!.failNext = true;
       await expect(
-        world.auth.verifyPasskey(await reload(world, pending), "login", credential("cred-1"), meta()),
+        world.auth.verifyPasskey(
+          await reload(world, pending),
+          "login",
+          credential("cred-1"),
+          meta(),
+        ),
       ).rejects.toMatchObject({ code: "passkey.failed" });
       expect(await world.store.audit.list({ types: ["mfa.failed"], limit: 5 })).toHaveLength(1);
     });
@@ -456,7 +571,12 @@ describe("passkeys", () => {
 
       await world.auth.passkeyOptions(pending, "login", meta());
 
-      const { step } = await world.auth.verifyPasskey(await reload(world, pending), "login", credential("cred-1"), meta());
+      const { step } = await world.auth.verifyPasskey(
+        await reload(world, pending),
+        "login",
+        credential("cred-1"),
+        meta(),
+      );
       const active = await authOf(world, step!);
 
       await expect(world.auth.regenerateRecoveryCodes(active, "", meta())).rejects.toMatchObject({
@@ -464,14 +584,25 @@ describe("passkeys", () => {
       });
 
       await world.auth.passkeyOptions(active, "login", meta());
-      await world.auth.verifyPasskey(await reload(world, active), "login", credential("cred-1"), meta());
+      await world.auth.verifyPasskey(
+        await reload(world, active),
+        "login",
+        credential("cred-1"),
+        meta(),
+      );
 
-      const codes = await world.auth.regenerateRecoveryCodes(await reload(world, active), "", meta());
+      const codes = await world.auth.regenerateRecoveryCodes(
+        await reload(world, active),
+        "",
+        meta(),
+      );
 
       expect(codes).toHaveLength(10);
 
       // The marker is spent, and it expires after five minutes anyway.
-      await expect(world.auth.regenerateRecoveryCodes(await reload(world, active), "", meta())).rejects.toMatchObject({
+      await expect(
+        world.auth.regenerateRecoveryCodes(await reload(world, active), "", meta()),
+      ).rejects.toMatchObject({
         code: "auth.invalid-code",
       });
     });
@@ -483,14 +614,32 @@ describe("passkeys", () => {
 
       await world.addAccount("boss@example.com", {
         role: "admin",
-        passkeys: [{ id: "cred-1", publicKey: "pk", counter: 0, transports: [], name: "Laptop", createdAt: 1, lastUsedAt: null }],
+        passkeys: [
+          {
+            id: "cred-1",
+            publicKey: "pk",
+            counter: 0,
+            transports: [],
+            name: "Laptop",
+            createdAt: 1,
+            lastUsedAt: null,
+          },
+        ],
       });
 
-      const pending = await authOf(world, await world.auth.login({ email: "boss@example.com", password: PASSWORD }, meta()));
+      const pending = await authOf(
+        world,
+        await world.auth.login({ email: "boss@example.com", password: PASSWORD }, meta()),
+      );
 
       await world.auth.passkeyOptions(pending, "login", meta());
 
-      const { step } = await world.auth.verifyPasskey(await reload(world, pending), "login", credential("cred-1"), meta());
+      const { step } = await world.auth.verifyPasskey(
+        await reload(world, pending),
+        "login",
+        credential("cred-1"),
+        meta(),
+      );
       const auth = await authOf(world, step!);
 
       await expect(world.auth.removePasskey(auth, "cred-1", meta())).rejects.toMatchObject({
@@ -502,11 +651,15 @@ describe("passkeys", () => {
 
       const account = await world.store.accounts.findById(auth.account.id);
 
-      await world.store.accounts.update(account!.id, account!.version, { totpSecret: `enc:${FAKE_SECRET}` });
+      await world.store.accounts.update(account!.id, account!.version, {
+        totpSecret: `enc:${FAKE_SECRET}`,
+      });
       await world.auth.removePasskey(await reload(world, auth), "cred-1", meta(), PASSWORD);
 
       expect((await world.store.accounts.findById(auth.account.id))?.passkeys).toEqual([]);
-      expect(await world.store.audit.list({ types: ["passkey.removed"], limit: 5 })).toHaveLength(1);
+      expect(await world.store.audit.list({ types: ["passkey.removed"], limit: 5 })).toHaveLength(
+        1,
+      );
     });
   });
 });

@@ -86,7 +86,11 @@ export function MfaVerifyScreen({ session, onStep, onSignOut }: MfaVerifyScreenP
           </Button>
         </div>
       ) : null}
-      <button type="button" className="text-sm text-muted-foreground underline" onClick={() => void onSignOut()}>
+      <button
+        type="button"
+        className="text-sm text-muted-foreground underline"
+        onClick={() => void onSignOut()}
+      >
         Sign out
       </button>
     </AuthLayout>

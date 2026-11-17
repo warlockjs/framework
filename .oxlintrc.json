@@ -46,6 +46,7 @@
     "temp/**",
     "tools/release/builds/**",
     "tools/release/sources/**",
-    "packages/create-warlock/templates/**"
+    "packages/create-warlock/templates/**",
+    "packages/devtools/ui/dashboard/**"
   ]
 }

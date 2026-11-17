@@ -11,9 +11,18 @@ export function PercentileBar({ p50, p95, max }: { p50: number; p95: number; max
       aria-label={`p50 ${formatMs(p50)}, p95 ${formatMs(p95)}, max ${formatMs(max)}`}
       className="relative h-3 min-w-24 rounded-sm bg-muted"
     >
-      <span className="absolute inset-y-0 left-0 rounded-sm opacity-40" style={{ width: pct(max), background: "var(--chart-4)" }} />
-      <span className="absolute inset-y-0 left-0 rounded-sm opacity-70" style={{ width: pct(p95), background: "var(--chart-1)" }} />
-      <span className="absolute inset-y-0 left-0 rounded-sm" style={{ width: pct(p50), background: "var(--chart-2)" }} />
+      <span
+        className="absolute inset-y-0 left-0 rounded-sm opacity-40"
+        style={{ width: pct(max), background: "var(--chart-4)" }}
+      />
+      <span
+        className="absolute inset-y-0 left-0 rounded-sm opacity-70"
+        style={{ width: pct(p95), background: "var(--chart-1)" }}
+      />
+      <span
+        className="absolute inset-y-0 left-0 rounded-sm"
+        style={{ width: pct(p50), background: "var(--chart-2)" }}
+      />
     </div>
   );
 }

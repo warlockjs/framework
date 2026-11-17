@@ -1,9 +1,11 @@
-import { constants, monitorEventLoopDelay, performance, PerformanceObserver } from "node:perf_hooks";
+import {
+  constants,
+  monitorEventLoopDelay,
+  performance,
+  PerformanceObserver,
+} from "node:perf_hooks";
 import v8 from "node:v8";
-import type {
-  DevtoolsResourcePoint,
-  DevtoolsResourceSnapshot,
-} from "../contracts";
+import type { DevtoolsResourcePoint, DevtoolsResourceSnapshot } from "../contracts";
 import type { DevtoolsResourceMonitor } from "./types";
 
 type GcKind = keyof DevtoolsResourceSnapshot["gcByKind"];

@@ -58,7 +58,12 @@ export function ApiPanel(_props: DevtoolsPanelProps) {
           </a>
         </Button>
       </div>
-      <iframe key={viewer.id} className="h-[75vh] w-full rounded-md border" src={viewer.src} title="API reference" />
+      <iframe
+        key={viewer.id}
+        className="h-[75vh] w-full rounded-md border"
+        src={viewer.src}
+        title="API reference"
+      />
     </div>
   );
 }

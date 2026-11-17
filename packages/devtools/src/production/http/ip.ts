@@ -121,10 +121,13 @@ function ipv6Groups(address: string): number[] | null {
   if (isIP(address) !== 6) return null;
 
   // A trailing dotted IPv4 part (`::ffff:1.2.3.4`, `64:ff9b::1.2.3.4`) becomes two hex groups.
-  const text = address.replace(/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/, (_, a, b, c, d) =>
-    `${((Number(a) << 8) | Number(b)).toString(16)}:${((Number(c) << 8) | Number(d)).toString(16)}`,
+  const text = address.replace(
+    /(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/,
+    (_, a, b, c, d) =>
+      `${((Number(a) << 8) | Number(b)).toString(16)}:${((Number(c) << 8) | Number(d)).toString(16)}`,
   );
-  const parse = (part: string) => (part === "" ? [] : part.split(":").map((group) => parseInt(group, 16)));
+  const parse = (part: string) =>
+    part === "" ? [] : part.split(":").map((group) => parseInt(group, 16));
   const [head = "", rest] = text.split("::");
   const left = parse(head);
   const right = rest === undefined ? [] : parse(rest);

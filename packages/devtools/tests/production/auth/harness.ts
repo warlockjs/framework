@@ -127,7 +127,8 @@ export function createFakeCrypto(now: () => number): FakeCrypto {
 
       return null;
     },
-    totpUri: ({ secret, account, issuer }) => `otpauth://totp/${issuer}:${account}?secret=${secret}`,
+    totpUri: ({ secret, account, issuer }) =>
+      `otpauth://totp/${issuer}:${account}?secret=${secret}`,
     hmac: (value) => createHash("sha256").update(`app-key:${value}`).digest("hex"),
   };
 
@@ -258,7 +259,10 @@ export async function authOf(world: World, step: DevtoolsAuthStep): Promise<Devt
 }
 
 /** The auth of a step whose session may not have a new token: re-reads by the session record. */
-export async function reload(world: World, auth: DevtoolsAuthenticated): Promise<DevtoolsAuthenticated> {
+export async function reload(
+  world: World,
+  auth: DevtoolsAuthenticated,
+): Promise<DevtoolsAuthenticated> {
   const session = (await world.store.sessions.listForAccount(auth.account.id)).find(
     (candidate) => candidate.id === auth.session.id,
   );
@@ -271,12 +275,19 @@ export async function reload(world: World, auth: DevtoolsAuthenticated): Promise
 
 /** Signs a viewer in with the default password and returns the active auth. */
 export async function signedIn(world: World, email: string, role: "admin" | "viewer" = "viewer") {
-  await world.addAccount(email, { role, ...(role === "admin" ? { totpSecret: "enc:" + FAKE_SECRET } : {}) });
+  await world.addAccount(email, {
+    role,
+    ...(role === "admin" ? { totpSecret: "enc:" + FAKE_SECRET } : {}),
+  });
 
   let step = await world.auth.login({ email, password: "correct horse battery" }, meta());
 
   if (step.stage === "mfa-verify") {
-    step = await world.auth.verifySecondFactor(await authOf(world, step), { code: world.code() }, meta());
+    step = await world.auth.verifySecondFactor(
+      await authOf(world, step),
+      { code: world.code() },
+      meta(),
+    );
   }
 
   return authOf(world, step);

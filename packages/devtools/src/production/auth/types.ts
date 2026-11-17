@@ -172,7 +172,11 @@ export interface DevtoolsAuthService {
    * factor and one is required). Needs the `current` password or a fresh
    * passkey step-up.
    */
-  removeTotp(auth: DevtoolsAuthenticated, meta: DevtoolsRequestMeta, current?: string): Promise<void>;
+  removeTotp(
+    auth: DevtoolsAuthenticated,
+    meta: DevtoolsRequestMeta,
+    current?: string,
+  ): Promise<void>;
   /** Stage `mfa-verify`: a TOTP code or a recovery code. Failures count toward the limits. */
   verifySecondFactor(
     auth: DevtoolsAuthenticated,

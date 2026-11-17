@@ -33,7 +33,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - In development, a value logged as the message (such as an Error) shows as text, and a tab that fails to draw no longer blanks the dashboard.
 - The server answers 503 with a build hint when `ui/dashboard/` is missing.
 
-
 ## 5.55.0 - 2026-11-17
 
 ### Added

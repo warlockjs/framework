@@ -11,7 +11,10 @@ type Core = typeof import("@warlock.js/core");
  * routes do not change after boot; a failed build is tried again next time.
  */
 export function createProductionOpenApi(
-  core: Pick<Core, "router" | "buildOpenApiDocument" | "openApiToPostmanCollection" | "config" | "rootPath">,
+  core: Pick<
+    Core,
+    "router" | "buildOpenApiDocument" | "openApiToPostmanCollection" | "config" | "rootPath"
+  >,
 ): { getOpenApiDocument: () => Promise<object>; getPostmanCollection: () => Promise<object> } {
   let built: Promise<object> | undefined;
 

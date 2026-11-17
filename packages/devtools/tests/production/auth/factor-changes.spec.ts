@@ -25,7 +25,10 @@ async function signedInWithFactors(world: World) {
     await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta()),
   );
 
-  return authOf(world, await world.auth.verifySecondFactor(pending, { code: world.code() }, meta()));
+  return authOf(
+    world,
+    await world.auth.verifySecondFactor(pending, { code: world.code() }, meta()),
+  );
 }
 
 /** Passes a passkey check in the active session (the step-up). */
@@ -101,7 +104,12 @@ describe("changing second factors from an active session", () => {
 
     await world.auth.passkeyOptions(pending, "login", meta());
 
-    const { step } = await world.auth.verifyPasskey(await reload(world, pending), "login", { id: "cred-1" }, meta());
+    const { step } = await world.auth.verifyPasskey(
+      await reload(world, pending),
+      "login",
+      { id: "cred-1" },
+      meta(),
+    );
     const auth = await authOf(world, step!);
 
     await world.auth.startTotp(auth, meta());
@@ -125,7 +133,13 @@ describe("changing second factors from an active session", () => {
     ).rejects.toMatchObject({ code: "auth.wrong-current-password" });
 
     await world.auth.passkeyOptions(await reload(world, auth), "register", meta());
-    await world.auth.verifyPasskey(await reload(world, auth), "register", { id: "cred-9" }, meta(), PASSWORD);
+    await world.auth.verifyPasskey(
+      await reload(world, auth),
+      "register",
+      { id: "cred-9" },
+      meta(),
+      PASSWORD,
+    );
 
     expect((await world.store.accounts.findById(auth.account.id))?.passkeys).toHaveLength(2);
 
@@ -141,7 +155,12 @@ describe("changing second factors from an active session", () => {
 
     await world.auth.passkeyOptions(enrolling, "register", meta());
 
-    const result = await world.auth.verifyPasskey(await reload(world, enrolling), "register", { id: "cred-boss" }, meta());
+    const result = await world.auth.verifyPasskey(
+      await reload(world, enrolling),
+      "register",
+      { id: "cred-boss" },
+      meta(),
+    );
 
     expect(result.step?.stage).toBe("active");
   });
@@ -162,6 +181,8 @@ describe("the step-up for recovery codes", () => {
     expect(results.find((result) => result.status === "rejected")).toMatchObject({
       reason: { code: "auth.invalid-code" },
     });
-    expect(await world.store.audit.list({ types: ["recovery-codes.regenerated"], limit: 5 })).toHaveLength(1);
+    expect(
+      await world.store.audit.list({ types: ["recovery-codes.regenerated"], limit: 5 }),
+    ).toHaveLength(1);
   });
 });

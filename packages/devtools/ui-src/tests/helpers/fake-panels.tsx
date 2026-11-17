@@ -6,7 +6,21 @@ import { vi } from "vitest";
  * must be hoisted, so the spec calls `fakeRegistry()` inside the factory.
  */
 export async function fakeRegistry() {
-  const ids = ["requests", "queries", "routes", "resources", "health", "errors", "logs", "jobs", "mail", "ai", "agents", "api", "broken"];
+  const ids = [
+    "requests",
+    "queries",
+    "routes",
+    "resources",
+    "health",
+    "errors",
+    "logs",
+    "jobs",
+    "mail",
+    "ai",
+    "agents",
+    "api",
+    "broken",
+  ];
   const make = (id: string) =>
     function FakePanel(props: { route: string; instance: string }) {
       // A tab that fails while drawing, for the shell's error boundary.

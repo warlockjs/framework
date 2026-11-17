@@ -15,7 +15,10 @@ afterEach(() => {
 /** Core as `warlock start` has it: routes registered, no development OpenAPI provider. */
 function fakeCore(routes: unknown[]) {
   root = mkdtempSync(path.join(tmpdir(), "devtools-openapi-"));
-  writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "shop-api", version: "2.1.0" }));
+  writeFileSync(
+    path.join(root, "package.json"),
+    JSON.stringify({ name: "shop-api", version: "2.1.0" }),
+  );
 
   const build = vi.fn(buildOpenApiDocument);
   const values: Record<string, unknown> = { "app.baseUrl": "https://shop.example" };

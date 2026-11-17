@@ -14,7 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { CopyButton } from "@/components/common/CopyButton";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
@@ -96,7 +103,8 @@ function InviteForm({ onCreated }: { onCreated: () => void }) {
           <div className="grid gap-2 rounded-md border bg-muted p-3 text-sm">
             <p>
               Invite for <strong>{created.invite.email}</strong> (expires{" "}
-              <RelativeTime at={created.invite.expiresAt} />). This link is shown only now:
+              <RelativeTime at={created.invite.expiresAt} />
+              ). This link is shown only now:
             </p>
             <code className="font-mono text-xs break-all" data-testid="invite-link">
               {inviteLink(created.token)}
@@ -134,7 +142,8 @@ function dialogFor(pending: Pending): { title: string; description: string; labe
     case "reset-mfa":
       return {
         title: `Reset the second factor of ${pending.account.email}?`,
-        description: "Their authenticator app, passkeys and recovery codes are removed. They add new ones at the next sign-in.",
+        description:
+          "Their authenticator app, passkeys and recovery codes are removed. They add new ones at the next sign-in.",
         label: "Reset",
       };
     case "sign-out":
@@ -163,7 +172,10 @@ export function UsersPage() {
 
     switch (pending.type) {
       case "role":
-        await apiFetch(`api/admin/users/${pending.account.id}`, { method: "PATCH", body: { role: pending.role } });
+        await apiFetch(`api/admin/users/${pending.account.id}`, {
+          method: "PATCH",
+          body: { role: pending.role },
+        });
         break;
       case "remove":
         await apiFetch(`api/admin/users/${pending.account.id}`, { method: "DELETE" });
@@ -217,7 +229,9 @@ export function UsersPage() {
                         </TableCell>
                         <TableCell>{account.role}</TableCell>
                         <TableCell>
-                          {account.twoFactor.totp || account.twoFactor.passkeys.length > 0 ? "On" : "Off"}
+                          {account.twoFactor.totp || account.twoFactor.passkeys.length > 0
+                            ? "On"
+                            : "Off"}
                         </TableCell>
                         <TableCell>
                           <RelativeTime at={account.lastLoginAt} />
@@ -238,13 +252,25 @@ export function UsersPage() {
                               >
                                 {account.role === "admin" ? "Make viewer" : "Make admin"}
                               </Button>
-                              <Button size="xs" variant="outline" onClick={() => setPending({ type: "reset-mfa", account })}>
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                onClick={() => setPending({ type: "reset-mfa", account })}
+                              >
                                 Reset second factor
                               </Button>
-                              <Button size="xs" variant="outline" onClick={() => setPending({ type: "sign-out", account })}>
+                              <Button
+                                size="xs"
+                                variant="outline"
+                                onClick={() => setPending({ type: "sign-out", account })}
+                              >
                                 Sign out everywhere
                               </Button>
-                              <Button size="xs" variant="destructive" onClick={() => setPending({ type: "remove", account })}>
+                              <Button
+                                size="xs"
+                                variant="destructive"
+                                onClick={() => setPending({ type: "remove", account })}
+                              >
                                 Remove
                               </Button>
                             </>
@@ -277,7 +303,11 @@ export function UsersPage() {
                             expires <RelativeTime at={invite.expiresAt} />
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button size="xs" variant="outline" onClick={() => setPending({ type: "revoke", invite })}>
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              onClick={() => setPending({ type: "revoke", invite })}
+                            >
                               Revoke
                             </Button>
                           </TableCell>

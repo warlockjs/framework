@@ -25,14 +25,24 @@ describe("passkeys adapter", () => {
       email: "boss@example.com",
       passkeys: [],
     } as never;
-    const registration = await passkeys!.registrationOptions({ account, rpId: "example.com", rpName: "Warlock monitor" });
+    const registration = await passkeys!.registrationOptions({
+      account,
+      rpId: "example.com",
+      rpName: "Warlock monitor",
+    });
 
     expect(registration.challenge).toMatch(/^[\w-]{20,}$/);
-    expect(registration.options).toMatchObject({ rp: { id: "example.com" }, authenticatorSelection: { userVerification: "required" } });
+    expect(registration.options).toMatchObject({
+      rp: { id: "example.com" },
+      authenticatorSelection: { userVerification: "required" },
+    });
 
     const authentication = await passkeys!.authenticationOptions({ account, rpId: "example.com" });
 
-    expect(authentication.options).toMatchObject({ rpId: "example.com", userVerification: "required" });
+    expect(authentication.options).toMatchObject({
+      rpId: "example.com",
+      userVerification: "required",
+    });
   });
 
   it("rejects an assertion for a credential the account does not have", async () => {

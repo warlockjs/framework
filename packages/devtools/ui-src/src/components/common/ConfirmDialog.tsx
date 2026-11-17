@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,13 +51,18 @@ export function ConfirmDialog({
   const [typed, setTyped] = useState("");
   const [password, setPassword] = useState("");
 
-  useEffect(() => {
+  // Each time the dialog opens it starts clean (state reset during render, not in an effect).
+  const [wasOpen, setWasOpen] = useState(open);
+
+  if (open !== wasOpen) {
+    setWasOpen(open);
+
     if (open) {
       setError(null);
       setTyped("");
       setPassword("");
     }
-  }, [open]);
+  }
 
   const confirm = async () => {
     setPending(true);

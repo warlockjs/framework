@@ -29,11 +29,12 @@ describe("statistics bounds", () => {
     stats.record(observation("SELECT a")); // a is the most recent now
     stats.record(observation("SELECT d")); // evicts b
 
-    expect(stats.snapshot(10).map((shape) => shape.shape).sort()).toEqual([
-      "SELECT a",
-      "SELECT c",
-      "SELECT d",
-    ]);
+    expect(
+      stats
+        .snapshot(10)
+        .map((shape) => shape.shape)
+        .sort(),
+    ).toEqual(["SELECT a", "SELECT c", "SELECT d"]);
     expect(stats.evicted()).toBe(1);
   });
 
@@ -42,8 +43,26 @@ describe("statistics bounds", () => {
     const errors = createErrorGroups({ maxGroups: 2 });
 
     for (const route of ["/a", "/b", "/c"]) {
-      routes.record({ method: "GET", route, status: 200, failed: false, durationMs: 1, at: 1, requestId: null, phases: [] });
-      errors.record({ source: "request", message: `fail ${route}x`, name: null, stack: null, route, status: 500, requestId: null, at: 1 });
+      routes.record({
+        method: "GET",
+        route,
+        status: 200,
+        failed: false,
+        durationMs: 1,
+        at: 1,
+        requestId: null,
+        phases: [],
+      });
+      errors.record({
+        source: "request",
+        message: `fail ${route}x`,
+        name: null,
+        stack: null,
+        route,
+        status: 500,
+        requestId: null,
+        at: 1,
+      });
     }
 
     expect(routes.snapshot(10)).toHaveLength(2);
@@ -54,9 +73,21 @@ describe("statistics bounds", () => {
 
   it("keeps at most 30 phases per route and limits what a snapshot returns", () => {
     const routes = createRouteStats({ maxRoutes: 10, instance: "i" });
-    const phases = Array.from({ length: 45 }, (_, index) => ({ name: `p${index}`, durationMs: index + 1 }));
+    const phases = Array.from({ length: 45 }, (_, index) => ({
+      name: `p${index}`,
+      durationMs: index + 1,
+    }));
 
-    routes.record({ method: "GET", route: "/a", status: 200, failed: false, durationMs: 1, at: 1, requestId: null, phases });
+    routes.record({
+      method: "GET",
+      route: "/a",
+      status: 200,
+      failed: false,
+      durationMs: 1,
+      at: 1,
+      requestId: null,
+      phases,
+    });
 
     expect(routes.snapshot(10)[0]?.phases).toHaveLength(30);
     expect(routes.snapshot(10)[0]?.phases[0]?.name).toBe("p44");
@@ -67,20 +98,46 @@ describe("statistics bounds", () => {
     const logs = createRecentLogs({ maxEntries: 3 });
 
     for (let index = 1; index <= 5; index++) {
-      logs.record({ level: index % 2 ? "warn" : "error", module: index > 3 ? "Mail" : "app", action: "a", message: `m${index}`, at: index, requestId: null });
+      logs.record({
+        level: index % 2 ? "warn" : "error",
+        module: index > 3 ? "Mail" : "app",
+        action: "a",
+        message: `m${index}`,
+        at: index,
+        requestId: null,
+      });
     }
 
     expect(logs.snapshot(10).map((entry) => entry.message)).toEqual(["m5", "m4", "m3"]);
     expect(logs.snapshot(10, { level: "error" }).map((entry) => entry.message)).toEqual(["m4"]);
-    expect(logs.snapshot(10, { module: "mail" }).map((entry) => entry.message)).toEqual(["m5", "m4"]);
+    expect(logs.snapshot(10, { module: "mail" }).map((entry) => entry.message)).toEqual([
+      "m5",
+      "m4",
+    ]);
   });
 
   it("truncates long messages and stacks", () => {
     const errors = createErrorGroups({ maxGroups: 5 });
     const logs = createRecentLogs({ maxEntries: 5 });
 
-    errors.record({ source: "request", message: "x".repeat(900), name: null, stack: "s".repeat(9000), route: null, status: 500, requestId: null, at: 1 });
-    logs.record({ level: "warn", module: "a", action: "b", message: "y".repeat(3000), at: 1, requestId: null });
+    errors.record({
+      source: "request",
+      message: "x".repeat(900),
+      name: null,
+      stack: "s".repeat(9000),
+      route: null,
+      status: 500,
+      requestId: null,
+      at: 1,
+    });
+    logs.record({
+      level: "warn",
+      module: "a",
+      action: "b",
+      message: "y".repeat(3000),
+      at: 1,
+      requestId: null,
+    });
 
     expect(errors.snapshot(1)[0]?.message).toHaveLength(500);
     expect(errors.snapshot(1)[0]?.stack).toHaveLength(4000);
@@ -115,10 +172,17 @@ describe("per request limits", () => {
     engine.hooks.onRequestStart(request);
 
     for (let index = 0; index < 70; index++) {
-      engine.hooks.onLog("busy", { level: "info", module: "m", action: "a", message: `l${index}`, at: index });
+      engine.hooks.onLog("busy", {
+        level: "info",
+        module: "m",
+        action: "a",
+        message: `l${index}`,
+        at: index,
+      });
     }
 
-    for (let index = 0; index < 130; index++) engine.hooks.onPhase(request, { name: `p${index}`, durationMs: 1 });
+    for (let index = 0; index < 130; index++)
+      engine.hooks.onPhase(request, { name: `p${index}`, durationMs: 1 });
 
     engine.hooks.onRequestEnd(request, { status: 200, durationMs: 5 });
     await engine.flush();
@@ -141,7 +205,10 @@ describe("per request limits", () => {
     const { engine } = createEngine({ production: { maxShapes: 2, maxRoutes: 2 } });
 
     for (let index = 0; index < 4; index++) {
-      runRequest(engine, `r${index}`, { route: `/r${index}`, queries: [{ sql: `SELECT col${index} FROM t` }] });
+      runRequest(engine, `r${index}`, {
+        route: `/r${index}`,
+        queries: [{ sql: `SELECT col${index} FROM t` }],
+      });
     }
 
     expect(engine.counters()).toMatchObject({ evictedShapes: 2, evictedRoutes: 2 });
@@ -173,7 +240,10 @@ describe("sample writer", () => {
     const insert = vi.fn(async () => {});
     const store = createMemoryStore();
     const wrapped: DevtoolsStore = { ...store, samples: { ...store.samples, insert } };
-    const { engine } = createEngine({ store: wrapped, production: { maxStoredSamplesPerMinute: 1000 } });
+    const { engine } = createEngine({
+      store: wrapped,
+      production: { maxStoredSamplesPerMinute: 1000 },
+    });
 
     for (let index = 0; index < 49; index++) runRequest(engine, `f${index}`);
 

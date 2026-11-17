@@ -10,7 +10,10 @@ async function setup() {
 
   await store.reports.write(
     report("b", NOW - 5000, {
-      queries: [shape("q1", [100, 200]), shape("q2", [5, 5, 5, 5], { nPlusOne: { requests: 3, maxPerRequest: 9 } })],
+      queries: [
+        shape("q1", [100, 200]),
+        shape("q2", [5, 5, 5, 5], { nPlusOne: { requests: 3, maxPerRequest: 9 } }),
+      ],
       routes: [route("GET /a", [10, 20], 1), route("GET /b", [500])],
       errors: [errorGroup("e1", NOW - 4000, 2)],
       logs: [logEntry(NOW - 4000, "error", "db")],
@@ -85,7 +88,9 @@ describe("createSharedInsights", () => {
   it("sorts queries by total (default), p95, count and n+1", async () => {
     const { insights } = await setup();
     const ids = async (sort?: string) =>
-      (await insights.queryStats({ instance: "b", ...(sort ? { sort } : {}) })).shapes.map((s) => s.id);
+      (await insights.queryStats({ instance: "b", ...(sort ? { sort } : {}) })).shapes.map(
+        (s) => s.id,
+      );
 
     expect(await ids()).toEqual(["q1", "q2"]);
     expect(await ids("total")).toEqual(["q1", "q2"]);
@@ -132,8 +137,12 @@ describe("createSharedInsights", () => {
     const all = await insights.logs({ instance: "all" });
 
     expect(all.map((l) => l.instance)).toEqual(["a", "c", "b"]);
-    expect((await insights.logs({ instance: "all", module: "http" })).map((l) => l.instance)).toEqual(["a", "c"]);
-    expect((await insights.logs({ instance: "all", level: "ERR" })).map((l) => l.instance)).toEqual(["b"]);
+    expect(
+      (await insights.logs({ instance: "all", module: "http" })).map((l) => l.instance),
+    ).toEqual(["a", "c"]);
+    expect((await insights.logs({ instance: "all", level: "ERR" })).map((l) => l.instance)).toEqual(
+      ["b"],
+    );
     expect((await insights.logs({ instance: "c" })).every((l) => l.instance === "c")).toBe(true);
   });
 
@@ -158,12 +167,18 @@ describe("createSharedInsights", () => {
 describe("createLocalInsights", () => {
   it("shows this process only, with its own sample rate", async () => {
     const reporter = fakeReporter("a", () =>
-      report("a", NOW, { queries: [shape("q", [5])], capture: { ...report("a", 1).capture, sampleRate: 1 } }),
+      report("a", NOW, {
+        queries: [shape("q", [5])],
+        capture: { ...report("a", 1).capture, sampleRate: 1 },
+      }),
     );
     const insights = createLocalInsights(reporter);
 
     expect((await insights.instances()).instances).toHaveLength(1);
-    expect(await insights.queryStats({ instance: "all" })).toMatchObject({ sampleRate: 1, instanceCount: 1 });
+    expect(await insights.queryStats({ instance: "all" })).toMatchObject({
+      sampleRate: 1,
+      instanceCount: 1,
+    });
     expect((await insights.queryStats({ instance: "other" })).shapes).toEqual([]);
   });
 });

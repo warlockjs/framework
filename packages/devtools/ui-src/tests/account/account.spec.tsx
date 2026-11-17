@@ -11,8 +11,24 @@ vi.mock("@simplewebauthn/browser", () => ({
 }));
 
 const sessions = [
-  { id: "s1", current: true, createdAt: 1, lastSeenAt: Date.now(), expiresAt: 9, ip: "10.0.0.1", userAgent: "Firefox" },
-  { id: "s2", current: false, createdAt: 1, lastSeenAt: Date.now() - 600_000, expiresAt: 9, ip: "10.0.0.2", userAgent: "Chrome" },
+  {
+    id: "s1",
+    current: true,
+    createdAt: 1,
+    lastSeenAt: Date.now(),
+    expiresAt: 9,
+    ip: "10.0.0.1",
+    userAgent: "Firefox",
+  },
+  {
+    id: "s2",
+    current: false,
+    createdAt: 1,
+    lastSeenAt: Date.now() - 600_000,
+    expiresAt: 9,
+    ip: "10.0.0.2",
+    userAgent: "Chrome",
+  },
 ];
 
 function routes(extra: Record<string, never | object> = {}) {
@@ -42,8 +58,16 @@ describe("account page", () => {
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Revoke" }));
 
-    await waitFor(() => expect(api.calls.some((call) => call.method === "DELETE" && call.path === "api/account/sessions/s2")).toBe(true));
-    expect(api.calls.find((call) => call.method === "DELETE")?.headers.get("X-Devtools-Csrf")).toBe("csrf-1");
+    await waitFor(() =>
+      expect(
+        api.calls.some(
+          (call) => call.method === "DELETE" && call.path === "api/account/sessions/s2",
+        ),
+      ).toBe(true),
+    );
+    expect(api.calls.find((call) => call.method === "DELETE")?.headers.get("X-Devtools-Csrf")).toBe(
+      "csrf-1",
+    );
   });
 
   it("changes the password with the current one and shows the server's error when it fails", async () => {
@@ -52,7 +76,11 @@ describe("account page", () => {
       routes({
         "POST api/account/password": {
           status: 422,
-          body: { error: "The current password is not right. Type it again.", code: "auth.wrong-current-password", ref: "PW000001" },
+          body: {
+            error: "The current password is not right. Type it again.",
+            code: "auth.wrong-current-password",
+            ref: "PW000001",
+          },
         },
       }),
     );
@@ -77,12 +105,18 @@ describe("account page", () => {
       routes({
         "DELETE api/account/totp": {
           status: 409,
-          body: { error: "This is your only second factor. Add a passkey first.", code: "account.last-factor", ref: "LAST0001" },
+          body: {
+            error: "This is your only second factor. Add a passkey first.",
+            code: "account.last-factor",
+            ref: "LAST0001",
+          },
         },
       }),
     );
     render(<App />);
-    await userEvent.click(await screen.findByRole("button", { name: "Remove the authenticator app" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Remove the authenticator app" }),
+    );
 
     const dialog = await screen.findByRole("dialog");
 
@@ -95,24 +129,37 @@ describe("account page", () => {
     expect(await within(dialog).findByText(/This is your only second factor/)).toBeInTheDocument();
     expect(within(dialog).getByText("Reference: LAST0001")).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(api.calls.find((call) => call.path === "api/account/totp")?.body).toEqual({ current: "my-password-1" });
+    expect(api.calls.find((call) => call.path === "api/account/totp")?.body).toEqual({
+      current: "my-password-1",
+    });
   });
 
   it("adds an authenticator app from the account page with the code and the current password", async () => {
     window.location.hash = "#/account";
     const api = mockApi(
       routes({
-        "api/account": { body: account({ twoFactor: { totp: false, passkeys: [], recoveryCodesLeft: 0 } }) },
-        "POST api/account/totp/start": {
-          body: { secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://totp/x?secret=JBSWY3DPEHPK3PXP", issuer: "Warlock monitor", account: "admin@example.com" },
+        "api/account": {
+          body: account({ twoFactor: { totp: false, passkeys: [], recoveryCodesLeft: 0 } }),
         },
-        "POST api/account/totp/confirm": { body: { stage: "active", csrf: null, recoveryCodes: ["r1-aaaa"] } },
+        "POST api/account/totp/start": {
+          body: {
+            secret: "JBSWY3DPEHPK3PXP",
+            uri: "otpauth://totp/x?secret=JBSWY3DPEHPK3PXP",
+            issuer: "Warlock monitor",
+            account: "admin@example.com",
+          },
+        },
+        "POST api/account/totp/confirm": {
+          body: { stage: "active", csrf: null, recoveryCodes: ["r1-aaaa"] },
+        },
       }),
     );
 
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "Add an authenticator app" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Set up an authenticator app" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Set up an authenticator app" }),
+    );
     await userEvent.type(await screen.findByLabelText("Code from the app"), "123456");
     await userEvent.type(screen.getAllByLabelText("Current password").at(-1)!, "my-password-1");
     await userEvent.click(screen.getByRole("button", { name: "Confirm the code" }));
@@ -154,7 +201,9 @@ describe("account page", () => {
     const passkey = { id: "cred-1", name: "Laptop", createdAt: 1, lastUsedAt: null };
     const api = mockApi(
       routes({
-        "api/account": { body: account({ twoFactor: { totp: true, passkeys: [passkey], recoveryCodesLeft: 8 } }) },
+        "api/account": {
+          body: account({ twoFactor: { totp: true, passkeys: [passkey], recoveryCodesLeft: 8 } }),
+        },
         "DELETE api/account/passkeys/cred-1": { status: 204 },
       }),
     );
@@ -179,7 +228,9 @@ describe("account page", () => {
     const passkey = { id: "cred-1", name: "Laptop", createdAt: 1, lastUsedAt: null };
     const api = mockApi(
       routes({
-        "api/account": { body: account({ twoFactor: { totp: false, passkeys: [passkey], recoveryCodesLeft: 3 } }) },
+        "api/account": {
+          body: account({ twoFactor: { totp: false, passkeys: [passkey], recoveryCodesLeft: 3 } }),
+        },
         "POST api/account/passkey/options": { body: { challenge: "c" } },
         "POST api/account/passkey/verify": { body: { stage: "active", csrf: null } },
         "POST api/account/recovery-codes": { body: { codes: ["new1-aaaa"] } },
@@ -189,33 +240,62 @@ describe("account page", () => {
     render(<App />);
 
     expect(await screen.findByText(/3 left/)).toBeInTheDocument();
-    expect(screen.queryByLabelText("Current code from your authenticator app")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Current code from your authenticator app"),
+    ).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Make new recovery codes with a passkey" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Make new recovery codes with a passkey" }),
+    );
 
     expect(await screen.findByText("new1-aaaa")).toBeInTheDocument();
-    expect(api.calls.filter((call) => call.method === "POST").map((call) => [call.path, call.body])).toEqual([
+    expect(
+      api.calls.filter((call) => call.method === "POST").map((call) => [call.path, call.body]),
+    ).toEqual([
       ["api/account/passkey/options", { purpose: "login" }],
-      ["api/account/passkey/verify", { purpose: "login", response: { id: "cred-1", type: "public-key" } }],
+      [
+        "api/account/passkey/verify",
+        { purpose: "login", response: { id: "cred-1", type: "public-key" } },
+      ],
       ["api/account/recovery-codes", {}],
     ]);
   });
 
   it("regenerates recovery codes with a current code and shows them once", async () => {
     window.location.hash = "#/account";
-    const api = mockApi(routes({ "POST api/account/recovery-codes": { body: { codes: ["new1-aaaa", "new2-bbbb"] } } }));
+    const api = mockApi(
+      routes({
+        "POST api/account/recovery-codes": { body: { codes: ["new1-aaaa", "new2-bbbb"] } },
+      }),
+    );
 
     render(<App />);
-    await userEvent.type(await screen.findByLabelText("Current code from your authenticator app"), "654321");
+    await userEvent.type(
+      await screen.findByLabelText("Current code from your authenticator app"),
+      "654321",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Make new recovery codes" }));
 
     expect(await screen.findByText("new1-aaaa")).toBeInTheDocument();
-    expect(api.calls.find((call) => call.path === "api/account/recovery-codes")?.body).toEqual({ code: "654321" });
+    expect(api.calls.find((call) => call.path === "api/account/recovery-codes")?.body).toEqual({
+      code: "654321",
+    });
   });
 
   it("shows an account load error with its reference", async () => {
     window.location.hash = "#/account";
-    mockApi(routes({ "api/account": { status: 500, body: { error: "The account could not be read. Reload the page.", code: "server.error", ref: "ACC00001" } } }));
+    mockApi(
+      routes({
+        "api/account": {
+          status: 500,
+          body: {
+            error: "The account could not be read. Reload the page.",
+            code: "server.error",
+            ref: "ACC00001",
+          },
+        },
+      }),
+    );
     render(<App />);
 
     expect(await screen.findByText(/account could not be read/)).toBeInTheDocument();

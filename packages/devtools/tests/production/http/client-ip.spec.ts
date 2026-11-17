@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { resolveClient } from "../../../src/production/http/client";
-import { ipMatches, isValidNetworkEntry, normalizeIp, rateLimitClient } from "../../../src/production/http/ip";
+import {
+  ipMatches,
+  isValidNetworkEntry,
+  normalizeIp,
+  rateLimitClient,
+} from "../../../src/production/http/ip";
 import { createApp, HOST, PATH } from "./harness";
 
 type Headers = Record<string, string | string[] | undefined>;

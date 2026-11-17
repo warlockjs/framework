@@ -14,7 +14,11 @@ export function Sparkline({
 }) {
   if (values.length < 2) {
     return (
-      <span className="text-xs text-muted-foreground" role="img" aria-label={label ?? "No trend yet"}>
+      <span
+        className="text-xs text-muted-foreground"
+        role="img"
+        aria-label={label ?? "No trend yet"}
+      >
         no trend yet
       </span>
     );
@@ -25,7 +29,10 @@ export function Sparkline({
   const range = max - min || 1;
   const step = width / (values.length - 1);
   const points = values
-    .map((value, index) => `${(index * step).toFixed(1)},${(height - 2 - ((value - min) / range) * (height - 4)).toFixed(1)}`)
+    .map(
+      (value, index) =>
+        `${(index * step).toFixed(1)},${(height - 2 - ((value - min) / range) * (height - 4)).toFixed(1)}`,
+    )
     .join(" ");
 
   return (

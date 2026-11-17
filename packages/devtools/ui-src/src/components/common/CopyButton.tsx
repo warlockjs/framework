@@ -12,7 +12,12 @@ export type CopyButtonProps = {
 };
 
 /** Copies `value` to the clipboard; when the browser refuses, it says so and asks the user to select the text. */
-export function CopyButton({ value, label = "Copy", size = "sm", variant = "outline" }: CopyButtonProps) {
+export function CopyButton({
+  value,
+  label = "Copy",
+  size = "sm",
+  variant = "outline",
+}: CopyButtonProps) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
 
   const copy = async () => {

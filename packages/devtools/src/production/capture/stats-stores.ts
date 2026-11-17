@@ -269,7 +269,10 @@ export function createRouteStats(limits: {
             let smallest: string | undefined;
 
             for (const [name, candidate] of entry.phases) {
-              if (smallest === undefined || candidate.sumMs < (entry.phases.get(smallest)?.sumMs ?? 0)) {
+              if (
+                smallest === undefined ||
+                candidate.sumMs < (entry.phases.get(smallest)?.sumMs ?? 0)
+              ) {
                 smallest = name;
               }
             }

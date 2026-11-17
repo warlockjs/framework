@@ -96,20 +96,29 @@ async function startServer(hooks: DevtoolsCaptureHooks) {
 
   {
     app.addHook("onRequest", async (req) => {
-      const traced = { requestId: String(req.id), method: req.method, path: req.url, route: "/posts/:id" };
+      const traced = {
+        requestId: String(req.id),
+        method: req.method,
+        path: req.url,
+        route: "/posts/:id",
+      };
 
       (req as unknown as { traced: typeof traced }).traced = traced;
       hooks.onRequestStart(traced);
     });
     app.addHook("onResponse", async (req, reply) => {
-      const traced = (req as unknown as { traced: { requestId: string; method: string; path: string } }).traced;
+      const traced = (
+        req as unknown as { traced: { requestId: string; method: string; path: string } }
+      ).traced;
 
       hooks.onRequestEnd(traced, { status: reply.statusCode, durationMs: reply.elapsedTime });
     });
   }
 
   app.get("/posts/:id", async (req) => {
-    const traced = (req as unknown as { traced?: { requestId: string; method: string; path: string } }).traced;
+    const traced = (
+      req as unknown as { traced?: { requestId: string; method: string; path: string } }
+    ).traced;
     const id = String(req.id);
 
     if (traced) {
@@ -132,7 +141,13 @@ async function startServer(hooks: DevtoolsCaptureHooks) {
       });
     }
 
-    hooks.onLog(id, { level: "info", module: "app", action: "seen", message: "handled", at: Date.now() });
+    hooks.onLog(id, {
+      level: "info",
+      module: "app",
+      action: "seen",
+      message: "handled",
+      at: Date.now(),
+    });
 
     return body;
   });
@@ -181,7 +196,11 @@ function median(values: number[]): number {
 async function measure(withCapture: boolean): Promise<number> {
   const engine = withCapture
     ? createCaptureEngine({
-        options: { path: production.path, maxRequests: production.maxRequests, nPlusOneThreshold: 5 },
+        options: {
+          path: production.path,
+          maxRequests: production.maxRequests,
+          nPlusOneThreshold: 5,
+        },
         production,
         instance,
         store: process.env.STORE === "none" ? null : createMemoryStore(),

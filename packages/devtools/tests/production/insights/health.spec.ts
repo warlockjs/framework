@@ -8,7 +8,12 @@ describe("createHealthHistory", () => {
   it("is unknown before the first check", () => {
     const history = createHealthHistory({ readiness: async () => ({ status: "ok" }) });
 
-    expect(history.report()).toEqual({ status: "unknown", checkedAt: null, checks: {}, history: [] });
+    expect(history.report()).toEqual({
+      status: "unknown",
+      checkedAt: null,
+      checks: {},
+      history: [],
+    });
   });
 
   it("records the status, the checks and the failed names", async () => {
@@ -57,7 +62,9 @@ describe("createHealthHistory", () => {
 
   it("records nothing while the app boots, and checks again a second later", async () => {
     let booted = false;
-    const readiness = vi.fn(async () => (booted ? { status: "ok" as const, checks: { db: true } } : null));
+    const readiness = vi.fn(async () =>
+      booted ? { status: "ok" as const, checks: { db: true } } : null,
+    );
     const history = createHealthHistory({ intervalMs: 30_000, readiness });
 
     history.start();

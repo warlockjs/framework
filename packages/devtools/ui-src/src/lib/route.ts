@@ -25,7 +25,10 @@ export function parseHash(hash: string): HashRoute {
     if (first === "invite" && second) return { type: "invite", token: decodeURIComponent(second) };
     if (first === "account") return { type: "account" };
     if (first === "admin") {
-      return { type: "admin", page: second === "audit" || second === "settings" ? second : "users" };
+      return {
+        type: "admin",
+        page: second === "audit" || second === "settings" ? second : "users",
+      };
     }
 
     return { type: "tab", id: "", route: "" };

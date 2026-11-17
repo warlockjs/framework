@@ -16,7 +16,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { LoadingRows } from "@/components/common/LoadingRows";
@@ -39,16 +46,23 @@ function PasswordSection() {
           requireCurrent
           submitLabel="Change password"
           onSubmit={async ({ current, password }) => {
-            const result = await apiFetch<DevtoolsAuthStepResult | undefined>("api/account/password", {
-              method: "POST",
-              body: { current, password },
-            });
+            const result = await apiFetch<DevtoolsAuthStepResult | undefined>(
+              "api/account/password",
+              {
+                method: "POST",
+                body: { current, password },
+              },
+            );
 
             if (result?.csrf) setCsrfToken(result.csrf);
           }}
           onDone={() => setChanged(true)}
         />
-        {changed ? <p role="status" className="text-sm">Password changed.</p> : null}
+        {changed ? (
+          <p role="status" className="text-sm">
+            Password changed.
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -261,7 +275,9 @@ function RecoverySection({ account, reload }: { account: DevtoolsAccountView } &
                     disabled={withPasskey.pending}
                     onClick={() => void withPasskey.run()}
                   >
-                    {withPasskey.pending ? "Waiting for the passkey…" : "Make new recovery codes with a passkey"}
+                    {withPasskey.pending
+                      ? "Waiting for the passkey…"
+                      : "Make new recovery codes with a passkey"}
                   </Button>
                 </div>
               </div>
@@ -305,7 +321,8 @@ function SessionsSection() {
               {sessions.data.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="max-w-64 truncate" title={item.userAgent ?? undefined}>
-                    {item.userAgent ?? "Unknown"} {item.current ? <Badge>This session</Badge> : null}
+                    {item.userAgent ?? "Unknown"}{" "}
+                    {item.current ? <Badge>This session</Badge> : null}
                   </TableCell>
                   <TableCell className="font-mono text-xs">{item.ip ?? "—"}</TableCell>
                   <TableCell>

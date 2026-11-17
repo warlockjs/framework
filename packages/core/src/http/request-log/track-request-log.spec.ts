@@ -90,7 +90,10 @@ describe("excluded paths", () => {
     useConfig({ enabled: true, only: "all", channels: [capture] });
 
     const remove = excludeFromRequestLog("/secret-ops");
-    const excluded = { ...fakeRequest(), baseRequest: { method: "POST", url: "/secret-ops/api/auth/login?x=1" } };
+    const excluded = {
+      ...fakeRequest(),
+      baseRequest: { method: "POST", url: "/secret-ops/api/auth/login?x=1" },
+    };
     const partial = { ...fakeRequest(), baseRequest: { method: "GET", url: "/secret-opsx" } };
 
     finishRequestLog(excluded as unknown as Request, { statusCode: 200 }, undefined, 1, 1);

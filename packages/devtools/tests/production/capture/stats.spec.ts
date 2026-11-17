@@ -86,7 +86,10 @@ describe("query statistics", () => {
     const { engine } = createEngine({ random: () => 0 });
 
     runRequest(engine, "n1", {
-      queries: Array.from({ length: 6 }, (_, index) => ({ sql: "SELECT * FROM t WHERE id = $1", bindings: [index] })),
+      queries: Array.from({ length: 6 }, (_, index) => ({
+        sql: "SELECT * FROM t WHERE id = $1",
+        bindings: [index],
+      })),
     });
 
     expect(engine.queries.snapshot(1)[0]).toMatchObject({
@@ -185,10 +188,12 @@ describe("route statistics", () => {
     first.record(request(10));
     second.record(request(20));
 
-    expect(mergeRouteStats([
+    expect(
+      mergeRouteStats([
         { instance: "a", routes: first.snapshot(5) },
         { instance: "b", routes: second.snapshot(5) },
-      ])[0]).toMatchObject({ count: 2 });
+      ])[0],
+    ).toMatchObject({ count: 2 });
   });
 });
 
@@ -209,7 +214,9 @@ describe("error groups", () => {
     const errors = createErrorGroups({ maxGroups: 10 });
 
     errors.record(error('User 42 "ann" not found for ann@example.com', { at: 1 }));
-    errors.record(error('User 977 "bob" not found for bob@example.org', { at: 2, requestId: "last" }));
+    errors.record(
+      error('User 977 "bob" not found for bob@example.org', { at: 2, requestId: "last" }),
+    );
     errors.record(error("User 3 missing"));
 
     const groups = errors.snapshot(10);
@@ -235,22 +242,28 @@ describe("error groups", () => {
   });
 
   it("replaces uuids and hex ids in the fingerprint", () => {
-    expect(normalizeErrorMessage("no 3f2b8c1e-0a4d-4f6b-9c1d-2a7e5b8d9f01 or 507f1f77bcf86cd799439011")).toBe(
-      "no <uuid> or <hex>",
-    );
+    expect(
+      normalizeErrorMessage("no 3f2b8c1e-0a4d-4f6b-9c1d-2a7e5b8d9f01 or 507f1f77bcf86cd799439011"),
+    ).toBe("no <uuid> or <hex>");
     expect(normalizeErrorMessage("retry in 2.5s at 0xdeadbeef")).toBe("retry in <n>s at <hex>");
   });
 
   it("groups lines that carry a request id, such as core's request summary", () => {
     const errors = createErrorGroups({ maxGroups: 10 });
 
-    errors.record(error("Completed Request: R9DyP5UlXSbfpkQvevfulOl6dB64Shua — 500 in 8ms", { source: "log" }));
-    errors.record(error("Completed Request: BKmOaSe05kfa70JZ0wfvPFUloNsUcFtF — 500 in 1ms", { source: "log" }));
+    errors.record(
+      error("Completed Request: R9DyP5UlXSbfpkQvevfulOl6dB64Shua — 500 in 8ms", { source: "log" }),
+    );
+    errors.record(
+      error("Completed Request: BKmOaSe05kfa70JZ0wfvPFUloNsUcFtF — 500 in 1ms", { source: "log" }),
+    );
 
     expect(errors.snapshot(10)).toHaveLength(1);
     expect(errors.snapshot(1)[0]?.count).toBe(2);
     // A plain word with no digit is not an id.
-    expect(normalizeErrorMessage("ConnectionRefusedByUpstream")).toBe("ConnectionRefusedByUpstream");
+    expect(normalizeErrorMessage("ConnectionRefusedByUpstream")).toBe(
+      "ConnectionRefusedByUpstream",
+    );
   });
 
   it("keeps the previous stack when a later occurrence has none", () => {
@@ -265,7 +278,11 @@ describe("error groups", () => {
 
 describe("attachDevelopmentStats", () => {
   it("feeds queries, routes, N+1, errors and logs from settled requests", () => {
-    const collector = createCollector({ path: "/__warlock", maxRequests: 50, nPlusOneThreshold: 3 });
+    const collector = createCollector({
+      path: "/__warlock",
+      maxRequests: 50,
+      nPlusOneThreshold: 3,
+    });
     const parts = {
       queries: createQueryStats({ maxShapes: 20, instance: "dev" }),
       routes: createRouteStats({ maxRoutes: 20, instance: "dev" }),
@@ -275,20 +292,47 @@ describe("attachDevelopmentStats", () => {
     };
     const stop = attachDevelopmentStats(collector, parts);
 
-    collector.startRequest({ id: "d1", method: "GET", path: "/p/1", route: "/p/:id", startedAt: 1 });
+    collector.startRequest({
+      id: "d1",
+      method: "GET",
+      path: "/p/1",
+      route: "/p/:id",
+      startedAt: 1,
+    });
     collector.addPhase("d1", { name: "handler", startedAt: 1, durationMs: 4 });
 
     for (let index = 0; index < 4; index++) {
-      collector.addQuery("d1", { connection: "default", driver: "postgres", sql: `SELECT * FROM t WHERE id = ${index}`, startedAt: 2, durationMs: 5 });
+      collector.addQuery("d1", {
+        connection: "default",
+        driver: "postgres",
+        sql: `SELECT * FROM t WHERE id = ${index}`,
+        startedAt: 2,
+        durationMs: 5,
+      });
     }
 
     collector.addLog("d1", { level: "info", module: "m", action: "a", message: "ignored", at: 3 });
-    collector.addLog("d1", { level: "error", module: "m", action: "a", message: "bad thing", at: 4, context: { token: "x" } });
+    collector.addLog("d1", {
+      level: "error",
+      module: "m",
+      action: "a",
+      message: "bad thing",
+      at: 4,
+      context: { token: "x" },
+    });
     collector.endRequest("d1", { status: 500, durationMs: 20, error: "kaput" });
 
-    expect(parts.queries.snapshot(5)[0]).toMatchObject({ count: 4, nPlusOne: { requests: 1, maxPerRequest: 4 } });
+    expect(parts.queries.snapshot(5)[0]).toMatchObject({
+      count: 4,
+      nPlusOne: { requests: 1, maxPerRequest: 4 },
+    });
     expect(parts.routes.snapshot(5)[0]).toMatchObject({ key: "GET /p/:id", errors: 1 });
-    expect(parts.errors.snapshot(5).map((group) => [group.source, group.message]).sort()).toEqual([
+    expect(
+      parts.errors
+        .snapshot(5)
+        .map((group) => [group.source, group.message])
+        .sort(),
+    ).toEqual([
       ["log", "bad thing"],
       ["request", "kaput"],
     ]);

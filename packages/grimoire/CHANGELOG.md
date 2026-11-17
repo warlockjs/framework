@@ -8,7 +8,6 @@
 
 - The Grimoire tab works in the devtools production monitor. It is read-only there: it opens the book without writing any file. `GrimoireDevtoolsPanel` gains `production`, and `GrimoirePanelContext` gains `mode`.
 
-
 ## 5.55.0 - 2026-11-17
 
 ### Added

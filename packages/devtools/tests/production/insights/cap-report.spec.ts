@@ -9,7 +9,9 @@ function big() {
     logs: Array.from({ length: 50 }, (_, i) => ({ ...logEntry(i), message: "x".repeat(1000) })),
     errors: Array.from({ length: 50 }, (_, i) => errorGroup(`e${i}`, i)),
     routes: Array.from({ length: 200 }, (_, i) => route(`GET /r${i}`, [1, 2, 3])),
-    queries: Array.from({ length: 200 }, (_, i) => shape(`q${i}`, [1, 2, 3], { shape: "s".repeat(500) })),
+    queries: Array.from({ length: 200 }, (_, i) =>
+      shape(`q${i}`, [1, 2, 3], { shape: "s".repeat(500) }),
+    ),
   });
 }
 
@@ -27,7 +29,9 @@ describe("capReportSize", () => {
 
     expect(size(capped)).toBeLessThanOrEqual(limit);
     expect(capped.logs.length).toBeLessThan(50);
-    expect(capped.logs.map((l) => l.at)).toEqual(input.logs.slice(0, capped.logs.length).map((l) => l.at));
+    expect(capped.logs.map((l) => l.at)).toEqual(
+      input.logs.slice(0, capped.logs.length).map((l) => l.at),
+    );
     expect(capped.errors).toHaveLength(50);
     expect(capped.queries).toHaveLength(200);
   });
@@ -63,7 +67,10 @@ describe("capReportSize", () => {
   it("defaults to 256 KB", () => {
     const input = big();
 
-    input.logs = Array.from({ length: 50 }, (_, i) => ({ ...logEntry(i), message: "x".repeat(20_000) }));
+    input.logs = Array.from({ length: 50 }, (_, i) => ({
+      ...logEntry(i),
+      message: "x".repeat(20_000),
+    }));
     expect(size(input)).toBeGreaterThan(262_144);
     expect(size(capReportSize(input))).toBeLessThanOrEqual(262_144);
   });

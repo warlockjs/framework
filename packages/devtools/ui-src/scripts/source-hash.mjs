@@ -67,13 +67,17 @@ function isBuildInput(relativePath) {
  * missing: the hash must never silently cover less than the sources.
  */
 export async function dashboardSourceHash(packageDir) {
-  const uiFiles = (await listFiles(packageDir, path.join(packageDir, "ui-src")))
-    .filter(isBuildInput);
+  const uiFiles = (await listFiles(packageDir, path.join(packageDir, "ui-src"))).filter(
+    isBuildInput,
+  );
   const inputs = [...uiFiles, "src/production/contracts.ts"].sort();
 
   const hash = createHash("sha256");
   for (const relativePath of inputs) {
-    const content = (await readFile(path.join(packageDir, relativePath), "utf8")).replace(/\r\n/g, "\n");
+    const content = (await readFile(path.join(packageDir, relativePath), "utf8")).replace(
+      /\r\n/g,
+      "\n",
+    );
     hash.update(`${relativePath}\0${content}\0`);
   }
 

@@ -4,7 +4,14 @@ import { apiFetch } from "@/api/client";
 import { useApi } from "@/api/hooks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { LoadingRows } from "@/components/common/LoadingRows";
@@ -44,7 +51,12 @@ const AUDIT_TYPES: readonly DevtoolsAuditType[] = [
   "panel.action",
 ];
 
-const FAILURES = new Set<DevtoolsAuditType>(["login.failed", "mfa.failed", "login.blocked", "dashboard.locked"]);
+const FAILURES = new Set<DevtoolsAuditType>([
+  "login.failed",
+  "mfa.failed",
+  "login.blocked",
+  "dashboard.locked",
+]);
 
 function query(type: string, account: string, before?: number): string {
   const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
@@ -66,11 +78,15 @@ export function AuditPage() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const users = useApi<DevtoolsUserListView>("api/admin/users");
 
-  useEffect(() => {
-    let current = true;
-
+  // A filter change clears the list so the loading state shows while the new page arrives.
+  const changeFilter = (set: (value: string) => void, value: string) => {
+    set(value);
     setEntries(null);
     setError(null);
+  };
+
+  useEffect(() => {
+    let current = true;
 
     apiFetch<DevtoolsAuditEntry[]>(query(type, account)).then(
       (rows) => {
@@ -121,7 +137,7 @@ export function AuditPage() {
           <select
             className="h-9 rounded-md border bg-background px-2"
             value={type}
-            onChange={(event) => setType(event.target.value)}
+            onChange={(event) => changeFilter(setType, event.target.value)}
           >
             <option value="">All events</option>
             {AUDIT_TYPES.map((item) => (
@@ -136,7 +152,7 @@ export function AuditPage() {
           <select
             className="h-9 rounded-md border bg-background px-2"
             value={account}
-            onChange={(event) => setAccount(event.target.value)}
+            onChange={(event) => changeFilter(setAccount, event.target.value)}
           >
             <option value="">All accounts</option>
             {users.data?.accounts.map((item) => (
@@ -149,7 +165,9 @@ export function AuditPage() {
       </div>
       <ErrorMessage error={error} />
       {!entries && !error ? <LoadingRows /> : null}
-      {entries && entries.length === 0 ? <EmptyState title="No audit entries match." hint="Clear a filter to see more." /> : null}
+      {entries && entries.length === 0 ? (
+        <EmptyState title="No audit entries match." hint="Clear a filter to see more." />
+      ) : null}
       {entries && entries.length > 0 ? (
         <Table>
           <TableHeader>
@@ -165,9 +183,13 @@ export function AuditPage() {
           <TableBody>
             {entries.map((entry) => (
               <TableRow key={entry.id}>
-                <TableCell className="whitespace-nowrap">{new Date(entry.at).toLocaleString()}</TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {new Date(entry.at).toLocaleString()}
+                </TableCell>
                 <TableCell>
-                  <Badge variant={FAILURES.has(entry.type) ? "destructive" : "secondary"}>{entry.type}</Badge>
+                  <Badge variant={FAILURES.has(entry.type) ? "destructive" : "secondary"}>
+                    {entry.type}
+                  </Badge>
                 </TableCell>
                 <TableCell>{entry.email ?? "—"}</TableCell>
                 <TableCell className="font-mono text-xs">{entry.ip ?? "—"}</TableCell>

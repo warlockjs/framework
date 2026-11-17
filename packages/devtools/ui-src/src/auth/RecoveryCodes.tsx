@@ -35,7 +35,10 @@ export function RecoveryCodes({ codes, onDone, doneLabel = "Continue" }: Recover
         Each code works once if you lose your authenticator. They are shown only now: save them
         somewhere safe before you continue.
       </p>
-      <ul className="grid grid-cols-2 gap-2 rounded-md border bg-muted p-3 font-mono text-sm" aria-label="Recovery codes">
+      <ul
+        className="grid grid-cols-2 gap-2 rounded-md border bg-muted p-3 font-mono text-sm"
+        aria-label="Recovery codes"
+      >
         {codes.map((code) => (
           <li key={code}>{code}</li>
         ))}

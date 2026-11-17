@@ -11,8 +11,14 @@ describe("API panel", () => {
     renderPanel(ApiPanel);
 
     expect(screen.getByTitle("API reference")).toHaveAttribute("src", "docs");
-    expect(screen.getByRole("link", { name: "OpenAPI JSON" })).toHaveAttribute("href", "api/openapi.json");
-    expect(screen.getByRole("link", { name: "Postman collection" })).toHaveAttribute("href", "api/postman.json");
+    expect(screen.getByRole("link", { name: "OpenAPI JSON" })).toHaveAttribute(
+      "href",
+      "api/openapi.json",
+    );
+    expect(screen.getByRole("link", { name: "Postman collection" })).toHaveAttribute(
+      "href",
+      "api/postman.json",
+    );
   });
 
   it("switches to Swagger UI and remembers the choice", async () => {

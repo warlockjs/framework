@@ -15,7 +15,14 @@ export const instanceA: DevtoolsInstanceInfo = {
   nodeVersion: "v22.13.0",
 };
 
-export const instanceB: DevtoolsInstanceInfo = { ...instanceA, id: "web-2:200:def", label: "web-2 #1", host: "web-2", pid: 200, worker: "1" };
+export const instanceB: DevtoolsInstanceInfo = {
+  ...instanceA,
+  id: "web-2:200:def",
+  label: "web-2 #1",
+  host: "web-2",
+  pid: 200,
+  worker: "1",
+};
 
 function session(overrides: Partial<DevtoolsSessionView>): DevtoolsSessionView {
   return {
@@ -65,7 +72,10 @@ export function mockApi(routes: Route[]) {
 
       if (!hit) continue;
 
-      const value = typeof answer === "function" ? (answer as (u: string, i?: RequestInit) => unknown)(url, init) : answer;
+      const value =
+        typeof answer === "function"
+          ? (answer as (u: string, i?: RequestInit) => unknown)(url, init)
+          : answer;
 
       if (value && typeof value === "object" && "__status" in value) {
         const { __status, body } = value as { __status: number; body: unknown };

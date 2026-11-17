@@ -47,7 +47,6 @@ export function App() {
       const view = await apiFetch<DevtoolsSessionView>("api/auth/session");
 
       setCsrfToken(view.csrf);
-      stageRef.current = view.stage;
       setSession(view);
       setError(null);
 
@@ -67,8 +66,30 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    stageRef.current = session?.stage ?? null;
+  }, [session]);
+
+  // The first read starts from a promise callback, so no state is set while the effect runs.
+  useEffect(() => {
+    let current = true;
+
+    void apiFetch<DevtoolsSessionView>("api/auth/session").then(
+      (view) => {
+        if (!current) return;
+
+        setCsrfToken(view.csrf);
+        setSession(view);
+        setError(null);
+      },
+      (reason: unknown) => {
+        if (current) setError(reason);
+      },
+    );
+
+    return () => {
+      current = false;
+    };
+  }, []);
 
   // A setup or invite token is read once, then removed from the address and history.
   useEffect(() => {
@@ -149,8 +170,8 @@ export function App() {
     return (
       <AuthLayout title="The dashboard is turned off">
         <p className="text-sm">
-          It is closed on every instance. To open it again, run <code>warlock devtools:enable</code> on
-          the server, or deploy with a new <code>DEVTOOLS_PATH</code>.
+          It is closed on every instance. To open it again, run <code>warlock devtools:enable</code>{" "}
+          on the server, or deploy with a new <code>DEVTOOLS_PATH</code>.
         </p>
       </AuthLayout>
     );

@@ -25,7 +25,11 @@ function setup(query: DevtoolsQuery, executing = false) {
 
   queries.rememberExample(query);
 
-  return { run, explain: createShapeExplainer({ queries, executing, instance: "me", run }), id: shortId(query.shape) };
+  return {
+    run,
+    explain: createShapeExplainer({ queries, executing, instance: "me", run }),
+    id: shortId(query.shape),
+  };
 }
 
 async function failure(promise: Promise<unknown>): Promise<DevtoolsApiError> {
@@ -49,7 +53,12 @@ describe("PostgreSQL", () => {
       sql: "EXPLAIN (FORMAT JSON) SELECT * FROM posts WHERE id = $1",
     });
     expect(run.mock.calls[0]?.[0].bindings).toEqual([7]);
-    expect(result).toMatchObject({ shapeId: id, driver: "postgres", executing: false, instance: "me" });
+    expect(result).toMatchObject({
+      shapeId: id,
+      driver: "postgres",
+      executing: false,
+      instance: "me",
+    });
   });
 
   it("uses ANALYZE only when executing is allowed", async () => {
@@ -103,7 +112,10 @@ describe("MongoDB", () => {
       collection: "users",
       command,
       pipeline,
-      shape: `users.${command} ${JSON.stringify(pipeline)}`.replace(/"[a-z0-9@.]+"(?=[,}\]])/g, '"?"'),
+      shape: `users.${command} ${JSON.stringify(pipeline)}`.replace(
+        /"[a-z0-9@.]+"(?=[,}\]])/g,
+        '"?"',
+      ),
       ...extra,
     });
 
@@ -158,7 +170,12 @@ describe("MongoDB", () => {
 describe("error codes", () => {
   it("answers explain.elsewhere, with the instance, when this process has no example", async () => {
     const queries = createQueryStats({ maxShapes: 10, instance: "me" });
-    const explain = createShapeExplainer({ queries, executing: false, instance: "me", run: vi.fn() });
+    const explain = createShapeExplainer({
+      queries,
+      executing: false,
+      instance: "me",
+      run: vi.fn(),
+    });
     const error = await failure(explain("0123456789abcdef"));
 
     expect(error).toBeInstanceOf(DevtoolsApiError);
@@ -213,7 +230,11 @@ describe("values in production plans", () => {
   }
 
   it("are replaced by ? in a PostgreSQL plan, keeping names, costs and placeholders", async () => {
-    const { explain, id } = explainer(sqlQuery("SELECT * FROM users_2024 WHERE id = $1"), pgPlan, true);
+    const { explain, id } = explainer(
+      sqlQuery("SELECT * FROM users_2024 WHERE id = $1"),
+      pgPlan,
+      true,
+    );
     const result = await explain(id);
 
     expect(result.plan).toEqual([

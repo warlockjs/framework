@@ -31,7 +31,11 @@ function parts(overrides: Record<string, unknown> = {}) {
       instance: instance("a"),
       resources,
       health: healthHistory,
-      jobs: async () => ({ available: { scheduler: true, queue: false }, schedules: [], queues: [] }),
+      jobs: async () => ({
+        available: { scheduler: true, queue: false },
+        schedules: [],
+        queues: [],
+      }),
       queries: {
         record() {},
         recordNPlusOne() {},
@@ -47,7 +51,12 @@ function parts(overrides: Record<string, unknown> = {}) {
         evicted: () => 2,
         clear() {},
       },
-      errors: { record() {}, snapshot: (limit: number) => (note("errors", limit), []), evicted: () => 1, clear() {} },
+      errors: {
+        record() {},
+        snapshot: (limit: number) => (note("errors", limit), []),
+        evicted: () => 1,
+        clear() {},
+      },
       logs: { record() {}, snapshot: (limit: number) => (note("logs", limit), []), clear() {} },
       counters: null,
       now: () => 9000,
@@ -82,7 +91,18 @@ describe("createLocalReporter", () => {
   });
 
   it("uses the capture counters in production", async () => {
-    const counters = () => ({ sampleRate: 0.2, requests: 5, sampled: 1, keptUnsampled: 0, stored: 1, droppedStored: 0, evictedShapes: 0, evictedRoutes: 0, evictedErrors: 0, droppedQueries: 0 });
+    const counters = () => ({
+      sampleRate: 0.2,
+      requests: 5,
+      sampled: 1,
+      keptUnsampled: 0,
+      stored: 1,
+      droppedStored: 0,
+      evictedShapes: 0,
+      evictedRoutes: 0,
+      evictedErrors: 0,
+      droppedQueries: 0,
+    });
     const report = await createLocalReporter(parts({ counters }).parts as never).snapshot();
 
     expect(report.capture.sampleRate).toBe(0.2);

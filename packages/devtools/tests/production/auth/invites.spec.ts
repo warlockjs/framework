@@ -10,7 +10,12 @@ async function adminWorld() {
   return { world, admin };
 }
 
-async function invite(world: World, admin: Awaited<ReturnType<typeof signedIn>>, email = "new@example.com", role: "admin" | "viewer" = "viewer") {
+async function invite(
+  world: World,
+  admin: Awaited<ReturnType<typeof signedIn>>,
+  email = "new@example.com",
+  role: "admin" | "viewer" = "viewer",
+) {
   return world.auth.createInvite(admin, { email, role }, meta());
 }
 
@@ -38,34 +43,51 @@ describe("invites", () => {
   it("refuses an email that already has an account", async () => {
     const { world, admin } = await adminWorld();
 
-    await expect(invite(world, admin, "BOSS@example.com")).rejects.toMatchObject({ code: "invite.email-taken" });
+    await expect(invite(world, admin, "BOSS@example.com")).rejects.toMatchObject({
+      code: "invite.email-taken",
+    });
   });
 
   it("refuses a bad email or role", async () => {
     const { world, admin } = await adminWorld();
 
-    await expect(invite(world, admin, "not-an-email")).rejects.toMatchObject({ code: "input.invalid" });
-    await expect(invite(world, admin, "a@b.co", "root" as never)).rejects.toMatchObject({ code: "input.invalid" });
+    await expect(invite(world, admin, "not-an-email")).rejects.toMatchObject({
+      code: "input.invalid",
+    });
+    await expect(invite(world, admin, "a@b.co", "root" as never)).rejects.toMatchObject({
+      code: "input.invalid",
+    });
   });
 
   it("inspects a valid invite, and answers invite.invalid for unknown, used and expired ones", async () => {
     const { world, admin } = await adminWorld();
     const created = await invite(world, admin);
 
-    await expect(world.auth.inspectInvite(created.token)).resolves.toEqual({ email: "new@example.com", role: "viewer" });
+    await expect(world.auth.inspectInvite(created.token)).resolves.toEqual({
+      email: "new@example.com",
+      role: "viewer",
+    });
 
     for (const token of ["", "unknown", "x".repeat(500)]) {
-      await expect(world.auth.inspectInvite(token)).rejects.toMatchObject({ code: "invite.invalid", statusCode: 410 });
+      await expect(world.auth.inspectInvite(token)).rejects.toMatchObject({
+        code: "invite.invalid",
+        statusCode: 410,
+      });
     }
 
     world.advance(DAY + 1);
-    await expect(world.auth.inspectInvite(created.token)).rejects.toMatchObject({ code: "invite.invalid" });
+    await expect(world.auth.inspectInvite(created.token)).rejects.toMatchObject({
+      code: "invite.invalid",
+    });
   });
 
   it("accepts an invite: creates the account, then signs in at the next stage", async () => {
     const { world, admin } = await adminWorld();
     const created = await invite(world, admin);
-    const step = await world.auth.acceptInvite({ token: created.token, password: "My-Chosen-Passphrase-3" }, meta());
+    const step = await world.auth.acceptInvite(
+      { token: created.token, password: "My-Chosen-Passphrase-3" },
+      meta(),
+    );
 
     expect(step.stage).toBe("active");
 
@@ -84,7 +106,10 @@ describe("invites", () => {
   it("sends an invited admin to enrol", async () => {
     const { world, admin } = await adminWorld();
     const created = await invite(world, admin, "second@example.com", "admin");
-    const step = await world.auth.acceptInvite({ token: created.token, password: "My-Chosen-Passphrase-3" }, meta());
+    const step = await world.auth.acceptInvite(
+      { token: created.token, password: "My-Chosen-Passphrase-3" },
+      meta(),
+    );
 
     expect(step.stage).toBe("mfa-enrol");
   });
@@ -93,10 +118,14 @@ describe("invites", () => {
     const { world, admin } = await adminWorld();
     const created = await invite(world, admin);
 
-    await expect(world.auth.acceptInvite({ token: created.token, password: "new@example.com" }, meta())).rejects.toMatchObject({
+    await expect(
+      world.auth.acceptInvite({ token: created.token, password: "new@example.com" }, meta()),
+    ).rejects.toMatchObject({
       code: "auth.password-same-as-email",
     });
-    await expect(world.auth.acceptInvite({ token: created.token, password: "short" }, meta())).rejects.toMatchObject({
+    await expect(
+      world.auth.acceptInvite({ token: created.token, password: "short" }, meta()),
+    ).rejects.toMatchObject({
       code: "auth.password-too-short",
     });
     // A refused password does not spend the invite.
@@ -107,19 +136,33 @@ describe("invites", () => {
     const { world, admin } = await adminWorld();
     const created = await invite(world, admin);
 
-    await world.auth.acceptInvite({ token: created.token, password: "My-Chosen-Passphrase-3" }, meta());
+    await world.auth.acceptInvite(
+      { token: created.token, password: "My-Chosen-Passphrase-3" },
+      meta(),
+    );
     await expect(
-      world.auth.acceptInvite({ token: created.token, password: "Another-Chosen-Passphrase-4" }, meta()),
+      world.auth.acceptInvite(
+        { token: created.token, password: "Another-Chosen-Passphrase-4" },
+        meta(),
+      ),
     ).rejects.toMatchObject({ code: "invite.invalid" });
-    await expect(world.auth.inspectInvite(created.token)).rejects.toMatchObject({ code: "invite.invalid" });
+    await expect(world.auth.inspectInvite(created.token)).rejects.toMatchObject({
+      code: "invite.invalid",
+    });
   });
 
   it("lets one of two concurrent accepts win; the loser gets invite.invalid", async () => {
     const { world, admin } = await adminWorld();
     const created = await invite(world, admin);
     const results = await Promise.allSettled([
-      world.auth.acceptInvite({ token: created.token, password: "First-Chosen-Passphrase-3" }, meta()),
-      world.auth.acceptInvite({ token: created.token, password: "Second-Chosen-Passphrase-4" }, meta()),
+      world.auth.acceptInvite(
+        { token: created.token, password: "First-Chosen-Passphrase-3" },
+        meta(),
+      ),
+      world.auth.acceptInvite(
+        { token: created.token, password: "Second-Chosen-Passphrase-4" },
+        meta(),
+      ),
     ]);
 
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
@@ -127,7 +170,9 @@ describe("invites", () => {
     const loser = results.find((result) => result.status === "rejected");
 
     expect(loser).toMatchObject({ reason: { code: "invite.invalid" } });
-    expect((await world.store.accounts.list()).filter((account) => account.email === "new@example.com")).toHaveLength(1);
+    expect(
+      (await world.store.accounts.list()).filter((account) => account.email === "new@example.com"),
+    ).toHaveLength(1);
   });
 
   it("cannot be accepted after expiry or revocation", async () => {
@@ -150,16 +195,22 @@ describe("invites", () => {
   it("revoking an unknown invite answers invite.invalid", async () => {
     const { world, admin } = await adminWorld();
 
-    await expect(world.auth.revokeInvite(admin, "nope", meta())).rejects.toMatchObject({ code: "invite.invalid" });
+    await expect(world.auth.revokeInvite(admin, "nope", meta())).rejects.toMatchObject({
+      code: "invite.invalid",
+    });
   });
 
   it("is admin-only", async () => {
     const world = createWorld();
     const viewer = await signedIn(world, "viewer@example.com");
 
-    await expect(world.auth.createInvite(viewer, { email: "a@b.co", role: "viewer" }, meta())).rejects.toMatchObject({
+    await expect(
+      world.auth.createInvite(viewer, { email: "a@b.co", role: "viewer" }, meta()),
+    ).rejects.toMatchObject({
       code: "role.forbidden",
     });
-    await expect(world.auth.revokeInvite(viewer, "x", meta())).rejects.toMatchObject({ code: "role.forbidden" });
+    await expect(world.auth.revokeInvite(viewer, "x", meta())).rejects.toMatchObject({
+      code: "role.forbidden",
+    });
   });
 });

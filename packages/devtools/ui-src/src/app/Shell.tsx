@@ -21,14 +21,23 @@ export function Shell() {
   const panels = useApi<DevtoolsPanelInfo[]>("api/panels");
   const list = panels.data ?? [];
   const tabId =
-    route.type === "tab" ? (list.some((panel) => panel.id === route.id) ? route.id : (list[0]?.id ?? "")) : null;
+    route.type === "tab"
+      ? list.some((panel) => panel.id === route.id)
+        ? route.id
+        : (list[0]?.id ?? "")
+      : null;
 
   const navigateTab = (id: string) => (next: string) => {
     location.hash = `#${id}${next ? `/${next}` : ""}`;
   };
 
   let content;
-  const viewKey = route.type === "admin" ? `admin:${route.page}` : route.type === "tab" ? `tab:${tabId ?? ""}` : route.type;
+  const viewKey =
+    route.type === "admin"
+      ? `admin:${route.page}`
+      : route.type === "tab"
+        ? `tab:${tabId ?? ""}`
+        : route.type;
   const viewName =
     route.type === "account"
       ? "Account"

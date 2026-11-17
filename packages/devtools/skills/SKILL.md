@@ -55,21 +55,21 @@ export default {
 
 ## What each panel shows
 
-| Panel        | What you see                                                                                                                                                                                                                                      | Where it comes from                       |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| **Requests** | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis. | core `registerTracingHooks()`             |
-| **Queries**  | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`)                                                                                            | cascade `dataSourceRegistry.on("query")`  |
-| **N+1**      | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal                                                                                                    | same query shape ≥ 5 times in one request |
-| **Mail**     | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                              | core `mailEvents.onCaptured()`            |
-| **Logs**     | Log entries per request, filterable by level and module                                                                                                                                                                                           | a logger channel                          |
-| **Cache**    | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                   | cache `cache.on(...)`                     |
-| **Resources** | Memory, CPU, event-loop delay and garbage collection, with a 10-minute history | the process |
-| **Health**   | Readiness checks over time | core `health.readiness()` |
-| **Errors**   | Failed requests grouped by cause with counts | tracing and logger |
-| **Jobs**     | Registered scheduled jobs with schedule, last and next run (no run history, duration or error yet); queue counts only when the queue driver reports them (not available today) | `@warlock.js/scheduler`, `@warlock.js/queue` |
-| **Agents**   | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                      | `@warlock.js/ai` `agentTraces` store      |
-| **Routes**   | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                               |
-| **API**      | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`    |
+| Panel         | What you see                                                                                                                                                                                                                                      | Where it comes from                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **Requests**  | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis. | core `registerTracingHooks()`                |
+| **Queries**   | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`)                                                                                            | cascade `dataSourceRegistry.on("query")`     |
+| **N+1**       | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal                                                                                                    | same query shape ≥ 5 times in one request    |
+| **Mail**      | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                              | core `mailEvents.onCaptured()`               |
+| **Logs**      | Log entries per request, filterable by level and module                                                                                                                                                                                           | a logger channel                             |
+| **Cache**     | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                   | cache `cache.on(...)`                        |
+| **Resources** | Memory, CPU, event-loop delay and garbage collection, with a 10-minute history                                                                                                                                                                    | the process                                  |
+| **Health**    | Readiness checks over time                                                                                                                                                                                                                        | core `health.readiness()`                    |
+| **Errors**    | Failed requests grouped by cause with counts                                                                                                                                                                                                      | tracing and logger                           |
+| **Jobs**      | Registered scheduled jobs with schedule, last and next run (no run history, duration or error yet); queue counts only when the queue driver reports them (not available today)                                                                    | `@warlock.js/scheduler`, `@warlock.js/queue` |
+| **Agents**    | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                      | `@warlock.js/ai` `agentTraces` store         |
+| **Routes**    | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                                  |
+| **API**       | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`       |
 
 Work outside a request (boot, scheduler ticks, queue jobs) goes to a separate
 background list, so it never clutters a request's timeline.
@@ -333,18 +333,18 @@ Options under `production` (all optional, defaults in brackets):
 The app refuses to boot with a `DevtoolsProductionConfigError`
 (`DEVTOOLS_CONFIG_CODES` holds the messages):
 
-| Code | Fix |
-| ---- | --- |
-| `DT001` | Set `DEVTOOLS_PATH` or `production.path`. |
-| `DT002` | Use a path of 8+ characters starting with `/`, with letters, digits and `- _ . ~ /` only; not `/__warlock`. |
+| Code    | Fix                                                                                                                         |
+| ------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `DT001` | Set `DEVTOOLS_PATH` or `production.path`.                                                                                   |
+| `DT002` | Use a path of 8+ characters starting with `/`, with letters, digits and `- _ . ~ /` only; not `/__warlock`.                 |
 | `DT003` | No admin: set `DEVTOOLS_ADMIN_EMAIL` plus a password or setup token, or run `warlock devtools:reset-admin --email <email>`. |
-| `DT004` | The env password breaks the rules (8+ characters, at most 72 bytes, not common, not the email). |
-| `DT005` | Install `@warlock.js/cascade` and configure a database. |
-| `DT006` | Set `encryption.key` (64 hex characters). |
-| `DT007` | An option is invalid; the message names it. |
-| `DT008` | Add `devtoolsMigrations` to `database.migrations` and run `warlock migrate`. |
-| `DT009` | Set the password or the setup token, not both. |
-| `DT010` | The setup token needs 32+ characters (`openssl rand -base64 32`). |
+| `DT004` | The env password breaks the rules (8+ characters, at most 72 bytes, not common, not the email).                             |
+| `DT005` | Install `@warlock.js/cascade` and configure a database.                                                                     |
+| `DT006` | Set `encryption.key` (64 hex characters).                                                                                   |
+| `DT007` | An option is invalid; the message names it.                                                                                 |
+| `DT008` | Add `devtoolsMigrations` to `database.migrations` and run `warlock migrate`.                                                |
+| `DT009` | Set the password or the setup token, not both.                                                                              |
+| `DT010` | The setup token needs 32+ characters (`openssl rand -base64 32`).                                                           |
 
 Every dashboard URL gives a 404: check that `production.enabled` is true, the
 dashboard is not disabled or locked (`warlock devtools:enable`), the request is

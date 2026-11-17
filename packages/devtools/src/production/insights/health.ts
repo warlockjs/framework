@@ -32,7 +32,12 @@ export function createHealthHistory(
   let running: Promise<DevtoolsHealthReport> | undefined;
 
   function report(): DevtoolsHealthReport {
-    return { status, checkedAt, checks: { ...checks }, history: history.map((e) => ({ ...e, failed: [...e.failed] })) };
+    return {
+      status,
+      checkedAt,
+      checks: { ...checks },
+      history: history.map((e) => ({ ...e, failed: [...e.failed] })),
+    };
   }
 
   async function run(): Promise<DevtoolsHealthReport> {

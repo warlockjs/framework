@@ -1,7 +1,13 @@
 import type { DevtoolsInstanceInfo } from "../../../src/production/contracts";
-import { createCaptureEngine, type DevtoolsQueryEvent } from "../../../src/production/capture/engine";
+import {
+  createCaptureEngine,
+  type DevtoolsQueryEvent,
+} from "../../../src/production/capture/engine";
 import type { DevtoolsCaptureDeps } from "../../../src/production/capture/types";
-import { DEVTOOLS_PRODUCTION_DEFAULTS, type ResolvedDevtoolsProductionOptions } from "../../../src/production/options";
+import {
+  DEVTOOLS_PRODUCTION_DEFAULTS,
+  type ResolvedDevtoolsProductionOptions,
+} from "../../../src/production/options";
 import { createMemoryStore } from "../../../src/production/store/memory-store";
 
 export const instance: DevtoolsInstanceInfo = {
@@ -124,7 +130,11 @@ export function runRequest(
     phases?: { name: string; durationMs: number }[];
   } = {},
 ) {
-  const request = traced(id, options.path ?? "/posts/1", "route" in options ? options.route : "/posts/:id");
+  const request = traced(
+    id,
+    options.path ?? "/posts/1",
+    "route" in options ? options.route : "/posts/:id",
+  );
 
   engine.hooks.onRequestStart(request);
 

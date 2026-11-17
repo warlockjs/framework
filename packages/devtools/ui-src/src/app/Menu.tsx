@@ -60,7 +60,15 @@ const itemClass =
   "block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground";
 
 /** A link row inside a `Menu`. */
-export function MenuLink({ href, onSelect, children }: { href: string; onSelect: () => void; children: ReactNode }) {
+export function MenuLink({
+  href,
+  onSelect,
+  children,
+}: {
+  href: string;
+  onSelect: () => void;
+  children: ReactNode;
+}) {
   return (
     <a role="menuitem" href={href} className={itemClass} onClick={onSelect}>
       {children}

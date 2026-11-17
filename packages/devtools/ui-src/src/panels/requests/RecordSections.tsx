@@ -11,7 +11,9 @@ export function RecordSections({ record }: { record: RequestRecord }) {
     session: record.session,
     ip: record.ip,
   };
-  const where = record.error ? [record.error.phase, record.error.file, record.error.site].filter(Boolean).join(" · ") : "";
+  const where = record.error
+    ? [record.error.phase, record.error.file, record.error.site].filter(Boolean).join(" · ")
+    : "";
 
   return (
     <>

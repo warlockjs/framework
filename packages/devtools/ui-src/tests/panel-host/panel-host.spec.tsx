@@ -12,8 +12,8 @@ describe("PanelHost", () => {
   it("renders the 5.55 fixture view module with the 5.55 context", async () => {
     // The fixture the server specs use: it calls api("search?q=a") and draws bars with the rows' count.
     // @ts-expect-error The fixture is a plain JavaScript view module without a declaration file.
-    const fixture =
-      (await import("../../../tests/fixtures/test-panel/view.js")) as unknown as LegacyPanelModule;
+    const imported = await import("../../../tests/fixtures/test-panel/view.js");
+    const fixture = imported as unknown as LegacyPanelModule;
     const api = mockApi({ "api/test/search": { body: { results: [1, 2, 3] } } });
 
     setPanelModuleLoader(async () => fixture);

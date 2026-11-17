@@ -2,7 +2,18 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
-import { Bytes, ConfirmDialog, CopyButton, Duration, EmptyState, ErrorMessage, RelativeTime, formatBytes, formatDuration, formatRelativeTime } from "@/components/common";
+import {
+  Bytes,
+  ConfirmDialog,
+  CopyButton,
+  Duration,
+  EmptyState,
+  ErrorMessage,
+  RelativeTime,
+  formatBytes,
+  formatDuration,
+  formatRelativeTime,
+} from "@/components/common";
 
 describe("common components", () => {
   it("formats durations, sizes and relative times", () => {
@@ -34,7 +45,9 @@ describe("common components", () => {
   });
 
   it("ErrorMessage shows the message and the reference of an ApiError", () => {
-    render(<ErrorMessage error={new ApiError("Could not save. Try again.", 500, { ref: "XY123456" })} />);
+    render(
+      <ErrorMessage error={new ApiError("Could not save. Try again.", 500, { ref: "XY123456" })} />,
+    );
 
     expect(screen.getByRole("alert")).toHaveTextContent("Could not save. Try again.");
     expect(screen.getByText("Reference: XY123456")).toBeInTheDocument();

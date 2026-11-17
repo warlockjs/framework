@@ -334,11 +334,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
   // -------------------------------------------------------------------------
 
   /** Whether the client of `ip` (the address, or its /64 for IPv6) is over the per-IP limit. */
-  async function ipOverLimit(
-    ip: string,
-    since: number,
-    stateResetAt: number,
-  ): Promise<boolean> {
+  async function ipOverLimit(ip: string, since: number, stateResetAt: number): Promise<boolean> {
     const client = rateLimitClient(ip);
     const cached = blockedIps.get(client);
 
@@ -431,7 +427,12 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
   async function failLogin(
     type: "login.failed" | "login.blocked",
     code: DevtoolsErrorCode,
-    input: { email: string | null; accountId?: string | null; meta: DevtoolsRequestMeta; detail?: AuditDetail },
+    input: {
+      email: string | null;
+      accountId?: string | null;
+      meta: DevtoolsRequestMeta;
+      detail?: AuditDetail;
+    },
   ): Promise<never> {
     const ref = type === "login.blocked" ? await auditBlocked(input) : await audit(type, input);
 
@@ -479,7 +480,9 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     const token = generateToken();
     const at = now();
     const lifetime =
-      stage === "active" ? options.session.maxHours * HOUR : options.session.pendingMinutes * MINUTE;
+      stage === "active"
+        ? options.session.maxHours * HOUR
+        : options.session.pendingMinutes * MINUTE;
     const session = await store.sessions.create({
       tokenHash: hashToken(token),
       accountId: account.id,
@@ -586,7 +589,9 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
 
     if (existing && existing.role === "admin") {
       if (existing.passwordSource === "env" && admin.password !== null) {
-        const same = await withSlot(() => verifyPassword(admin.password as string, existing.passwordHash));
+        const same = await withSlot(() =>
+          verifyPassword(admin.password as string, existing.passwordHash),
+        );
 
         if (!same) {
           if (checkPasswordPolicy(admin.password, email) !== null) {
@@ -713,7 +718,9 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     const at = now();
     // The failures count resets only when the password alone completes the sign-in (see `moveTo`).
     const updated = await casAccount(account, (fresh) =>
-      nextStage(fresh) === "active" ? { failuresResetAt: at, lastLoginAt: at } : { lastLoginAt: at },
+      nextStage(fresh) === "active"
+        ? { failuresResetAt: at, lastLoginAt: at }
+        : { lastLoginAt: at },
     );
 
     if (!updated) return failLogin("login.failed", "auth.invalid-credentials", { email, meta });
@@ -1078,7 +1085,9 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     if (auth.account.totpSecret !== null) fail("input.invalid");
 
     const secret = crypto.generateTotpSecret();
-    const saved = await casSession(auth.session, () => ({ pendingTotpSecret: crypto.encrypt(secret) }));
+    const saved = await casSession(auth.session, () => ({
+      pendingTotpSecret: crypto.encrypt(secret),
+    }));
 
     if (!saved) fail("server.error");
 
@@ -1212,7 +1221,10 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
       let found = -1;
 
       account.recoveryCodes.forEach((stored, index) => {
-        if (safeEqual(stored, given) && normalizeRecoveryCode(input.recoveryCode as string).length === 10) {
+        if (
+          safeEqual(stored, given) &&
+          normalizeRecoveryCode(input.recoveryCode as string).length === 10
+        ) {
           found = index;
         }
       });
@@ -1455,7 +1467,8 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
   ): Promise<void> {
     requireStage(auth, "active");
 
-    if (!auth.account.passkeys.some((passkey) => passkey.id === passkeyId)) fail("account.not-found");
+    if (!auth.account.passkeys.some((passkey) => passkey.id === passkeyId))
+      fail("account.not-found");
 
     if (
       twoFactorRequired(auth.account) &&

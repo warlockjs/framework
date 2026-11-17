@@ -24,16 +24,16 @@ export type MfaEnrolScreenProps = {
  */
 export function MfaEnrolScreen({ session, onStep, onSignOut }: MfaEnrolScreenProps) {
   const [done, setDone] = useState<AuthStepWithCodes | null>(null);
-  const passkey = useAction(async () => {
-    finish(await registerPasskey("api/auth"));
-  });
-
   const finish = (result: AuthStepWithCodes) => {
     // The session token changed on this step: later calls need the new CSRF token before the next screen loads.
     if (result.csrf) setCsrfToken(result.csrf);
 
     setDone(result);
   };
+
+  const passkey = useAction(async () => {
+    finish(await registerPasskey("api/auth"));
+  });
 
   if (done) {
     const codes = done.recoveryCodes ?? [];
@@ -69,7 +69,11 @@ export function MfaEnrolScreen({ session, onStep, onSignOut }: MfaEnrolScreenPro
           </Button>
         </div>
       ) : null}
-      <button type="button" className="text-sm text-muted-foreground underline" onClick={() => void onSignOut()}>
+      <button
+        type="button"
+        className="text-sm text-muted-foreground underline"
+        onClick={() => void onSignOut()}
+      >
         Sign out
       </button>
     </AuthLayout>

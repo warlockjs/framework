@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type ActionResult<T> = { ok: true; value: T } | { ok: false };
 
@@ -20,7 +20,9 @@ export function useAction<TArgs extends unknown[], TResult>(
   const [error, setError] = useState<unknown>(null);
   const latest = useRef(action);
 
-  latest.current = action;
+  useEffect(() => {
+    latest.current = action;
+  });
 
   const run = useCallback(async (...args: TArgs): Promise<ActionResult<TResult>> => {
     setPending(true);

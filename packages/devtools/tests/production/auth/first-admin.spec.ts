@@ -19,7 +19,9 @@ describe("ensureFirstAdmin", () => {
   it("refuses an email without a password or token (DT003)", async () => {
     const world = createWorld({ options: { admin: admin({}) } });
 
-    await expect(world.auth.ensureFirstAdmin()).rejects.toBeInstanceOf(DevtoolsProductionConfigError);
+    await expect(world.auth.ensureFirstAdmin()).rejects.toBeInstanceOf(
+      DevtoolsProductionConfigError,
+    );
   });
 
   it("accepts a missing env admin when an admin already exists", async () => {
@@ -137,7 +139,10 @@ describe("ensureFirstAdmin", () => {
       expect(account?.passwordHash.startsWith("!")).toBe(true);
 
       await expect(
-        world.auth.login({ email: "owner@example.com", password: account?.passwordHash ?? "" }, meta()),
+        world.auth.login(
+          { email: "owner@example.com", password: account?.passwordHash ?? "" },
+          meta(),
+        ),
       ).rejects.toMatchObject({ code: "auth.invalid-credentials" });
     });
 

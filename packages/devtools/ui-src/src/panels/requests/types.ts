@@ -13,7 +13,14 @@ export type RequestRecord = {
   ip?: string;
   status?: number;
   response?: Record<string, unknown>;
-  error?: { name: string; message: string; stack?: string; phase?: string; file?: string; site?: string };
+  error?: {
+    name: string;
+    message: string;
+    stack?: string;
+    phase?: string;
+    file?: string;
+    site?: string;
+  };
   queries?: { count: number; nPlusOne?: unknown[] } & Record<string, unknown>;
 };
 
@@ -57,11 +64,21 @@ export type DetailWarning = {
  * a list of operations); production returns a stored sample (cache is counts)
  * or a rebuilt request log record.
  */
-export type RequestDetail = Omit<DevtoolsSampleDetail, "queries" | "cache" | "warnings" | "logs"> & {
+export type RequestDetail = Omit<
+  DevtoolsSampleDetail,
+  "queries" | "cache" | "warnings" | "logs"
+> & {
   queries: DetailQuery[];
   cache: DetailCacheOperation[] | DevtoolsSampleDetail["cache"];
   warnings: DetailWarning[];
-  logs: { level: string; module: string; action: string; message: string; at: number; context?: unknown }[];
+  logs: {
+    level: string;
+    module: string;
+    action: string;
+    message: string;
+    at: number;
+    context?: unknown;
+  }[];
   mails?: string[];
   record?: RequestRecord;
 };

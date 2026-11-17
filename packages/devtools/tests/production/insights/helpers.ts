@@ -13,7 +13,10 @@ import type {
 import { createHistogram, recordDuration } from "../../../src/production/stats";
 import type { DevtoolsLocalReporter } from "../../../src/production/insights/types";
 
-export function instance(id: string, overrides: Partial<DevtoolsInstanceInfo> = {}): DevtoolsInstanceInfo {
+export function instance(
+  id: string,
+  overrides: Partial<DevtoolsInstanceInfo> = {},
+): DevtoolsInstanceInfo {
   return {
     id,
     label: `host pid ${id}`,
@@ -66,7 +69,11 @@ export function histogramOf(...durations: number[]) {
   return histogram;
 }
 
-export function shape(id: string, durations: number[], overrides: Partial<DevtoolsQueryShapeStats> = {}): DevtoolsQueryShapeStats {
+export function shape(
+  id: string,
+  durations: number[],
+  overrides: Partial<DevtoolsQueryShapeStats> = {},
+): DevtoolsQueryShapeStats {
   return {
     id,
     shape: `select ${id}`,
@@ -115,11 +122,20 @@ export function errorGroup(id: string, lastSeen: number, count = 1): DevtoolsErr
   };
 }
 
-export function logEntry(at: number, level: DevtoolsReportLogEntry["level"] = "warn", module = "http"): DevtoolsReportLogEntry {
+export function logEntry(
+  at: number,
+  level: DevtoolsReportLogEntry["level"] = "warn",
+  module = "http",
+): DevtoolsReportLogEntry {
   return { level, module, action: "act", message: `m${at}`, at, requestId: null };
 }
 
-export const health: DevtoolsHealthReport = { status: "ok", checkedAt: 1, checks: { db: true }, history: [] };
+export const health: DevtoolsHealthReport = {
+  status: "ok",
+  checkedAt: 1,
+  checks: { db: true },
+  history: [],
+};
 export const jobs: DevtoolsJobsReport = {
   available: { scheduler: false, queue: false },
   schedules: [],
@@ -158,6 +174,9 @@ export function report(
 }
 
 /** A reporter that returns `make()` each time. */
-export function fakeReporter(id: string, make: () => DevtoolsInstanceReport): DevtoolsLocalReporter {
+export function fakeReporter(
+  id: string,
+  make: () => DevtoolsInstanceReport,
+): DevtoolsLocalReporter {
   return { instance: instance(id), snapshot: async () => make() };
 }

@@ -76,7 +76,8 @@ describe("sign-in", () => {
       "api/auth/session": { body: signedOut },
       "POST api/auth/login": () =>
         new Promise((resolve) => {
-          release = () => resolve({ status: 401, body: { error: "No.", code: "auth.invalid-credentials" } });
+          release = () =>
+            resolve({ status: 401, body: { error: "No.", code: "auth.invalid-credentials" } });
         }),
     });
     render(<App />);
@@ -127,7 +128,9 @@ describe("sign-in", () => {
   });
 
   it("refuses a password typed differently twice, before calling the server", async () => {
-    const api = mockApi({ "api/auth/session": { body: sessionView({ stage: "password-change" }) } });
+    const api = mockApi({
+      "api/auth/session": { body: sessionView({ stage: "password-change" }) },
+    });
 
     render(<App />);
     await userEvent.type(await screen.findByLabelText("New password"), "one-password-here");
@@ -153,7 +156,9 @@ describe("sign-in", () => {
     await userEvent.type(screen.getByLabelText("Repeat the new password"), "a-long-new-password");
     await userEvent.click(screen.getByRole("button", { name: "Create the admin account" }));
 
-    await waitFor(() => expect(api.calls.some((call) => call.path === "api/auth/setup")).toBe(true));
+    await waitFor(() =>
+      expect(api.calls.some((call) => call.path === "api/auth/setup")).toBe(true),
+    );
     expect(api.calls.find((call) => call.path === "api/auth/setup")?.body).toEqual({
       token: "setup-token-123",
       password: "a-long-new-password",
@@ -178,7 +183,9 @@ describe("sign-in", () => {
     await userEvent.type(screen.getByLabelText("Repeat the new password"), "a-long-new-password");
     await userEvent.click(screen.getByRole("button", { name: "Create my account" }));
 
-    await waitFor(() => expect(api.calls.some((call) => call.path === "api/auth/invite/accept")).toBe(true));
+    await waitFor(() =>
+      expect(api.calls.some((call) => call.path === "api/auth/invite/accept")).toBe(true),
+    );
     expect(api.calls.find((call) => call.path === "api/auth/invite/inspect")?.body).toEqual({
       token: "invite-token-9",
     });
@@ -194,7 +201,11 @@ describe("sign-in", () => {
       "api/auth/session": { body: signedOut },
       "POST api/auth/invite/inspect": {
         status: 422,
-        body: { error: "This invite is not valid any more. Ask an admin for a new link.", code: "invite.invalid", ref: "INV00001" },
+        body: {
+          error: "This invite is not valid any more. Ask an admin for a new link.",
+          code: "invite.invalid",
+          ref: "INV00001",
+        },
       },
     });
     render(<App />);
@@ -231,7 +242,9 @@ describe("second factor", () => {
     await userEvent.click(screen.getByRole("button", { name: "Verify" }));
 
     expect(await screen.findByRole("link", { name: "Requests" })).toBeInTheDocument();
-    expect(api.calls.find((call) => call.path === "api/auth/mfa")?.body).toEqual({ code: "123456" });
+    expect(api.calls.find((call) => call.path === "api/auth/mfa")?.body).toEqual({
+      code: "123456",
+    });
   });
 
   it("verifies with a recovery code", async () => {
@@ -252,7 +265,9 @@ describe("second factor", () => {
     await userEvent.click(screen.getByRole("button", { name: "Verify" }));
 
     expect(await screen.findByRole("link", { name: "Requests" })).toBeInTheDocument();
-    expect(api.calls.find((call) => call.path === "api/auth/mfa")?.body).toEqual({ recoveryCode: "abcd-efgh" });
+    expect(api.calls.find((call) => call.path === "api/auth/mfa")?.body).toEqual({
+      recoveryCode: "abcd-efgh",
+    });
   });
 
   it("shows a wrong code's error and keeps the form", async () => {
@@ -260,7 +275,11 @@ describe("second factor", () => {
       "api/auth/session": { body: sessionView({ stage: "mfa-verify" }) },
       "POST api/auth/mfa": {
         status: 401,
-        body: { error: "That code is not right. Wait for the next code and try again.", code: "auth.invalid-code", ref: "MFA12345" },
+        body: {
+          error: "That code is not right. Wait for the next code and try again.",
+          code: "auth.invalid-code",
+          ref: "MFA12345",
+        },
       },
     });
     render(<App />);
@@ -273,7 +292,11 @@ describe("second factor", () => {
   });
 
   it("offers passkeys only when the server does", async () => {
-    mockApi({ "api/auth/session": { body: sessionView({ stage: "mfa-verify", methods: { totp: true, passkeys: false } }) } });
+    mockApi({
+      "api/auth/session": {
+        body: sessionView({ stage: "mfa-verify", methods: { totp: true, passkeys: false } }),
+      },
+    });
 
     const { unmount } = render(<App />);
 
@@ -281,7 +304,11 @@ describe("second factor", () => {
     expect(screen.queryByRole("button", { name: "Use a passkey" })).not.toBeInTheDocument();
     unmount();
 
-    mockApi({ "api/auth/session": { body: sessionView({ stage: "mfa-verify", methods: { totp: true, passkeys: true } }) } });
+    mockApi({
+      "api/auth/session": {
+        body: sessionView({ stage: "mfa-verify", methods: { totp: true, passkeys: true } }),
+      },
+    });
     render(<App />);
 
     expect(await screen.findByRole("button", { name: "Use a passkey" })).toBeInTheDocument();
@@ -294,7 +321,9 @@ describe("second factor", () => {
 
     const api = mockApi({
       ...shellRoutes,
-      "api/auth/session": () => ({ body: sessionView({ stage: stage as "active", methods: { totp: true, passkeys: true } }) }),
+      "api/auth/session": () => ({
+        body: sessionView({ stage: stage as "active", methods: { totp: true, passkeys: true } }),
+      }),
       "POST api/auth/passkey/options": { body: { challenge: "xyz" } },
       "POST api/auth/passkey/verify": () => {
         stage = "active";
@@ -308,7 +337,9 @@ describe("second factor", () => {
 
     expect(await screen.findByRole("link", { name: "Requests" })).toBeInTheDocument();
     expect(startAuthentication).toHaveBeenCalledWith({ optionsJSON: { challenge: "xyz" } });
-    expect(api.calls.find((call) => call.path === "api/auth/passkey/options")?.body).toEqual({ purpose: "login" });
+    expect(api.calls.find((call) => call.path === "api/auth/passkey/options")?.body).toEqual({
+      purpose: "login",
+    });
     expect(api.calls.find((call) => call.path === "api/auth/passkey/verify")?.body).toEqual({
       purpose: "login",
       response: { id: "assertion" },
@@ -318,7 +349,9 @@ describe("second factor", () => {
   it("says what to do when the passkey prompt is cancelled", async () => {
     startAuthentication.mockRejectedValue(new Error("The operation was cancelled"));
     mockApi({
-      "api/auth/session": { body: sessionView({ stage: "mfa-verify", methods: { totp: true, passkeys: true } }) },
+      "api/auth/session": {
+        body: sessionView({ stage: "mfa-verify", methods: { totp: true, passkeys: true } }),
+      },
       "POST api/auth/passkey/options": { body: { challenge: "xyz" } },
     });
     render(<App />);
@@ -341,10 +374,14 @@ describe("enrolment", () => {
     mockApi({
       "api/auth/session": { body: sessionView({ stage: "mfa-enrol" }) },
       "POST api/auth/totp/start": { body: enrolment },
-      "POST api/auth/totp/confirm": { body: { stage: "active", csrf: "c", recoveryCodes: ["aaaa-1111", "bbbb-2222"] } },
+      "POST api/auth/totp/confirm": {
+        body: { stage: "active", csrf: "c", recoveryCodes: ["aaaa-1111", "bbbb-2222"] },
+      },
     });
     render(<App />);
-    await userEvent.click(await screen.findByRole("button", { name: "Set up an authenticator app" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Set up an authenticator app" }),
+    );
 
     const qr = await screen.findByRole("img", { name: /QR code/ });
 
@@ -361,12 +398,16 @@ describe("enrolment", () => {
       "POST api/auth/totp/confirm": () => {
         stage = "active";
 
-        return { body: { stage: "active", csrf: "csrf-after", recoveryCodes: ["aaaa-1111", "bbbb-2222"] } };
+        return {
+          body: { stage: "active", csrf: "csrf-after", recoveryCodes: ["aaaa-1111", "bbbb-2222"] },
+        };
       },
     });
 
     render(<App />);
-    await userEvent.click(await screen.findByRole("button", { name: "Set up an authenticator app" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Set up an authenticator app" }),
+    );
     await userEvent.type(await screen.findByLabelText("Code from the app"), "123456");
     await userEvent.click(screen.getByRole("button", { name: "Confirm the code" }));
 
@@ -384,11 +425,17 @@ describe("enrolment", () => {
     await userEvent.click(next);
 
     expect(await screen.findByRole("link", { name: "Requests" })).toBeInTheDocument();
-    expect(api.calls.find((call) => call.path === "api/auth/totp/confirm")?.body).toEqual({ code: "123456" });
+    expect(api.calls.find((call) => call.path === "api/auth/totp/confirm")?.body).toEqual({
+      code: "123456",
+    });
   });
 
   it("offers a passkey at enrolment only when the server does", async () => {
-    mockApi({ "api/auth/session": { body: sessionView({ stage: "mfa-enrol", methods: { totp: true, passkeys: false } }) } });
+    mockApi({
+      "api/auth/session": {
+        body: sessionView({ stage: "mfa-enrol", methods: { totp: true, passkeys: false } }),
+      },
+    });
 
     const { unmount } = render(<App />);
 
@@ -398,9 +445,13 @@ describe("enrolment", () => {
 
     startRegistration.mockResolvedValue({ id: "attestation" });
     mockApi({
-      "api/auth/session": { body: sessionView({ stage: "mfa-enrol", methods: { totp: true, passkeys: true } }) },
+      "api/auth/session": {
+        body: sessionView({ stage: "mfa-enrol", methods: { totp: true, passkeys: true } }),
+      },
       "POST api/auth/passkey/options": { body: { challenge: "reg" } },
-      "POST api/auth/passkey/verify": { body: { stage: "active", csrf: "c", recoveryCodes: ["cccc-3333"] } },
+      "POST api/auth/passkey/verify": {
+        body: { stage: "active", csrf: "c", recoveryCodes: ["cccc-3333"] },
+      },
     });
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "Add a passkey instead" }));

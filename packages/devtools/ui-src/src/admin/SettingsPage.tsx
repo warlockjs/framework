@@ -31,8 +31,8 @@ export function SettingsPage() {
           <>
             <p>
               Every instance answers as if the page did not exist, and every session ends. Only
-              someone with shell access can open it again: run <code>warlock devtools:enable</code>, or
-              deploy with a new <code>DEVTOOLS_PATH</code>.
+              someone with shell access can open it again: run <code>warlock devtools:enable</code>,
+              or deploy with a new <code>DEVTOOLS_PATH</code>.
             </p>
           </>
         }

@@ -53,7 +53,12 @@ export type PanelContextOptions = {
 };
 
 /** What a panel's view module receives: the 5.55.0 panel API. */
-export function buildPanelContext({ id, root, route, refresh }: PanelContextOptions): LegacyPanelContext {
+export function buildPanelContext({
+  id,
+  root,
+  route,
+  refresh,
+}: PanelContextOptions): LegacyPanelContext {
   return {
     id,
     root,

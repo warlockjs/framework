@@ -2,11 +2,7 @@ import { log } from "@warlock.js/logger";
 import type { DevtoolsExplainResult } from "../contracts";
 import { createErrorRef, DevtoolsApiError } from "../errors";
 import type { DevtoolsQuery } from "../../types";
-import type {
-  DevtoolsExplainRunner,
-  DevtoolsExplainStatement,
-  DevtoolsQueryStats,
-} from "./types";
+import type { DevtoolsExplainRunner, DevtoolsExplainStatement, DevtoolsQueryStats } from "./types";
 
 type ExplainStatement = DevtoolsExplainStatement;
 type ExplainRunner = DevtoolsExplainRunner;
@@ -73,7 +69,8 @@ function maskSql(sql: string, backslashEscapes: boolean): string | null {
     if (character === "'" || character === '"') {
       const escapes =
         character === "'" &&
-        (backslashEscapes || (/[eE]/.test(sql[at - 1] ?? "") && !isIdentifierCharacter(sql[at - 2])));
+        (backslashEscapes ||
+          (/[eE]/.test(sql[at - 1] ?? "") && !isIdentifierCharacter(sql[at - 2])));
       let closed = false;
 
       at++;
@@ -169,7 +166,11 @@ export function explainableSql(sql: string | undefined): string | null {
 
   const statement = withoutLeadingNoise(sql)?.trimEnd();
 
-  if (statement === undefined || !isOneRead(maskSql(statement, false)) || !isOneRead(maskSql(statement, true))) {
+  if (
+    statement === undefined ||
+    !isOneRead(maskSql(statement, false)) ||
+    !isOneRead(maskSql(statement, true))
+  ) {
     return null;
   }
 

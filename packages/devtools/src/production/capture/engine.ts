@@ -7,7 +7,11 @@ import type {
   DevtoolsQuery,
   DevtoolsRequest,
 } from "../../types";
-import type { DevtoolsCaptureCounters, DevtoolsSampleDetail, DevtoolsSampleSummary } from "../contracts";
+import type {
+  DevtoolsCaptureCounters,
+  DevtoolsSampleDetail,
+  DevtoolsSampleSummary,
+} from "../contracts";
 import type { DevtoolsStoredSample } from "../store/types";
 import { createShapeExplainer } from "./explain";
 import { sampleMatchesFilter } from "./filter";
@@ -381,11 +385,7 @@ export function createCaptureEngine(deps: DevtoolsCaptureDeps): DevtoolsCaptureE
     shape: queryShape(event),
   });
 
-  const recordQuery = (
-    query: DevtoolsQuery,
-    route: string | null,
-    requestId: string | null,
-  ) => {
+  const recordQuery = (query: DevtoolsQuery, route: string | null, requestId: string | null) => {
     queries.record({
       shape: query.shape,
       driver: query.driver,

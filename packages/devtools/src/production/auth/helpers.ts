@@ -16,7 +16,10 @@ const TEMPORARY_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz234567
  * the built-in common list (compared lower-cased), not equal to the email
  * (lower-cased). Returns the failing rule's error code, or `null`.
  */
-export function checkPasswordPolicy(password: string, email: string | null): DevtoolsErrorCode | null {
+export function checkPasswordPolicy(
+  password: string,
+  email: string | null,
+): DevtoolsErrorCode | null {
   if (typeof password !== "string" || [...password].length < MIN_PASSWORD_LENGTH) {
     return "auth.password-too-short";
   }
@@ -91,7 +94,9 @@ export function generateRecoveryCode(): string {
 
 /** The form a recovery code is hashed in: upper case, letters and digits only. */
 export function normalizeRecoveryCode(code: string): string {
-  return String(code).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return String(code)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
 }
 
 /** SHA-256 hex of a normalized recovery code. */

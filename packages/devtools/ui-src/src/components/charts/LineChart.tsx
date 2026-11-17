@@ -42,7 +42,8 @@ export function LineChart({
   const plotWidth = width - left - 4;
   const plotHeight = height - top - bottom;
   const x = (at: number) => left + ((at - minAt) / (maxAt - minAt || 1)) * plotWidth;
-  const y = (value: number) => top + plotHeight - (Math.min(value, maxValue) / maxValue) * plotHeight;
+  const y = (value: number) =>
+    top + plotHeight - (Math.min(value, maxValue) / maxValue) * plotHeight;
   const ticks = [0, 0.5, 1].map((fraction) => fraction * maxValue);
 
   return (
@@ -66,8 +67,21 @@ export function LineChart({
       >
         {ticks.map((tick) => (
           <g key={tick}>
-            <line x1={left} x2={width - 4} y1={y(tick)} y2={y(tick)} stroke="var(--border)" strokeWidth={1} />
-            <text x={left - 4} y={y(tick) + 3} textAnchor="end" fontSize={9} fill="var(--muted-foreground)">
+            <line
+              x1={left}
+              x2={width - 4}
+              y1={y(tick)}
+              y2={y(tick)}
+              stroke="var(--border)"
+              strokeWidth={1}
+            />
+            <text
+              x={left - 4}
+              y={y(tick) + 3}
+              textAnchor="end"
+              fontSize={9}
+              fill="var(--muted-foreground)"
+            >
               {format(tick)}
             </text>
           </g>
@@ -79,13 +93,21 @@ export function LineChart({
             stroke={item.color}
             strokeWidth={1.5}
             strokeLinejoin="round"
-            points={item.points.map((point) => `${x(point.at).toFixed(1)},${y(point.value).toFixed(1)}`).join(" ")}
+            points={item.points
+              .map((point) => `${x(point.at).toFixed(1)},${y(point.value).toFixed(1)}`)
+              .join(" ")}
           />
         ))}
         <text x={left} y={height - 4} fontSize={9} fill="var(--muted-foreground)">
           {new Date(minAt).toLocaleTimeString()}
         </text>
-        <text x={width - 4} y={height - 4} textAnchor="end" fontSize={9} fill="var(--muted-foreground)">
+        <text
+          x={width - 4}
+          y={height - 4}
+          textAnchor="end"
+          fontSize={9}
+          fill="var(--muted-foreground)"
+        >
           {new Date(maxAt).toLocaleTimeString()}
         </text>
       </svg>

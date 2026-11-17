@@ -87,17 +87,23 @@ describe("sessions", () => {
 
     world.advance(30_000);
     await world.auth.authenticate(step.token ?? "");
-    expect((await world.store.sessions.findByTokenHash(step.session.tokenHash))?.lastSeenAt).toBe(start);
+    expect((await world.store.sessions.findByTokenHash(step.session.tokenHash))?.lastSeenAt).toBe(
+      start,
+    );
 
     world.advance(30_000);
     await world.auth.authenticate(step.token ?? "");
-    expect((await world.store.sessions.findByTokenHash(step.session.tokenHash))?.lastSeenAt).toBe(world.now());
+    expect((await world.store.sessions.findByTokenHash(step.session.tokenHash))?.lastSeenAt).toBe(
+      world.now(),
+    );
 
     const version = (await world.store.sessions.findByTokenHash(step.session.tokenHash))?.version;
 
     world.advance(10_000);
     await world.auth.authenticate(step.token ?? "");
-    expect((await world.store.sessions.findByTokenHash(step.session.tokenHash))?.version).toBe(version);
+    expect((await world.store.sessions.findByTokenHash(step.session.tokenHash))?.version).toBe(
+      version,
+    );
   });
 
   it("ignores a lost touch race", async () => {
@@ -117,11 +123,21 @@ describe("sessions", () => {
   it("mints a new token when the session becomes active and removes the old one", async () => {
     const world = createWorld();
 
-    await world.addAccount("viewer@example.com", { mustChangePassword: true, passwordSource: "env" });
+    await world.addAccount("viewer@example.com", {
+      mustChangePassword: true,
+      passwordSource: "env",
+    });
 
-    const first = await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta());
+    const first = await world.auth.login(
+      { email: "viewer@example.com", password: PASSWORD },
+      meta(),
+    );
     const pending = await authOf(world, first);
-    const second = await world.auth.changePassword(pending, { password: "A-fresh-passphrase-42" }, meta());
+    const second = await world.auth.changePassword(
+      pending,
+      { password: "A-fresh-passphrase-42" },
+      meta(),
+    );
 
     expect(second.stage).toBe("active");
     expect(second.token).not.toBe(first.token);
@@ -138,7 +154,10 @@ describe("sessions", () => {
 
     await world.addAccount("boss@example.com", { role: "admin" });
 
-    const pending = await world.auth.login({ email: "boss@example.com", password: PASSWORD }, meta());
+    const pending = await world.auth.login(
+      { email: "boss@example.com", password: PASSWORD },
+      meta(),
+    );
 
     expect(pending.session.expiresAt).toBe(world.now() + 10 * MINUTE);
   });
@@ -160,7 +179,10 @@ describe("sessions", () => {
 
     world.advance(1000);
 
-    const second = await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.9"));
+    const second = await world.auth.login(
+      { email: "viewer@example.com", password: PASSWORD },
+      meta("198.51.100.9"),
+    );
     const auth = await authOf(world, second);
     const list = await world.auth.listSessions(auth);
 
@@ -218,12 +240,17 @@ describe("sessions", () => {
       expect(world.auth.verifyCsrf(auth, "")).toBe(false);
       expect(world.auth.verifyCsrf(auth, token.slice(0, -1))).toBe(false);
       expect(world.auth.verifyCsrf(auth, `${token}x`)).toBe(false);
-      expect(world.auth.verifyCsrf(auth, token.replace(/^./, token.startsWith("A") ? "B" : "A"))).toBe(false);
+      expect(
+        world.auth.verifyCsrf(auth, token.replace(/^./, token.startsWith("A") ? "B" : "A")),
+      ).toBe(false);
     });
 
     it("compares with the constant-time helper, never with ===", async () => {
       const { readFile } = await import("node:fs/promises");
-      const source = await readFile(new URL("../../../src/production/auth/service.ts", import.meta.url), "utf8");
+      const source = await readFile(
+        new URL("../../../src/production/auth/service.ts", import.meta.url),
+        "utf8",
+      );
 
       expect(source).toContain("safeEqual(header, csrfToken(auth.session))");
       expect(source).not.toMatch(/header\s*===\s*csrfToken|csrfToken\([^)]*\)\s*===\s*header/);
@@ -277,10 +304,17 @@ describe("sessions", () => {
   it("changing the password ends the account's other sessions", async () => {
     const world = createWorld();
     const first = await login(world);
-    const second = await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.9"));
+    const second = await world.auth.login(
+      { email: "viewer@example.com", password: PASSWORD },
+      meta("198.51.100.9"),
+    );
     const auth = await authOf(world, second);
 
-    await world.auth.changePassword(auth, { current: PASSWORD, password: "Brand-new-passphrase-8" }, meta());
+    await world.auth.changePassword(
+      auth,
+      { current: PASSWORD, password: "Brand-new-passphrase-8" },
+      meta(),
+    );
 
     expect(await world.auth.authenticate(first.token ?? "")).toBeNull();
     expect(await world.auth.authenticate(second.token ?? "")).not.toBeNull();

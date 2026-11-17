@@ -44,7 +44,9 @@ export function registerOpenApiRoutes(
   // The API tab shows these pages in a frame. The app's own headers (core's security headers forbid framing) are
   // replaced on the reply; production sets its full docs policy on top.
   const frameable = (reply: FastifyReply): FastifyReply =>
-    reply.header("X-Frame-Options", "SAMEORIGIN").header("Content-Security-Policy", "frame-ancestors 'self'");
+    reply
+      .header("X-Frame-Options", "SAMEORIGIN")
+      .header("Content-Security-Policy", "frame-ancestors 'self'");
 
   server.get("/docs", (_request, reply) => {
     sendFile(frameable(reply), path.join(resolveUiRoot(), "docs.html"), "text/html; charset=utf-8");

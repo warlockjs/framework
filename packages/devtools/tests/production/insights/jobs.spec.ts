@@ -37,7 +37,12 @@ describe("createJobsReader", () => {
       lastRunAt: 1000,
       nextRunAt: 2000,
     });
-    expect(report.schedules[1]).toMatchObject({ name: "poll", cron: null, interval: "every 5 minutes", lastRunAt: null });
+    expect(report.schedules[1]).toMatchObject({
+      name: "poll",
+      cron: null,
+      interval: "every 5 minutes",
+      lastRunAt: null,
+    });
     expect(report.queues).toEqual([{ name: "mail", counts: { waiting: 3, failed: 1 } }]);
   });
 

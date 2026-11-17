@@ -14,7 +14,8 @@ describe("rate limits", () => {
     await world.addAccount("viewer@example.com");
 
     // Different IPs, so only the account limit applies.
-    for (let index = 0; index < 5; index++) await fail(world, "viewer@example.com", `198.51.100.${index}`);
+    for (let index = 0; index < 5; index++)
+      await fail(world, "viewer@example.com", `198.51.100.${index}`);
 
     const blocked = await world.auth
       .login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.99"))
@@ -30,11 +31,17 @@ describe("rate limits", () => {
 
     await world.addAccount("viewer@example.com");
 
-    for (let index = 0; index < 5; index++) await fail(world, "viewer@example.com", `198.51.100.${index}`);
-    for (let index = 0; index < 10; index++) await fail(world, "viewer@example.com", "198.51.100.200");
+    for (let index = 0; index < 5; index++)
+      await fail(world, "viewer@example.com", `198.51.100.${index}`);
+    for (let index = 0; index < 10; index++)
+      await fail(world, "viewer@example.com", "198.51.100.200");
 
     expect(
-      await world.store.audit.count({ types: ["login.failed"], since: 0, accountId: (await world.store.accounts.findByEmail("viewer@example.com"))?.id ?? "" }),
+      await world.store.audit.count({
+        types: ["login.failed"],
+        since: 0,
+        accountId: (await world.store.accounts.findByEmail("viewer@example.com"))?.id ?? "",
+      }),
     ).toBe(5);
   });
 
@@ -43,11 +50,15 @@ describe("rate limits", () => {
 
     await world.addAccount("viewer@example.com");
 
-    for (let index = 0; index < 5; index++) await fail(world, "viewer@example.com", `198.51.100.${index}`);
+    for (let index = 0; index < 5; index++)
+      await fail(world, "viewer@example.com", `198.51.100.${index}`);
 
     world.advance(15 * MINUTE + 1);
 
-    const step = await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.99"));
+    const step = await world.auth.login(
+      { email: "viewer@example.com", password: PASSWORD },
+      meta("198.51.100.99"),
+    );
 
     expect(step.stage).toBe("active");
   });
@@ -67,7 +78,12 @@ describe("rate limits", () => {
 
     // Another IP still signs in.
     expect(
-      (await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.7"))).stage,
+      (
+        await world.auth.login(
+          { email: "viewer@example.com", password: PASSWORD },
+          meta("198.51.100.7"),
+        )
+      ).stage,
     ).toBe("active");
   });
 
@@ -77,19 +93,29 @@ describe("rate limits", () => {
     await world.addAccount("viewer@example.com");
 
     // One host rotating through its /64.
-    for (let index = 0; index < 20; index++) await fail(world, `ghost${index}@example.com`, `2001:db8:1:2::${index + 1}`);
+    for (let index = 0; index < 20; index++)
+      await fail(world, `ghost${index}@example.com`, `2001:db8:1:2::${index + 1}`);
 
     const sameNetwork = await world.auth
-      .login({ email: "viewer@example.com", password: PASSWORD }, meta("2001:db8:1:2:ffff:abcd:1234:5678"))
+      .login(
+        { email: "viewer@example.com", password: PASSWORD },
+        meta("2001:db8:1:2:ffff:abcd:1234:5678"),
+      )
       .catch((error) => error);
 
     expect(sameNetwork.code).toBe("auth.invalid-credentials");
     // The next /64 is another client.
     expect(
-      (await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta("2001:db8:1:3::1"))).stage,
+      (
+        await world.auth.login(
+          { email: "viewer@example.com", password: PASSWORD },
+          meta("2001:db8:1:3::1"),
+        )
+      ).stage,
     ).toBe("active");
 
-    for (let index = 0; index < 20; index++) await fail(world, `mapped${index}@example.com`, "::ffff:198.51.100.40");
+    for (let index = 0; index < 20; index++)
+      await fail(world, `mapped${index}@example.com`, "::ffff:198.51.100.40");
 
     const asIpv4 = await world.auth
       .login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.40"))
@@ -99,9 +125,14 @@ describe("rate limits", () => {
   });
 
   it("locks the whole dashboard at the global limit and audits it once", async () => {
-    const world = createWorld({ options: { rateLimits: { windowMinutes: 15, account: 50, ip: 50, global: 6, lockMinutes: 15 } } });
+    const world = createWorld({
+      options: {
+        rateLimits: { windowMinutes: 15, account: 50, ip: 50, global: 6, lockMinutes: 15 },
+      },
+    });
 
-    for (let index = 0; index < 6; index++) await fail(world, `ghost${index}@example.com`, `198.51.100.${index}`);
+    for (let index = 0; index < 6; index++)
+      await fail(world, `ghost${index}@example.com`, `198.51.100.${index}`);
 
     const state = await world.store.state.read();
 
@@ -115,11 +146,16 @@ describe("rate limits", () => {
   });
 
   it("refuses everyone while locked and opens after the lock ends", async () => {
-    const world = createWorld({ options: { rateLimits: { windowMinutes: 15, account: 50, ip: 50, global: 3, lockMinutes: 5 } } });
+    const world = createWorld({
+      options: {
+        rateLimits: { windowMinutes: 15, account: 50, ip: 50, global: 3, lockMinutes: 5 },
+      },
+    });
 
     await world.addAccount("viewer@example.com");
 
-    for (let index = 0; index < 3; index++) await fail(world, `ghost${index}@example.com`, `198.51.100.${index}`);
+    for (let index = 0; index < 3; index++)
+      await fail(world, `ghost${index}@example.com`, `198.51.100.${index}`);
 
     await expect(
       world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.77")),
@@ -128,7 +164,12 @@ describe("rate limits", () => {
     world.advance(15 * MINUTE + 1);
 
     expect(
-      (await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.77"))).stage,
+      (
+        await world.auth.login(
+          { email: "viewer@example.com", password: PASSWORD },
+          meta("198.51.100.77"),
+        )
+      ).stage,
     ).toBe("active");
   });
 
@@ -136,19 +177,31 @@ describe("rate limits", () => {
     const world = createWorld();
     const account = await world.addAccount("viewer@example.com");
 
-    for (let index = 0; index < 5; index++) await fail(world, "viewer@example.com", `198.51.100.${index}`);
+    for (let index = 0; index < 5; index++)
+      await fail(world, "viewer@example.com", `198.51.100.${index}`);
 
     world.advance(1000);
-    await world.store.accounts.update(account.id, account.version, { failuresResetAt: world.now() });
+    await world.store.accounts.update(account.id, account.version, {
+      failuresResetAt: world.now(),
+    });
     world.advance(1000);
 
     expect(
-      (await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.99"))).stage,
+      (
+        await world.auth.login(
+          { email: "viewer@example.com", password: PASSWORD },
+          meta("198.51.100.99"),
+        )
+      ).stage,
     ).toBe("active");
   });
 
   it("failuresResetAt on the state (CLI) reopens the IP and the lock", async () => {
-    const world = createWorld({ options: { rateLimits: { windowMinutes: 15, account: 50, ip: 3, global: 4, lockMinutes: 15 } } });
+    const world = createWorld({
+      options: {
+        rateLimits: { windowMinutes: 15, account: 50, ip: 3, global: 4, lockMinutes: 15 },
+      },
+    });
 
     await world.addAccount("viewer@example.com");
 
@@ -162,10 +215,15 @@ describe("rate limits", () => {
 
     const state = await world.store.state.read();
 
-    await world.store.state.update(state.version, { lockedUntil: null, failuresResetAt: world.now() });
+    await world.store.state.update(state.version, {
+      lockedUntil: null,
+      failuresResetAt: world.now(),
+    });
     world.advance(1000);
 
-    expect((await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta())).stage).toBe("active");
+    expect(
+      (await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta())).stage,
+    ).toBe("active");
   });
 
   it("counts failed second factors toward the limits", async () => {
@@ -173,7 +231,10 @@ describe("rate limits", () => {
 
     await world.addAccount("viewer@example.com", { totpSecret: "enc:JBSWY3DPEHPK3PXP" });
 
-    const step = await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta());
+    const step = await world.auth.login(
+      { email: "viewer@example.com", password: PASSWORD },
+      meta(),
+    );
     const pending = await world.auth.authenticate(step.token ?? "");
 
     for (let index = 0; index < 4; index++) {
@@ -208,11 +269,14 @@ describe("rate limits", () => {
 
       await world.addAccount("viewer@example.com");
 
-      for (let index = 0; index < 5; index++) await fail(world, "viewer@example.com", `198.51.100.${index}`);
+      for (let index = 0; index < 5; index++)
+        await fail(world, "viewer@example.com", `198.51.100.${index}`);
 
       world.crypto.verifyCalls.length = 0;
 
-      await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.99")).catch(() => undefined);
+      await world.auth
+        .login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.99"))
+        .catch(() => undefined);
 
       expect(world.crypto.verifyCalls).toHaveLength(1);
       expect(world.crypto.verifyCalls[0]?.hash).not.toBe(`hash:${PASSWORD}`);
@@ -231,7 +295,11 @@ describe("rate limits", () => {
     it("verifies once for a setup-pending admin (placeholder hash)", async () => {
       const world = createWorld();
 
-      await world.addAccount("owner@example.com", { role: "admin", passwordHash: "!no-password-set", passwordSource: "setup" });
+      await world.addAccount("owner@example.com", {
+        role: "admin",
+        passwordHash: "!no-password-set",
+        passwordSource: "setup",
+      });
       await fail(world, "owner@example.com");
 
       expect(world.crypto.verifyCalls).toHaveLength(1);
@@ -247,7 +315,10 @@ describe("rate limits", () => {
 
       const release = world.crypto.holdVerifications();
       const pending = Array.from({ length: 4 }, (_, index) =>
-        world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta(`198.51.100.${index}`)),
+        world.auth.login(
+          { email: "viewer@example.com", password: PASSWORD },
+          meta(`198.51.100.${index}`),
+        ),
       );
 
       await vi.waitFor(() => expect(world.crypto.verifyCalls).toHaveLength(4));
@@ -263,7 +334,12 @@ describe("rate limits", () => {
       await Promise.all(pending);
 
       expect(
-        (await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta("198.51.100.51"))).stage,
+        (
+          await world.auth.login(
+            { email: "viewer@example.com", password: PASSWORD },
+            meta("198.51.100.51"),
+          )
+        ).stage,
       ).toBe("active");
     });
   });

@@ -1,4 +1,9 @@
-import type { DevtoolsCaptureCounters, DevtoolsInstanceInfo, DevtoolsInstanceReport, DevtoolsJobsReport } from "../contracts";
+import type {
+  DevtoolsCaptureCounters,
+  DevtoolsInstanceInfo,
+  DevtoolsInstanceReport,
+  DevtoolsJobsReport,
+} from "../contracts";
 import type {
   DevtoolsErrorGroups,
   DevtoolsProductionCapture,

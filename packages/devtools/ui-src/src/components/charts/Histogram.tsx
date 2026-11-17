@@ -19,7 +19,8 @@ export function HistogramBars({ histogram }: { histogram: DevtoolsHistogram }) {
   const counts = histogram.counts;
   const first = counts.findIndex((count) => count > 0);
 
-  if (first === -1) return <p className="text-xs text-muted-foreground">No timings recorded yet.</p>;
+  if (first === -1)
+    return <p className="text-xs text-muted-foreground">No timings recorded yet.</p>;
 
   const last = counts.length - 1 - [...counts].reverse().findIndex((count) => count > 0);
   const peak = Math.max(...counts, 1);

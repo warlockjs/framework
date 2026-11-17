@@ -23,7 +23,15 @@ describe("admin users", () => {
       "POST api/admin/invites": {
         body: {
           token: "tok-abc",
-          invite: { id: "i1", email: "new@example.com", role: "viewer", createdAt: 1, expiresAt: Date.now() + 86_400_000, createdBy: "a1", usedAt: null },
+          invite: {
+            id: "i1",
+            email: "new@example.com",
+            role: "viewer",
+            createdAt: 1,
+            expiresAt: Date.now() + 86_400_000,
+            createdBy: "a1",
+            usedAt: null,
+          },
         },
       },
     });
@@ -34,10 +42,15 @@ describe("admin users", () => {
 
     const link = await screen.findByTestId("invite-link");
 
-    expect(link).toHaveTextContent(`${window.location.origin}${window.location.pathname}#/invite/tok-abc`);
+    expect(link).toHaveTextContent(
+      `${window.location.origin}${window.location.pathname}#/invite/tok-abc`,
+    );
     expect(screen.getByText(/Invite for/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
-    expect(api.calls.find((call) => call.path === "api/admin/invites")?.body).toEqual({ email: "new@example.com", role: "viewer" });
+    expect(api.calls.find((call) => call.path === "api/admin/invites")?.body).toEqual({
+      email: "new@example.com",
+      role: "viewer",
+    });
 
     await userEvent.click(screen.getByRole("button", { name: "Hide" }));
     expect(screen.queryByTestId("invite-link")).not.toBeInTheDocument();
@@ -69,8 +82,14 @@ describe("admin users", () => {
 
       const dialog = await screen.findByRole("dialog");
 
-      await userEvent.click(within(dialog).getAllByRole("button").find((item) => item.textContent !== "Cancel" && item.textContent !== "Close")!);
-      await waitFor(() => expect(api.calls.some((call) => call.path === path && call.method === method)).toBe(true));
+      await userEvent.click(
+        within(dialog)
+          .getAllByRole("button")
+          .find((item) => item.textContent !== "Cancel" && item.textContent !== "Close")!,
+      );
+      await waitFor(() =>
+        expect(api.calls.some((call) => call.path === path && call.method === method)).toBe(true),
+      );
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     }
 
@@ -79,7 +98,11 @@ describe("admin users", () => {
     const dialog = await screen.findByRole("dialog");
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
-    await waitFor(() => expect(api.calls.some((call) => call.method === "DELETE" && call.path === "api/admin/users/a2")).toBe(true));
+    await waitFor(() =>
+      expect(
+        api.calls.some((call) => call.method === "DELETE" && call.path === "api/admin/users/a2"),
+      ).toBe(true),
+    );
     expect(api.calls.find((call) => call.method === "PATCH")?.body).toEqual({ role: "admin" });
   });
 
@@ -90,7 +113,17 @@ describe("admin users", () => {
       "api/admin/users": {
         body: {
           accounts: [account()],
-          invites: [{ id: "i9", email: "wait@example.com", role: "viewer", createdAt: 1, expiresAt: Date.now() + 1000, createdBy: "a1", usedAt: null }],
+          invites: [
+            {
+              id: "i9",
+              email: "wait@example.com",
+              role: "viewer",
+              createdAt: 1,
+              expiresAt: Date.now() + 1000,
+              createdBy: "a1",
+              usedAt: null,
+            },
+          ],
         },
       },
       "DELETE api/admin/invites/i9": { status: 204 },
@@ -103,7 +136,11 @@ describe("admin users", () => {
     const dialog = await screen.findByRole("dialog");
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Revoke" }));
-    await waitFor(() => expect(api.calls.some((call) => call.method === "DELETE" && call.path === "api/admin/invites/i9")).toBe(true));
+    await waitFor(() =>
+      expect(
+        api.calls.some((call) => call.method === "DELETE" && call.path === "api/admin/invites/i9"),
+      ).toBe(true),
+    );
   });
 
   it("is closed to viewers with a note that says what to do", async () => {
@@ -165,7 +202,17 @@ describe("admin audit", () => {
 
   it("shows a load error with its reference", async () => {
     window.location.hash = "#/admin/audit";
-    mockApi({ ...base, "api/admin/audit": { status: 500, body: { error: "The audit log could not be read. Try again.", code: "server.error", ref: "AUD00001" } } });
+    mockApi({
+      ...base,
+      "api/admin/audit": {
+        status: 500,
+        body: {
+          error: "The audit log could not be read. Try again.",
+          code: "server.error",
+          ref: "AUD00001",
+        },
+      },
+    });
     render(<App />);
 
     expect(await screen.findByText(/audit log could not be read/)).toBeInTheDocument();
@@ -196,12 +243,24 @@ describe("admin settings", () => {
     await userEvent.click(confirm);
 
     expect(await screen.findByText("The dashboard is turned off")).toBeInTheDocument();
-    expect(api.calls.find((call) => call.path === "api/admin/disable")?.body).toEqual({ confirm: "disable" });
+    expect(api.calls.find((call) => call.path === "api/admin/disable")?.body).toEqual({
+      confirm: "disable",
+    });
   });
 
   it("keeps the dialog open and shows the error when disabling fails", async () => {
     window.location.hash = "#/admin/settings";
-    mockApi({ ...base, "POST api/admin/disable": { status: 403, body: { error: "Only admins can turn the dashboard off. Sign in as an admin.", code: "role.forbidden", ref: "DIS00001" } } });
+    mockApi({
+      ...base,
+      "POST api/admin/disable": {
+        status: 403,
+        body: {
+          error: "Only admins can turn the dashboard off. Sign in as an admin.",
+          code: "role.forbidden",
+          ref: "DIS00001",
+        },
+      },
+    });
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "Disable the dashboard" }));
 
@@ -210,7 +269,9 @@ describe("admin settings", () => {
     await userEvent.type(within(dialog).getByLabelText(/Type/), "disable");
     await userEvent.click(within(dialog).getByRole("button", { name: "Disable the dashboard" }));
 
-    expect(await within(dialog).findByText(/Only admins can turn the dashboard off/)).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText(/Only admins can turn the dashboard off/),
+    ).toBeInTheDocument();
     expect(within(dialog).getByText("Reference: DIS00001")).toBeInTheDocument();
   });
 });

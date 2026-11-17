@@ -131,10 +131,12 @@ describe("shell", () => {
     await userEvent.click(await screen.findByRole("button", { name: /admin@example.com/ }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Sign out" }));
 
-    await waitFor(() => expect(api.calls.some((call) => call.path === "api/auth/logout")).toBe(true));
-    expect(api.calls.find((call) => call.path === "api/auth/logout")?.headers.get("X-Devtools-Csrf")).toBe(
-      "token-from-session",
+    await waitFor(() =>
+      expect(api.calls.some((call) => call.path === "api/auth/logout")).toBe(true),
     );
+    expect(
+      api.calls.find((call) => call.path === "api/auth/logout")?.headers.get("X-Devtools-Csrf"),
+    ).toBe("token-from-session");
   });
 
   it("returns to sign-in with a note when an API call answers a bare 404", async () => {
@@ -159,7 +161,14 @@ describe("shell", () => {
 
   it("says what to do when the session cannot be read", async () => {
     mockApi({
-      "api/auth/session": { status: 500, body: { error: "The monitor database is down. Check the server log.", code: "server.error", ref: "R1" } },
+      "api/auth/session": {
+        status: 500,
+        body: {
+          error: "The monitor database is down. Check the server log.",
+          code: "server.error",
+          ref: "R1",
+        },
+      },
     });
     render(<App />);
 

@@ -1,8 +1,4 @@
-import type {
-  DevtoolsInstanceInfo,
-  DevtoolsInstanceReport,
-  DevtoolsLogRow,
-} from "../contracts";
+import type { DevtoolsInstanceInfo, DevtoolsInstanceReport, DevtoolsLogRow } from "../contracts";
 import {
   histogramMean,
   histogramQuantile,

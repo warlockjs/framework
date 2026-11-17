@@ -40,15 +40,19 @@ export function mockApi(routes: Record<string, MockHandler>) {
       (method === "GET" ? (routes[url] ?? routes[path]) : undefined);
 
     if (handler === undefined) {
-      return new Response(JSON.stringify({ error: `unmocked ${method} ${url}`, code: "server.error" }), {
-        status: 599,
-      });
+      return new Response(
+        JSON.stringify({ error: `unmocked ${method} ${url}`, code: "server.error" }),
+        {
+          status: 599,
+        },
+      );
     }
 
     const answer = typeof handler === "function" ? await handler(request) : handler;
     const status = answer.status ?? 200;
 
-    if (status === 204 || answer.body === undefined) return new Response(null, { status: status === 200 ? 204 : status });
+    if (status === 204 || answer.body === undefined)
+      return new Response(null, { status: status === 200 ? 204 : status });
 
     return new Response(JSON.stringify(answer.body), { status });
   });

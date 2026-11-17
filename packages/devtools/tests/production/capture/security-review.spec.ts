@@ -62,7 +62,10 @@ function explainerFor(query: DevtoolsQuery, executing: boolean) {
 
   queries.rememberExample(query);
 
-  return { explain: createShapeExplainer({ queries, executing, instance: "me" }), id: shortId(query.shape) };
+  return {
+    explain: createShapeExplainer({ queries, executing, instance: "me" }),
+    id: shortId(query.shape),
+  };
 }
 
 describe("the EXPLAIN statement guard", () => {
@@ -86,9 +89,9 @@ describe("the EXPLAIN statement guard", () => {
   });
 
   it("still accepts plain reads with strings, identifiers, comments and positional parameters", () => {
-    expect(explainableSql(`SELECT 'it''s', E'a\\'b', "update", $tag$ ; $tag$ FROM t WHERE a = $1;`)).toBe(
-      `SELECT 'it''s', E'a\\'b', "update", $tag$ ; $tag$ FROM t WHERE a = $1`,
-    );
+    expect(
+      explainableSql(`SELECT 'it''s', E'a\\'b', "update", $tag$ ; $tag$ FROM t WHERE a = $1;`),
+    ).toBe(`SELECT 'it''s', E'a\\'b', "update", $tag$ ; $tag$ FROM t WHERE a = $1`);
     expect(explainableSql("/* a /* nested */ note */ -- list\n  SELECT foo$bar FROM t")).toBe(
       "SELECT foo$bar FROM t",
     );
@@ -104,7 +107,10 @@ describe("EXPLAIN on PostgreSQL", () => {
   it.each([false, true])(
     "runs inside a read-only transaction that is rolled back (executing: %s)",
     async (executing) => {
-      const { explain, id } = explainerFor(sqlQuery("SELECT * FROM posts WHERE id = $1"), executing);
+      const { explain, id } = explainerFor(
+        sqlQuery("SELECT * FROM posts WHERE id = $1"),
+        executing,
+      );
       const result = await explain(id);
 
       expect(result.plan).toEqual([{ "QUERY PLAN": [{ Plan: {} }] }]);

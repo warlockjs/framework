@@ -92,7 +92,11 @@ describe("production request routes", () => {
     runRequest(engine, "bad", { status: 500, route: "/boom" });
 
     const ids = async (query: string) =>
-      ((await server.inject({ method: "GET", url: `/api/requests?${query}` })).json() as { id: string }[]).map((row) => row.id);
+      (
+        (await server.inject({ method: "GET", url: `/api/requests?${query}` })).json() as {
+          id: string;
+        }[]
+      ).map((row) => row.id);
 
     expect(await ids("status=5xx")).toEqual(["bad"]);
     expect(await ids("status=200")).toEqual(["ok"]);
@@ -116,17 +120,26 @@ describe("production request routes", () => {
   it("opens a sampled request with its redacted timeline and the persisted record", async () => {
     const { server, engine } = await build(fakeRequestLog([record("t1", { body: { a: 1 } })]));
 
-    runRequest(engine, "t1", { queries: [{ bindings: ["hunter2"] }], phases: [{ name: "handler", durationMs: 3 }] });
+    runRequest(engine, "t1", {
+      queries: [{ bindings: ["hunter2"] }],
+      phases: [{ name: "handler", durationMs: 3 }],
+    });
 
     const detail = (await server.inject({ method: "GET", url: "/api/requests/t1" })).json();
 
-    expect(detail).toMatchObject({ id: "t1", queries: [{ shape: expect.any(String) }], record: { body: { a: 1 } } });
+    expect(detail).toMatchObject({
+      id: "t1",
+      queries: [{ shape: expect.any(String) }],
+      record: { body: { a: 1 } },
+    });
     expect(JSON.stringify(detail.queries)).not.toContain("hunter2");
   });
 
   it("opens a partial request, from the log when it has a record", async () => {
     const { server, engine } = await build(
-      fakeRequestLog([record("p1", { status: 503, error: { message: "db down", name: "Error", stack: "x" } })]),
+      fakeRequestLog([
+        record("p1", { status: 503, error: { message: "db down", name: "Error", stack: "x" } }),
+      ]),
       () => 0.99,
     );
 
@@ -136,7 +149,12 @@ describe("production request routes", () => {
     const withLog = (await server.inject({ method: "GET", url: "/api/requests/p1" })).json();
     const without = (await server.inject({ method: "GET", url: "/api/requests/p2" })).json();
 
-    expect(withLog).toMatchObject({ id: "p1", partial: true, error: "db down", instance: "host:1:abc" });
+    expect(withLog).toMatchObject({
+      id: "p1",
+      partial: true,
+      error: "db down",
+      instance: "host:1:abc",
+    });
     expect(without).toMatchObject({ id: "p2", partial: true, status: 500 });
     expect(without.phases).toBeUndefined();
   });
@@ -153,12 +171,26 @@ describe("production request routes", () => {
   });
 
   it("builds curl from the record, else from the method and path", async () => {
-    const { server, engine } = await build(fakeRequestLog([record("c1", { method: "POST", url: "/old" })]));
+    const { server, engine } = await build(
+      fakeRequestLog([record("c1", { method: "POST", url: "/old" })]),
+    );
 
     runRequest(engine, "c2", { path: "/it's" });
 
-    const fromLog = (await server.inject({ method: "GET", url: "/api/requests/c1/curl", headers: { host: "app.test" } })).json();
-    const fromSample = (await server.inject({ method: "GET", url: "/api/requests/c2/curl", headers: { host: "app.test" } })).json();
+    const fromLog = (
+      await server.inject({
+        method: "GET",
+        url: "/api/requests/c1/curl",
+        headers: { host: "app.test" },
+      })
+    ).json();
+    const fromSample = (
+      await server.inject({
+        method: "GET",
+        url: "/api/requests/c2/curl",
+        headers: { host: "app.test" },
+      })
+    ).json();
 
     expect(fromLog.curl).toBe("curl -X POST 'http://app.test/old'");
     expect(fromSample.curl).toBe("curl -X GET 'http://app.test/it'\\''s'");
@@ -184,8 +216,14 @@ describe("production request routes", () => {
     collector.startRequest({ id: "d", method: "GET", path: "/d", startedAt: 1 });
     collector.endRequest("d", { status: 200, durationMs: 1 });
 
-    expect(((await server.inject({ method: "GET", url: "/api/requests" })).json() as { id: string }[]).map((row) => row.id)).toEqual(["d"]);
-    expect((await server.inject({ method: "GET", url: "/api/requests/none" })).statusCode).toBe(404);
+    expect(
+      (
+        (await server.inject({ method: "GET", url: "/api/requests" })).json() as { id: string }[]
+      ).map((row) => row.id),
+    ).toEqual(["d"]);
+    expect((await server.inject({ method: "GET", url: "/api/requests/none" })).statusCode).toBe(
+      404,
+    );
   });
 });
 
@@ -205,15 +243,25 @@ describe("POST /api/queries/:shapeId/explain", () => {
     });
 
     const [shape] = engine.queries.snapshot(1);
-    const response = await server.inject({ method: "POST", url: `/api/queries/${shape?.id}/explain` });
+    const response = await server.inject({
+      method: "POST",
+      url: `/api/queries/${shape?.id}/explain`,
+    });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ shapeId: shape?.id, executing: false, instance: "host:1:abc" });
+    expect(response.json()).toMatchObject({
+      shapeId: shape?.id,
+      executing: false,
+      instance: "host:1:abc",
+    });
   });
 
   it("answers the error code, status and instance", async () => {
     const { server } = await build();
-    const response = await server.inject({ method: "POST", url: "/api/queries/0123456789abcdef/explain" });
+    const response = await server.inject({
+      method: "POST",
+      url: "/api/queries/0123456789abcdef/explain",
+    });
 
     expect(response.statusCode).toBe(409);
     expect(response.json()).toEqual({
