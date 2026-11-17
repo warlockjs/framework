@@ -6,6 +6,51 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 None.
 
+## 5.56.0: production monitor
+
+### T-145 [feature] Devtools in production: a secured monitor at a custom path, with accounts, and a React dashboard
+
+- Source: owner request of 2026-11-17 (design agreed in conversation the same day).
+- What and why: the owner wants to see queries, their performance and plans, request states, bottlenecks, memory and
+  CPU, health checks and the Grimoire of a production app from the browser (for example `https://<app>/__monitor__`)
+  without logging in to the server. Today devtools is development-only (loopback guard, refuses proxy headers) and
+  the dashboard is plain HTML and JavaScript.
+- Agreed design:
+  - Off in production by default. Enabling needs an explicit custom path and a first admin, both from env at deploy
+    time (`DEVTOOLS_PATH`, `DEVTOOLS_ADMIN_EMAIL`, `DEVTOOLS_ADMIN_PASSWORD` or a one-time setup token); it refuses to
+    start without them. The env password works only until the admin changes it at first login.
+  - Its own accounts, separate from the app's users, stored through cascade (table or collection, migration). Roles:
+    admin (manage users, disable switch, EXPLAIN) and viewer (read-only). The admin adds users from the dashboard with a
+    one-time invite link (24 h); users set their own password.
+  - Passwords: minimum 8 characters, a small built-in list of common passwords refused, hashed with the framework's
+    password hashing. Rate limits per account, per IP and globally (lockout), with a trusted-proxy setting for the client
+    IP. HttpOnly, Secure, SameSite=Strict session with a short TTL; CSRF on every action; audit log of logins, failed
+    tries and actions. Two-factor sign-in (TOTP or passkey via `@warlock.js/auth`), on by default for admins.
+  - A "Disable dashboard" button: a shared flag (cache or database) that turns it off on every instance and survives
+    restarts; re-enabling only from config or `warlock devtools:enable`. `warlock devtools:reset-admin` for recovery.
+    The path answers a uniform 404 while disabled or locked; `noindex`; no CORS.
+  - Panels in production: requests (sampled by `sampleRate`, slow requests always kept, redacted headers and bodies,
+    bounded memory, plus the persistent request log), query stats per normalized query shape (count, p50/p95, slowest
+    example, N+1) and slowest routes and phases (tracing hooks), EXPLAIN on demand per query shape (never an executing
+    plan such as PostgreSQL `ANALYZE` or MongoDB `executionStats` unless the project allows it), resources per process
+    (RSS, heap, CPU, event-loop delay, GC, short history; each pm2 or cluster worker), health checks with history,
+    errors, logs, jobs and schedules, and Grimoire. Mail previews and process controls stay off in production unless a
+    project opts in per panel. Unsampled requests do no capture work; the mode costs nothing when off.
+  - Dashboard rebuilt with React, Tailwind and shadcn in `packages/devtools/ui-src/` (own Vite dev server); a build
+    step writes the bundle that devtools serves; the release gate rebuilds it and fails when the shipped bundle is
+    stale; size budget about 300 KB gzipped. The 5.55.0 panel registration API stays: the React shell mounts package
+    panel view modules (the Grimoire tab keeps working). SSR through `@warlock.js/web` was considered and rejected
+    (devtools must work in API-only apps).
+- Evidence: `packages/devtools/src/server/guard.ts` (development-only guard), `packages/devtools/ui/app.js` (plain DOM
+  UI), `packages/core/skills/request-log/SKILL.md` (`http.logging.requests` production settings),
+  `packages/core/skills/request-tracing/SKILL.md` (`http.tracing`), `packages/devtools/src/panels.ts` (panel API).
+- Acceptance: specs for every access rule (disabled by default, missing path or admin refuses to start, rate limits and
+  lockout, session and CSRF, roles, invite links, two-factor, disable switch across instances, uniform 404),
+  redaction and sampling specs, an overhead benchmark at the default sampling rate, UI specs for the React dashboard,
+  the bundle freshness and size gate, docs, skills, changelog and upgrade notes; a dedicated security review before
+  release.
+- Status: open; planned as 5.56.0.
+
 ## After 5.55.0: Grimoire follow-ups
 
 ### T-138 [chore] Build a book of the release gate's blog app in CI
