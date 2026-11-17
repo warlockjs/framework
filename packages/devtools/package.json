@@ -32,9 +32,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "vitest run && vitest run --config vitest.ui.config.ts",
+    "test": "node scripts/test.mjs",
     "test:ui": "vitest run --config vitest.ui.config.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p ui-src/tsconfig.json",
+    "typecheck": "node scripts/typecheck.mjs",
     "build:ui": "vite build --config ui-src/vite.config.ts && node ui-src/scripts/write-build-info.mjs",
     "dev:ui": "vite --config ui-src/vite.config.ts",
     "generate:llms": "node scripts/generate-llms.mjs"
