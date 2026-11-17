@@ -1101,11 +1101,19 @@ async function checkDevtoolsInDev(context, details) {
     await waitForOutput(server, /➜\s+Web\s+http/, TIMEOUTS.devBoot, "dev ready block");
     log("dev server is up");
 
-    const dashboard = await httpRequest(`${BASE_URL}${DEVTOOLS_PATH}`);
+    // The bare path redirects to the trailing-slash form, which the
+    // dashboard's relative asset URLs need.
+    const bare = await httpRequest(`${BASE_URL}${DEVTOOLS_PATH}`);
+
+    if (bare.status !== 308) {
+      throw new Error(`GET ${DEVTOOLS_PATH} in dev returned ${bare.status}, expected 308`);
+    }
+
+    const dashboard = await httpRequest(`${BASE_URL}${DEVTOOLS_PATH}/`);
 
     if (dashboard.status !== 200 || !dashboard.contentType.includes("text/html")) {
       throw new Error(
-        `GET ${DEVTOOLS_PATH} in dev returned ${dashboard.status} ${dashboard.contentType}`,
+        `GET ${DEVTOOLS_PATH}/ in dev returned ${dashboard.status} ${dashboard.contentType}`,
       );
     }
 
