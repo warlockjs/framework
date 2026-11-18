@@ -1,4 +1,20 @@
 {
+  "5.58.0": {
+    "publishedAt": "2026-11-18T18:29:39.170Z",
+    "matrix": "none",
+    "headline": "A flow page, a grouped Check tab and a Product map with read-only share links in the Grimoire tab, and flow steps that list only the files that run.",
+    "highlights": [
+      "The Grimoire tab has a flow page: summary, health strip, a \"Fix next\" box, the journey as a stepper, criteria with their tests and edge cases.",
+      "The Check tab groups findings by code with counts and filters by severity, code, feature and flow; the Overview ranks top problems by severity.",
+      "A Product map for readers who do not read code: feature and flow pages in plain words with screenshots; in the production monitor an admin shares it with an expiring, revocable read-only link.",
+      "Flow steps list only the files that run: type-only imports are not followed, and flow answers on large apps drop from megabytes to kilobytes.",
+      "`warlock inspect` marks type-only imports with `typeOnly: true`; test results can be read from another file with `testResultsFile`."
+    ],
+    "upgradeNotes": [
+      "Share links need the `devtools_shares` table from `devtoolsMigrations`; nothing else to change for apps.",
+      "Flow steps list fewer files; ownership coverage (GR3006) still counts type-only reach."
+    ]
+  },
   "5.57.0": {
     "publishedAt": "2026-11-18T05:52:24.804Z",
     "matrix": "none",

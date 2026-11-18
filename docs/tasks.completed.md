@@ -15,7 +15,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Decision: D1 (`summary` via `paragraphAfterTitle`, warning GR1030 when missing). Contract field added 2026-11-18.
 - Acceptance: parser, devtools flow answer, flow page and skill template carry the summary; GR1030 in the check and
   docs; specs.
-- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+- Status: shipped in 5.58.0, commit 33c436691.
 
 ### T-153 [bug] Flow page shows "does not apply: does not apply: …"
 
@@ -25,7 +25,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
   `packages/grimoire/ui/grimoire-view.js:1028` adds it again.
 - Decision: D2 (view-only fix; "Does not apply" cases collapsed in their own group).
 - Acceptance: the prefix appears once; view spec.
-- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+- Status: shipped in 5.58.0, commit 33c436691.
 
 ### T-154 [bug] Flow steps list the whole import closure, through type-only imports; flow answers reach megabytes
 
@@ -42,7 +42,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
   `typeOnlyFiles`; coverage keeps the full reach; devtools and MCP send counts first, file lists paged on request).
 - Acceptance: the fixture's regression passes as `it`; flow answers on the shop fixture carry no full file lists;
   GR3006 counts unchanged by the type-only change; docs, specs, goldens.
-- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+- Status: shipped in 5.58.0, commit 33c436691.
 
 ### T-155 [feature] Grimoire tab UX: flow page, grouped Check tab, Overview ranking, phone layout, display bugs
 
@@ -57,7 +57,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
   `:1451-1505` (Check tab, headline `:1461`), `:664` (Top problems); `ui/grimoire.css` (no phone rules for tables).
 - Decision: D9, D10, D12, D13 (owner's proposed flow page and Check tab).
 - Acceptance: the flow page and Check tab as designed; works at 390 px with no horizontal scroll; view specs; docs.
-- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+- Status: shipped in 5.58.0, commit 33c436691.
 
 ### T-156 [bug] Tagged tests read "not-run" in the devtools tab
 
@@ -74,7 +74,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
   `TestResultsInfo` in answers; GR4009 no results recorded; GR4010 unmatched proving test).
 - Acceptance: a new results file shows in production without a restart (spec); the tab shows "No test results
   recorded yet" with the fix when none exist; docs show the CI → deploy path.
-- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+- Status: shipped in 5.58.0, commit 33c436691.
 
 ### T-157 [feature] Product map in the Grimoire tab, with read-only share links
 
@@ -95,7 +95,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Acceptance: map, feature and flow pages render from the shop fixture at 390 px and desktop, light and dark; a share
   link opens in a private window, exposes no file path, and stops working after revoke; security specs per the WP-6
   checklist; docs pages (grimoire product map, devtools panels/production/security), skills, changelogs.
-- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+- Status: shipped in 5.58.0, commit 33c436691.
 - Verified by: one typecheck + full tests + release gates, single review, real-browser screenshots at 1440/390 px light/dark; share-link store run on Postgres 16 and MongoDB 7.
 
 

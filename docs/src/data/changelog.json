@@ -140,6 +140,136 @@
   ],
   "releases": [
     {
+      "version": "5.58.0",
+      "id": "v5-58-0",
+      "date": "November 18, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "A flow page, a grouped Check tab and a Product map with read-only share links in the Grimoire tab, and flow steps that list only the files that run.",
+      "highlights": [
+        "The Grimoire tab has a flow page: summary, health strip, a \"Fix next\" box, the journey as a stepper, criteria with their tests and edge cases.",
+        "The Check tab groups findings by code with counts and filters by severity, code, feature and flow; the Overview ranks top problems by severity.",
+        "A Product map for readers who do not read code: feature and flow pages in plain words with screenshots; in the production monitor an admin shares it with an expiring, revocable read-only link.",
+        "Flow steps list only the files that run: type-only imports are not followed, and flow answers on large apps drop from megabytes to kilobytes.",
+        "<code>warlock inspect</code> marks type-only imports with <code>typeOnly: true</code>; test results can be read from another file with <code>testResultsFile</code>."
+      ],
+      "upgradeNotes": [
+        "Share links need the <code>devtools_shares</code> table from <code>devtoolsMigrations</code>; nothing else to change for apps.",
+        "Flow steps list fewer files; ownership coverage (GR3006) still counts type-only reach."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.58.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/grimoire",
+          "slug": "grimoire",
+          "total": 12,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 7
+            },
+            {
+              "type": "Changed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Flows have a summary: the paragraph under the <code># Title</code>. It shows on the flow page, in <code>scry --flow</code> and in the product map. A flow without one gets the warning GR1030."
+            },
+            {
+              "type": "Added",
+              "html": "The devtools Grimoire tab has a flow page: summary, status and origin, previous and next flow, a health strip, a \"Fix next\" box with a ready <code>@proves</code> line, the journey as a stepper with file counts, one row per criterion with its tests, and edge cases with \"does not apply\" collapsed."
+            },
+            {
+              "type": "Added",
+              "html": "A \"Product map\" view in the Grimoire tab for readers who do not read code: feature cards with a plain summary, audience, apps and a health light; feature pages with why, flows as short stories, where each appears in the apps with screenshots, release history and planned work; flow pages with the steps in the user's words and what proves them. Code detail sits behind \"For developers\". In the production monitor an admin can share it with a read-only link."
+            },
+            {
+              "type": "Added",
+              "html": "Written format: feature <code>audience</code> and <code>## Why</code>, flow <code>## Story</code>, screenshots as image lines pointing into <code>grimoire/screenshots/</code> (pages, blocks and story steps), and <code>(AC-n)</code> at the end of a case line to link it to a criterion. New checks GR1029, GR2013 and GR2014."
+            },
+            {
+              "type": "Added",
+              "html": "The panel option <code>testResultsFile</code> reads test results from another file; the reporter writes there with <code>grimoireReporter({ file })</code>. New warnings GR4009 (proofs but no recorded results) and GR4010 (a proving test the reporter could not match)."
+            },
+            {
+              "type": "Added",
+              "html": "The static export includes the product map and its screenshots."
+            },
+            {
+              "type": "Added",
+              "html": "A new route pages through the files of one flow step."
+            },
+            {
+              "type": "Changed",
+              "html": "Flow steps list the files that run: type-only imports are no longer followed, so a page that imports a type through a barrel no longer lists the server files behind it. Book maps add <code>entries</code>, <code>direct</code> and <code>typeOnlyFiles</code> per step, and book entries add <code>typeOnlyImports</code>. Ownership coverage (GR3006) still counts type-only reach."
+            },
+            {
+              "type": "Changed",
+              "html": "The devtools flow answer and the MCP <code>grimoire_flow</code> tool send counts and direct imports per step instead of every reachable file. Flow answers on large apps drop from megabytes to kilobytes."
+            },
+            {
+              "type": "Changed",
+              "html": "The Check tab groups findings by code with counts and the fix shown once, filters by severity, code, feature and flow, and shows \"files no flow reaches\" (GR3006) one row per feature. The Overview's top problems rank by severity, then by count."
+            },
+            {
+              "type": "Changed",
+              "html": "The devtools tab works on phones: cards instead of tables, scrolling sub-tabs, no overflowing tables or wrapped ids, and readable module graph labels. Code spans in criteria and task text render as code."
+            },
+            {
+              "type": "Changed",
+              "html": "The Test results view tells \"no results recorded\" apart from \"did not run\" and picks up new results without a restart."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Read-only share links in the production monitor (<code>production.share.enabled</code>): an admin creates an expiring, revocable link to a shareable panel (the Grimoire product map) under Admin, Share links, with a label. The token stays in the URL fragment and is stored hashed; the link opens only that panel's shared view. Needs the new <code>devtools_shares</code> table from <code>devtoolsMigrations</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Panels can serve a folder of images (<code>files</code>), declare a shared view (<code>share</code>), and receive captured error counts (<code>errors</code>). View contexts gain <code>file()</code>, <code>shared</code> and <code>share</code>, and panel requests carry <code>shared</code> when they come through a share link."
+            },
+            {
+              "type": "Added",
+              "html": "A panel view's <code>asset()</code> and <code>file()</code> return absolute URLs, so a view can <code>import()</code> another of its modules."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "The file facts of <code>warlock inspect</code> (<code>files</code> section) mark type-only imports with <code>typeOnly: true</code> (<code>import type</code>, <code>export type … from</code>, imports and re-exports whose names are all <code>type</code>, <code>typeof import()</code>)."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.57.0",
       "id": "v5-57-0",
       "date": "November 18, 2026",
