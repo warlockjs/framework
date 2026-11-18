@@ -210,3 +210,50 @@ describe("Queries panel", () => {
     expect(screen.getByText("Counts cover every request.")).toBeInTheDocument();
   });
 });
+
+describe("Queries panel summary and filters", () => {
+  const mixed = () =>
+    view([
+      shape(),
+      shape({
+        id: "def456",
+        shape: "select * from posts",
+        p95Ms: 400,
+        errors: 0,
+        nPlusOne: { requests: 0, maxPerRequest: 0 },
+      }),
+    ]);
+
+  it("shows summary tiles from the statistics", async () => {
+    mockApi([[/^api\/queries\/stats/, mixed()]]);
+    renderPanel(QueriesPanel, { session: prodViewer });
+
+    const summary = await screen.findByLabelText("Summary");
+
+    expect(within(summary).getByText("Query shapes")).toBeInTheDocument();
+    expect(within(summary).getByText("Slow shapes")).toBeInTheDocument();
+    expect(within(summary).getByText("N+1 shapes")).toBeInTheDocument();
+    expect(within(summary).getByText("Total runs")).toBeInTheDocument();
+    expect(within(summary).getByText("240")).toBeInTheDocument();
+  });
+
+  it("filters by search text and the show control, with counts and a clear action", async () => {
+    mockApi([[/^api\/queries\/stats/, mixed()]]);
+    const user = userEvent.setup();
+
+    renderPanel(QueriesPanel, { session: prodViewer });
+    await screen.findByRole("table", { name: "Query statistics" });
+    expect(screen.getByRole("status")).toHaveTextContent("2 shapes");
+
+    await user.type(screen.getByLabelText("Search queries"), "posts");
+    expect(screen.getByRole("status")).toHaveTextContent("1 of 2 shapes");
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByRole("status")).toHaveTextContent("2 shapes");
+
+    await user.click(
+      within(screen.getByRole("group", { name: "Show" })).getByRole("button", { name: "N+1" }),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("1 of 2 shapes");
+  });
+});

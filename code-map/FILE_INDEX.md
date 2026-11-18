@@ -613,7 +613,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `docs/src/content/docs/v/latest/grimoire/guides/06-tasks-and-releases.mdx` - Tasks and releases - One file per task, one file per release, and how a release collects the changelog entries…
 - `docs/src/content/docs/v/latest/grimoire/guides/07-apps.mdx` - Apps, pages and blocks - How agents describe sites and mobile apps under grimoire/apps, with named conditions, lay…
 - `docs/src/content/docs/v/latest/grimoire/guides/08-test-results.mdx` - Test results - Prove an acceptance criterion with a test, and see its last result in the Grimoire with t…
-- `docs/src/content/docs/v/latest/grimoire/guides/09-devtools.mdx` - The devtools tab - Browse the Grimoire in the devtools dashboard (search, features, flows, pages, tasks, rel…
+- `docs/src/content/docs/v/latest/grimoire/guides/09-devtools.mdx` - The devtools tab - Browse the Grimoire in the devtools dashboard (search, a features listing, flows, apps an…
 - `docs/src/content/docs/v/latest/grimoire/index.mdx` - Grimoire - An experimental project map for Warlock.js apps, written partly by Warlock and partly by …
 - `docs/src/content/docs/v/latest/herald/essentials/01-the-messaging-model.md` - The messaging model - How herald maps onto RabbitMQ — channels, queues, ack semantics, and what the metadata en…
 - `docs/src/content/docs/v/latest/herald/essentials/02-connection-and-config.md` - Connection and config - How herald connects to RabbitMQ, what the connection options mean, multi-broker setups, a…
@@ -3266,7 +3266,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/scripts/format-check-template.mjs` - packageRoot, templateRoot, checkedRoot, shouldWrite, options, collectFiles, files, defective
 - `packages/create-warlock/scripts/generate-llms.mjs` - create-warlock/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
 - `packages/create-warlock/scripts/sync-design-system.mjs` - packageRoot, SHARED_FILES, collect, payloadFor, shadcn, mantine
-- `packages/create-warlock/scripts/test.mjs` - root, workspaceRoot, phases
+- `packages/create-warlock/scripts/test.mjs` - create-warlock/scripts/test.mjs, root, workspaceRoot, phases
 - `packages/create-warlock/scripts/typecheck-scaffold.mjs` - packageRoot, { values }, run, heading, main
 - `packages/create-warlock/scripts/typecheck-template.mjs` - packageRoot, tsc
 - `packages/create-warlock/skills/SKILL.md` - create-warlock - Scaffold Warlock apps with `npm create warlock@latest` or `npx create-warlock`; the CLI e…
@@ -3493,11 +3493,14 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/tests/acceptance/starter-browser-gate.mjs` - Cdp, file, checkout, requireFromCheckout, options, candidate, state, output
 - `packages/create-warlock/vitest.config.ts` - create-warlock/vitest.config.ts
 
-## packages/devtools (86 test files not listed)
+## packages/devtools (87 test files not listed)
 
 - `packages/devtools/README.md`
 - `packages/devtools/bench/production-overhead.ts` - production, instance, body, noop, noopHooks, startServer, load, median
 - `packages/devtools/scripts/generate-llms.mjs` - devtools/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
+- `packages/devtools/scripts/run-steps.mjs` - packageRoot, runSteps
+- `packages/devtools/scripts/test.mjs` - devtools/scripts/test.mjs
+- `packages/devtools/scripts/typecheck.mjs` - devtools/scripts/typecheck.mjs
 - `packages/devtools/skills/SKILL.md` - warlock-js-devtools - Dev dashboard and opt-in production monitor for Warlock apps via `devtoolsConnector`: req…
 - `packages/devtools/src/caller-location.ts` - packageDirectory, captureCallerLocation, parseFrame, normalizePath, shouldSkip
 - `packages/devtools/src/collector.ts` - src/collector.ts, createCollector, summary, mailSummary, copyRequest
@@ -3506,6 +3509,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/index.ts` - devtools/src/index.ts
 - `packages/devtools/src/n-plus-one.ts` - detectNPlusOne, truncate, mostFrequentCaller
 - `packages/devtools/src/options.ts` - src/options.ts, resolveDevtoolsOptions
+- `packages/devtools/src/panel-tokens.ts` - DEVTOOLS_PANEL_TOKENS
 - `packages/devtools/src/panels.ts` - MountedDevtoolsPanel, LoadDevtoolsPanelsOptions, DevtoolsProductionPanels, RESERVED_PANEL_IDS, METHODS, CONTENT_TYPES, panelContentType, toFilePath
 - `packages/devtools/src/process-panel.ts` - ProcessPanel, loadProcessPanel, processesDevtoolsPanel
 - `packages/devtools/src/production/auth/common-passwords.ts` - COMMON_PASSWORDS
@@ -3606,7 +3610,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/sources/mail-source.ts` - addressToString, attachmentSize, toDevtoolsAttachment, attachMailSource
 - `packages/devtools/src/sources/query-source.ts` - QueryEvent, redactBindings, attachQuerySource
 - `packages/devtools/src/sources/tracing-source.ts` - attachTracingSource
-- `packages/devtools/src/types.ts` - DevtoolsOptions, DevtoolsProductionOptions, ResolvedDevtoolsOptions, DevtoolsPanelMethod, DevtoolsPanelRequest, DevtoolsPanelRoute, DevtoolsPanel, DevtoolsPanelFactoryContext
+- `packages/devtools/src/types.ts` - DevtoolsOptions, DevtoolsProductionOptions, ResolvedDevtoolsOptions, DevtoolsPanelMethod, DevtoolsPanelRequest, DevtoolsPanelRoute, DevtoolsPanel, DevtoolsPanelEntry
 - `packages/devtools/src/ui-root.ts` - isPackageRoot, resolveUiRoot
 - `packages/devtools/tests/fixtures/test-panel/graph.js` - drawBars
 - `packages/devtools/tests/fixtures/test-panel/panel.ts` - devtoolsPanel
@@ -3633,12 +3637,16 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/api/hooks.ts` - ApiState, StreamEvent, useApi, useInterval, useStream
 - `packages/devtools/ui-src/src/api/types.ts` - AuthStepWithCodes, api/types.ts
 - `packages/devtools/ui-src/src/app/App.tsx` - SignInLink, readLink, App
+- `packages/devtools/ui-src/src/app/CommandPalette.tsx` - PaletteItem, CommandPaletteProps, CommandPalette
 - `packages/devtools/ui-src/src/app/Header.tsx` - HeaderProps, Header
 - `packages/devtools/ui-src/src/app/InstancePicker.tsx` - InstancePickerProps, InstancePicker
 - `packages/devtools/ui-src/src/app/Menu.tsx` - MenuProps, Menu, MenuLink, MenuButton
 - `packages/devtools/ui-src/src/app/Shell.tsx` - Shell
+- `packages/devtools/ui-src/src/app/Sidebar.tsx` - SidebarProps, Sidebar
+- `packages/devtools/ui-src/src/app/ThemeToggle.tsx` - NEXT, NAME, ICON, ThemeToggle
+- `packages/devtools/ui-src/src/app/nav.ts` - NavIcon, NavGroup, NavEntry, ICONS, iconFor, NAV_GROUPS, SECTIONS, ORDER
 - `packages/devtools/ui-src/src/app/session.tsx` - SessionContextValue, SessionContext, useSession
-- `packages/devtools/ui-src/src/app/useColorScheme.ts` - useColorScheme
+- `packages/devtools/ui-src/src/app/useColorScheme.ts` - ThemeChoice, THEME_STORAGE_KEY, THEME_CHOICES, readThemeChoice, systemPrefersDark, applyTheme, applyStoredTheme, listeners
 - `packages/devtools/ui-src/src/app/useHashRoute.ts` - useHashRoute
 - `packages/devtools/ui-src/src/auth/AuthLayout.tsx` - AuthLayoutProps, AuthLayout
 - `packages/devtools/ui-src/src/auth/InviteScreen.tsx` - InviteScreenProps, InviteScreen
@@ -3656,6 +3664,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/components/charts/PercentileBar.tsx` - PercentileBar
 - `packages/devtools/ui-src/src/components/charts/Sparkline.tsx` - Sparkline
 - `packages/devtools/ui-src/src/components/charts/index.ts` - charts/index.ts
+- `packages/devtools/ui-src/src/components/common/BrandMark.tsx` - BrandMark
 - `packages/devtools/ui-src/src/components/common/Bytes.tsx`
 - `packages/devtools/ui-src/src/components/common/ConfirmDialog.tsx` - ConfirmDialogProps, ConfirmDialog
 - `packages/devtools/ui-src/src/components/common/CopyButton.tsx` - CopyButtonProps, CopyButton
@@ -3663,10 +3672,18 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/components/common/EmptyState.tsx` - EmptyStateProps, EmptyState
 - `packages/devtools/ui-src/src/components/common/ErrorMessage.tsx` - ErrorMessageProps, errorText, ErrorMessage
 - `packages/devtools/ui-src/src/components/common/LoadingRows.tsx` - LoadingRowsProps, LoadingRows
+- `packages/devtools/ui-src/src/components/common/PageHeader.tsx` - PageHeaderProps, common/PageHeader.tsx, PageHeader
 - `packages/devtools/ui-src/src/components/common/RelativeTime.tsx`
 - `packages/devtools/ui-src/src/components/common/ViewBoundary.tsx` - ViewBoundaryProps, ViewBoundaryState, ViewBoundary
 - `packages/devtools/ui-src/src/components/common/format.tsx` - DurationProps, BytesProps, RelativeTimeProps, formatDuration, formatBytes, formatRelativeTime, Duration, Bytes
 - `packages/devtools/ui-src/src/components/common/index.ts` - components/common/index.ts
+- `packages/devtools/ui-src/src/components/listing/DataTable.tsx` - TableCard, HEAD, NUM_CELL, rowOpen, DurationBar, percentile
+- `packages/devtools/ui-src/src/components/listing/Detail.tsx` - DetailSection, KeyValueGrid, CodeBlock, BackButton
+- `packages/devtools/ui-src/src/components/listing/FilterBar.tsx` - SegmentOption, FilterBar, SearchField, Segmented, ResultCount, ClearFilters
+- `packages/devtools/ui-src/src/components/listing/PageHeader.tsx` - listing/PageHeader.tsx, PageHeader
+- `packages/devtools/ui-src/src/components/listing/Pill.tsx` - PillTone, TONES, TONE_TEXT, Pill, statusPillTone, StatusPill, METHOD_TONES, MethodPill
+- `packages/devtools/ui-src/src/components/listing/StatTiles.tsx` - StatTile, StatTiles
+- `packages/devtools/ui-src/src/components/listing/index.ts` - listing/index.ts
 - `packages/devtools/ui-src/src/components/ui/LICENSE.md`
 - `packages/devtools/ui-src/src/components/ui/alert.tsx` - alertVariants, Alert, AlertTitle, AlertDescription
 - `packages/devtools/ui-src/src/components/ui/badge.tsx` - badgeVariants, Badge
@@ -3690,22 +3707,22 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/panel-host/types.ts` - LegacyPanelContext, LegacyPanelModule, panel-host/types.ts
 - `packages/devtools/ui-src/src/panels/agents/index.tsx` - agents/index.tsx, value, AgentRunSummary, ToolCall, Turn, agentDiffText, RunDetail, AgentsPanel
 - `packages/devtools/ui-src/src/panels/agents/types.ts` - AgentRun, AgentRunsAnswer, AgentToolCall, AgentTurn, AgentTraceDetail, agents/types.ts
-- `packages/devtools/ui-src/src/panels/ai/index.tsx` - ai/index.tsx, value, aiUsageText, AiRunSummary, AiSpan, RunDetail, AiPanel
+- `packages/devtools/ui-src/src/panels/ai/index.tsx` - ai/index.tsx, runTone, value, aiUsageText, AiRunSummary, AiSpan, RunDetail, AiPanel
 - `packages/devtools/ui-src/src/panels/ai/types.ts` - AiUsage, AiRun, AiAnswer, AiSpanNode, AiTrace, ai/types.ts
 - `packages/devtools/ui-src/src/panels/api/index.tsx` - api/index.tsx, VIEWERS, DOCS_VIEWER_KEY, savedViewer, saveViewer, ApiPanel
-- `packages/devtools/ui-src/src/panels/errors/index.tsx` - errors/index.tsx, ErrorsPanel, GroupRows
-- `packages/devtools/ui-src/src/panels/health/index.tsx` - health/index.tsx, statusBadge, HistoryStrip, HealthPanel
+- `packages/devtools/ui-src/src/panels/errors/index.tsx` - Group, errors/index.tsx, SOURCES, ErrorsPanel, GroupRows
+- `packages/devtools/ui-src/src/panels/health/index.tsx` - health/index.tsx, statusPill, HistoryStrip, HealthPanel
 - `packages/devtools/ui-src/src/panels/jobs/index.tsx` - jobs/index.tsx, Schedules, Queues, JobsPanel
 - `packages/devtools/ui-src/src/panels/logs/index.tsx` - logs/index.tsx, LEVELS, LogsPanel
 - `packages/devtools/ui-src/src/panels/mail/index.tsx` - MailSummary, Mail, mail/index.tsx, MailDetail, MailPanel
 - `packages/devtools/ui-src/src/panels/queries/BackgroundQueries.tsx` - BackgroundQuery, BackgroundQueries
 - `packages/devtools/ui-src/src/panels/queries/ExplainBox.tsx` - ExplainOutcome, isRecord, PlanTree, ExplainBox
-- `packages/devtools/ui-src/src/panels/queries/index.tsx` - SortKey, queries/index.tsx, SORTS, ShapeDetail, QueriesPanel
+- `packages/devtools/ui-src/src/panels/queries/index.tsx` - SortKey, queries/index.tsx, SHOW, SORTS, ShapeDetail, QueriesPanel
 - `packages/devtools/ui-src/src/panels/registry.ts` - panels/registry.ts, BUILT_IN_PANELS, isBuiltInPanel
-- `packages/devtools/ui-src/src/panels/requests/RecordSections.tsx` - RecordSections
+- `packages/devtools/ui-src/src/panels/requests/RecordSections.tsx` - pretty, RecordSections
 - `packages/devtools/ui-src/src/panels/requests/RequestDetailView.tsx` - AiRunRow, AiAnswer, CopyCurl, QueryRow, AiSection, RequestDetailView
 - `packages/devtools/ui-src/src/panels/requests/Waterfall.tsx` - Entry, COLORS, Waterfall
-- `packages/devtools/ui-src/src/panels/requests/index.tsx` - Filters, requests/index.tsx, NO_FILTERS, SINCE, Row, RequestsPanel
+- `packages/devtools/ui-src/src/panels/requests/index.tsx` - Filters, requests/index.tsx, NO_FILTERS, STATUS_CLASSES, SINCE, Row, RequestsPanel
 - `packages/devtools/ui-src/src/panels/requests/query-text.ts` - queryText, canExplainDevelopment
 - `packages/devtools/ui-src/src/panels/requests/types.ts` - RequestRow, RequestRecord, DetailQuery, DetailCacheOperation, DetailWarning, RequestDetail, requests/types.ts
 - `packages/devtools/ui-src/src/panels/resources/index.tsx` - Entry, resources/index.tsx, Metric, series, InstanceResources, ResourcesPanel
@@ -3717,7 +3734,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/tests/panels/helpers.tsx` - Answer, Route, ApiCall, FakeEventSource, instanceA, instanceB, session, devSession
 - `packages/devtools/ui-src/tests/setup.ts` - tests/setup.ts
 - `packages/devtools/ui-src/vite.config.ts` - ui-src/vite.config.ts, devBase, proxied
-- `packages/devtools/ui/dashboard/assets/app.js` - me, v, S, ce, ie, le, ne, oe
+- `packages/devtools/ui/dashboard/assets/app.js` - i, me, v, be, le, xe, ye, ne
 - `packages/devtools/ui/docs-swagger.js`
 - `packages/devtools/ui/panels/processes.js` - renderProcesses
 - `packages/devtools/vitest.config.ts` - devtools/vitest.config.ts
@@ -3769,7 +3786,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/fs/tests/helpers.ts` - tests/helpers.ts, withTempDir
 - `packages/fs/vitest.config.ts` - fs/vitest.config.ts
 
-## packages/grimoire (49 test files not listed)
+## packages/grimoire (51 test files not listed)
 
 - `packages/grimoire/README.md`
 - `packages/grimoire/scripts/generate-llms.mjs` - grimoire/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -3815,11 +3832,11 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/grimoire/src/contracts/snapshot.ts` - GrimoireSnapshot, OpenGrimoireOptions, GrimoireRule, AppMatch, contracts/snapshot.ts
 - `packages/grimoire/src/contracts/test-results.ts` - ProofLine, TestOutcome, ProofResult, TestResultsStore, CriterionStatus
 - `packages/grimoire/src/contracts/written.ts` - WrittenStatus, WrittenOrigin, FeatureVersion, FlowRef, CriterionId, WrittenListLine, WrittenFeatureReadme, ChangeWord
-- `packages/grimoire/src/devtools/data.ts` - GrimoirePanelError, GrimoireSummary, GrimoireAppsAnswer, GrimoirePageAnswer, GrimoireReleasesAnswer, ask, required, summary
+- `packages/grimoire/src/devtools/data.ts` - GrimoirePanelError, GrimoireSummary, GrimoireFeatureRow, GrimoireFeaturesAnswer, GrimoireAppRow, GrimoireAppsAnswer, GrimoirePageAnswer, GrimoireReleasesAnswer
 - `packages/grimoire/src/devtools/graphs.ts` - GraphNode, GraphEdge, GrimoireGraph, GraphBuilder, GRAPH_LIMIT, fileLabel, fileGraph, featureGraph
 - `packages/grimoire/src/devtools/index.ts` - GrimoirePanelRequest, GrimoireDevtoolsPanel, GrimoirePanelContext, devtools/index.ts, one, grimoireDevtoolsPanel
 - `packages/grimoire/src/devtools/site.ts` - ExportGrimoireSiteOptions, SearchItem, SITE_FILE_LIMIT, uiFolder, buildSiteData, inlineJson, inlineCode, attempt
-- `packages/grimoire/src/devtools/snapshot-source.ts` - SnapshotSourceOptions, SnapshotSource, manifestStamp, loadAdapter, createSnapshotSource, open
+- `packages/grimoire/src/devtools/snapshot-source.ts` - SnapshotSourceOptions, SnapshotSource, STAMPED, changeStamp, loadAdapter, createSnapshotSource, open, ensureOpening
 - `packages/grimoire/src/front-matter/index.ts` - FrontMatterValue, FrontMatterField, FrontMatterResult, front-matter/index.ts, unquote, inlineList, readFrontMatter, frontMatterString
 - `packages/grimoire/src/graph/index.ts` - FileGraph, graph/index.ts, fileGraph, walk, importClosure, importerClosure, packageNameOf
 - `packages/grimoire/src/index.ts` - grimoire/src/index.ts
@@ -3940,7 +3957,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/grimoire/tests/support/fake-dom.ts` - FakeNode, build, fakeHelpers, fakePanelContext
 - `packages/grimoire/tests/support/written-model.ts` - FlowInput, FeatureInput, at, located, codeFile, facts, step, flow
 - `packages/grimoire/ui/grimoire-static.js` - grimoireStaticApi, grimoireStaticContext, grimoireStaticMount, show
-- `packages/grimoire/ui/grimoire-view.js` - NAV, decodeSegment, plain, targetOf, nodeTarget, shorten, NODE_COLOURS, graphView
+- `packages/grimoire/ui/grimoire-view.js` - TABS, decodeSegment, plain, plural, tabOf, targetOf, nodeTarget, shorten
 - `packages/grimoire/vitest.config.ts` - grimoire/vitest.config.ts
 
 ## packages/herald (14 test files not listed)
@@ -4365,7 +4382,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 
 - `packages/web/README.md`
 - `packages/web/scripts/generate-llms.mjs` - web/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
-- `packages/web/scripts/typecheck.mjs` - root, tsc, projects
+- `packages/web/scripts/typecheck.mjs` - web/scripts/typecheck.mjs, root, tsc, projects
 - `packages/web/skills/add-web-to-an-app/SKILL.md` - add-web-to-an-app - Install the SSR page layer with `warlock add web`: add React/Vite peers, scaffold `src/we…
 - `packages/web/skills/build-accessible-controls/SKILL.md` - build-accessible-controls - Use the app design-system Mongez controls for accessible forms: searchable selections, ra…
 - `packages/web/skills/build-rtl-and-mixed-direction-ui/SKILL.md` - build-rtl-and-mixed-direction-ui - Build RTL/LTR layouts in SSR pages: document lang/dir, `useTextDirection()`, logical CSS,…

@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/common/EmptyState";
 import { useSession } from "@/app/session";
 import type { AdminPage as AdminPageId } from "@/lib/route";
@@ -25,14 +26,22 @@ export function AdminPage({ page }: { page: AdminPageId }) {
   }
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-4">
-      <nav aria-label="Admin pages" className="flex gap-3 text-sm">
+    <div className="mx-auto grid max-w-6xl gap-5">
+      <nav
+        aria-label="Admin pages"
+        className="flex gap-1 overflow-x-auto rounded-lg border bg-card p-1 text-sm"
+      >
         {PAGES.map((item) => (
           <a
             key={item.id}
             href={`#/admin/${item.id}`}
             aria-current={item.id === page ? "page" : undefined}
-            className={item.id === page ? "font-semibold underline" : "text-muted-foreground"}
+            className={cn(
+              "flex min-h-8 items-center rounded-md px-3 whitespace-nowrap transition-colors max-md:min-h-10",
+              item.id === page
+                ? "bg-brand/10 font-semibold text-brand"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            )}
           >
             {item.label}
           </a>

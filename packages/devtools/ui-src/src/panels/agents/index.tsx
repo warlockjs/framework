@@ -3,14 +3,22 @@ import { useApi, useStream } from "@/api/hooks";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import {
-  Code,
+  BackButton,
+  CodeBlock,
+  FilterBar,
+  PageHeader,
+  Pill,
+  StatTiles,
+} from "@/components/listing";
+import {
   DASH,
   formatCost,
+  formatNumber,
   Json,
-  PanelHeader,
   RowButton,
   TextField,
 } from "@/components/ui/panel-kit";
+import { runTone } from "@/panels/ai";
 import type { DevtoolsPanelProps } from "@/panels/types";
 import type {
   AgentRun,
@@ -25,6 +33,9 @@ const value = (item: number | string | null | undefined) => (item == null ? DASH
 function AgentRunSummary({ run }: { run: AgentRun }) {
   return (
     <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <Pill tone={runTone(run.status)}>{run.status}</Pill>
+      </div>
       <div className="font-medium">{`${run.agent} · ${run.status} · ${value(run.durationMs)} ms`}</div>
       <div className="text-xs text-muted-foreground break-words">{run.model}</div>
       <p className="text-sm">
@@ -45,7 +56,7 @@ function ToolCall({ call }: { call: AgentToolCall }) {
   ].join(" · ");
 
   return (
-    <details open={Boolean(call.refusal || call.error)} className="ml-3 border-l pl-2">
+    <details open={Boolean(call.refusal || call.error)} className="ml-3 border-l-2 pl-2">
       <summary className="cursor-pointer text-sm">{line}</summary>
       <Json value={{ input: call.input, output: call.output }} />
     </details>
@@ -57,7 +68,7 @@ function Turn({ turn }: { turn: AgentTurn }) {
   const cost = turn.cost == null ? "" : ` · ${formatCost(turn.cost)}`;
 
   return (
-    <details open className="rounded-md border p-2">
+    <details open className="rounded-lg border bg-card p-2.5">
       <summary className="cursor-pointer text-sm font-medium">
         {`turn ${turn.index} · ${value(turn.finishReason)} · ${Math.round(turn.durationMs)} ms · ${turn.usage.input} input · ${turn.usage.output} output${cost}`}
       </summary>
@@ -67,7 +78,7 @@ function Turn({ turn }: { turn: AgentTurn }) {
       <p className="text-xs text-muted-foreground">
         {`Tools offered (~${tokens} tokens): ${turn.toolsOffered.map((tool) => `${tool.name}@${tool.schemaHash.slice(0, 8)}`).join(", ") || "none"}`}
       </p>
-      {turn.text ? <Code>{turn.text}</Code> : null}
+      {turn.text ? <CodeBlock>{turn.text}</CodeBlock> : null}
       {turn.toolCalls.map((call, index) => (
         <ToolCall key={index} call={call} />
       ))}
@@ -107,7 +118,15 @@ export function agentDiffText(
     : `Against ${previous.runId}: system prompt ${prompt}; tools changed: ${changed.map(([name]) => name).join(", ") || "none"}; added: ${added.join(", ") || "none"}; removed: ${removed.join(", ") || "none"}.`;
 }
 
-function RunDetail({ run, earlier }: { run: AgentRun; earlier: AgentRun | undefined }) {
+function RunDetail({
+  run,
+  earlier,
+  onClose,
+}: {
+  run: AgentRun;
+  earlier: AgentRun | undefined;
+  onClose: () => void;
+}) {
   const {
     data: trace,
     error,
@@ -120,7 +139,8 @@ function RunDetail({ run, earlier }: { run: AgentRun; earlier: AgentRun | undefi
   const comparing = Boolean(earlier) && !previous.data && !previous.error;
 
   return (
-    <section aria-label="Agent run detail" className="space-y-2">
+    <section aria-label="Agent run detail" className="space-y-2 rounded-xl border bg-card p-3.5">
+      <BackButton onClick={onClose}>Close run</BackButton>
       <AgentRunSummary run={run} />
       {error ? (
         <ErrorMessage error={error} title="Could not load this agent run" onRetry={reload} />
@@ -132,7 +152,9 @@ function RunDetail({ run, earlier }: { run: AgentRun; earlier: AgentRun | undefi
           {trace.systemPrompt ? (
             <details>
               <summary className="cursor-pointer text-sm">{`System prompt ${trace.systemPrompt.hash}`}</summary>
-              <Code>{trace.systemPrompt.text ?? "Text not kept (only the hash is recorded)."}</Code>
+              <CodeBlock>
+                {trace.systemPrompt.text ?? "Text not kept (only the hash is recorded)."}
+              </CodeBlock>
             </details>
           ) : null}
           <p className="text-xs text-muted-foreground">
@@ -141,7 +163,7 @@ function RunDetail({ run, earlier }: { run: AgentRun; earlier: AgentRun | undefi
           {Object.entries(trace.toolSchemas).map(([hash, schema]) => (
             <details key={hash}>
               <summary className="cursor-pointer text-sm">{`Tool ${schema.name}@${hash.slice(0, 8)}`}</summary>
-              <Code>{`${schema.description}\n\n${schema.schema ?? "Schema not kept."}`}</Code>
+              <CodeBlock>{`${schema.description}\n\n${schema.schema ?? "Schema not kept."}`}</CodeBlock>
             </details>
           ))}
           {trace.turns.map((turn) => (
@@ -172,13 +194,17 @@ export function AgentsPanel({ route, navigate }: DevtoolsPanelProps) {
       ? data.runs.slice(data.runs.indexOf(selected) + 1).find((run) => run.agent === selected.agent)
       : undefined;
 
+  const runs = data?.runs ?? [];
+
   return (
     <div>
-      <PanelHeader title="Agent runs" />
-      <form
-        className="mb-3 flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
+      <PageHeader
+        title="Agent runs"
+        description="Each agent run with its prompt, tools, turns, tool calls and refusals."
+      />
+      <FilterBar
+        label="Agent run filters"
+        onSubmit={() => {
           setApplied(requestId.trim());
           navigate("");
           reload();
@@ -187,45 +213,82 @@ export function AgentsPanel({ route, navigate }: DevtoolsPanelProps) {
         <TextField
           placeholder="HTTP request id (empty for all runs)"
           aria-label="Filter agent runs by HTTP request id"
-          className="w-72"
+          className="w-72 max-w-full"
           value={requestId}
           onChange={(event) => setRequestId(event.target.value)}
         />
         <Button type="submit" size="sm">
           Filter / refresh
         </Button>
-      </form>
+      </FilterBar>
       {error ? (
         <ErrorMessage error={error} title="Could not load the agent runs" onRetry={reload} />
       ) : null}
       {!data && loading ? <LoadingRows /> : null}
       {data && !data.available ? (
-        <EmptyState title={data.message || "No agent traces yet."} />
+        <EmptyState
+          title={data.message || "No agent traces yet."}
+          hint="Agent traces need the AI package in development."
+        />
       ) : null}
       {data?.available && !data.runs.length ? (
-        <EmptyState title="No agent runs yet. Execute an agent in development; runs appear as turns finish." />
+        <EmptyState
+          title="No agent runs yet. Execute an agent in development; runs appear as turns finish."
+          hint={
+            applied ? "This request id has no runs. Clear the filter to see all runs." : undefined
+          }
+        />
       ) : null}
       {data?.available && data.runs.length ? (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          <div className="space-y-1">
-            {data.runs.map((run) => (
-              <RowButton
-                key={run.runId}
-                selected={run.runId === route}
-                onClick={() => navigate(run.runId)}
-              >
-                <AgentRunSummary run={run} />
-              </RowButton>
-            ))}
+        <>
+          <StatTiles
+            items={[
+              { label: "Runs", value: formatNumber(runs.length) },
+              {
+                label: "Turns",
+                value: formatNumber(runs.reduce((sum, run) => sum + run.turns, 0)),
+              },
+              {
+                label: "Tool calls",
+                value: formatNumber(runs.reduce((sum, run) => sum + run.toolCalls, 0)),
+              },
+              {
+                label: "Refused calls",
+                value: formatNumber(runs.reduce((sum, run) => sum + run.refusals, 0)),
+                tone: runs.some((run) => run.refusals) ? "warning" : "success",
+              },
+            ]}
+          />
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <div className="min-w-0 space-y-1.5">
+              {data.runs.map((run) => (
+                <RowButton
+                  key={run.runId}
+                  selected={run.runId === route}
+                  className="rounded-xl bg-card p-3"
+                  onClick={() => navigate(run.runId)}
+                >
+                  <AgentRunSummary run={run} />
+                </RowButton>
+              ))}
+            </div>
+            <div className="min-w-0">
+              {selected ? (
+                <RunDetail
+                  key={selected.runId}
+                  run={selected}
+                  earlier={earlier}
+                  onClose={() => navigate("")}
+                />
+              ) : (
+                <EmptyState
+                  title="Select a run to inspect its prompt, tools, calls and refusals."
+                  hint="The turn-by-turn trace opens here."
+                />
+              )}
+            </div>
           </div>
-          <div>
-            {selected ? (
-              <RunDetail key={selected.runId} run={selected} earlier={earlier} />
-            ) : (
-              <EmptyState title="Select a run to inspect its prompt, tools, calls and refusals." />
-            )}
-          </div>
-        </div>
+        </>
       ) : null}
     </div>
   );

@@ -66,7 +66,11 @@ export function InviteScreen({ token, onStep, onCancel }: InviteScreenProps) {
           />
         </>
       ) : null}
-      <button type="button" className="text-sm text-muted-foreground underline" onClick={onCancel}>
+      <button
+        type="button"
+        className="rounded-sm text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        onClick={onCancel}
+      >
         Go to sign in
       </button>
     </AuthLayout>

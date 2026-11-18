@@ -2,20 +2,20 @@ import { useState } from "react";
 import type { DevtoolsSessionView } from "@contracts";
 import { apiFetch } from "@/api/client";
 import { useApi } from "@/api/hooks";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import {
-  clockTime,
-  Code,
-  formatMs,
-  formatNumber,
-  Json,
-  levelTone,
-  SectionTitle,
-  statusTone,
-  DASH,
-} from "@/components/ui/panel-kit";
+  BackButton,
+  CodeBlock,
+  DetailSection,
+  DurationBar,
+  KeyValueGrid,
+  LevelPill,
+  MethodPill,
+  Pill,
+  StatusPill,
+} from "@/components/listing";
+import { clockTime, formatMs, formatNumber, Json, Time } from "@/components/ui/panel-kit";
 import { ExplainBox, type ExplainOutcome } from "@/panels/queries/ExplainBox";
 import { RecordSections } from "./RecordSections";
 import { queryText, canExplainDevelopment } from "./query-text";
@@ -72,11 +72,13 @@ function QueryRow({
   requestId,
   nPlusOne,
   session,
+  slowest,
 }: {
   query: DetailQuery;
   requestId: string;
   nPlusOne: boolean;
   session: DevtoolsSessionView;
+  slowest: number;
 }) {
   const development = session.mode === "development";
   const isAdmin = session.role === "admin";
@@ -101,17 +103,19 @@ function QueryRow({
   };
 
   return (
-    <div className="rounded-md border p-2">
+    <div className="space-y-2 rounded-lg border p-2.5">
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>{query.driver}</span>
-        <span className="tabular-nums">{formatMs(query.durationMs)}</span>
+        <Pill>{query.driver}</Pill>
+        <span className="w-28">
+          <DurationBar ms={query.durationMs} max={slowest} text={formatMs(query.durationMs)} />
+        </span>
         <span className="tabular-nums">{formatNumber(query.rowCount)} rows</span>
-        {nPlusOne ? <Badge variant="destructive">N+1</Badge> : null}
+        {nPlusOne ? <Pill tone="warning">N+1</Pill> : null}
         {query.error ? <span className="text-destructive">{query.error}</span> : null}
       </div>
-      <Code className="mt-1">{queryText(query)}</Code>
+      <CodeBlock>{queryText(query)}</CodeBlock>
       {query.bindings ? (
-        <Code className="mt-1">{`bindings: ${JSON.stringify(query.bindings, null, 2)}`}</Code>
+        <CodeBlock>{`bindings: ${JSON.stringify(query.bindings, null, 2)}`}</CodeBlock>
       ) : null}
       {explainable ? <ExplainBox run={run} /> : null}
     </div>
@@ -134,7 +138,7 @@ function AiSection({ requestId }: { requestId: string }) {
       {data.runs.map((run) => (
         <li key={run.traceId}>
           <a
-            className="block rounded-md border p-2 text-sm hover:bg-muted/60"
+            className="block rounded-lg border p-2.5 text-sm hover:bg-muted/60"
             href={`#ai/${encodeURIComponent(run.traceId)}`}
           >
             {run.name} · {run.status} · {formatMs(run.duration)}
@@ -146,7 +150,15 @@ function AiSection({ requestId }: { requestId: string }) {
 }
 
 /** One request: warnings, curl, the persisted record, waterfall, queries, logs, mail and AI runs. */
-export function RequestDetailView({ id, session }: { id: string; session: DevtoolsSessionView }) {
+export function RequestDetailView({
+  id,
+  session,
+  onClose,
+}: {
+  id: string;
+  session: DevtoolsSessionView;
+  onClose?: () => void;
+}) {
   const {
     data: request,
     error,
@@ -156,36 +168,54 @@ export function RequestDetailView({ id, session }: { id: string; session: Devtoo
   const development = session.mode === "development";
 
   if (error && !request)
-    return <ErrorMessage error={error} title="Could not load this request" onRetry={reload} />;
+    return (
+      <div>
+        {onClose ? <BackButton onClick={onClose} /> : null}
+        <ErrorMessage error={error} title="Could not load this request" onRetry={reload} />
+      </div>
+    );
   if (!request) return loading ? <LoadingRows rows={5} /> : null;
 
   const nPlusOneShapes = new Set(request.warnings.map((warning) => warning.shape));
   const counts = Array.isArray(request.cache) ? null : request.cache;
   const operations = Array.isArray(request.cache) ? request.cache : null;
   const partial = request.partial === true;
+  const slowestQuery = Math.max(0, ...request.queries.map((query) => query.durationMs));
 
   return (
-    <section aria-label="Request detail" className="space-y-1">
-      <h2 className="text-base font-semibold break-all">
-        {request.method} {request.path} ·{" "}
-        <span className={statusTone(request.status)}>{request.status ?? DASH}</span> ·{" "}
-        {formatMs(request.durationMs)}
-      </h2>
+    <section aria-label="Request detail" className="space-y-3">
+      <div>
+        {onClose ? <BackButton onClick={onClose}>Close request</BackButton> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <MethodPill method={request.method} />
+          <StatusPill status={request.status} />
+          <h2 className="min-w-0 font-mono text-base font-semibold break-all">{request.path}</h2>
+        </div>
+      </div>
+      <KeyValueGrid
+        items={[
+          { label: "Duration", value: formatMs(request.durationMs) },
+          { label: "Started", value: <Time at={request.startedAt} /> },
+          { label: "Route", value: request.route ?? "—" },
+          { label: "Queries", value: formatNumber(request.queryCount) },
+          { label: "Warnings", value: formatNumber(request.warningCount) },
+          { label: "Id", value: <span className="font-mono text-xs">{request.id}</span> },
+        ]}
+      />
       {partial ? (
         <p className="text-xs text-muted-foreground">
-          <Badge variant="outline">not sampled</Badge> Kept because it was slow or failed. Phases,
-          queries and logs were not recorded for it.
+          <Pill>not sampled</Pill> Kept because it was slow or failed. Phases, queries and logs were
+          not recorded for it.
         </p>
       ) : null}
       {request.error ? <p className="text-sm text-destructive">{request.error}</p> : null}
 
       {request.warnings.length ? (
-        <>
-          <SectionTitle>Warnings</SectionTitle>
+        <DetailSection title="Warnings">
           {request.warnings.map((warning, index) => (
             <p
               key={index}
-              className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2 text-sm"
+              className="rounded-lg border border-warning/40 bg-warning/10 p-2.5 text-sm"
             >
               {warning.message}{" "}
               {warning.caller ? (
@@ -198,95 +228,94 @@ export function RequestDetailView({ id, session }: { id: string; session: Devtoo
               ) : null}
             </p>
           ))}
-        </>
+        </DetailSection>
       ) : null}
 
-      <div className="pt-2">
-        <CopyCurl id={request.id} />
-      </div>
+      <CopyCurl id={request.id} />
 
       {request.record ? <RecordSections record={request.record} /> : null}
 
-      <SectionTitle>Waterfall</SectionTitle>
-      <Waterfall request={request} />
+      <DetailSection title="Waterfall">
+        <Waterfall request={request} />
+      </DetailSection>
 
-      <SectionTitle>Queries</SectionTitle>
-      {request.queries.length ? (
-        <div className="space-y-2">
-          {request.queries.map((query) => (
-            <QueryRow
-              key={query.id}
-              query={query}
-              requestId={request.id}
-              nPlusOne={nPlusOneShapes.has(query.shape ?? query.sql ?? "")}
-              session={session}
-            />
-          ))}
-          {request.droppedQueries ? (
-            <p className="text-xs text-muted-foreground">
-              {request.droppedQueries} more queries ran but were not kept (the per-request limit was
-              reached).
-            </p>
-          ) : null}
-        </div>
-      ) : (
-        <EmptyState title="No queries recorded." />
-      )}
+      <DetailSection title={`Queries (${request.queries.length})`}>
+        {request.queries.length ? (
+          <div className="space-y-2">
+            {request.queries.map((query) => (
+              <QueryRow
+                key={query.id}
+                query={query}
+                requestId={request.id}
+                nPlusOne={nPlusOneShapes.has(query.shape ?? query.sql ?? "")}
+                session={session}
+                slowest={slowestQuery}
+              />
+            ))}
+            {request.droppedQueries ? (
+              <p className="text-xs text-muted-foreground">
+                {request.droppedQueries} more queries ran but were not kept (the per-request limit
+                was reached).
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <EmptyState title="No queries recorded." />
+        )}
+      </DetailSection>
 
       {counts ? (
-        <>
-          <SectionTitle>Cache</SectionTitle>
+        <DetailSection title="Cache">
           <p className="text-sm tabular-nums">
             {counts.hits} hits · {counts.misses} misses · {counts.writes} writes
           </p>
-        </>
+        </DetailSection>
       ) : operations?.length ? (
-        <>
-          <SectionTitle>Cache</SectionTitle>
-          <ul className="text-xs font-mono">
+        <DetailSection title="Cache">
+          <ul className="font-mono text-xs">
             {operations.map((operation, index) => (
               <li key={index}>
                 {operation.type} {operation.key || operation.keys?.join(", ") || ""}
               </li>
             ))}
           </ul>
-        </>
+        </DetailSection>
       ) : null}
 
-      <SectionTitle>Request logs</SectionTitle>
-      {request.logs.length ? (
-        <ul className="space-y-1">
-          {request.logs.map((log, index) => (
-            <li key={index} className="rounded-md border p-2 text-sm">
-              <div className="flex gap-2 text-xs text-muted-foreground">
-                <span className={levelTone(log.level)}>{log.level}</span>
-                <span>
-                  {log.module} · {log.action} · {clockTime(log.at)}
-                </span>
-              </div>
-              <div className="break-words">{log.message}</div>
-              {log.context !== undefined ? (
-                <details>
-                  <summary className="cursor-pointer text-xs">Context</summary>
-                  <Json value={log.context} />
-                </details>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <EmptyState title="No logs recorded." />
-      )}
+      <DetailSection title="Request logs">
+        {request.logs.length ? (
+          <ul className="space-y-2">
+            {request.logs.map((log, index) => (
+              <li key={index} className="rounded-lg border p-2.5 text-sm">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <LevelPill level={log.level} />
+                  <span>
+                    {log.module} · {log.action} · {clockTime(log.at)}
+                  </span>
+                </div>
+                <div className="mt-1 break-words">{log.message}</div>
+                {log.context !== undefined ? (
+                  <details>
+                    <summary className="cursor-pointer text-xs">Context</summary>
+                    <Json value={log.context} />
+                  </details>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState title="No logs recorded." />
+        )}
+      </DetailSection>
 
       {development || request.mails?.length ? (
-        <>
-          <SectionTitle>Request mail</SectionTitle>
+        <DetailSection title="Request mail">
           {request.mails?.length ? (
             <ul className="space-y-1">
               {request.mails.map((mailId) => (
                 <li key={mailId}>
                   <a
-                    className="block rounded-md border p-2 text-sm hover:bg-muted/60"
+                    className="block rounded-lg border p-2.5 text-sm hover:bg-muted/60"
                     href={`#mail/${encodeURIComponent(mailId)}`}
                   >
                     Mail {mailId}
@@ -297,14 +326,13 @@ export function RequestDetailView({ id, session }: { id: string; session: Devtoo
           ) : (
             <EmptyState title="No mail captured." />
           )}
-        </>
+        </DetailSection>
       ) : null}
 
       {development ? (
-        <>
-          <SectionTitle>AI runs</SectionTitle>
+        <DetailSection title="AI runs">
           <AiSection requestId={request.id} />
-        </>
+        </DetailSection>
       ) : null}
     </section>
   );

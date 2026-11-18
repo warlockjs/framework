@@ -6,6 +6,7 @@ import { DEVTOOLS_BUILT_IN_PANELS } from "./production/contracts";
 import type { DevtoolsMode, DevtoolsPanelInfo } from "./production/contracts";
 import type {
   DevtoolsPanel,
+  DevtoolsPanelEntry,
   DevtoolsPanelExport,
   DevtoolsPanelMethod,
   DevtoolsPanelRoute,
@@ -213,6 +214,31 @@ export type LoadDevtoolsPanelsOptions = {
   mode?: DevtoolsMode;
 };
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const prototype = Object.getPrototypeOf(value);
+
+  return prototype === Object.prototype || prototype === null;
+}
+
+/** What is wrong with a `[specifier, options]` entry, or `undefined` when it is valid. */
+function tupleProblem(entry: readonly unknown[]): string | undefined {
+  if (entry.length !== 2) {
+    return `it has ${entry.length} item(s); use exactly [specifier, options]`;
+  }
+
+  if (typeof entry[0] !== "string" || entry[0] === "") {
+    return `its first item is ${JSON.stringify(entry[0])}; use the module specifier as a string`;
+  }
+
+  if (!isPlainObject(entry[1])) {
+    return `its second item is not a plain object; pass the options as { name: value }`;
+  }
+
+  return undefined;
+}
+
 /** The URL or specifier to import for a `panels` entry. */
 function resolvePanelSpecifier(entry: string, root: string): string {
   if (entry.startsWith("./") || entry.startsWith("../") || path.isAbsolute(entry)) {
@@ -324,8 +350,10 @@ async function panelsOf(
   exported: DevtoolsPanelExport,
   root: string,
   mode: DevtoolsMode,
+  panelOptions: Readonly<Record<string, unknown>> = {},
 ): Promise<readonly unknown[]> {
-  const value = typeof exported === "function" ? await exported({ root, mode }) : exported;
+  const value =
+    typeof exported === "function" ? await exported({ ...panelOptions, root, mode }) : exported;
 
   return Array.isArray(value) ? value : [value];
 }
@@ -337,7 +365,7 @@ async function panelsOf(
  * skipped, so one broken panel never stops the dashboard.
  */
 export async function loadDevtoolsPanels(
-  entries: readonly (string | DevtoolsPanel)[],
+  entries: readonly DevtoolsPanelEntry[],
   options: LoadDevtoolsPanelsOptions,
 ): Promise<MountedDevtoolsPanel[]> {
   // `src/config/devtools.ts` is a plain object with no types: a single string would be read letter by letter.
@@ -358,8 +386,23 @@ export async function loadDevtoolsPanels(
     let candidates: readonly unknown[];
 
     try {
-      if (typeof entry === "string") {
-        const module = (await importModule(resolvePanelSpecifier(entry, options.root))) as {
+      if (Array.isArray(entry as unknown)) {
+        const problem = tupleProblem(entry as readonly unknown[]);
+
+        if (problem !== undefined) {
+          options.warn(
+            `Devtools panels entry ${JSON.stringify(entry)} is invalid: ${problem}. Example: ["@warlock.js/grimoire/devtools", { ttlMs: 60000 }]. The entry was not added.`,
+          );
+          continue;
+        }
+      }
+
+      if (typeof entry === "string" || Array.isArray(entry as unknown)) {
+        const [specifier, panelOptions] =
+          typeof entry === "string"
+            ? [entry, undefined]
+            : (entry as readonly [string, Record<string, unknown>]);
+        const module = (await importModule(resolvePanelSpecifier(specifier, options.root))) as {
           default?: DevtoolsPanelExport;
         };
 
@@ -367,13 +410,13 @@ export async function loadDevtoolsPanels(
           throw new Error("the module has no default export");
         }
 
-        candidates = await panelsOf(module.default, options.root, mode);
+        candidates = await panelsOf(module.default, options.root, mode, panelOptions);
       } else {
         candidates = [entry];
       }
     } catch (error) {
       options.warn(
-        `Devtools panel module "${String(entry)}" could not be loaded: ${describe(error)}. Check that it is installed and listed correctly in the devtools "panels" option.`,
+        `Devtools panel module "${String(Array.isArray(entry as unknown) ? (entry as readonly unknown[])[0] : entry)}" could not be loaded: ${describe(error)}. Check that it is installed and listed correctly in the devtools "panels" option.`,
       );
       continue;
     }

@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { DownloadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/listing";
 import { ToggleButton } from "@/components/ui/panel-kit";
 import type { DevtoolsPanelProps } from "@/panels/types";
 
@@ -34,7 +36,24 @@ export function ApiPanel(_props: DevtoolsPanelProps) {
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <PageHeader
+        title="API"
+        description="The reference for every route, generated from your app. Pick a viewer, or download the OpenAPI file or Postman collection."
+      >
+        <Button asChild variant="outline" size="sm">
+          <a href="api/openapi.json" download="openapi.json">
+            <DownloadIcon />
+            OpenAPI JSON
+          </a>
+        </Button>
+        <Button asChild variant="outline" size="sm">
+          <a href="api/postman.json" download="postman.json">
+            <DownloadIcon />
+            Postman collection
+          </a>
+        </Button>
+      </PageHeader>
+      <div className="mb-3 flex flex-wrap items-center gap-2" role="group" aria-label="Viewer">
         {VIEWERS.map((item) => (
           <ToggleButton
             key={item.id}
@@ -47,20 +66,10 @@ export function ApiPanel(_props: DevtoolsPanelProps) {
             {item.label}
           </ToggleButton>
         ))}
-        <Button asChild variant="link" size="sm">
-          <a href="api/openapi.json" download="openapi.json">
-            OpenAPI JSON
-          </a>
-        </Button>
-        <Button asChild variant="link" size="sm">
-          <a href="api/postman.json" download="postman.json">
-            Postman collection
-          </a>
-        </Button>
       </div>
       <iframe
         key={viewer.id}
-        className="h-[75vh] w-full rounded-md border"
+        className="h-[75vh] w-full rounded-xl border bg-background"
         src={viewer.src}
         title="API reference"
       />

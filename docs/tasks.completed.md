@@ -2,6 +2,33 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+## 5.57.0 (2026-11-18)
+
+### T-150 [feature] Modern devtools UI, a readable Grimoire tab with a Features view, faster Grimoire loads
+
+- Source: owner, 2026-11-18, with the write-up https://claude.ai/artifact/DBtF1QLyZvq3wb9yRbNJCX (checked against 5.56.0).
+- What and why: the Grimoire tab is close to unreadable (its stylesheet uses `--text`, `--line`, `--surface`, `--good`,
+  `--bad`, `--warn`, `--bar`, which the dashboard never defines; `--accent`/`--muted` are surface greys, so nav links
+  render at 1.31:1 on dark), its lists are one flat column with no grouping, counts or filters, features are only a
+  table on Home, and the first open after a few idle seconds reopens the whole book (`ttlMs` default 2000). The owner
+  rates the whole dashboard's UI and UX as poor and wants a modern one, with Grimoire listings as the priority.
+- Scope: (1) dashboard design system and shell (themes with a toggle, sidebar, documented panel tokens, contrast spec);
+  (2) built-in tab listings; (3) Grimoire view rebuild with a Features tab, filterable lists and detail views;
+  (4) snapshot kept until the book changes, warm-up in production, `[module, options]` panel entries.
+- Evidence: `packages/grimoire/ui/grimoire.css`, `packages/grimoire/ui/grimoire-view.js`,
+  `packages/grimoire/src/devtools/snapshot-source.ts:66`, `packages/devtools/src/panels.ts` (`panelsOf`,
+  `loadDevtoolsPanels`), `packages/devtools/ui-src/src/styles.css`.
+- Acceptance: every panel colour comes from a documented token defined in both themes, with a spec that fails on an
+  undefined variable; Grimoire has Overview, Features, Apps, Tasks, Releases, Check and Modules views with search,
+  filters and counts; a second open of an unchanged book in production does not reopen it; specs, docs, skills and
+  changelogs ship with it.
+- Shipped: 5.57.0 (2026-11-18), release commit on `main` (tag `v5.57.0`).
+- Verified: devtools typecheck, 957 server specs and 143 dashboard specs (new token and contrast spec, shell, palette,
+  drawer and listing specs); grimoire typecheck and 491 specs (tokens, data routes, view, snapshot source); oxlint 0
+  errors, format check, public-text check, docs build, dashboard bundle rebuilt (141 KB gzipped); screenshots of the
+  built dashboard and the Grimoire tab in light and dark at 1440 px and 390 px with real Grimoire data over the shop
+  fixture, no console errors; one review pass (three fixes).
+
 ## 5.56.0 (2026-11-17)
 
 Built from an architecture document and nine work packages, then an integration pass, a dedicated security review

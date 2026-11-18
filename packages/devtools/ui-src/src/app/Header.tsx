@@ -1,88 +1,101 @@
-import type { DevtoolsPanelInfo } from "@contracts";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { MenuIcon, SearchIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { InstancePicker } from "./InstancePicker";
 import { Menu, MenuButton, MenuLink } from "./Menu";
 import { useSession } from "./session";
+import { ThemeToggle } from "./ThemeToggle";
 
 export type HeaderProps = {
-  panels: readonly DevtoolsPanelInfo[];
-  /** The open tab id, or `null` on an account or admin page. */
-  activeTab: string | null;
+  /** The open tab or page title. */
+  title: string;
   instance: string;
   onInstanceChange: (instance: string) => void;
+  onOpenNavigation: () => void;
+  onOpenPalette: () => void;
+  navigationOpen: boolean;
 };
 
-/** Product name, mode badge, instance picker, user and admin menus, and the tab strip. */
-export function Header({ panels, activeTab, instance, onInstanceChange }: HeaderProps) {
+/** The slim top bar: menu button (narrow screens), page title, search, instance picker, theme and the user menus. */
+export function Header({
+  title,
+  instance,
+  onInstanceChange,
+  onOpenNavigation,
+  onOpenPalette,
+  navigationOpen,
+}: HeaderProps) {
   const { session, signOut } = useSession();
   const production = session.mode === "production";
-  const label = production
-    ? `Production${session.instance ? ` — ${session.instance.label}` : ""}`
-    : "Development";
+  const email = session.account?.email ?? "Account";
 
   return (
-    <header className="border-b bg-card">
-      <div className="flex flex-wrap items-center gap-3 px-4 py-2">
-        <h1 className="text-base font-semibold">Warlock Devtools</h1>
-        <Badge variant={production ? "default" : "secondary"}>{label}</Badge>
-        <div className="ml-auto flex items-center gap-2">
-          {production ? <InstancePicker value={instance} onChange={onInstanceChange} /> : null}
-          {production && session.role === "admin" ? (
-            <Menu label="Admin">
-              {(close) => (
-                <>
-                  <MenuLink href="#/admin/users" onSelect={close}>
-                    Users and invites
-                  </MenuLink>
-                  <MenuLink href="#/admin/audit" onSelect={close}>
-                    Audit log
-                  </MenuLink>
-                  <MenuLink href="#/admin/settings" onSelect={close}>
-                    Settings
-                  </MenuLink>
-                </>
-              )}
-            </Menu>
-          ) : null}
-          {production ? (
-            <Menu label={session.account?.email ?? "Account"}>
-              {(close) => (
-                <>
-                  <MenuLink href="#/account" onSelect={close}>
-                    Account
-                  </MenuLink>
-                  <MenuButton
-                    onClick={() => {
-                      close();
-                      void signOut();
-                    }}
-                  >
-                    Sign out
-                  </MenuButton>
-                </>
-              )}
-            </Menu>
-          ) : null}
-        </div>
-      </div>
-      <nav aria-label="Dashboard tabs" className="flex gap-1 overflow-x-auto px-3">
-        {panels.map((panel) => (
-          <a
-            key={panel.id}
-            href={`#${panel.id}`}
-            aria-current={panel.id === activeTab ? "page" : undefined}
-            className={cn(
-              "border-b-2 px-3 py-2 text-sm whitespace-nowrap",
-              panel.id === activeTab
-                ? "border-primary font-medium"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {panel.title}
-          </a>
-        ))}
-      </nav>
+    <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/85 px-3 backdrop-blur sm:px-5">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="lg:hidden"
+        aria-label="Open navigation"
+        aria-controls="dashboard-sidebar"
+        aria-expanded={navigationOpen}
+        onClick={onOpenNavigation}
+      >
+        <MenuIcon />
+      </Button>
+      <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight">{title}</h1>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="gap-2 text-muted-foreground max-sm:w-10 max-sm:px-0"
+        aria-label="Search tabs and pages"
+        aria-keyshortcuts="Control+K Meta+K"
+        onClick={onOpenPalette}
+      >
+        <SearchIcon />
+        <span className="hidden sm:inline">Search</span>
+        <kbd className="hidden rounded border bg-muted px-1.5 font-mono text-[0.6875rem] text-muted-foreground sm:inline">
+          Ctrl K
+        </kbd>
+      </Button>
+      {production ? <InstancePicker value={instance} onChange={onInstanceChange} /> : null}
+      <ThemeToggle />
+      {production && session.role === "admin" ? (
+        <Menu label="Admin">
+          {(close) => (
+            <>
+              <MenuLink href="#/admin/users" onSelect={close}>
+                Users and invites
+              </MenuLink>
+              <MenuLink href="#/admin/audit" onSelect={close}>
+                Audit log
+              </MenuLink>
+              <MenuLink href="#/admin/settings" onSelect={close}>
+                Settings
+              </MenuLink>
+            </>
+          )}
+        </Menu>
+      ) : null}
+      {production ? (
+        <Menu label={email} avatar={email}>
+          {(close) => (
+            <>
+              <MenuLink href="#/account" onSelect={close}>
+                Account
+              </MenuLink>
+              <MenuButton
+                onClick={() => {
+                  close();
+                  void signOut();
+                }}
+              >
+                Sign out
+              </MenuButton>
+            </>
+          )}
+        </Menu>
+      ) : null}
     </header>
   );
 }

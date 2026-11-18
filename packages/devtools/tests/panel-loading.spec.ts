@@ -132,4 +132,61 @@ describe("loadDevtoolsPanels", () => {
       rmSync(app, { recursive: true, force: true });
     }
   });
+
+  it("passes the options of a [specifier, options] entry to the factory; root and mode always win", async () => {
+    const factory = vi.fn(() => panel("optioned"));
+    const importModule = vi.fn(async () => ({ default: factory }));
+
+    const loaded = await loadDevtoolsPanels(
+      [["@example/optioned/devtools", { ttlMs: 60_000, root: "/elsewhere", mode: "development" }]],
+      { root: packageRoot, warn: vi.fn(), importModule, mode: "production" },
+    );
+
+    expect(loaded.map((item) => item.id)).toEqual(["optioned"]);
+    expect(importModule).toHaveBeenCalledWith("@example/optioned/devtools");
+    expect(factory).toHaveBeenCalledWith({ ttlMs: 60_000, root: packageRoot, mode: "production" });
+  });
+
+  it("reports and skips a tuple that is not [string, plain object], keeping the other entries", async () => {
+    const warn = vi.fn();
+    const importModule = vi.fn(async () => ({ default: panel("kept") }));
+    const bad = [
+      ["@example/a"],
+      ["@example/a", "ttl"],
+      ["@example/a", [1]],
+      ["@example/a", null],
+      [42, {}],
+      ["@example/a", {}, {}],
+    ] as unknown as readonly string[];
+
+    const loaded = await loadDevtoolsPanels([...bad, ["@example/ok", {}] as never], {
+      root: packageRoot,
+      warn,
+      importModule,
+    });
+
+    expect(loaded.map((item) => item.id)).toEqual(["kept"]);
+    expect(importModule).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(6);
+    expect(warn.mock.calls[0]?.[0]).toContain('["@example/a"]');
+    expect(warn.mock.calls[0]?.[0]).toContain("use exactly [specifier, options]");
+    expect(warn.mock.calls[1]?.[0]).toContain("second item is not a plain object");
+    expect(warn.mock.calls[4]?.[0]).toContain("use the module specifier as a string");
+  });
+
+  it("names the specifier, not the pair, when a tuple's module fails to load", async () => {
+    const warn = vi.fn();
+
+    await loadDevtoolsPanels([["@example/missing", { a: 1 }]], {
+      root: packageRoot,
+      warn,
+      importModule: async () => {
+        throw new Error("Cannot find package");
+      },
+    });
+
+    expect(warn.mock.calls[0]?.[0]).toContain(
+      'Devtools panel module "@example/missing" could not be loaded',
+    );
+  });
 });

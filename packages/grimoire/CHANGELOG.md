@@ -2,6 +2,21 @@
 
 `@warlock.js/grimoire` is new in 5.55.0 and experimental: its file layout, `GR` codes and API may change in any release until it is marked stable.
 
+## 5.57.0 - 2026-11-18
+
+### Added
+
+- The devtools Grimoire tab has a Features view: every feature with its status, version, summary and flows, with a status filter, a text filter, sorting and counts.
+- New `/features` data route. `/apps` rows carry each page or screen's route, heading, layout, blocks and whether it is confirmed or inferred, and `/summary` gains app, page, screen and release counts. Existing fields are unchanged.
+
+### Changed
+
+- The Grimoire tab is rebuilt: a tab bar (Overview, Features, Apps, Tasks, Releases, Check, Modules) with counts and breadcrumbs, and a search box with the `/` shortcut, results grouped by type and arrow-key navigation.
+- The Overview shows stat cards, recent releases and the top check problems. Apps groups pages and screens by route segment with a filter. Tasks, Releases, Check and Modules are filterable lists, and Check keeps what to fix apart from expected findings.
+- The tab shows an "Opening the book…" state while a large book opens, and a failed view says what failed and what to do next.
+- The tab uses the dashboard's colour tokens, so links and status text are readable in the light and the dark theme. The static export defines the same tokens for both themes.
+- The tab keeps its snapshot until the book changes in production (no time limit) and starts opening the book when the panel is created, so the first view is fast on large apps. In development it serves the cached snapshot at once and refreshes it in the background; a failed refresh keeps the old snapshot. Set `ttlMs` through the panel options (`[specifier, options]` in devtools' `panels`) to choose a fixed reuse time.
+
 ## 5.56.0 - 2026-11-17
 
 ### Added

@@ -59,11 +59,13 @@ export type DevtoolsOptions = {
    * development, whose default export is a `DevtoolsPanelExport`: a package
    * export such as `"@warlock.js/grimoire/devtools"` (resolved from the app
    * root) or a path starting with `./` (relative to the app root). An entry
-   * may also be a `DevtoolsPanel` object.
+   * may also be a `DevtoolsPanel` object, or a `[specifier, options]` pair
+   * whose options object is passed to the panel factory next to `root` and
+   * `mode` (`["@warlock.js/grimoire/devtools", { ttlMs: 60_000 }]`).
    *
    * @default []
    */
-  panels?: readonly (string | DevtoolsPanel)[];
+  panels?: readonly DevtoolsPanelEntry[];
   /**
    * The production monitor: a signed-in dashboard at a secret path. Off
    * unless `enabled` is `true`; read only when the app runs in production
@@ -307,8 +309,15 @@ export type DevtoolsPanel = {
   assets?: Readonly<Record<string, string | URL>>;
 };
 
+/** One `panels` entry: a module specifier, a ready panel, or `[specifier, options]` to pass options to the module's factory. */
+export type DevtoolsPanelEntry =
+  | string
+  | DevtoolsPanel
+  | readonly [specifier: string, options: Readonly<Record<string, unknown>>];
+
 /** What a panel factory receives. */
 export type DevtoolsPanelFactoryContext = {
+  // A `[specifier, options]` entry adds its options to this object; `root` and `mode` always win.
   /** The app's root directory. */
   root: string;
   /**

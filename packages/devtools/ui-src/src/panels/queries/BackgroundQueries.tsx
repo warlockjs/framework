@@ -1,6 +1,7 @@
 import { useApi } from "@/api/hooks";
 import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
-import { Code, formatMs, SectionTitle } from "@/components/ui/panel-kit";
+import { CodeBlock, DetailSection, Pill } from "@/components/listing";
+import { formatMs } from "@/components/ui/panel-kit";
 
 type BackgroundQuery = {
   id: string;
@@ -22,31 +23,38 @@ export function BackgroundQueries() {
   );
 
   return (
-    <section aria-label="Background queries">
-      <SectionTitle>Background queries (outside any request)</SectionTitle>
-      {error ? (
-        <ErrorMessage
-          error={error}
-          title="Could not load the background queries"
-          onRetry={reload}
-        />
-      ) : null}
-      {!data && loading ? <LoadingRows rows={2} /> : null}
-      {data && !data.queries.length ? <EmptyState title="No background queries yet." /> : null}
-      <div className="space-y-2">
-        {data?.queries.map((query) => (
-          <div key={query.id} className="rounded-md border p-2">
-            <div className="text-xs text-muted-foreground">
-              {query.driver} · <span className="tabular-nums">{formatMs(query.durationMs)}</span>
+    <section aria-label="Background queries" className="mt-4">
+      <DetailSection title="Background queries (outside any request)">
+        {error ? (
+          <ErrorMessage
+            error={error}
+            title="Could not load the background queries"
+            onRetry={reload}
+          />
+        ) : null}
+        {!data && loading ? <LoadingRows rows={2} /> : null}
+        {data && !data.queries.length ? (
+          <EmptyState
+            title="No background queries yet."
+            hint="Boot work, scheduler ticks and queue jobs that query the database show up here."
+          />
+        ) : null}
+        <div className="space-y-2">
+          {data?.queries.map((query) => (
+            <div key={query.id} className="space-y-1.5 rounded-lg border p-2.5">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Pill>{query.driver}</Pill>
+                <span className="tabular-nums">{formatMs(query.durationMs)}</span>
+              </div>
+              <CodeBlock>
+                {query.sql ||
+                  query.shape ||
+                  `${query.collection ?? "collection"}.${query.command ?? "command"}`}
+              </CodeBlock>
             </div>
-            <Code className="mt-1">
-              {query.sql ||
-                query.shape ||
-                `${query.collection ?? "collection"}.${query.command ?? "command"}`}
-            </Code>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </DetailSection>
     </section>
   );
 }

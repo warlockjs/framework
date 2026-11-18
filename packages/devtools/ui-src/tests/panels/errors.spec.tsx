@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { DevtoolsErrorsView } from "@contracts";
@@ -85,5 +85,33 @@ describe("Errors panel", () => {
 
     expect(await screen.findByText("Errors could not be read. Try again.")).toBeInTheDocument();
     expect(screen.getByText("Reference: er-1")).toBeInTheDocument();
+  });
+});
+
+describe("Errors panel summary and filters", () => {
+  it("shows tiles and filters groups by search and source", async () => {
+    mockApi([[/^api\/errors/, view()]]);
+    const user = userEvent.setup();
+
+    renderPanel(ErrorsPanel, { session: devSession });
+
+    const summary = await screen.findByLabelText("Summary");
+
+    expect(within(summary).getByText("Error groups")).toBeInTheDocument();
+    expect(within(summary).getByText("Occurrences")).toBeInTheDocument();
+    expect(within(summary).getByText("18")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("2 groups");
+
+    await user.click(
+      within(screen.getByRole("group", { name: "Source" })).getByRole("button", { name: "Logs" }),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("1 of 2 groups");
+    expect(
+      screen.queryByRole("button", { name: "Cannot read properties of undefined" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    await user.type(screen.getByLabelText("Search errors"), "nothing-like-this");
+    expect(screen.getByText("No error group matches these filters.")).toBeInTheDocument();
   });
 });

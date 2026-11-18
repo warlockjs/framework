@@ -40,10 +40,45 @@ export type GrimoireSummary = {
   /** Whether any feature, app, task or release is written, and how big the book is. */
   written: boolean;
   book: { files: number; modules: number; builtAt: string };
+  /** How many apps, pages, screens and releases are written (the tab's navigation and overview badges). */
+  apps: { apps: number; pages: number; screens: number };
+  releases: number;
+};
+
+/** One feature of the listing: the index entry plus what the cards show. */
+export type GrimoireFeatureRow = Omit<FeaturesIndex["features"][number], "flows"> & {
+  /** The README paragraph under the heading, or `null`. */
+  summary: string | null;
+  /** The index flows with their headings. */
+  flows: (FeaturesIndex["features"][number]["flows"][number] & { heading: string | null })[];
+};
+
+export type GrimoireFeaturesAnswer = { features: GrimoireFeatureRow[] };
+
+/** One page or screen of an app, as the listing shows it. */
+export type GrimoireAppRow = {
+  id: string;
+  type: "page" | "screen";
+  /** The page route or the screen name, or `null` when the file gives none. */
+  route: string | null;
+  heading: string | null;
+  /** `confirmed` or `inferred` when the file says so, otherwise `null`. */
+  origin: "confirmed" | "inferred" | null;
+  layout: string | null;
+  /** How many block rows the page lists itself. */
+  blocks: number;
 };
 
 export type GrimoireAppsAnswer = {
-  apps: { id: string; type: string; root: string; pages: string[]; screens: string[] }[];
+  apps: {
+    id: string;
+    type: string;
+    root: string;
+    pages: string[];
+    screens: string[];
+    /** Every page and screen with what the listing needs. */
+    rows: GrimoireAppRow[];
+  }[];
 };
 
 export type GrimoirePageAnswer = {
@@ -94,6 +129,32 @@ export function summary(snapshot: GrimoireSnapshot): GrimoireSummary {
       modules: new Set(files.map((file) => file.module)).size,
       builtAt: snapshot.book.manifest.builtAt,
     },
+    apps: {
+      apps: written.apps.length,
+      pages: written.apps.reduce((total, app) => total + app.pages.length, 0),
+      screens: written.apps.reduce((total, app) => total + app.screens.length, 0),
+    },
+    releases: written.releases.length,
+  };
+}
+
+/** The features listing: the features index with each README summary and flow headings. */
+export function features(snapshot: GrimoireSnapshot): GrimoireFeaturesAnswer {
+  const written = new Map(snapshot.written.features.map((feature) => [feature.id, feature]));
+
+  return {
+    features: snapshot.collected.featuresIndex.features.map((entry) => {
+      const source = written.get(entry.id);
+      const headings = new Map(
+        (source?.flows ?? []).map((flow) => [flow.id.value, flow.heading?.value ?? null]),
+      );
+
+      return {
+        ...entry,
+        summary: source?.readme?.summary ?? null,
+        flows: entry.flows.map((flow) => ({ ...flow, heading: headings.get(flow.id) ?? null })),
+      };
+    }),
   };
 }
 
@@ -151,6 +212,15 @@ export function apps(snapshot: GrimoireSnapshot): GrimoireAppsAnswer {
       root: app.root.value,
       pages: app.pages.map((page) => page.id),
       screens: app.screens.map((screen) => screen.id),
+      rows: [...app.pages, ...app.screens].map((item) => ({
+        id: item.id,
+        type: item.type,
+        route: item.route?.value ?? item.screen?.value ?? null,
+        heading: item.heading?.value ?? null,
+        origin: item.origin?.value ?? null,
+        layout: item.layout?.value ?? null,
+        blocks: item.blocks.length,
+      })),
     })),
   };
 }

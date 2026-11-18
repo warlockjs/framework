@@ -2,61 +2,86 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* shadcn/ui new-york-v4 neutral tokens. */
+/*
+ * Design tokens. The shadcn names stay; the palette is a cool, slightly tinted
+ * neutral with one indigo brand colour. Every text colour (foreground,
+ * muted-foreground, brand, success, warning, info, destructive) is at least
+ * 4.5:1 on --background and --card in both themes; tests/panel-tokens.spec.ts
+ * checks it. Package panel stylesheets may use only the tokens listed in
+ * src/panel-tokens.ts.
+ */
 :root {
+  color-scheme: light;
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --background: #f6f7fb;
+  --foreground: #14162b;
+  --card: #ffffff;
+  --card-foreground: #14162b;
+  --popover: #ffffff;
+  --popover-foreground: #14162b;
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --secondary: #eceef7;
+  --secondary-foreground: #232647;
+  --muted: #eceef7;
+  --muted-foreground: #566078;
+  --accent: #e6e8fb;
+  --accent-foreground: #312e81;
+  --destructive: #c81e1e;
+  --border: #c9cee0;
+  --input: #bcc2d8;
+  --ring: #6d65f0;
+  --brand: #4f46e5;
+  --brand-foreground: #ffffff;
+  --success: #047857;
+  --warning: #9a4a07;
+  --info: #0369a1;
+  --chart-1: #4f46e5;
+  --chart-2: #0d9488;
+  --chart-3: #d97706;
+  --chart-4: #c026d3;
+  --chart-5: #e11d48;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  color-scheme: dark;
+  --background: #0d0f1f;
+  --foreground: #e8eaf6;
+  --card: #151932;
+  --card-foreground: #e8eaf6;
+  --popover: #1a1f3b;
+  --popover-foreground: #e8eaf6;
+  --primary: #9a9dff;
+  --primary-foreground: #0d0f1f;
+  --secondary: #1c2140;
+  --secondary-foreground: #e8eaf6;
+  --muted: #1c2140;
+  --muted-foreground: #9aa3c0;
+  --accent: #232a52;
+  --accent-foreground: #dcdfff;
+  --destructive: #ff8080;
+  --border: #2f3558;
+  --input: #3a4170;
+  --ring: #8f93ff;
+  --brand: #9a9dff;
+  --brand-foreground: #0d0f1f;
+  --success: #3ddc97;
+  --warning: #fbbf24;
+  --info: #5cc8ff;
+  --chart-1: #9a9dff;
+  --chart-2: #2dd4bf;
+  --chart-3: #fbbf24;
+  --chart-4: #e879f9;
+  --chart-5: #fb7185;
 }
 
 @theme inline {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -79,11 +104,38 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --animate-dt-fade: dt-fade 150ms ease-out;
+  --animate-dt-drawer: dt-drawer 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-dt-pop: dt-pop 150ms ease-out;
+}
+
+@keyframes dt-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dt-drawer {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes dt-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
 }
 
 @layer base {
@@ -91,7 +143,176 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background font-sans text-[0.9375rem] leading-6 text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    @apply font-mono;
+  }
+
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--brand) 28%, transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/*
+ * Package panels draw their own DOM (`el("section", { class: "card detail" })`).
+ * These rules give that plain markup the dashboard's look and use contract tokens only.
+ */
+@layer components {
+  [data-panel-host] .panel {
+    display: grid;
+    gap: 1rem;
+  }
+
+  [data-panel-host] h1,
+  [data-panel-host] h2 {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  [data-panel-host] h3 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+
+  [data-panel-host] a {
+    color: var(--brand);
+    text-underline-offset: 3px;
+  }
+
+  [data-panel-host] a:hover {
+    text-decoration: underline;
+  }
+
+  [data-panel-host] .card {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem 1.125rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--card-foreground);
+    box-shadow: 0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent);
+  }
+
+  [data-panel-host] .muted {
+    color: var(--muted-foreground);
+  }
+
+  [data-panel-host] .empty {
+    padding: 2rem 1rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    color: var(--muted-foreground);
+    text-align: center;
+  }
+
+  [data-panel-host] .error {
+    padding: 0.625rem 0.75rem;
+    border: 1px solid color-mix(in oklab, var(--destructive) 40%, var(--border));
+    border-radius: var(--radius);
+    background: color-mix(in oklab, var(--destructive) 8%, var(--card));
+    color: var(--destructive);
+  }
+
+  [data-panel-host] pre {
+    max-height: 24rem;
+    overflow: auto;
+    padding: 0.75rem;
+    border-radius: calc(var(--radius) - 2px);
+    background: var(--muted);
+    color: var(--foreground);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  [data-panel-host] button {
+    min-height: 2rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--input);
+    border-radius: calc(var(--radius) - 2px);
+    background: var(--card);
+    color: var(--foreground);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 120ms;
+  }
+
+  [data-panel-host] button:hover {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  [data-panel-host] input,
+  [data-panel-host] select,
+  [data-panel-host] textarea {
+    min-height: 2rem;
+    padding: 0 0.625rem;
+    border: 1px solid var(--input);
+    border-radius: calc(var(--radius) - 2px);
+    background: var(--background);
+    color: var(--foreground);
+    font: inherit;
+    font-size: 0.875rem;
+  }
+
+  [data-panel-host] table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  [data-panel-host] th {
+    position: sticky;
+    top: 0;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted-foreground);
+    font-weight: 600;
+    text-align: left;
+  }
+
+  [data-panel-host] td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  [data-panel-host] tr:hover td {
+    background: var(--muted);
   }
 }

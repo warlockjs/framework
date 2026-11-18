@@ -97,10 +97,10 @@ export function PanelHeader({
   note?: React.ReactNode;
 }) {
   return (
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h2 className="text-base font-semibold">{title}</h2>
-        {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+        {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
@@ -108,7 +108,7 @@ export function PanelHeader({
 }
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-2 text-sm font-semibold">{children}</h3>;
+  return <h3 className="mt-6 mb-2 text-sm font-semibold text-foreground">{children}</h3>;
 }
 
 /** Monospace text that wraps: SQL, query shapes, stacks, JSON. */
@@ -116,7 +116,7 @@ export function Code({ children, className }: { children: React.ReactNode; class
   return (
     <pre
       className={cn(
-        "max-h-80 overflow-auto rounded-md bg-muted p-2 font-mono text-xs break-words whitespace-pre-wrap",
+        "max-h-80 overflow-auto rounded-lg border bg-muted p-3 font-mono text-xs leading-relaxed break-words whitespace-pre-wrap",
         className,
       )}
     >
@@ -130,7 +130,7 @@ export function Json({ value }: { value: unknown }) {
 }
 
 const fieldClass =
-  "h-8 rounded-md border border-input bg-background px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
+  "h-8 rounded-lg border border-input bg-card px-2.5 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 max-md:h-10";
 
 export function TextField({ className, ...props }: React.ComponentProps<"input">) {
   return <input className={cn(fieldClass, className)} {...props} />;
@@ -150,7 +150,7 @@ export function ToggleButton({
     <Button
       type="button"
       size="sm"
-      variant={active ? "default" : "outline"}
+      variant={active ? "brand" : "outline"}
       aria-pressed={active}
       {...props}
     >
@@ -170,8 +170,8 @@ export function RowButton({
       type="button"
       aria-current={selected ? "true" : undefined}
       className={cn(
-        "block w-full rounded-md border p-2 text-left text-sm transition-colors hover:bg-muted/60 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-        selected && "border-ring bg-muted",
+        "block w-full rounded-lg border bg-card p-2.5 text-left text-sm transition-colors hover:bg-muted/60 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+        selected && "border-brand bg-brand/10",
         className,
       )}
       {...props}
@@ -183,10 +183,10 @@ export function RowButton({
 export function statusTone(status: number | null | undefined): string {
   if (status == null) return "text-muted-foreground";
   if (status >= 500) return "text-destructive";
-  if (status >= 400) return "text-amber-600 dark:text-amber-400";
-  if (status >= 300) return "text-sky-600 dark:text-sky-400";
+  if (status >= 400) return "text-warning";
+  if (status >= 300) return "text-info";
 
-  return "text-emerald-600 dark:text-emerald-400";
+  return "text-success";
 }
 
 export function levelTone(level: string): string {
@@ -194,13 +194,13 @@ export function levelTone(level: string): string {
     case "error":
       return "text-destructive";
     case "warn":
-      return "text-amber-600 dark:text-amber-400";
+      return "text-warning";
     case "success":
-      return "text-emerald-600 dark:text-emerald-400";
+      return "text-success";
     case "debug":
       return "text-muted-foreground";
     default:
-      return "text-sky-600 dark:text-sky-400";
+      return "text-info";
   }
 }
 

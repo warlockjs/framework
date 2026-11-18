@@ -46,6 +46,12 @@ The default dashboard retains the latest 200 requests at `/__warlock`.
 | Jobs      | The registered scheduled jobs of `@warlock.js/scheduler` with their schedule, last and next run. The scheduler keeps no run history yet, so duration, last error and failure counts are empty. Queue job counts appear only when the queue driver reports them; today the tab says they are not available. |
 | API       | The app's API reference, rendered from its OpenAPI 3.1 document. See [API docs](#api-docs).                                                                                                                                                                                                                |
 
+Each panel opens with a short description and its main actions, then a row of figures computed from the data on screen
+(for Requests: the count, the server error rate, the p95 duration and the slowest request). Lists have a filter bar with a
+result count (`42 of 310`) and a **Clear filters** action. Status codes and log levels are colour-coded, durations carry
+a small bar that shows their size against the rest of the list, and a row opens its detail with the keyboard (Enter or
+Space) as well as the mouse. Tables scroll inside their card on narrow screens.
+
 **Queries** also lists query statistics: each query shape with its count,
 total and mean time, and p50 and p95. **Routes** lists the same for each route.
 In development these come from this process's memory.

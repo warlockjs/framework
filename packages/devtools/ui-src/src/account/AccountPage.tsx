@@ -365,11 +365,11 @@ export function AccountPage() {
   if (!account.data) return <LoadingRows />;
 
   return (
-    <div className="mx-auto grid max-w-3xl gap-4">
+    <div className="mx-auto grid max-w-3xl gap-5">
       <div>
-        <h2 className="text-lg font-semibold">Account</h2>
-        <p className="text-sm text-muted-foreground">
-          {account.data.email} <Badge variant="secondary">{account.data.role}</Badge>
+        <h2 className="text-xl font-semibold tracking-tight">Account</h2>
+        <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          {account.data.email} <Badge variant="brand">{account.data.role}</Badge>
         </p>
       </div>
       <PasswordSection />

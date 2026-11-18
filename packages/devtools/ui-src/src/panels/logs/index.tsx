@@ -1,17 +1,29 @@
 import { useCallback, useMemo, useState } from "react";
+import { RefreshCwIcon } from "lucide-react";
 import type { DevtoolsInstancesView, DevtoolsLogRow, DevtoolsLogsView } from "@contracts";
 import { useApi, useStream, type StreamEvent } from "@/api/hooks";
+import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import {
+  ClearFilters,
+  FilterBar,
+  HEAD,
+  LevelPill,
+  PageHeader,
+  ResultCount,
+  SearchField,
+  Segmented,
+  StatTiles,
+  TableCard,
+} from "@/components/listing";
+import {
   clockTime,
+  formatNumber,
   instanceLabel,
   Json,
-  levelTone,
-  PanelHeader,
   queryString,
-  SelectField,
-  TextField,
 } from "@/components/ui/panel-kit";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { DevtoolsPanelProps } from "@/panels/types";
 
 const LEVELS = ["", "debug", "info", "warn", "error", "success"] as const;
@@ -22,6 +34,7 @@ export function LogsPanel({ instance, session }: DevtoolsPanelProps) {
   const production = session.mode === "production";
   const [level, setLevel] = useState("");
   const [module, setModule] = useState("");
+  const [search, setSearch] = useState("");
   const [live, setLive] = useState<DevtoolsLogRow[]>([]);
   const path = `api/logs${queryString({ level, module, instance: instance === "all" ? undefined : instance })}`;
   const { data, error, loading, reload } = useApi<DevtoolsLogsView>(path, { refreshMs: 10_000 });
@@ -39,7 +52,7 @@ export function LogsPanel({ instance, session }: DevtoolsPanelProps) {
 
   useStream(["log"], onStream);
 
-  const rows = useMemo(() => {
+  const loaded = useMemo(() => {
     if (!data) return [];
 
     const newest = data[0]?.at ?? 0;
@@ -53,62 +66,157 @@ export function LogsPanel({ instance, session }: DevtoolsPanelProps) {
     return [...fresh, ...data].slice(0, MAX_ROWS);
   }, [data, live, level, module]);
 
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return term
+      ? loaded.filter((row) => `${row.message} ${row.action}`.toLowerCase().includes(term))
+      : loaded;
+  }, [loaded, search]);
+
+  const filtered = Boolean(level) || Boolean(module) || Boolean(search.trim());
+  const count = (name: string) => loaded.filter((row) => row.level === name).length;
+  const clearFilters = () => {
+    setLevel("");
+    setModule("");
+    setSearch("");
+  };
+
   return (
     <div>
-      <PanelHeader
+      <PageHeader
         title="Logs"
-        note={production ? "Warnings and errors, without their context." : undefined}
+        description={
+          production
+            ? "Warnings and errors, without their context. Newest first."
+            : "What your app logged, newest first, with live entries as they arrive."
+        }
       >
-        <SelectField
-          aria-label="Level"
-          value={level}
-          onChange={(event) => setLevel(event.target.value)}
-        >
-          {LEVELS.map((name) => (
-            <option key={name} value={name}>
-              {name || "All levels"}
-            </option>
-          ))}
-        </SelectField>
-        <TextField
+        <Button size="sm" variant="outline" onClick={reload}>
+          <RefreshCwIcon />
+          Refresh
+        </Button>
+      </PageHeader>
+      {loaded.length ? (
+        <StatTiles
+          items={[
+            { label: "Entries", value: formatNumber(loaded.length), hint: "loaded" },
+            {
+              label: "Errors",
+              value: formatNumber(count("error")),
+              tone: count("error") ? "destructive" : "success",
+            },
+            {
+              label: "Warnings",
+              value: formatNumber(count("warn")),
+              tone: count("warn") ? "warning" : "success",
+            },
+            {
+              label: "Modules",
+              value: formatNumber(new Set(loaded.map((row) => row.module)).size),
+            },
+          ]}
+        />
+      ) : null}
+      <FilterBar
+        label="Log filters"
+        trailing={
+          <>
+            <ResultCount shown={rows.length} total={loaded.length} noun="entry" />
+            {filtered ? <ClearFilters onClick={clearFilters} /> : null}
+          </>
+        }
+      >
+        <SearchField
+          label="Search messages"
+          placeholder="Search messages"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <SearchField
+          label="Filter module"
           placeholder="Filter module"
-          aria-label="Filter module"
+          className="max-w-56 min-w-36 flex-none"
           value={module}
           onChange={(event) => setModule(event.target.value)}
         />
-      </PanelHeader>
+        <Segmented
+          label="Level"
+          value={level}
+          onChange={setLevel}
+          options={LEVELS.map((name) => ({ value: name, label: name || "All" }))}
+        />
+      </FilterBar>
       {error ? (
         <ErrorMessage error={error} title="Could not load the logs" onRetry={reload} />
       ) : null}
       {!data && loading ? <LoadingRows /> : null}
-      {data && !rows.length ? <EmptyState title="No logs found for these filters." /> : null}
-      <div className="space-y-1">
-        {rows.map((row, index) => (
-          <div key={`${row.at}-${index}`} className="rounded-md border p-2 text-sm">
-            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <span className={`font-semibold ${levelTone(row.level)}`}>{row.level}</span>
-              <span>
-                {row.module} · {row.action} · {clockTime(row.at)}
-              </span>
-              {production && row.instance ? (
-                <span>{instanceLabel(row.instance, instances?.instances)}</span>
-              ) : null}
-              {row.requestId ? (
-                <a className="underline" href={`#requests/${encodeURIComponent(row.requestId)}`}>
-                  request
-                </a>
-              ) : null}
-            </div>
-            <div className="break-words">{row.message}</div>
-            {row.context !== undefined ? (
-              <details>
-                <summary className="cursor-pointer text-xs">Context</summary>
-                <Json value={row.context} />
-              </details>
-            ) : null}
-          </div>
-        ))}
-      </div>
+      {data && !rows.length ? (
+        <EmptyState
+          title="No logs found for these filters."
+          hint={
+            filtered
+              ? "Clear the filters, or pick a lower level to see more."
+              : "Entries appear here as your app logs them."
+          }
+        />
+      ) : null}
+      {rows.length ? (
+        <TableCard label="Logs">
+          <TableHeader>
+            <TableRow>
+              <TableHead className={HEAD}>Time</TableHead>
+              <TableHead className={HEAD}>Level</TableHead>
+              <TableHead className={HEAD}>Source</TableHead>
+              <TableHead className={HEAD}>Message</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row, index) => (
+              <TableRow key={`${row.at}-${index}`} className="align-top">
+                <TableCell
+                  className="w-24 text-xs text-muted-foreground tabular-nums"
+                  title={new Date(row.at).toLocaleString()}
+                >
+                  {clockTime(row.at)}
+                </TableCell>
+                <TableCell className="w-20">
+                  <LevelPill level={row.level} />
+                </TableCell>
+                <TableCell className="max-w-48 text-xs">
+                  <div className="truncate font-medium" title={`${row.module} · ${row.action}`}>
+                    {row.module} · {row.action}
+                  </div>
+                  <div className="flex gap-2 text-muted-foreground">
+                    {production && row.instance ? (
+                      <span>{instanceLabel(row.instance, instances?.instances)}</span>
+                    ) : null}
+                    {row.requestId ? (
+                      <a
+                        className="underline"
+                        href={`#requests/${encodeURIComponent(row.requestId)}`}
+                      >
+                        request
+                      </a>
+                    ) : null}
+                  </div>
+                </TableCell>
+                <TableCell className="min-w-64 text-sm whitespace-normal">
+                  <div className="break-words">{row.message}</div>
+                  {row.context !== undefined ? (
+                    <details>
+                      <summary className="cursor-pointer text-xs text-muted-foreground">
+                        Context
+                      </summary>
+                      <Json value={row.context} />
+                    </details>
+                  ) : null}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </TableCard>
+      ) : null}
     </div>
   );
 }

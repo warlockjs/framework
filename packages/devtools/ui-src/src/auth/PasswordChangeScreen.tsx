@@ -28,7 +28,7 @@ export function PasswordChangeScreen({ onStep, onSignOut }: PasswordChangeScreen
       />
       <button
         type="button"
-        className="text-sm text-muted-foreground underline"
+        className="rounded-sm text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
         onClick={() => void onSignOut()}
       >
         Sign out

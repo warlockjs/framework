@@ -299,3 +299,44 @@ describe("Requests panel", () => {
 });
 
 void devSession;
+
+describe("Requests panel summary and counts", () => {
+  it("summarises the list in tiles and counts the rows", async () => {
+    mockApi([
+      [
+        "api/requests",
+        [row({ durationMs: 40 }), row({ id: "req-2", status: 500, durationMs: 900 })],
+      ],
+    ]);
+    renderPanel(RequestsPanel);
+
+    const summary = await screen.findByLabelText("Summary");
+
+    expect(within(summary).getByText("Requests")).toBeInTheDocument();
+    expect(within(summary).getByText("50.0 %")).toBeInTheDocument();
+    expect(within(summary).getAllByText("900 ms").length).toBeGreaterThan(0);
+    expect(screen.getByRole("status")).toHaveTextContent("2 requests");
+  });
+
+  it("applies a status class from the segmented control and clears the filters", async () => {
+    const { calls } = mockApi([[/^api\/requests/, []]]);
+    const user = userEvent.setup();
+
+    renderPanel(RequestsPanel);
+    await screen.findByText(/No requests yet/);
+    await user.click(
+      within(screen.getByRole("group", { name: "Status class" })).getByRole("button", {
+        name: "5xx",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(calls.some((call) => call.url === "api/requests?status=5xx")).toBe(true),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() =>
+      expect(calls.filter((call) => call.url === "api/requests").length).toBeGreaterThan(1),
+    );
+  });
+});

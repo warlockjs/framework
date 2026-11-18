@@ -1,4 +1,4 @@
-import { act, screen } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { DevtoolsLogRow } from "@contracts";
@@ -57,7 +57,9 @@ describe("Logs panel", () => {
 
     renderPanel(LogsPanel);
     await screen.findByText(/No logs found/);
-    await user.selectOptions(screen.getByLabelText("Level"), "error");
+    await user.click(
+      within(screen.getByRole("group", { name: "Level" })).getByRole("button", { name: "error" }),
+    );
     await user.type(screen.getByLabelText("Filter module"), "db");
 
     expect(calls.some((call) => call.url === "api/logs?level=error&module=db")).toBe(true);
@@ -86,5 +88,34 @@ describe("Logs panel", () => {
 
     expect(await screen.findByText("Logs could not be read. Try again.")).toBeInTheDocument();
     expect(screen.getByText("Reference: lg-1")).toBeInTheDocument();
+  });
+});
+
+describe("Logs panel summary and counts", () => {
+  it("shows tiles and narrows the loaded rows by message", async () => {
+    mockApi([
+      [
+        /^api\/logs/,
+        [
+          log(),
+          log({ level: "error", message: "Disk full", module: "storage", at: Date.now() - 30_000 }),
+        ],
+      ],
+    ]);
+    const user = userEvent.setup();
+
+    renderPanel(LogsPanel);
+
+    const summary = await screen.findByLabelText("Summary");
+
+    expect(within(summary).getByText("Errors")).toBeInTheDocument();
+    expect(within(summary).getByText("Warnings")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("2 entries");
+
+    await user.type(screen.getByLabelText("Search messages"), "disk");
+
+    expect(screen.getByRole("status")).toHaveTextContent("1 of 2 entries");
+    expect(screen.queryByText("Gateway timed out")).not.toBeInTheDocument();
+    expect(screen.getByText("Disk full")).toBeInTheDocument();
   });
 });

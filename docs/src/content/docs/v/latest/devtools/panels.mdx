@@ -184,6 +184,24 @@ const queuePanel: DevtoolsPanelExport = ({ mode }) => ({
 export default queuePanel;
 ```
 
+## Passing options to a panel
+
+A package panel can take options. List it as a pair, the module specifier and a plain options object:
+
+```ts title="src/config/devtools.ts"
+export default {
+  panels: [["@warlock.js/grimoire/devtools", { ttlMs: 60_000 }]],
+};
+```
+
+The options object is spread into the factory's context next to `root` and `mode`, so the factory receives
+`{ ttlMs: 60000, root, mode }`. `root` and `mode` always come from devtools and cannot be overridden. A plain string
+entry still works and passes no options. Which options a panel reads is up to the panel; see its own page.
+
+A pair must be exactly `[string, plain object]`. Anything else (a missing options object, an array, a string, a third
+item) is reported in the server log with the entry and what to change, and that entry is skipped; the other entries
+still load. `production.panels[<id>]` keys by the panel's `id`, so it works the same for a pair.
+
 ## Writes in production
 
 In the production monitor, a panel's GET routes need a signed-in user. Every other method needs an **admin**, an
@@ -194,6 +212,42 @@ context's `api()` adds the header for you. If your view calls `fetch` directly f
 
 Turn a panel off in production with `production.panels[<id>]: false`; see
 [Devtools in production](/v/latest/devtools/production/#tabs-in-production).
+
+## Styling a panel
+
+The dashboard has a light and a dark theme, and a panel's view renders inside it. Style the panel with the
+dashboard's CSS variables so it follows the theme and stays readable in both. A panel stylesheet (the files in
+`assets`, or styles written by the view) may use only these variables, plus variables it defines itself:
+
+| Group    | Variables                                                                                                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Surfaces | `--background`, `--card`, `--card-foreground`, `--popover`, `--popover-foreground`, `--muted`, `--secondary`, `--secondary-foreground`, `--accent`, `--accent-foreground` |
+| Text     | `--foreground`, `--muted-foreground`                                                                                                                                      |
+| Brand    | `--primary`, `--primary-foreground`, `--brand`, `--brand-foreground`, `--ring`                                                                                            |
+| Status   | `--success`, `--warning`, `--info`, `--destructive`                                                                                                                       |
+| Lines    | `--border`, `--input`, `--radius`                                                                                                                                         |
+| Charts   | `--chart-1` to `--chart-5`                                                                                                                                                |
+
+```css title="queue.css"
+.queue-row {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--card-foreground);
+}
+.queue-row .late {
+  color: var(--warning);
+}
+```
+
+`--foreground`, `--muted-foreground`, `--brand`, `--success`, `--warning`, `--info` and `--destructive` are at least
+4.5:1 against `--background` and `--card` in both themes, so text in these colours is readable. A variable that is
+not in the list (or defined by the panel itself) is not set by the dashboard and falls back to the browser default,
+which can make text unreadable. The list is exported as `DEVTOOLS_PANEL_TOKENS` from `@warlock.js/devtools`, so a
+package can check its own stylesheet in a test.
+
+The view's DOM also gets the dashboard's base styles: elements with the classes `card`, `muted`, `empty` and
+`error`, plus plain `h2`, `a`, `button`, `input`, `select`, `table` and `pre`, are styled to match.
 
 ## Security
 

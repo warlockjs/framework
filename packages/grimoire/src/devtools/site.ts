@@ -34,6 +34,7 @@ const uiFolder = fileURLToPath(new URL("../../ui/", import.meta.url));
 export function buildSiteData(snapshot: GrimoireSnapshot) {
   const routes: Record<string, unknown> = {
     summary: data.summary(snapshot),
+    features: data.features(snapshot),
     apps: data.apps(snapshot),
     tasks: data.tasks(snapshot),
     releases: data.releases(snapshot),
@@ -160,14 +161,17 @@ export function inlineView(source: string): string {
   return source.replace(marker, "");
 }
 
-const PAGE_STYLE = `
-:root{color-scheme:light dark;--bg:#f5f6f8;--surface:#fff;--line:#d9dde5;--text:#18202a;--muted:#667085;--accent:#285fc1;--good:#167a43;--warn:#a96000;--bad:#b42318;--bar:#5b7cfa;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#16191f;--surface:#20242c;--line:#383e49;--text:#edf0f5;--muted:#aab3c2;--accent:#83adff;--good:#65d394;--warn:#f6b65a;--bad:#ff9c95;--bar:#8ca7ff}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-size:14px}
-main{max-width:1100px;margin:0 auto;padding:16px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.badge{display:inline-block;padding:0 6px;border:1px solid var(--line);border-radius:10px;font-size:12px}
-.empty,.error{padding:12px;color:var(--muted)}.error{color:var(--bad)}
+/**
+ * The page's own styles: it defines every devtools panel token (light, then dark under
+ * `prefers-color-scheme`), so `grimoire.css` renders the same here as in the dashboard.
+ * The values keep text AA on `--background` and `--card`.
+ */
+export const PAGE_STYLE = `
+:root{color-scheme:light dark;--background:#f7f8fa;--foreground:#161b22;--card:#fff;--card-foreground:#161b22;--popover:#fff;--popover-foreground:#161b22;--primary:#1f2937;--primary-foreground:#fff;--secondary:#eceff3;--secondary-foreground:#1f2937;--muted:#eceff3;--muted-foreground:#4b5565;--accent:#e4e9f2;--accent-foreground:#161b22;--destructive:#b42318;--border:#d5dae3;--input:#c3cad6;--ring:#2f5fd0;--radius:10px;--brand:#2757c4;--brand-foreground:#fff;--success:#13693b;--warning:#8a5300;--info:#0b66a3;--chart-1:#2757c4;--chart-2:#13693b;--chart-3:#8a5300;--chart-4:#6d3ac7;--chart-5:#b4306b;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+@media (prefers-color-scheme:dark){:root{--background:#14171c;--foreground:#eceff4;--card:#1c2027;--card-foreground:#eceff4;--popover:#1c2027;--popover-foreground:#eceff4;--primary:#eceff4;--primary-foreground:#14171c;--secondary:#272c35;--secondary-foreground:#eceff4;--muted:#272c35;--muted-foreground:#a9b2c1;--accent:#2d3440;--accent-foreground:#eceff4;--destructive:#ff8f86;--border:#343b47;--input:#3f4756;--ring:#8fb0ff;--radius:10px;--brand:#86adff;--brand-foreground:#0d1320;--success:#5fd391;--warning:#f3b25a;--info:#6cc0f5;--chart-1:#86adff;--chart-2:#5fd391;--chart-3:#f3b25a;--chart-4:#b79cff;--chart-5:#ff8fbd}}
+*{box-sizing:border-box}body{margin:0;background:var(--background);color:var(--foreground);font-size:14px;line-height:1.5}
+main{max-width:1180px;margin:0 auto;padding:16px}
+.empty{padding:12px;color:var(--muted-foreground)}.error{padding:12px;color:var(--destructive)}
 `;
 
 /** The `index.html` text. */
@@ -189,7 +193,7 @@ export function renderSiteHtml(
 <style>${PAGE_STYLE}${sources.css}</style>
 </head>
 <body>
-<main id="grimoire-root"><p class="empty">Loading the Grimoire…</p></main>
+<main id="grimoire-root"><p class="empty">Opening the book…</p></main>
 <script type="application/json" id="grimoire-data">${json}</script>
 <script type="module">${script}</script>
 </body>

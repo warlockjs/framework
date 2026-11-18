@@ -1,94 +1,107 @@
+import { RefreshCwIcon } from "lucide-react";
 import type { DevtoolsJobsReport, DevtoolsJobsView } from "@contracts";
 import { useApi } from "@/api/hooks";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
-import {
-  DASH,
-  formatMs,
-  formatNumber,
-  NUM,
-  PanelHeader,
-  queryString,
-  Time,
-} from "@/components/ui/panel-kit";
+import { HEAD, NUM_CELL, PageHeader, Pill, StatTiles, TableCard } from "@/components/listing";
+import { DASH, formatMs, formatNumber, queryString, Time } from "@/components/ui/panel-kit";
 import type { DevtoolsPanelProps } from "@/panels/types";
 
 function Schedules({ report }: { report: DevtoolsJobsReport }) {
   if (!report.available.scheduler) {
     return (
-      <EmptyState title="The scheduler is not installed in this app. Install @warlock.js/scheduler to see its jobs here." />
+      <EmptyState
+        title="The scheduler is not installed in this app. Install @warlock.js/scheduler to see its jobs here."
+        hint="Add the package, register a job and restart the app."
+      />
     );
   }
 
-  if (!report.schedules.length) return <EmptyState title="No scheduled jobs are registered." />;
+  if (!report.schedules.length)
+    return (
+      <EmptyState
+        title="No scheduled jobs are registered."
+        hint="Jobs you register with the scheduler appear here with their next run."
+      />
+    );
 
   return (
-    <Table aria-label="Schedules">
+    <TableCard label="Schedules">
       <TableHeader>
         <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Schedule</TableHead>
-          <TableHead>Last run</TableHead>
-          <TableHead>Next run</TableHead>
-          <TableHead className={NUM}>Duration</TableHead>
-          <TableHead className={NUM}>Runs</TableHead>
-          <TableHead className={NUM}>Failures</TableHead>
-          <TableHead>Last error</TableHead>
+          <TableHead className={HEAD}>Name</TableHead>
+          <TableHead className={HEAD}>Schedule</TableHead>
+          <TableHead className={HEAD}>Last run</TableHead>
+          <TableHead className={HEAD}>Next run</TableHead>
+          <TableHead className={`${HEAD} ${NUM_CELL}`}>Duration</TableHead>
+          <TableHead className={`${HEAD} ${NUM_CELL}`}>Runs</TableHead>
+          <TableHead className={`${HEAD} ${NUM_CELL}`}>Failures</TableHead>
+          <TableHead className={HEAD}>Last error</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {report.schedules.map((job) => (
           <TableRow key={job.name}>
             <TableCell className="font-mono text-xs">
-              {job.name} {job.isRunning ? <Badge variant="secondary">running</Badge> : null}
+              {job.name} {job.isRunning ? <Pill tone="info">running</Pill> : null}
             </TableCell>
             <TableCell className="font-mono text-xs">{job.cron ?? job.interval ?? DASH}</TableCell>
-            <TableCell>
+            <TableCell className="text-muted-foreground">
               <Time at={job.lastRunAt} />
             </TableCell>
             <TableCell>
               <Time at={job.nextRunAt} />
             </TableCell>
-            <TableCell className={NUM}>{formatMs(job.lastDurationMs)}</TableCell>
-            <TableCell className={NUM}>{formatNumber(job.runs)}</TableCell>
-            <TableCell className={NUM}>{job.failures || DASH}</TableCell>
+            <TableCell className={NUM_CELL}>{formatMs(job.lastDurationMs)}</TableCell>
+            <TableCell className={NUM_CELL}>{formatNumber(job.runs)}</TableCell>
+            <TableCell className={NUM_CELL}>
+              {job.failures ? (
+                <Pill tone="destructive" mono>
+                  {job.failures}
+                </Pill>
+              ) : (
+                DASH
+              )}
+            </TableCell>
             <TableCell className="max-w-xs text-xs whitespace-normal text-destructive">
               {job.lastError ?? DASH}
             </TableCell>
           </TableRow>
         ))}
       </TableBody>
-    </Table>
+    </TableCard>
   );
 }
 
 function Queues({ report }: { report: DevtoolsJobsReport }) {
   if (!report.available.queue) {
     return (
-      <EmptyState title="The queue is not installed in this app. Install @warlock.js/queue to see its job counts here." />
+      <EmptyState
+        title="The queue is not installed in this app. Install @warlock.js/queue to see its job counts here."
+        hint="Add the package, dispatch a job and restart the app."
+      />
     );
   }
 
-  if (!report.queues.length) return <EmptyState title="No queue reported job counts." />;
+  if (!report.queues.length)
+    return (
+      <EmptyState
+        title="No queue reported job counts."
+        hint="Counts appear once a queue has handled a job."
+      />
+    );
 
   const states = [...new Set(report.queues.flatMap((queue) => Object.keys(queue.counts)))];
 
   return (
-    <Table aria-label="Queues">
+    <TableCard label="Queues">
       <TableHeader>
         <TableRow>
-          <TableHead>Queue</TableHead>
+          <TableHead className={HEAD}>Queue</TableHead>
           {states.map((state) => (
-            <TableHead key={state} className={NUM}>
+            <TableHead key={state} className={`${HEAD} ${NUM_CELL}`}>
               {state}
             </TableHead>
           ))}
@@ -99,14 +112,17 @@ function Queues({ report }: { report: DevtoolsJobsReport }) {
           <TableRow key={queue.name}>
             <TableCell className="font-mono text-xs">{queue.name}</TableCell>
             {states.map((state) => (
-              <TableCell key={state} className={NUM}>
+              <TableCell
+                key={state}
+                className={`${NUM_CELL} ${state === "failed" && queue.counts[state] ? "font-semibold text-destructive" : ""}`}
+              >
                 {formatNumber(queue.counts[state] ?? 0)}
               </TableCell>
             ))}
           </TableRow>
         ))}
       </TableBody>
-    </Table>
+    </TableCard>
   );
 }
 
@@ -114,24 +130,64 @@ function Queues({ report }: { report: DevtoolsJobsReport }) {
 export function JobsPanel({ instance }: DevtoolsPanelProps) {
   const path = `api/jobs${queryString({ instance: instance === "all" ? undefined : instance })}`;
   const { data, error, loading, reload } = useApi<DevtoolsJobsView>(path, { refreshMs: 10_000 });
+  const reports = (data?.instances ?? []).map((entry) => entry.report);
+  const schedules = reports.flatMap((report) => report.schedules);
+  const running = schedules.filter((job) => job.isRunning).length;
+  const failingJobs = schedules.filter((job) => job.lastError).length;
+  const failedQueued = reports
+    .flatMap((report) => report.queues)
+    .reduce((sum, queue) => sum + (queue.counts.failed ?? 0), 0);
 
   return (
     <div>
-      <PanelHeader title="Jobs" />
+      <PageHeader
+        title="Jobs"
+        description="Scheduled jobs with their next run, and the job counts of each queue."
+      >
+        <Button size="sm" variant="outline" onClick={reload}>
+          <RefreshCwIcon />
+          Refresh
+        </Button>
+      </PageHeader>
       {error ? (
         <ErrorMessage error={error} title="Could not load the jobs" onRetry={reload} />
       ) : null}
       {!data && loading ? <LoadingRows rows={3} /> : null}
       {data && !data.instances.length ? (
-        <EmptyState title="No instance has reported its jobs yet." />
+        <EmptyState
+          title="No instance has reported its jobs yet."
+          hint="Reports arrive a few seconds after the app starts."
+        />
+      ) : null}
+      {data?.instances.length ? (
+        <StatTiles
+          items={[
+            { label: "Scheduled jobs", value: formatNumber(schedules.length) },
+            {
+              label: "Running now",
+              value: formatNumber(running),
+              tone: running ? "info" : "neutral",
+            },
+            {
+              label: "Jobs with a last error",
+              value: formatNumber(failingJobs),
+              tone: failingJobs ? "destructive" : "success",
+            },
+            {
+              label: "Failed queue jobs",
+              value: formatNumber(failedQueued),
+              tone: failedQueued ? "destructive" : "success",
+            },
+          ]}
+        />
       ) : null}
       <div className="space-y-4">
         {data?.instances.map(({ instance: info, report }) => (
           <Card key={info.id}>
             <CardHeader>
-              <CardTitle className="text-sm">{info.label}</CardTitle>
+              <CardTitle className="text-base">{info.label}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <section aria-label={`Schedules on ${info.label}`}>
                 <h3 className="mb-2 text-sm font-semibold">Schedules</h3>
                 <Schedules report={report} />

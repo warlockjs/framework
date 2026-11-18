@@ -64,7 +64,7 @@ export function MfaVerifyScreen({ session, onStep, onSignOut }: MfaVerifyScreenP
       </form>
       <button
         type="button"
-        className="text-sm underline"
+        className="rounded-sm text-sm underline underline-offset-4"
         onClick={() => {
           setUseRecovery((previous) => !previous);
           setValue("");
@@ -88,7 +88,7 @@ export function MfaVerifyScreen({ session, onStep, onSignOut }: MfaVerifyScreenP
       ) : null}
       <button
         type="button"
-        className="text-sm text-muted-foreground underline"
+        className="rounded-sm text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
         onClick={() => void onSignOut()}
       >
         Sign out

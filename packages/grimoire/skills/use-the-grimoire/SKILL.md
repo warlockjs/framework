@@ -135,3 +135,5 @@ From `@warlock.js/grimoire/vitest`: `grimoireReporter` records the last result o
 From `@warlock.js/grimoire/devtools`: `grimoireDevtoolsPanel` (the default export) is the Grimoire
 tab for `@warlock.js/devtools`, listed in `panels` of `src/config/devtools.ts`;
 `exportGrimoireSite` writes the same view as a static site.
+The tab keeps its snapshot until the book changes in production and refreshes it in the background in
+development; set `ttlMs` with `panels: [["@warlock.js/grimoire/devtools", { ttlMs: 60_000 }]]`.

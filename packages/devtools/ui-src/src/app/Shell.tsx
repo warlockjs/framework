@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DevtoolsPanelInfo } from "@contracts";
 import { useApi } from "@/api/hooks";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -7,19 +7,28 @@ import { LoadingRows } from "@/components/common/LoadingRows";
 import { ViewBoundary } from "@/components/common/ViewBoundary";
 import { AccountPage } from "@/account/AccountPage";
 import { AdminPage } from "@/admin/AdminPage";
+import { CircleUserIcon, ShieldCheckIcon, SunMoonIcon } from "lucide-react";
 import { PanelHost } from "@/panel-host/PanelHost";
 import { BUILT_IN_PANELS, isBuiltInPanel } from "@/panels/registry";
+import { CommandPalette, type PaletteItem } from "./CommandPalette";
 import { Header } from "./Header";
+import { groupPanels, iconFor } from "./nav";
+import { Sidebar } from "./Sidebar";
+import { useColorScheme } from "./useColorScheme";
 import { useSession } from "./session";
 import { useHashRoute } from "./useHashRoute";
 
-/** The signed-in dashboard: header, tabs from `api/panels`, and the open tab or page. */
+/** The signed-in dashboard: sidebar with the tabs from `api/panels`, top bar, command palette and the open tab or page. */
 export function Shell() {
   const { session } = useSession();
   const route = useHashRoute();
+  const { setChoice } = useColorScheme();
   const [instance, setInstance] = useState("all");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const menuButton = useRef<HTMLElement | null>(null);
   const panels = useApi<DevtoolsPanelInfo[]>("api/panels");
-  const list = panels.data ?? [];
+  const list = useMemo(() => panels.data ?? [], [panels.data]);
   const tabId =
     route.type === "tab"
       ? list.some((panel) => panel.id === route.id)
@@ -44,6 +53,88 @@ export function Shell() {
       : route.type === "admin"
         ? "Admin"
         : (list.find((panel) => panel.id === tabId)?.title ?? "tab");
+
+  const title =
+    route.type === "account"
+      ? "Account"
+      : route.type === "admin"
+        ? `Admin: ${{ users: "Users and invites", audit: "Audit log", settings: "Settings" }[route.page]}`
+        : viewName === "tab"
+          ? "Dashboard"
+          : viewName;
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    menuButton.current?.focus();
+  }, []);
+
+  // Ctrl/Cmd+K opens the palette from anywhere.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen((value) => !value);
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const production = session.mode === "production";
+  const paletteItems = useMemo<PaletteItem[]>(() => {
+    const go = (hash: string) => () => {
+      location.hash = hash;
+    };
+    const items: PaletteItem[] = groupPanels(list).flatMap(({ group, items: tabs }) =>
+      tabs.map((panel) => ({
+        id: `tab:${panel.id}`,
+        label: panel.title,
+        group,
+        icon: iconFor(panel.id),
+        run: go(`#${panel.id}`),
+      })),
+    );
+
+    if (production) {
+      items.push({
+        id: "account",
+        label: "Account",
+        group: "Account",
+        icon: CircleUserIcon,
+        run: go("#/account"),
+      });
+    }
+
+    if (production && session.role === "admin") {
+      for (const [page, label] of [
+        ["users", "Admin: Users and invites"],
+        ["audit", "Admin: Audit log"],
+        ["settings", "Admin: Settings"],
+      ] as const) {
+        items.push({
+          id: `admin:${page}`,
+          label,
+          group: "Admin",
+          icon: ShieldCheckIcon,
+          run: go(`#/admin/${page}`),
+        });
+      }
+    }
+
+    for (const choice of ["system", "light", "dark"] as const) {
+      items.push({
+        id: `theme:${choice}`,
+        label: `Theme: ${choice}`,
+        group: "Appearance",
+        icon: SunMoonIcon,
+        run: () => setChoice(choice),
+      });
+    }
+
+    return items;
+  }, [list, production, session.role, setChoice]);
 
   if (route.type === "account") {
     content = <AccountPage />;
@@ -82,13 +173,36 @@ export function Shell() {
   }
 
   return (
-    <div className="min-h-screen">
-      <Header panels={list} activeTab={tabId} instance={instance} onInstanceChange={setInstance} />
-      <main className="p-4">
-        <ViewBoundary key={viewKey} name={viewName}>
-          {content}
-        </ViewBoundary>
-      </main>
+    <div className="min-h-screen lg:flex">
+      <Sidebar panels={list} activeTab={tabId} open={drawerOpen} onClose={closeDrawer} />
+      {drawerOpen ? (
+        <button
+          type="button"
+          aria-label="Close navigation backdrop"
+          tabIndex={-1}
+          className="fixed inset-0 z-30 animate-dt-fade bg-black/50 lg:hidden"
+          onClick={closeDrawer}
+        />
+      ) : null}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Header
+          title={title}
+          instance={instance}
+          onInstanceChange={setInstance}
+          navigationOpen={drawerOpen}
+          onOpenNavigation={() => {
+            menuButton.current = document.activeElement as HTMLElement | null;
+            setDrawerOpen(true);
+          }}
+          onOpenPalette={() => setPaletteOpen(true)}
+        />
+        <main className="mx-auto w-full max-w-[110rem] flex-1 px-3 py-5 sm:px-6">
+          <ViewBoundary key={viewKey} name={viewName}>
+            {content}
+          </ViewBoundary>
+        </main>
+      </div>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} items={paletteItems} />
     </div>
   );
 }

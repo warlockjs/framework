@@ -1,3 +1,4 @@
+import { TriangleAlertIcon } from "lucide-react";
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -46,10 +47,11 @@ export function ErrorMessage({
 
   return (
     <Alert variant="destructive" className={cn("text-left", className)}>
+      <TriangleAlertIcon aria-hidden="true" />
       <AlertDescription className="text-destructive">
         {title ? <AlertTitle>{title}</AlertTitle> : null}
         <p>{text}</p>
-        {ref ? <p className="font-mono text-xs">Reference: {ref}</p> : null}
+        {ref ? <p className="font-mono text-xs opacity-90">Reference: {ref}</p> : null}
         {onRetry ? (
           <Button variant="outline" size="xs" className="mt-2" onClick={onRetry}>
             Try again

@@ -364,6 +364,7 @@ A package or the app adds a tab with one line in `src/config/devtools.ts`:
 ```ts
 export default {
   panels: ["@acme/queue/devtools"], // or "./src/devtools/queue-panel.ts"
+  // pass options to a panel factory (root and mode always win): [["@acme/queue/devtools", { pageSize: 50 }]]
 };
 ```
 
@@ -413,3 +414,9 @@ not write files in production. The ids `resources`, `health`, `errors`, `jobs`,
 `instances`, `auth`, `account` and `admin` are reserved.
 
 Full reference: the "Registering a panel" page of the devtools docs.
+
+Panel styling: a package panel's CSS may use only the dashboard's variables (`DEVTOOLS_PANEL_TOKENS`, exported by
+`@warlock.js/devtools`: `--background --foreground --card --muted --muted-foreground --accent --border --brand
+--success --warning --info --destructive --chart-1..5` and the other shadcn names) plus variables it defines itself.
+Never use another name (such as `--text` or `--surface`): the dashboard does not define it, and text can become
+unreadable. The text tokens meet 4.5:1 contrast on `--background` and `--card` in both themes.

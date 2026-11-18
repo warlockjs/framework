@@ -15,3 +15,4 @@ export {
   type DurationProps,
   type RelativeTimeProps,
 } from "./format";
+export { PageHeader, type PageHeaderProps } from "./PageHeader";

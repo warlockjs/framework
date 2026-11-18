@@ -1,15 +1,17 @@
 import type { DevtoolsResourcePoint, DevtoolsResourcesView } from "@contracts";
 import { useApi } from "@/api/hooks";
 import { LineChart, Sparkline } from "@/components/charts";
+import { RefreshCwIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
+import { PageHeader, StatTiles } from "@/components/listing";
 import {
   formatBytes,
   formatDuration,
   formatMs,
   formatNumber,
   formatPercent,
-  PanelHeader,
   queryString,
 } from "@/components/ui/panel-kit";
 import type { DevtoolsPanelProps } from "@/panels/types";
@@ -26,7 +28,7 @@ function Metric({
   trend?: readonly number[];
 }) {
   return (
-    <div className="rounded-md border p-2">
+    <div className="rounded-lg border bg-muted/30 p-2.5">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="text-lg font-semibold tabular-nums">{value}</div>
       {trend ? <Sparkline values={trend} width={110} height={24} label={`${label} trend`} /> : null}
@@ -50,7 +52,7 @@ function InstanceResources({ entry }: { entry: Entry }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">
+        <CardTitle className="text-base">
           {entry.instance.label}{" "}
           <span className="font-normal text-muted-foreground">
             · up {formatDuration(snapshot.uptimeSeconds)} · Node {entry.instance.nodeVersion}
@@ -177,15 +179,48 @@ export function ResourcesPanel({ instance }: DevtoolsPanelProps) {
   const path = `api/resources${queryString({ instance: instance === "all" ? undefined : instance })}`;
   const { data, error, loading, reload } = useApi<DevtoolsResourcesView>(path, { refreshMs: 5000 });
 
+  const entries = data?.instances ?? [];
+  const peak = (pick: (entry: Entry) => number) => Math.max(0, ...entries.map(pick));
+
   return (
     <div>
-      <PanelHeader title="Resources" note="Updated every 5 seconds." />
+      <PageHeader
+        title="Resources"
+        description="Memory, CPU, event loop and garbage collection of each running instance. Updated every 5 seconds."
+      >
+        <Button size="sm" variant="outline" onClick={reload}>
+          <RefreshCwIcon />
+          Refresh
+        </Button>
+      </PageHeader>
       {error ? (
         <ErrorMessage error={error} title="Could not load the resource readings" onRetry={reload} />
       ) : null}
       {!data && loading ? <LoadingRows rows={3} /> : null}
       {data && !data.instances.length ? (
-        <EmptyState title="No instance has reported its resources yet. Readings appear a few seconds after the app starts." />
+        <EmptyState
+          title="No instance has reported its resources yet. Readings appear a few seconds after the app starts."
+          hint="If the app is running and this stays empty, check that the monitor is enabled."
+        />
+      ) : null}
+      {entries.length ? (
+        <StatTiles
+          items={[
+            { label: "Instances", value: formatNumber(entries.length) },
+            {
+              label: "Highest memory (RSS)",
+              value: formatBytes(peak((entry) => entry.snapshot.rssBytes)),
+            },
+            {
+              label: "Highest CPU",
+              value: formatPercent(peak((entry) => entry.snapshot.cpuPercent)),
+            },
+            {
+              label: "Worst event loop p99",
+              value: formatMs(peak((entry) => entry.snapshot.eventLoopDelayP99Ms)),
+            },
+          ]}
+        />
       ) : null}
       <div className="space-y-4">
         {data?.instances.map((entry) => (

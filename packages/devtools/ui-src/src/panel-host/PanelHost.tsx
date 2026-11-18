@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { buildPanelContext } from "./context";
 import { loadPanelModule } from "./modules";
+import { LoaderCircleIcon } from "lucide-react";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 
 export type PanelHostProps = {
@@ -17,12 +18,14 @@ export type PanelHostProps = {
  * shell. The module is imported once per page load and called with the 5.55.0
  * panel context; whatever it renders goes into an element this component
  * owns, and it renders again on `refresh()` and when the panel's route
- * changes. A failed module shows an error that says what to check.
+ * changes. While the module and its first render are pending it shows a
+ * "Loading <title>…" note; a failed module shows an error that says what to check.
  */
 export function PanelHost({ id, title, route }: PanelHostProps) {
   const container = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let current = true;
@@ -31,6 +34,7 @@ export function PanelHost({ id, title, route }: PanelHostProps) {
     if (!host) return;
 
     setError(null);
+    setLoading(!host.hasChildNodes());
 
     const refresh = () => setTick((value) => value + 1);
 
@@ -63,8 +67,12 @@ export function PanelHost({ id, title, route }: PanelHostProps) {
       if (!current) return;
 
       host.replaceChildren(result instanceof Node ? result : root);
+      setLoading(false);
     })().catch((reason: unknown) => {
-      if (current) setError(reason instanceof Error ? reason.message : String(reason));
+      if (!current) return;
+
+      setError(reason instanceof Error ? reason.message : String(reason));
+      setLoading(false);
     });
 
     return () => {
@@ -74,7 +82,21 @@ export function PanelHost({ id, title, route }: PanelHostProps) {
 
   return (
     <>
-      {error ? <ErrorMessage message={error} /> : null}
+      {error ? (
+        <ErrorMessage message={error} title={`The ${title} panel could not be shown`} />
+      ) : null}
+      {loading && !error ? (
+        <div
+          role="status"
+          className="flex items-center gap-2.5 rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground"
+        >
+          <LoaderCircleIcon
+            className="size-4 animate-spin motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+          Loading {title}…
+        </div>
+      ) : null}
       <div ref={container} data-panel-host={id} />
     </>
   );

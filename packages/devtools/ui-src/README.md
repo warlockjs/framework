@@ -43,18 +43,18 @@ data, the empty state, an API error with its message and reference, and its main
 
 ## Where things live
 
-| Folder                       | What                                                                    |
-| ---------------------------- | ----------------------------------------------------------------------- |
-| `src/app/`                   | The shell, router, header, instance picker.                             |
-| `src/auth/`                  | Sign-in, setup, invite, password, two-factor enrolment, recovery codes. |
-| `src/admin/`, `src/account/` | Users and invites, audit, settings, the account page.                   |
-| `src/panel-host/`            | Mounts package panel view modules with the original context.            |
-| `src/panels/<id>/`           | One folder per built-in tab, registered in `src/panels/registry.ts`.    |
-| `src/components/ui/`         | shadcn components.                                                      |
-| `src/components/common/`     | Shared pieces such as the error message with its reference id.          |
-| `src/components/charts/`     | SVG charts.                                                             |
-| `src/api/`                   | `apiFetch`, the data hooks, and types.                                  |
-| `tests/`                     | UI specs.                                                               |
+| Folder                       | What                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------- |
+| `src/app/`                   | The shell: sidebar, top bar, command palette, theme toggle, instance picker. |
+| `src/auth/`                  | Sign-in, setup, invite, password, two-factor enrolment, recovery codes.      |
+| `src/admin/`, `src/account/` | Users and invites, audit, settings, the account page.                        |
+| `src/panel-host/`            | Mounts package panel view modules with the original context.                 |
+| `src/panels/<id>/`           | One folder per built-in tab, registered in `src/panels/registry.ts`.         |
+| `src/components/ui/`         | shadcn components.                                                           |
+| `src/components/common/`     | Shared pieces such as the error message with its reference id.               |
+| `src/components/charts/`     | SVG charts.                                                                  |
+| `src/api/`                   | `apiFetch`, the data hooks, and types.                                       |
+| `tests/`                     | UI specs.                                                                    |
 
 The wire types come from `src/production/contracts.ts` (imported as `@contracts`). That file has no imports so the UI
 can use it.
@@ -67,3 +67,12 @@ this folder, `contracts.ts` and the UI dependency versions; every shipped file s
 build is byte-identical to the shipped files; and the size is within budget. If `ui/dashboard/` is stale, the gate fails:
 rebuild and commit it. The gate runs Vite with a 10 minute timeout; on the shared server start it through the same
 wrapper as the build.
+
+## Design tokens and themes
+
+`src/styles.css` defines the tokens for the light theme (`:root`) and the dark theme (`.dark`): the shadcn names plus
+`--brand`, `--brand-foreground`, `--success`, `--warning`, `--info`, mapped in `@theme inline` (`text-success`,
+`bg-brand/10`). Use hex values so the contrast check can read them. The text tokens must stay at 4.5:1 or better on
+`--background` and `--card`; `packages/devtools/tests/panel-tokens.spec.ts` checks this and that every name in
+`src/panel-tokens.ts` (the contract for package panels) is defined in both themes. The theme choice (system, light,
+dark) is saved in localStorage and applied as the `dark` class on `<html>` by `useColorScheme`.

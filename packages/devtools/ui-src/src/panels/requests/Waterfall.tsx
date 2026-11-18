@@ -41,7 +41,16 @@ export function Waterfall({ request }: { request: RequestDetail }) {
   const total = Math.max(request.durationMs || 0, 1);
 
   return (
-    <div className="space-y-1" aria-label="Waterfall">
+    <div className="space-y-1.5" aria-label="Waterfall">
+      <div className="mb-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+        {(["phase", "query", "cache"] as const).map((kind) => (
+          <span key={kind} className="inline-flex items-center gap-1.5">
+            <span aria-hidden className="size-2 rounded-sm" style={{ background: COLORS[kind] }} />
+            {kind === "phase" ? "Phases" : kind === "query" ? "Queries" : "Cache"}
+          </span>
+        ))}
+        <span className="ml-auto tabular-nums">0 to {formatMs(total)}</span>
+      </div>
       {entries.map((entry, index) => {
         const start = Math.max(0, Math.min(100, ((entry.at - request.startedAt) / total) * 100));
         const width = Math.max(0.5, Math.min(100 - start, (entry.duration / total) * 100));
@@ -54,7 +63,7 @@ export function Waterfall({ request }: { request: RequestDetail }) {
             <span className="truncate font-mono" title={entry.label}>
               {entry.label}
             </span>
-            <span className="relative h-3 rounded-sm bg-muted">
+            <span className="relative h-3 rounded-sm bg-muted/70">
               <span
                 className="absolute inset-y-0 rounded-sm"
                 style={{ left: `${start}%`, width: `${width}%`, background: COLORS[entry.kind] }}

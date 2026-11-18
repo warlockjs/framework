@@ -177,3 +177,120 @@ describe("shell", () => {
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 });
+
+describe("shell chrome", () => {
+  const setup = () =>
+    mockApi({
+      "api/auth/session": { body: developmentSession },
+      "api/panels": {
+        body: [...panels, { id: "grimoire", title: "Grimoire", type: "package" }],
+      },
+    });
+
+  it("groups the tabs in sections and puts package panels under Packages", async () => {
+    setup();
+    render(<App />);
+
+    await screen.findByRole("link", { name: "Requests" });
+
+    const nav = screen.getByRole("navigation", { name: "Dashboard tabs" });
+
+    expect(within(nav).getByText("Monitor")).toBeInTheDocument();
+    expect(within(nav).getByText("Packages")).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Grimoire" })).toBeInTheDocument();
+  });
+
+  it("cycles the theme, saves it and sets the dark class", async () => {
+    localStorage.removeItem("warlock-devtools-theme");
+    setup();
+    render(<App />);
+
+    const toggle = await screen.findByRole("button", { name: /^Theme: system/ });
+
+    await userEvent.click(toggle);
+    expect(screen.getByRole("button", { name: /^Theme: light/ })).toBeInTheDocument();
+    expect(localStorage.getItem("warlock-devtools-theme")).toBe("light");
+    expect(document.documentElement).not.toHaveClass("dark");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Theme: light/ }));
+    expect(localStorage.getItem("warlock-devtools-theme")).toBe("dark");
+    expect(document.documentElement).toHaveClass("dark");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Theme: dark/ }));
+    expect(localStorage.getItem("warlock-devtools-theme")).toBeNull();
+
+    document.documentElement.classList.remove("dark");
+  });
+
+  it("opens the navigation drawer with the menu button and closes it with Escape", async () => {
+    setup();
+    render(<App />);
+
+    const open = await screen.findByRole("button", { name: "Open navigation" });
+    const sidebar = document.getElementById("dashboard-sidebar") as HTMLElement;
+
+    expect(sidebar).toHaveAttribute("data-open", "false");
+    await userEvent.click(open);
+    expect(sidebar).toHaveAttribute("data-open", "true");
+    expect(open).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Close navigation backdrop" })).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+    expect(sidebar).toHaveAttribute("data-open", "false");
+    expect(
+      screen.queryByRole("button", { name: "Close navigation backdrop" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("closes the drawer when a tab is chosen", async () => {
+    setup();
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Open navigation" }));
+    await userEvent.click(screen.getByRole("link", { name: "Queries" }));
+
+    expect(document.getElementById("dashboard-sidebar")).toHaveAttribute("data-open", "false");
+  });
+
+  it("opens the command palette with Ctrl+K and jumps to a tab with the keyboard", async () => {
+    setup();
+    render(<App />);
+    await screen.findByRole("link", { name: "Requests" });
+
+    await userEvent.keyboard("{Control>}k{/Control}");
+
+    const input = await screen.findByRole("combobox", { name: "Search tabs and pages" });
+
+    expect(input).toHaveFocus();
+    await userEvent.type(input, "quer");
+
+    const options = screen.getAllByRole("option");
+
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent("Queries");
+
+    await userEvent.keyboard("{Enter}");
+    expect(window.location.hash).toBe("#queries");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("moves with the arrow keys, says when nothing matches and closes with Escape", async () => {
+    setup();
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Search tabs and pages" }));
+
+    const input = await screen.findByRole("combobox");
+
+    expect(screen.getAllByRole("option")[0]).toHaveAttribute("aria-selected", "true");
+    await userEvent.keyboard("{ArrowDown}");
+    expect(screen.getAllByRole("option")[1]).toHaveAttribute("aria-selected", "true");
+    expect(input).toHaveAttribute("aria-activedescendant", screen.getAllByRole("option")[1]?.id);
+
+    await userEvent.type(input, "zzzz");
+    expect(screen.getByText(/Nothing matches/)).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+});

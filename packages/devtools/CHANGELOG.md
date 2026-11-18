@@ -4,6 +4,29 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.57.0 - 2026-11-18
+
+### Upgrading
+
+- The dashboard has a new palette and layout. A package panel whose stylesheet used CSS variables the dashboard never defined (anything outside `DEVTOOLS_PANEL_TOKENS`) should switch to the listed tokens; see "Styling a panel" in the docs.
+
+### Added
+
+- The `panels` option accepts `[specifier, options]` entries. The options object is passed to the panel factory next to `root` and `mode`, for example `panels: [["@warlock.js/grimoire/devtools", { ttlMs: 60_000 }]]`. An invalid entry is reported with what to change and skipped; the other panels still load.
+- `DEVTOOLS_PANEL_TOKENS`: the CSS variables a package panel stylesheet may use. Every one is defined in the light and the dark theme, and a spec checks the definitions, their WCAG AA contrast and the built-in panel views.
+- A command palette (Ctrl/Cmd+K, or the search button in the top bar) jumps to any tab, the account page or an admin page.
+- A theme toggle (system, light, dark) in the top bar, saved in the browser.
+- Package panels show a "Loading <title>…" state while their view loads, so a slow panel is never a blank area.
+
+### Changed
+
+- The dashboard has a new look: a left sidebar with grouped, icon-labelled tabs (Monitor, Application, AI, Packages), a slim top bar, and a slide-over menu on narrow screens. Light and dark themes use a tinted palette with one brand colour, and every text colour meets WCAG AA contrast on both themes.
+- Every built-in tab opens with a description and its actions, a row of summary figures, and a filter bar with result counts and a Clear filters action. Requests gains a status-class filter, Queries a Slow / N+1 / Errors filter, Errors a Source filter, and Logs a message search and a level control.
+- Status codes, methods and log levels are colour-coded pills, durations show a bar sized against the rest of the list, table headers stay in view while scrolling, and rows open their detail with the keyboard as well as the mouse. Tables scroll inside their card on narrow screens.
+- Detail views are split into titled sections with key/value grids and code blocks with copy buttons. The request detail has a Close button and a waterfall legend.
+- Badges gain `success`, `warning`, `info`, `brand` and `neutral` tones, buttons gain `brand` and `soft`, and empty states show an icon and what to do next.
+- Sign-in, account and admin screens use the new look.
+
 ## 5.56.0 - 2026-11-17
 
 ### Upgrading

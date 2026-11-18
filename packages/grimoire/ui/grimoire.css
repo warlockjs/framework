@@ -1,59 +1,527 @@
-/* The Grimoire tab. Colours come from the dashboard's variables. */
+/*
+ * The Grimoire tab. Colours come from the dashboard's panel tokens
+ * (--background, --foreground, --card, --muted-foreground, --brand, --success, ...).
+ * --muted and --accent are background surfaces, never text colours: text uses
+ * --foreground and --muted-foreground, links use --brand. Every class is scoped
+ * under .grimoire-root so nothing leaks into, or depends on, the dashboard.
+ */
+.grimoire-root {
+  --gm-gap: 16px;
+  --gm-radius: var(--radius, 10px);
+  --gm-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --gm-focus: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+  display: grid;
+  gap: var(--gm-gap);
+  min-width: 0;
+  max-width: 100%;
+  color: var(--foreground);
+  line-height: 1.5;
+}
+.grimoire-root *,
+.grimoire-root *::before,
+.grimoire-root *::after {
+  box-sizing: border-box;
+}
+.grimoire-root a {
+  color: var(--brand);
+  text-underline-offset: 2px;
+}
+.grimoire-root a:hover {
+  text-decoration-thickness: 2px;
+}
+.grimoire-root a:focus-visible,
+.grimoire-root button:focus-visible,
+.grimoire-root input:focus-visible,
+.grimoire-root select:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: var(--gm-focus);
+}
+.grimoire-root h2,
+.grimoire-root h3,
+.grimoire-root h4 {
+  margin: 0;
+  color: var(--foreground);
+  line-height: 1.25;
+}
+.grimoire-root h2 {
+  font-size: 22px;
+}
+.grimoire-root h3 {
+  font-size: 15px;
+}
+.grimoire-root h4 {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.grimoire-root p {
+  margin: 0;
+}
+.grimoire-root .empty {
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--gm-radius);
+  color: var(--muted-foreground);
+}
+.grimoire-muted {
+  color: var(--muted-foreground);
+}
+.grimoire-mono {
+  font-family: var(--gm-mono);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+/* Header: tabs and search */
 .grimoire-header {
   display: grid;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 12px;
 }
-.grimoire-nav {
+.grimoire-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
+  gap: 4px;
+  padding: 4px;
+  overflow-x: auto;
+  border-radius: var(--gm-radius);
+  background: var(--muted);
 }
-.grimoire-nav a {
-  color: var(--accent);
-  text-decoration: none;
+.grimoire-root .grimoire-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: calc(var(--gm-radius) - 3px);
+  color: var(--muted-foreground);
   font-weight: 600;
+  text-decoration: none;
+}
+.grimoire-root .grimoire-tab:hover {
+  color: var(--foreground);
+}
+.grimoire-root .grimoire-tab.is-active {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: inset 0 -2px 0 var(--brand);
+}
+.grimoire-tab-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.grimoire-tab-count:empty {
+  display: none;
+}
+.grimoire-searchbox {
+  position: relative;
+}
+.grimoire-search,
+.grimoire-filter-input,
+.grimoire-sort {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--input);
+  border-radius: var(--gm-radius);
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
 }
 .grimoire-search {
-  width: 100%;
-  max-width: 640px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
+  font-size: 15px;
+}
+.grimoire-search::placeholder,
+.grimoire-filter-input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 1;
 }
 .grimoire-results:empty {
   display: none;
 }
 .grimoire-results {
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  max-width: 640px;
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: min(60vh, 460px);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--gm-radius);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--foreground) 18%, transparent);
 }
-.grimoire-view h2 {
-  margin: 0 0 6px;
+.grimoire-hit-title {
+  padding: 8px 8px 4px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
 }
-.grimoire-view h3,
-.grimoire-view h4 {
-  margin: 12px 0 6px;
+.grimoire-root .grimoire-hit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-height: 40px;
+  padding: 6px 8px;
+  border-radius: calc(var(--gm-radius) - 4px);
+  color: var(--popover-foreground);
+  text-decoration: none;
 }
-.grimoire-view a,
-.grimoire-results a {
-  color: var(--accent);
+.grimoire-root .grimoire-hit:hover,
+.grimoire-root .grimoire-hit.is-active {
+  background: var(--accent);
+  color: var(--accent-foreground);
 }
-.grimoire-cards {
+.grimoire-root .grimoire-hit.is-plain {
+  color: var(--muted-foreground);
+}
+
+/* Breadcrumbs and titles */
+.grimoire-crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.grimoire-crumbs li + li::before {
+  content: "\203A";
+  padding: 0 8px;
+}
+.grimoire-crumbs [aria-current] {
+  color: var(--foreground);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.grimoire-view {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--gm-gap);
+  min-width: 0;
+}
+.grimoire-heading {
+  display: grid;
+  gap: 8px;
+}
+.grimoire-heading h2 {
+  overflow-wrap: anywhere;
+}
+.grimoire-heading-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.grimoire-lede {
+  max-width: 70ch;
+  font-size: 15px;
+}
+
+/* Pills: status words, severities, types. Tone text is AA on the background and card. */
+.grimoire-pill {
+  --gm-tone: var(--muted-foreground);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--gm-tone) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gm-tone) 10%, transparent);
+  color: var(--gm-tone);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.grimoire-pill.is-good {
+  --gm-tone: var(--success);
+}
+.grimoire-pill.is-info {
+  --gm-tone: var(--info);
+}
+.grimoire-pill.is-warn {
+  --gm-tone: var(--warning);
+}
+.grimoire-pill.is-bad {
+  --gm-tone: var(--destructive);
+}
+
+/* Cards and sections */
+.grimoire-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--gm-radius);
+  background: var(--card);
+  color: var(--card-foreground);
+}
+.grimoire-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: var(--gm-gap);
+}
+.grimoire-view-groups,
+.grimoire-app-list {
+  display: grid;
+  gap: var(--gm-gap);
+}
+.grimoire-note {
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  border-left-width: 4px;
+  border-radius: var(--gm-radius);
+  background: color-mix(in srgb, var(--warning) 8%, var(--card));
+  color: var(--foreground);
+}
+
+/* Overview stat cards */
+.grimoire-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
   gap: 12px;
-  margin-bottom: 12px;
+}
+.grimoire-root .grimoire-stat {
+  --gm-tone: var(--border);
+  display: grid;
+  gap: 2px;
+  min-height: 44px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--gm-tone);
+  border-radius: var(--gm-radius);
+  background: var(--card);
+  color: var(--card-foreground);
+  text-decoration: none;
+}
+.grimoire-root .grimoire-stat:hover {
+  border-color: var(--brand);
+  border-left-color: var(--gm-tone);
+}
+.grimoire-stat.is-good {
+  --gm-tone: var(--success);
+}
+.grimoire-stat.is-warn {
+  --gm-tone: var(--warning);
+}
+.grimoire-stat.is-bad {
+  --gm-tone: var(--destructive);
+}
+.grimoire-stat-label {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 600;
+}
+.grimoire-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.grimoire-stat-sub {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+/* Listings: toolbar, count, filters */
+.grimoire-listing {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.grimoire-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.grimoire-toolbar .grimoire-filter-input {
+  flex: 1 1 240px;
+  width: auto;
+}
+.grimoire-toolbar .grimoire-sort {
+  flex: 0 0 auto;
+  width: auto;
+}
+.grimoire-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.grimoire-root .grimoire-filter {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--input);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.grimoire-root .grimoire-filter:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.grimoire-root .grimoire-filter[aria-pressed="true"] {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-foreground);
+}
+.grimoire-listing-count {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+/* Feature cards */
+.grimoire-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 12px;
+}
+.grimoire-feature {
+  --gm-tone: var(--border);
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--gm-tone);
+  border-radius: var(--gm-radius);
+  background: var(--card);
+  color: var(--card-foreground);
+}
+.grimoire-feature.is-good {
+  --gm-tone: var(--success);
+}
+.grimoire-feature.is-info {
+  --gm-tone: var(--info);
+}
+.grimoire-feature.is-warn {
+  --gm-tone: var(--warning);
+}
+.grimoire-feature header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.grimoire-feature h3 {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.grimoire-feature-id {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.grimoire-feature-id .grimoire-mono {
+  margin-right: 6px;
+  color: var(--foreground);
+}
+.grimoire-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.grimoire-feature-flows {
+  display: grid;
+  gap: 6px;
+}
+
+/* Apps */
+.grimoire-app-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.grimoire-app-icon {
+  flex: none;
+  color: var(--brand);
+}
+.grimoire-group h4 {
+  margin: 8px 0 6px;
+  font-family: var(--gm-mono);
+}
+
+/* Chips, lists, facts, tables */
+.grimoire-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.grimoire-root .grimoire-chip {
+  max-width: 100%;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-family: var(--gm-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+.grimoire-root .grimoire-chip:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  text-decoration: underline;
+}
+.grimoire-root .grimoire-more {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px dashed var(--input);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--brand);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
 }
 .grimoire-list {
+  display: grid;
+  gap: 6px;
   margin: 0;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
+}
+.grimoire-list li {
+  overflow-wrap: anywhere;
+}
+.grimoire-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+}
+.grimoire-facts dt {
+  color: var(--muted-foreground);
+}
+.grimoire-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.grimoire-scroll {
+  max-width: 100%;
+  overflow-x: auto;
 }
 .grimoire-table {
   width: 100%;
@@ -61,28 +529,126 @@
 }
 .grimoire-table th,
 .grimoire-table td {
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
   text-align: left;
   vertical-align: top;
 }
-.grimoire-table td ul {
+.grimoire-table th {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.grimoire-table tbody tr:hover {
+  background: var(--muted);
+}
+.grimoire-table td .grimoire-list {
+  gap: 4px;
+}
+
+/* Check findings */
+.grimoire-findings {
+  display: grid;
+  gap: 10px;
   margin: 0;
-  padding-left: 16px;
+  padding: 0;
+  list-style: none;
 }
-.grimoire-view .card {
-  margin-bottom: 12px;
+.grimoire-finding {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--gm-radius) - 2px);
+  background: var(--background);
 }
-.grimoire-view .badge.good {
-  color: var(--good);
+.grimoire-finding-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
-.grimoire-view .badge.bad {
-  color: var(--bad);
+.grimoire-finding-message {
+  overflow-wrap: anywhere;
 }
-.grimoire-view .muted {
-  color: var(--muted);
-}
+
+/* Graphs */
 .grimoire-svg {
   width: 100%;
+  height: auto;
   max-height: 460px;
+}
+
+/* Loading and errors */
+.grimoire-skeleton {
+  display: grid;
+  gap: 10px;
+}
+.grimoire-skeleton-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.grimoire-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 12px;
+  margin-top: 6px;
+}
+.grimoire-skeleton-block {
+  height: 84px;
+  border-radius: var(--gm-radius);
+  background: linear-gradient(90deg, var(--muted) 0%, var(--accent) 50%, var(--muted) 100%);
+  background-size: 200% 100%;
+  animation: grimoire-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes grimoire-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.grimoire-error {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--destructive) 45%, transparent);
+  border-left-width: 4px;
+  border-radius: var(--gm-radius);
+  background: var(--card);
+}
+.grimoire-error-title {
+  color: var(--destructive);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* Small screens and touch */
+@media (max-width: 640px) {
+  .grimoire-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .grimoire-facts dd {
+    margin-bottom: 8px;
+  }
+  .grimoire-root h2 {
+    font-size: 19px;
+  }
+}
+@media (pointer: coarse) {
+  .grimoire-root .grimoire-tab,
+  .grimoire-root .grimoire-hit {
+    min-height: 44px;
+  }
+  .grimoire-root .grimoire-more {
+    min-height: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .grimoire-skeleton-block {
+    animation: none;
+  }
 }

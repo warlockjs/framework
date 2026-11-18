@@ -53,7 +53,11 @@ export type GrimoirePanelContext = {
   mode?: "development" | "production";
   /** The adapter to open the book with. Default: the Warlock adapter, loaded on first request. */
   adapter?: BookAdapter | (() => Promise<BookAdapter>);
-  /** How long an opened snapshot is reused when the book manifest did not change (ms). Default 2000, longer after a slow open. */
+  /**
+   * How long an opened snapshot is reused when the book did not change (ms).
+   * Default in development: 2000, longer after a slow open; the old snapshot is served while a
+   * background open refreshes it. Default in production: until the book changes.
+   */
   ttlMs?: number;
 };
 
@@ -73,9 +77,14 @@ export async function grimoireDevtoolsPanel(
   // and cached routes never boot the app.
   const source = createSnapshotSource(context.root, {
     write: context.mode !== "production",
+    mode: context.mode ?? "development",
     ...(context.adapter === undefined ? {} : { adapter: context.adapter }),
     ...(context.ttlMs === undefined ? {} : { ttlMs: context.ttlMs }),
   });
+
+  // In production, start opening the book now so the first tab view is fast.
+  if (context.mode === "production") source.warm();
+
   const answer =
     <Answer>(read: (snapshot: GrimoireSnapshot, request: GrimoirePanelRequest) => Answer) =>
     async (request: GrimoirePanelRequest): Promise<Answer> =>
@@ -115,6 +124,7 @@ export async function grimoireDevtoolsPanel(
           data.route(snapshot, one(query, "method"), one(query, "path")),
         ),
       },
+      { path: "/features", handler: answer((snapshot) => data.features(snapshot)) },
       {
         path: "/features/:feature",
         handler: answer((snapshot, { params }) => data.feature(snapshot, params.feature)),

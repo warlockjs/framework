@@ -135,7 +135,7 @@ export function AuditPage() {
         <label className="grid gap-1 text-sm">
           Event type
           <select
-            className="h-9 rounded-md border bg-background px-2"
+            className="h-9 rounded-lg border border-input bg-card px-2.5 shadow-xs focus-visible:ring-[3px] focus-visible:ring-ring/50 max-md:h-10"
             value={type}
             onChange={(event) => changeFilter(setType, event.target.value)}
           >
@@ -150,7 +150,7 @@ export function AuditPage() {
         <label className="grid gap-1 text-sm">
           Account
           <select
-            className="h-9 rounded-md border bg-background px-2"
+            className="h-9 rounded-lg border border-input bg-card px-2.5 shadow-xs focus-visible:ring-[3px] focus-visible:ring-ring/50 max-md:h-10"
             value={account}
             onChange={(event) => changeFilter(setAccount, event.target.value)}
           >

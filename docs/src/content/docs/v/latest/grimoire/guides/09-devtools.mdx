@@ -1,6 +1,6 @@
 ---
 title: The devtools tab
-description: Browse the Grimoire in the devtools dashboard (search, features, flows, pages, tasks, releases, the check report and small graphs), and export it as a static folder for people without the app running.
+description: Browse the Grimoire in the devtools dashboard (search, a features listing, flows, apps and pages, tasks, releases, the check report and small graphs), and export it as a static folder for people without the app running.
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -33,26 +33,55 @@ still never boots your app.
 
 ## What it shows
 
-One search box at the top of every view looks across flows, blocks, pages, routes, files, exports and tasks. Each hit
-opens its view. Views link to each other with hash links such as `#grimoire/flow/catalog/new-arrivals`, so you can
-copy the address of what you are looking at.
+The tab opens with a bar of seven views: Overview, Features, Apps, Tasks, Releases, Check and Modules. The one you are
+in is marked, and small counts show how much each holds. Detail views (a feature, a flow, a page, a task, a release, a
+file) belong to the view they came from and show a breadcrumb back to it, such as Features, then `auth`, then the flow.
 
-| View            | What it shows                                                                                                                                                                              |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Home            | The check counts, open tasks, the size of the book, and the features with their status.                                                                                                    |
-| Feature         | The README header, its flows, owned and borrowed files, routes, pages, files no flow reaches, open tasks, recent changes, findings, and a graph of the feature and its neighbours.         |
-| Flow            | The steps with the files behind each, the acceptance criteria with their tests and last results, the pages that show the flow, the cases and unknowns, and its history from the changelog. |
-| Page or screen  | Its blocks (with the layout's), who sees each, what each changes with, the files in the book, and a graph of the page and its blocks.                                                      |
-| Apps            | Every written app with its pages and screens.                                                                                                                                              |
-| Tasks, Releases | The open, waiting and done tasks from the index (a task waiting for approval is listed only under waiting), and each release with what it collected.                                       |
-| Check           | The same findings as `warlock grimoire check`.                                                                                                                                             |
-| File            | The book entry: exports, imports, importers, owner, flows, routes, and a graph of the file's neighbours.                                                                                   |
-| Modules         | Module coupling as a graph.                                                                                                                                                                |
+One search box sits above every view. Press `/` anywhere outside a text field to jump to it and `Escape` to clear it.
+It looks across flows, blocks, pages, routes, files, exports and tasks, and groups the hits by type. Move through them
+with the arrow keys and press `Enter` to open one. Views link to each other with hash links such as
+`#grimoire/flow/catalog/new-arrivals`, so you can copy the address of what you are looking at.
+
+A large book can take a few seconds to open the first time. The tab shows an "Opening the book" state at once, and a
+failed view says what failed, why and what to do next, with a button to try again.
+
+| View            | What it shows                                                                                                                                                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Overview        | Cards for the features by status, flows, apps, pages and screens, open and waiting tasks, check errors and warnings, and the size of the book; the route facts with the build hint when they are old or missing; recent releases and the top check problems. |
+| Features        | Every feature as a card with its status, version, flow count and flow names. Filter by status or text, sort by name, status, flows or last update; the count reads "12 of 30 features".                                                                      |
+| Feature         | The README header, its flows, owned and borrowed files, routes, pages, files no flow reaches, open tasks, recent changes, findings, and a graph of the feature and its neighbours.                                                                           |
+| Flow            | The steps with the files behind each, the acceptance criteria with their tests and last results, the pages that show the flow, the cases and unknowns, and its history from the changelog.                                                                   |
+| Apps            | One card per written app (site or mobile) with its root and counts. Pages and screens are grouped by the first segment of their route, with a text filter and a confirmed, inferred or unmarked status per row.                                              |
+| Page or screen  | Its blocks (with the layout's), who sees each, what each changes with, the files in the book, and a graph of the page and its blocks.                                                                                                                        |
+| Tasks, Releases | The open, waiting and done tasks from the index (a task waiting for approval is listed only under waiting) with a filter, and each release with what it collected, grouped by feature.                                                                       |
+| Check           | The same findings as `warlock grimoire check`, as a list with severity, code, message, what to do and where. What to fix comes first; the expected findings of proposed work are kept apart.                                                                 |
+| File, route     | The book entry: exports, imports, importers, owner, flows, routes, and a graph of the file's neighbours; or a route with the files behind it.                                                                                                                |
+| Modules         | Module coupling as a graph, with the modules listed by how many imports tie them to others.                                                                                                                                                                  |
 
 The graphs are plain SVG with at most 60 nodes. Click a node to open it.
 
-With no features written, the tab still works from the book: search, files, routes and the module graph. The home view
+With no features written, the tab still works from the book: search, files, routes and the module graph. The overview
 says that no features are written yet.
+
+## Performance
+
+The tab opens the book once and keeps that snapshot in memory; concurrent requests share one open.
+
+- **In production** the snapshot is reused with no time limit until the book changes. Devtools opens the book when the
+  panel is created, so the first view of the tab is fast even on a large app. A cheap change check (a few `stat` calls
+  on the book manifest and the written folders, no directory walk) reopens the book when you rebuild it or an agent adds
+  or removes a written file.
+- **In development** the snapshot is reused for 2 seconds, or five times as long as the last open took when that is
+  longer. After that the tab serves the cached snapshot at once and refreshes it in the background, so a view never
+  waits on a reopen once the first open is done. If a refresh fails, the old snapshot keeps being served.
+
+Set `ttlMs` (milliseconds) to choose the reuse time yourself, in either mode, by listing the panel as a pair:
+
+```ts title="src/config/devtools.ts"
+export default {
+  panels: [["@warlock.js/grimoire/devtools", { ttlMs: 60_000 }]],
+};
+```
 
 ## It never boots your app
 
@@ -63,7 +92,7 @@ changed since the last one.
 
 It keeps the snapshot in memory and opens it again when the book manifest changes, or once it is two seconds old (longer
 when an open took long), so edits to the written files show on the next view. Requests that arrive together share one
-open, so two views never rebuild the book at the same time. If the cached routes are old or missing, the home view says
+open, so two views never rebuild the book at the same time. If the cached routes are old or missing, the overview says
 so; run `warlock grimoire build` to refresh them.
 
 Every route sits behind the devtools guard, so only a local browser reaches it.
@@ -72,15 +101,16 @@ Every route sits behind the devtools guard, so only a local browser reaches it.
 
 Served at `/__warlock/api/grimoire`, all `GET`:
 
-| Route                                                                                      | Answer                                                                                   |
-| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| `/summary`                                                                                 | Route freshness, the features and tasks indexes, the check counts, the size of the book. |
-| `/search?q=&limit=`                                                                        | Ranked hits, as `warlock scry --search`.                                                 |
-| `/file?path=`, `/impact?path=`, `/route?method=&path=`                                     | Answers of `warlock scry`.                                                               |
-| `/features/:feature`, `/flows/:feature/:flow`                                              | The feature or flow with its book map, changes and findings.                             |
-| `/apps`, `/apps/:app/pages/:page`                                                          | Written apps; one page (by id or route) with its layout and book facts.                  |
-| `/tasks`, `/releases`, `/releases/:release`, `/check`                                      | Tasks index, releases, one release, the check report.                                    |
-| `/graph/file?path=`, `/graph/feature/:feature`, `/graph/page?app=&page=`, `/graph/modules` | `{ nodes, edges }`, at most 60 nodes.                                                    |
+| Route                                                                                      | Answer                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/summary`                                                                                 | Route freshness, the features and tasks indexes, the check counts, the size of the book, and how many apps, pages, screens and releases are written.         |
+| `/search?q=&limit=`                                                                        | Ranked hits, as `warlock scry --search`.                                                                                                                     |
+| `/file?path=`, `/impact?path=`, `/route?method=&path=`                                     | Answers of `warlock scry`.                                                                                                                                   |
+| `/features`                                                                                | The features listing: the index with each README summary and flow headings.                                                                                  |
+| `/features/:feature`, `/flows/:feature/:flow`                                              | The feature or flow with its book map, changes and findings.                                                                                                 |
+| `/apps`, `/apps/:app/pages/:page`                                                          | Written apps with a row per page and screen (route, title, layout, blocks, confirmed or inferred); one page (by id or route) with its layout and book facts. |
+| `/tasks`, `/releases`, `/releases/:release`, `/check`                                      | Tasks index, releases, one release, the check report.                                                                                                        |
+| `/graph/file?path=`, `/graph/feature/:feature`, `/graph/page?app=&page=`, `/graph/modules` | `{ nodes, edges }`, at most 60 nodes.                                                                                                                        |
 
 An unknown item answers `404` with a message, and a missing parameter `400`.
 
@@ -101,6 +131,6 @@ leaves it alone, and git ignores it. Pass `outDir` (project-relative or absolute
 returns the folder relative to the project.
 
 The static page answers everything in the table above except impact and route views, which need the running app and say
-so in place. Search runs in the page over the exported names. Per-file answers cover the 3000 most imported files.
+so in place. Search runs in the page over the exported names. The page carries its own light and dark colours (it follows the system setting), so it reads the same as the tab. Per-file answers cover the 3000 most imported files.
 
 The export function takes the same adapter as the rest of the package; with no `adapter` option it uses the Warlock one.

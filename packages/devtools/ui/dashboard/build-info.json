@@ -1,21 +1,21 @@
 {
-  "sourceHash": "28c5e4196542289d8fe4b0fc08f7346c628914ef338cd90d33631b9227e337fd",
+  "sourceHash": "7a2460bd004cdb5cbe740c48ecdad8c4a941e1f221ab5a7a7da75f64ca02beed",
   "budgetGzipBytes": 307200,
   "files": {
     "index.html": {
-      "bytes": 496,
-      "gzipBytes": 280,
-      "sha256": "ceebc13784a7a713a1def69fc441132412061566672971eeb2de135c29b1014d"
+      "bytes": 550,
+      "gzipBytes": 298,
+      "sha256": "c3f1725dc0a8d8fcf95ea3773de64d90d84780f56f49c702f0ce7eac1ad1d55b"
     },
     "assets/app.js": {
-      "bytes": 398281,
-      "gzipBytes": 118453,
-      "sha256": "5ea195e407c49bdbae69c68aec6e0571b2f541ee896e9d15ba5adf1a516beb43"
+      "bytes": 443344,
+      "gzipBytes": 131218,
+      "sha256": "1d19b5def581425fd9194741c1e00b4f78360a7438a7fef160ac2c33aabd7c71"
     },
     "assets/app.css": {
-      "bytes": 40741,
-      "gzipBytes": 8153,
-      "sha256": "88e05daeffcb7979fafab04d1feebaebbc5f40382b6e5173bb72e6075ef0dec9"
+      "bytes": 56264,
+      "gzipBytes": 10128,
+      "sha256": "7ed80103c89cf35c1678af9e1f287384d0a2f2bc71aef75b5049d8a7727bf5ec"
     }
   }
 }
