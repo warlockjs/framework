@@ -240,6 +240,18 @@ export type DevtoolsProductionOptions = {
     /** The WebAuthn relying party id. @default the host of `origin`, else of the request */
     rpId?: string;
   };
+  /**
+   * Read-only share links: an admin creates a link to a panel that declares
+   * `share` (the Grimoire product map), and anyone holding the link sees that
+   * view without an account. Off unless `enabled` is `true`. Needs the
+   * `devtools_shares` table (in `devtoolsMigrations`).
+   */
+  share?: {
+    /** @default false */
+    enabled?: boolean;
+    /** The longest life an admin may give a link, in days (1–365). @default 30 */
+    maxDays?: number;
+  };
 };
 
 /** `DevtoolsOptions` with every default applied. */
@@ -259,6 +271,13 @@ export type DevtoolsPanelRequest = {
   query: Readonly<Record<string, string | readonly string[]>>;
   /** The parsed request body; `undefined` when there is none. */
   body: unknown;
+  /**
+   * `true` when the request came through a read-only share link (no signed-in
+   * user). Only the routes listed in the panel's `share.routes` are reached
+   * this way; leave developer detail (file paths, code, test names) out of
+   * the answer. Absent for every other request.
+   */
+  shared?: boolean;
 };
 
 /**
@@ -307,6 +326,64 @@ export type DevtoolsPanel = {
    * `import "./graph.js"`. Names are plain file names (no folders).
    */
   assets?: Readonly<Record<string, string | URL>>;
+  /**
+   * A folder of images the view shows, served at
+   * `<path>/panels/<id>/files/<path inside the folder>`. Only the listed
+   * extensions are served; a path that leaves the folder answers 404.
+   */
+  files?: DevtoolsPanelFiles;
+  /**
+   * What a read-only share link of the panel opens (production monitor with
+   * `production.share.enabled`). Without it the panel cannot be shared.
+   */
+  share?: DevtoolsPanelShare;
+};
+
+/** A panel's folder of images (`DevtoolsPanel.files`). */
+export type DevtoolsPanelFiles = {
+  /** The folder: an absolute path or a `file:` URL. A missing folder serves nothing. */
+  dir: string | URL;
+  /**
+   * Lower-case extensions served.
+   *
+   * @default [".png", ".jpg", ".jpeg", ".webp", ".gif"]
+   */
+  extensions?: readonly string[];
+};
+
+/** What a share link of a panel opens (`DevtoolsPanel.share`). */
+export type DevtoolsPanelShare = {
+  /**
+   * The view module of the shared page: a browser ES module whose default
+   * export renders like `view`, called with `context.shared === true`.
+   */
+  view: string | URL;
+  /**
+   * Paths of the panel's GET routes the shared page may call, as written in
+   * `routes` (`"/product"`, `"/product/features/:feature"`). Every other
+   * route answers 404 through a share link.
+   */
+  routes: readonly string[];
+  /** Served names from `assets` the shared page may load. @default [] */
+  assets?: readonly string[];
+  /** Whether the shared page may load images from `files`. @default false */
+  files?: boolean;
+};
+
+/**
+ * One error group as a panel sees it: counts only, no message or stack
+ * (`DevtoolsPanelFactoryContext.errors`).
+ */
+export type DevtoolsPanelErrorSummary = {
+  /** The route pattern the error happened on (`/products/:id`), or `null` outside a request. */
+  route: string | null;
+  status: number | null;
+  /** The error class name when known (`TypeError`). */
+  name: string | null;
+  source: "request" | "log";
+  count: number;
+  firstSeen: number;
+  lastSeen: number;
 };
 
 /** One `panels` entry: a module specifier, a ready panel, or `[specifier, options]` to pass options to the module's factory. */
@@ -325,6 +402,11 @@ export type DevtoolsPanelFactoryContext = {
    * or run anything costly per request. Absent means `development`.
    */
   mode?: DevtoolsMode;
+  /**
+   * The captured error groups of the last hour (every instance in
+   * production), counts only. Absent when the monitor captures no errors.
+   */
+  errors?: () => Promise<readonly DevtoolsPanelErrorSummary[]>;
 };
 
 /** One panel or several. */

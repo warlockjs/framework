@@ -85,18 +85,37 @@
       "value": "Product catalog",
       "at": {
         "file": "grimoire/features/catalog/README.md",
-        "line": 11,
+        "line": 12,
         "column": null
       }
     },
     "summary": "Customers browse products, see what is new in their country, and will save products for later.",
+    "audience": [
+      {
+        "value": "shoppers",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 9,
+          "column": null
+        }
+      },
+      {
+        "value": "store staff",
+        "at": {
+          "file": "grimoire/features/catalog/README.md",
+          "line": 9,
+          "column": null
+        }
+      }
+    ],
+    "why": "Shoppers decide what to buy from this catalog, so it has to be fast and honest about what is in stock.\n\nStore staff use it to check what customers see.",
     "flows": [
       {
         "name": "browse-products",
         "text": "list products and open one",
         "at": {
           "file": "grimoire/features/catalog/README.md",
-          "line": 16,
+          "line": 23,
           "column": null
         }
       },
@@ -105,7 +124,7 @@
         "text": "the newest products sold in the customer's country",
         "at": {
           "file": "grimoire/features/catalog/README.md",
-          "line": 17,
+          "line": 24,
           "column": null
         }
       },
@@ -114,7 +133,7 @@
         "text": "save a product for later",
         "at": {
           "file": "grimoire/features/catalog/README.md",
-          "line": 18,
+          "line": 25,
           "column": null
         }
       }
@@ -127,7 +146,7 @@
         ],
         "at": {
           "file": "grimoire/features/catalog/README.md",
-          "line": 21,
+          "line": 28,
           "column": null
         }
       }
@@ -300,7 +319,7 @@
       "message": "catalog/browse-products AC-1 has no test",
       "at": {
         "file": "grimoire/features/catalog/flows/browse-products.md",
-        "line": 26,
+        "line": 34,
         "column": null
       },
       "expected": false,
@@ -319,7 +338,7 @@
       "message": "catalog/browse-products AC-2 has no test",
       "at": {
         "file": "grimoire/features/catalog/flows/browse-products.md",
-        "line": 27,
+        "line": 35,
         "column": null
       },
       "expected": false,
@@ -338,7 +357,7 @@
       "message": "catalog/browse-products AC-3 has no test",
       "at": {
         "file": "grimoire/features/catalog/flows/browse-products.md",
-        "line": 28,
+        "line": 36,
         "column": null
       },
       "expected": false,
@@ -357,7 +376,7 @@
       "message": "catalog/new-arrivals AC-3 has no test",
       "at": {
         "file": "grimoire/features/catalog/flows/new-arrivals.md",
-        "line": 30,
+        "line": 32,
         "column": null
       },
       "expected": false,
@@ -445,6 +464,25 @@
         "file": "grimoire/features/catalog/flows/wishlist.md"
       },
       "hint": "Fix the route path in the flow, or add the page to one of the feature's apps. A step scoped like `page /support [web-admin]` looks only in that app."
+    },
+    {
+      "code": "GR1030",
+      "severity": "warning",
+      "message": "the flow has no summary; write one or two sentences under the title.",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 8,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Write one or two plain sentences under the flow's `# Title`: who does what, and what they get."
     },
     {
       "code": "GR4001",

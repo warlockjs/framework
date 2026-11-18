@@ -312,8 +312,13 @@ export type InspectFile = {
   role: string;
   /** Public export names; default and * represent default and star exports. */
   exports: string[];
-  /** Literal imports and re-exports; null means external or unresolved. */
-  imports: { specifier: string; file: string | null }[];
+  /**
+   * Literal imports and re-exports; null means external or unresolved.
+   * `typeOnly` is `true` when every import and re-export of the specifier in
+   * this file is type-only (`import type`, `export type`, `import { type A }`
+   * with only type specifiers, `typeof import()`); absent otherwise.
+   */
+  imports: { specifier: string; file: string | null; typeOnly?: boolean }[];
   importedBy: string[];
   /** Line count of a code file; absent for non-code files. */
   lines?: number;

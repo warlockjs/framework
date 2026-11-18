@@ -24,6 +24,7 @@ import {
   normalizeKey,
   paragraphAfterTitle,
   readDocument,
+  readScreenshots,
   type BodyLine,
   type WrittenDocument,
 } from "./markdown";
@@ -303,6 +304,7 @@ export function parsePage(
     origin: fields.optionalOneOf("origin", ORIGINS),
     heading: heading(document),
     purpose: paragraphAfterTitle(document),
+    screenshots: readScreenshots(file, document.body, sink),
     blocks: blocks ? parseBlocksTable(file, blocks, sink) : [],
     alsoReachedFrom,
     blockFiles: [],
@@ -331,5 +333,6 @@ export function parseBlockFile(
     flow: fields.scalar("flow", { required: true, check: checks.flowRef }),
     heading: heading(document),
     details: readListLines(file, document.body, "detail", sink),
+    screenshots: readScreenshots(file, document.body, sink),
   };
 }

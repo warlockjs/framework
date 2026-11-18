@@ -18,6 +18,7 @@
   "imports": [
     "src/app/catalog/repositories/products.repository.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/web/$sites/client/products/show.page.tsx"
   ],

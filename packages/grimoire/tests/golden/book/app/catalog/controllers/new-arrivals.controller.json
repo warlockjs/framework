@@ -20,6 +20,7 @@
   "imports": [
     "src/app/catalog/services/new-arrivals.service.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/app/catalog/routes.ts"
   ],

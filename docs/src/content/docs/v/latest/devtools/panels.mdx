@@ -84,13 +84,15 @@ Use `import type` only: the module must not need devtools at runtime.
 | `view`       | yes      | The browser module: an absolute file path or a `file:` URL. It must exist when devtools starts.                                                                                                            |
 | `routes`     | no       | Data routes: `{ method?, path, handler }`.                                                                                                                                                                 |
 | `assets`     | no       | More files by served name: `{ "chart.js": <path or file: URL> }`. Plain file names, no folders.                                                                                                            |
+| `files`      | no       | A folder of images the view shows: `{ dir, extensions? }`. See [Images](#images-files).                                                                                                                    |
+| `share`      | no       | The shared view a read-only link opens: `{ view, routes, assets?, files? }`. See [Share a panel](#share-a-panel).                                                                                          |
 | `production` | no       | `true` when the panel is safe to show in the [production monitor](/v/latest/devtools/production/). Without it the panel is left out in production unless the project sets `production.panels[<id>]: true`. |
 
 An id that another panel already uses is refused with a message naming that
 panel. The dashboard's own ids (`requests`, `ai`, `agents`, `queries`, `mail`,
 `logs`, `routes`, `api`, and the API names `mails`, `background`, `stream`,
 `docs`, `assets`, `panels`, and the newer `resources`, `health`, `errors`, `jobs`, `instances`, `auth`, `account`,
-`admin`) and the built-in `processes` are taken.
+`admin`, `share`) and the built-in `processes` are taken.
 
 ### Data routes
 
@@ -114,6 +116,53 @@ const flowRoute: DevtoolsPanelRoute = {
 ```
 
 The client then gets `404` with `{ "error": "No flow named \"checkout\"." }`.
+
+### Images (`files`)
+
+`files` serves a folder of images, such as screenshots, at `/__warlock/panels/<id>/files/<path inside the folder>`.
+
+```ts
+files: { dir: new URL("./screenshots/", import.meta.url) }
+```
+
+- `dir` is an absolute path or a `file:` URL. A folder that does not exist serves nothing.
+- `extensions` lists the lower-case extensions that are served. The default is `.png`, `.jpg`, `.jpeg`, `.webp` and
+  `.gif`. `.svg`, `.html`, `.htm`, `.js` and `.mjs` are refused when the panel loads, because a browser can run them.
+- The path is decoded once, and a path is refused when it is empty, absolute, has an empty, `.` or `..` segment, a
+  backslash, a colon or a NUL byte, or an extension that is not listed. The real path of the file (links followed)
+  must stay inside the real path of the folder.
+- Every refusal answers `404`. Images are sent with `X-Content-Type-Options: nosniff` and `Cache-Control: no-store`.
+  In the production monitor the route needs a signed-in user.
+
+The view builds the URL with `context.file("login/step-1.png")`.
+
+### Share a panel
+
+In the [production monitor](/v/latest/devtools/production/#share-links) an admin can give someone a read-only link to a
+panel, with no account. A panel is shareable only when it declares `share`:
+
+```ts
+share: {
+  view: new URL("./shared-view.js", import.meta.url),
+  routes: ["/product", "/product/features/:feature"],
+  assets: ["shared.css"],
+  files: true,
+}
+```
+
+| Field    | What it is                                                                                                                  |
+| -------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `view`   | The browser module the link opens. It is called like `view`, with `context.shared === true`. It must exist.                  |
+| `routes` | The paths of the panel's GET routes, as written in `routes`, that the shared page may call. Any other path answers `404`.   |
+| `assets` | Served names from `assets` the shared page may load. Default: none.                                                         |
+| `files`  | `true` lets the shared page load images from `files`. The panel must declare `files`. Default: `false`.                     |
+
+The panel fails to load, with a message naming the panel and the field, when `view` is missing, a `routes` entry is not
+the path of one of its GET routes, an `assets` entry is not a name in `assets`, or `files` is set without a folder.
+
+A route called through a link receives `shared: true` in its request. Use it to leave developer detail out of the
+answer: file paths, code, test names and error messages. Everything a shared route returns reaches someone who is not
+signed in.
 
 ## Write the view module
 
@@ -154,7 +203,10 @@ export default async function renderQueue({ api, el, empty, href, route, root })
 | `href(route)`               | The link to one of the panel's views: `href("jobs/7")` is `#queue/jobs/7`, `href()` is `#queue`. A link opens the tab and renders that view.                                                                                                                                  |
 | `navigate(route)`           | Goes to that view, as following `href(route)` would.                                                                                                                                                                                                                          |
 | `refresh()`                 | Renders the panel again.                                                                                                                                                                                                                                                      |
-| `asset(name)`               | The URL of one of the panel's `assets`, for a `<link rel="stylesheet">` or an image.                                                                                                                                                                                          |
+| `asset(name)`               | The absolute URL of one of the panel's `assets`, for a `<link rel="stylesheet">`, an image or `import()` of another module.                                                                                                                                                   |
+| `file(path)`                | The URL of an image in the panel's `files` folder: `file("login/step-1.png")`. Behind a share link it points at the shared image route. |
+| `shared`                    | `true` when the view runs behind a read-only share link. Show the shared view only: no file paths, code or developer detail. |
+| `share`                     | For an admin in the production monitor, when sharing is on and the panel declares `share`: `{ enabled: true, manageHref }`, where `manageHref` opens the link manager for this panel. Otherwise `null`. Behind a link it is always `null`. |
 | `el(tag, attrs, children)`  | Builds an element. `text` sets the text, `class` the class name, `on<event>` adds a listener, anything else is an attribute.                                                                                                                                                  |
 | `svg(tag, attrs, children)` | The same for SVG elements, for small graphs drawn without a chart library.                                                                                                                                                                                                    |
 | `empty(message)`            | The dashboard's empty-state paragraph.                                                                                                                                                                                                                                        |
@@ -166,7 +218,7 @@ Clicking a tab opens its first view. Build text with `text` (never
 
 ## The factory receives `mode`
 
-A panel function receives `{ root, mode }`. `mode` is `"development"` or `"production"`. Use it to avoid side effects
+A panel function receives `{ root, mode, errors }`. `mode` is `"development"` or `"production"`. Use it to avoid side effects
 in production: a panel must not write files there. Grimoire opens its book read-only when `mode` is `"production"`.
 
 ```ts title="src/devtools/queue-panel.ts"
@@ -184,6 +236,36 @@ const queuePanel: DevtoolsPanelExport = ({ mode }) => ({
 export default queuePanel;
 ```
 
+## Captured errors (`errors`)
+
+The factory also receives `errors`, a function that reads the captured error groups of the last hour. In development
+it reads this process; in the production monitor it merges every instance. Each group is counts only (no message and
+no stack):
+
+```ts
+type DevtoolsPanelErrorSummary = {
+  route: string | null; // the route pattern, "/products/:id"
+  status: number | null;
+  name: string | null; // the error class, "TypeError"
+  source: "request" | "log";
+  count: number;
+  firstSeen: number;
+  lastSeen: number;
+};
+```
+
+```ts
+const healthPanel: DevtoolsPanelExport = ({ errors }) => ({
+  id: "health-map",
+  title: "Health map",
+  view: new URL("./view.js", import.meta.url),
+  routes: [{ path: "", handler: async () => ({ errors: errors ? await errors() : [] }) }],
+});
+```
+
+The function answers an empty list while capture is still starting. Read it per request: do not call it when the
+factory runs.
+
 ## Passing options to a panel
 
 A package panel can take options. List it as a pair, the module specifier and a plain options object:
@@ -194,8 +276,8 @@ export default {
 };
 ```
 
-The options object is spread into the factory's context next to `root` and `mode`, so the factory receives
-`{ ttlMs: 60000, root, mode }`. `root` and `mode` always come from devtools and cannot be overridden. A plain string
+The options object is spread into the factory's context next to `root`, `mode` and `errors`, so the factory receives
+`{ ttlMs: 60000, root, mode, errors }`. `root`, `mode` and `errors` always come from devtools and cannot be overridden. A plain string
 entry still works and passes no options. Which options a panel reads is up to the panel; see its own page.
 
 A pair must be exactly `[string, plain object]`. Anything else (a missing options object, an array, a string, a third
@@ -251,7 +333,7 @@ The view's DOM also gets the dashboard's base styles: elements with the classes 
 
 ## Security
 
-A panel's data routes, its view module and its assets are mounted in the same
+A panel's data routes, its view module, its assets and its images are mounted in the same
 scope as the dashboard, so the same guard applies to each request. In
 development:
 
@@ -263,7 +345,7 @@ development:
 - a request with a proxy header is refused unless `allowProxied` is set.
 
 A refused request gets an empty `404` before the handler runs. Only the files
-a panel lists are served; a request never becomes a file path.
+a panel lists are served (images only from inside its `files` folder); a request never becomes an unchecked file path.
 
 In the production monitor the loopback rules do not apply. The sign-in gate does: see
 [Devtools security](/v/latest/devtools/security/).

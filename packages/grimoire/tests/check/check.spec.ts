@@ -66,12 +66,13 @@ describe("checkGrimoire on the shop fixture", () => {
     const report = await checkCopy();
 
     expect(report.ok).toBe(true);
-    expect(report.counts).toEqual({ errors: 0, warnings: 8, expected: 8 });
+    expect(report.counts).toEqual({ errors: 0, warnings: 9, expected: 9 });
     expect(
       report.findings
         .filter((finding) => !finding.expected)
         .map((finding) => `${finding.code} ${finding.message}`),
     ).toEqual([
+      "GR4009 5 proving tests are written but no test results were found at grimoire/book/test-results.json",
       "GR4001 auth/login AC-1 has no test",
       "GR4001 auth/sign-up AC-1 has no test",
       "GR4001 auth/sign-up AC-2 has no test",
@@ -90,6 +91,7 @@ describe("checkGrimoire on the shop fixture", () => {
       'GR2001 route step "POST /api/wishlist" matches no route',
       'GR2004 notification step "wishlist-price-drop" matches no notification',
       `GR2002 page step "/wishlist" matches no page or screen of the feature's apps`,
+      "GR1030 the flow has no summary; write one or two sentences under the title.",
       "GR4001 catalog/wishlist AC-1 has no test",
       "GR4001 catalog/wishlist AC-2 has no test",
       "GR4001 catalog/wishlist AC-3 has no test",
@@ -122,7 +124,7 @@ describe("checkGrimoire on the shop fixture", () => {
     });
     const report = checkGrimoire(snapshot);
 
-    expect(report.counts).toEqual({ errors: 0, warnings: 8, expected: 8 });
+    expect(report.counts).toEqual({ errors: 0, warnings: 9, expected: 9 });
     expect(
       report.findings.filter((finding) => finding.code === "GR2001" && !finding.expected),
     ).toEqual([]);
@@ -152,7 +154,7 @@ describe("checkGrimoire on the shop fixture", () => {
       edit: (copy) => copy.replace(PLACE_ORDER, "POST /api/orders", "POST /api/order"),
       // The handler's files are reached by no other step now.
       expect: [
-        `GR2001 ${PLACE_ORDER}:12 error`,
+        `GR2001 ${PLACE_ORDER}:14 error`,
         "GR3006 src/app/orders/controllers/place-order.controller.ts:1 warning",
         "GR3006 src/app/orders/routes.ts:1 warning",
         "GR3006 src/app/orders/services/place-order.service.ts:1 warning",
@@ -166,7 +168,7 @@ describe("checkGrimoire on the shop fixture", () => {
           "page           /products/:id",
           "page           /product/:id",
         ),
-      expect: [`GR2002 ${CATALOG}/flows/browse-products.md:12 error`],
+      expect: [`GR2002 ${CATALOG}/flows/browse-products.md:20 error`],
     },
     {
       title: "GR2003 a mail step that names no mail",
@@ -176,7 +178,7 @@ describe("checkGrimoire on the shop fixture", () => {
           "mail              order-confirmation",
           "mail              order-confirm",
         ),
-      expect: [`GR2003 ${PLACE_ORDER}:16 error`],
+      expect: [`GR2003 ${PLACE_ORDER}:18 error`],
     },
     {
       title: "GR2004 a notification step that names no notification",
@@ -187,7 +189,7 @@ describe("checkGrimoire on the shop fixture", () => {
           "notification      order-sent",
         ),
       expect: [
-        `GR2004 ${PLACE_ORDER}:18 error`,
+        `GR2004 ${PLACE_ORDER}:20 error`,
         `GR3006 src/app/orders/notifications/order-shipped.notification.ts:1 warning`,
       ],
     },
@@ -199,7 +201,7 @@ describe("checkGrimoire on the shop fixture", () => {
           "job               send-receipt",
           "job               send-receipts",
         ),
-      expect: [`GR2005 ${PLACE_ORDER}:17 error`],
+      expect: [`GR2005 ${PLACE_ORDER}:19 error`],
     },
     {
       title: "GR2006 an event step that names no event",
@@ -209,7 +211,7 @@ describe("checkGrimoire on the shop fixture", () => {
           "event             order.placed",
           "event             order.created",
         ),
-      expect: [`GR2006 ${PLACE_ORDER}:14 error`],
+      expect: [`GR2006 ${PLACE_ORDER}:16 error`],
     },
     {
       title: "GR2007 an affects step that names no flow",
@@ -219,7 +221,7 @@ describe("checkGrimoire on the shop fixture", () => {
           "affects           catalog/browse-products",
           "affects           catalog/stock",
         ),
-      expect: [`GR2007 ${PLACE_ORDER}:15 error`],
+      expect: [`GR2007 ${PLACE_ORDER}:17 error`],
     },
     {
       title: "GR2008 a feature that names an app with no folder",
@@ -231,7 +233,7 @@ describe("checkGrimoire on the shop fixture", () => {
       title: "GR2009 a criterion scoped to an app its feature does not list",
       edit: (copy) =>
         copy.replace(`${AUTH}/flows/login.md`, "- AC-1   valid", "- AC-1 [web-admin]   valid"),
-      expect: [`GR2009 ${AUTH}/flows/login.md:29 warning`],
+      expect: [`GR2009 ${AUTH}/flows/login.md:31 warning`],
     },
     {
       title: "GR2010 a changelog entry that names no flow",
@@ -247,7 +249,7 @@ describe("checkGrimoire on the shop fixture", () => {
     {
       title: "GR2012 a README relation that names no flow",
       edit: (copy) => copy.replace(`${CATALOG}/README.md`, "orders/place-order", "orders/pay"),
-      expect: [`GR2012 ${CATALOG}/README.md:21 error`],
+      expect: [`GR2012 ${CATALOG}/README.md:28 error`],
     },
     {
       title: "GR3001 a source file with no header sentence",
@@ -319,7 +321,7 @@ describe("checkGrimoire on the shop fixture", () => {
     {
       title: "GR4002 a @proves line that names no criterion",
       edit: (copy) => copy.replace("e2e/checkout.e2e.ts", "AC-3", "AC-9"),
-      expect: ["GR4002 e2e/checkout.e2e.ts:5 error", `GR4001 ${PLACE_ORDER}:41 warning`],
+      expect: ["GR4002 e2e/checkout.e2e.ts:5 error", `GR4001 ${PLACE_ORDER}:43 warning`],
     },
     {
       title: "GR4003 a malformed @proves line",
@@ -329,7 +331,11 @@ describe("checkGrimoire on the shop fixture", () => {
           "// @proves orders/place-order AC-3",
           "// @proves orders AC-3",
         ),
-      expect: ["GR4003 e2e/checkout.e2e.ts:5 error", `GR4001 ${PLACE_ORDER}:41 warning`],
+      expect: [
+        "GR4003 e2e/checkout.e2e.ts:5 error",
+        `GR4001 ${PLACE_ORDER}:43 warning`,
+        "GR4009 src/app/catalog/tests/new-arrivals.test.ts:11 warning",
+      ],
     },
     {
       title: "GR6004 a README updated before its newest changelog section",

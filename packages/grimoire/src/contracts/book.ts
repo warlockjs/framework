@@ -52,6 +52,8 @@ export type BookEntry = {
   packages: string[];
   /** Project files it imports. */
   imports: string[];
+  /** The part of `imports` that is type-only (erased at runtime), sorted. */
+  typeOnlyImports: string[];
   /** Project files that import it. */
   importedBy: string[];
   /**

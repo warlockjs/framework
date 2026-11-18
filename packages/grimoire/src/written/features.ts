@@ -17,6 +17,7 @@ import {
   type WrittenOrigin,
   type WrittenStatus,
   type WrittenStep,
+  type WrittenStoryStep,
   type WrittenVersionBrief,
 } from "../contracts/written";
 import { FrontMatterReader, ID, SEP, VERSION, checks, isDate, projectFolder } from "./fields";
@@ -24,11 +25,15 @@ import { BULLET, bulletLines, readListLines, splitListLine } from "./lists";
 import {
   checkHeadings,
   findSection,
+  isImageLine,
   lineAt,
   logicalLines,
   normalizeKey,
   paragraphAfterTitle,
   readDocument,
+  readScreenshots,
+  withoutImages,
+  type BodyLine,
   type WrittenDocument,
 } from "./markdown";
 import type { FindingSink } from "./sink";
@@ -122,6 +127,29 @@ export function splitEntryText(text: string): {
 
 // ── README ─────────────────────────────────────────────────────────────────
 
+/** `## Why`: the paragraphs of the section, joined with a blank line; `null` when absent or empty. */
+function readWhy(document: WrittenDocument): string | null {
+  const paragraphs: string[] = [];
+  let open: string[] = [];
+
+  const close = (): void => {
+    if (open.length > 0) paragraphs.push(open.join(" "));
+
+    open = [];
+  };
+
+  for (const line of findSection(document, "why")?.lines ?? []) {
+    const trimmed = line.text.trim();
+
+    if (line.fenced || trimmed === "") close();
+    else open.push(trimmed);
+  }
+
+  close();
+
+  return paragraphs.length > 0 ? paragraphs.join("\n\n") : null;
+}
+
 /** `grimoire/features/<id>/README.md`. */
 export function parseFeatureReadme(
   file: string,
@@ -133,7 +161,7 @@ export function parseFeatureReadme(
   const fields = new FrontMatterReader(document, sink);
 
   fields.onlyKeys(
-    ["id", "title", "status", "version", "updated", "apps", "folders", "origin"],
+    ["id", "title", "status", "version", "updated", "apps", "folders", "origin", "audience"],
     "feature README",
   );
 
@@ -156,13 +184,15 @@ export function parseFeatureReadme(
     origin: fields.optionalOneOf("origin", ORIGINS),
     heading: heading(document),
     summary: paragraphAfterTitle(document),
+    audience: fields.list("audience", { required: false, check: checks.text }),
+    why: readWhy(document),
     flows: [],
     relations: [],
   };
 
   checkHeadings(
     document,
-    { title: true, required: [], optional: ["Flows", "Affects and affected by"] },
+    { title: true, required: [], optional: ["Why", "Flows", "Affects and affected by"] },
     sink,
   );
 
@@ -421,6 +451,119 @@ function parseSteps(file: string, document: WrittenDocument, sink: FindingSink):
   return steps;
 }
 
+/**
+ * `## Story`: numbered sentences in the user's words. Indented lines continue
+ * the item, image lines attach screenshots. GR1008 for any other line, GR1010
+ * for numbers out of order.
+ */
+function parseStory(
+  file: string,
+  document: WrittenDocument,
+  sink: FindingSink,
+): WrittenStoryStep[] {
+  const story: WrittenStoryStep[] = [];
+  const numbers: { number: number; line: number }[] = [];
+  let open: { step: WrittenStoryStep; text: string[] } | null = null;
+  let continuing = false;
+
+  const finish = (): void => {
+    if (open !== null) open.step.text = open.text.join(" ");
+
+    open = null;
+  };
+
+  const attach = (line: BodyLine): void => {
+    open?.step.screenshots.push(...readScreenshots(file, [line], sink));
+  };
+
+  for (const line of findSection(document, "story")?.lines ?? []) {
+    const trimmed = line.text.trim();
+    const at = lineAt(file, line.line);
+
+    if (line.fenced) {
+      continuing = false;
+      continue;
+    }
+
+    if (trimmed === "") {
+      continuing = false;
+      continue;
+    }
+
+    const numbered = NUMBERED.exec(trimmed);
+
+    if (numbered) {
+      finish();
+
+      const sentence = withoutImages(trimmed.replace(NUMBERED, ""));
+
+      if (sentence === "") {
+        sink.report(
+          "GR1008",
+          `the story line ${JSON.stringify(trimmed)} is not \`<n>. <sentence>\`.`,
+          at,
+        );
+        continuing = false;
+        continue;
+      }
+
+      const number = Number(numbered[1]);
+      const step: WrittenStoryStep = { index: number, text: sentence, screenshots: [], at };
+
+      numbers.push({ number, line: line.line });
+      story.push(step);
+      open = { step, text: [sentence] };
+      continuing = true;
+      attach(line);
+      continue;
+    }
+
+    if (isImageLine(trimmed)) {
+      if (open === null) {
+        sink.report(
+          "GR1008",
+          `the story line ${JSON.stringify(trimmed)} is an image before any story step.`,
+          at,
+        );
+      } else {
+        attach(line);
+      }
+
+      continue;
+    }
+
+    if (open !== null && continuing && /^[ \t]/.test(line.text)) {
+      const more = withoutImages(trimmed);
+
+      if (more !== "") open.text.push(more);
+
+      attach(line);
+      continue;
+    }
+
+    sink.report(
+      "GR1008",
+      `the story line ${JSON.stringify(trimmed)} is not \`<n>. <sentence>\`.`,
+      at,
+    );
+  }
+
+  finish();
+
+  const wrong = numbers.findIndex((entry, position) => entry.number !== position + 1);
+  const first = numbers[wrong];
+
+  if (first !== undefined) {
+    sink.report(
+      "GR1010",
+      `story step ${first.number} should be story step ${wrong + 1}; number the story steps 1, 2, 3 in order.`,
+      lineAt(file, first.line),
+    );
+  }
+
+  return story;
+}
+
 function parseCases(file: string, document: WrittenDocument, sink: FindingSink): WrittenCase[] {
   const cases: WrittenCase[] = [];
 
@@ -437,12 +580,15 @@ function parseCases(file: string, document: WrittenDocument, sink: FindingSink):
     }
 
     const question = normalizeKey(split.name);
+    const suffix = CRITERIA_SUFFIX.exec(split.text);
+    const answer = suffix ? split.text.slice(0, suffix.index).trimEnd() : split.text;
 
     cases.push({
       question,
       fixed: (CASE_QUESTIONS as readonly string[]).includes(question),
-      answer: split.text,
-      doesNotApply: /^does not apply\b/i.test(split.text),
+      answer,
+      doesNotApply: /^does not apply\b/i.test(answer),
+      criteria: suffix ? (suffix[1] ?? "").split(",").map((criterion) => criterion.trim()) : [],
       at: lineAt(file, line.line),
     });
   }
@@ -517,6 +663,8 @@ export function parseFlow(
     who: fields.required("who", checks.text),
     origin: fields.optionalOneOf("origin", ORIGINS),
     heading: heading(document),
+    summary: paragraphAfterTitle(document),
+    story: [],
     steps: [],
     differs: [],
     cases: [],
@@ -530,11 +678,20 @@ export function parseFlow(
     {
       title: true,
       required: ["Steps", "Cases", "Acceptance criteria"],
-      optional: ["Differs by app", "Not handled"],
+      optional: ["Story", "Differs by app", "Not handled"],
     },
     sink,
   );
 
+  if (flow.summary === null) {
+    sink.report(
+      "GR1030",
+      "the flow has no summary; write one or two sentences under the title.",
+      lineAt(file, document.title?.line ?? document.bodyStartLine),
+    );
+  }
+
+  flow.story = parseStory(file, document, sink);
   flow.steps = parseSteps(file, document, sink);
   flow.differs = readListLines(
     file,

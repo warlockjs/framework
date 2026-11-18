@@ -379,6 +379,18 @@ describe("createWarlockAdapter over the shop fixture", () => {
         }));
 
     expect(project(await shop.files(shopRoot))).toEqual(project(shopFacts.files));
+
+    // A type-only import keeps its flag; a value import carries none.
+    const controller = (await shop.files(shopRoot)).find(
+      (file) => file.file === "src/app/catalog/controllers/products.controller.ts",
+    );
+
+    expect(
+      controller?.imports.map((entry) => [entry.specifier, entry.typeOnly === true]),
+    ).toEqual([
+      ["../repositories/products.repository", false],
+      ["app/shared/utils/money", true],
+    ]);
   });
 });
 

@@ -62,6 +62,7 @@ export const shopFacts: BookFacts = {
         {
           specifier: "app/shared/utils/money",
           file: "src/app/shared/utils/money.ts",
+          typeOnly: true,
         },
       ],
       importedBy: [

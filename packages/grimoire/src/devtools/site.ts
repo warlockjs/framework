@@ -3,7 +3,7 @@
  * loader, the styles and the data as JSON. It opens from disk (`file://`) or
  * any static host and needs no running app.
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BookAdapter } from "../contracts/adapter";
@@ -11,6 +11,7 @@ import type { GrimoireSnapshot } from "../contracts/snapshot";
 import { GRIMOIRE_PATHS, projectPath, toPosixPath } from "../paths";
 import * as data from "./data";
 import { featureGraph, fileGraph, pageGraph } from "./graphs";
+import { productFeature, productFlow, productMap } from "./product-map";
 import { createSnapshotSource } from "./snapshot-source";
 
 /** Options of `exportGrimoireSite()`. */
@@ -42,6 +43,15 @@ export function buildSiteData(snapshot: GrimoireSnapshot) {
     check: { ...data.check(snapshot), root: "." },
     "graph/modules": data.graphOfModules(snapshot),
   };
+  // The static page is the signed-in view: developer detail stays, and no monitor reports errors.
+  const productOptions = { shared: false, errors: null } as const;
+  const productAnswer = attempt(() => productMap(snapshot, productOptions));
+  const groups = attempt(() => data.checkGroups(snapshot));
+
+  if (productAnswer !== undefined) routes.product = productAnswer;
+
+  if (groups !== undefined) routes["check/groups"] = groups;
+
   const search: SearchItem[] = [];
 
   for (const release of snapshot.written.releases) {
@@ -60,11 +70,20 @@ export function buildSiteData(snapshot: GrimoireSnapshot) {
 
     if (graph !== null) routes[`graph/feature/${feature.id}`] = graph;
 
+    const product = attempt(() => productFeature(snapshot, feature.id, productOptions));
+
+    if (product !== undefined) routes[`product/features/${feature.id}`] = product;
+
     for (const flow of feature.flows) {
       search.push({ type: "flow", id: flow.ref, detail: flow.heading?.value ?? null });
-      const flowAnswer = attempt(() => data.flow(snapshot, feature.id, flow.id.value));
+      const flowAnswer = attempt(() => data.flowAnswer(snapshot, feature.id, flow.id.value));
+      const productFlowAnswer = attempt(() =>
+        productFlow(snapshot, feature.id, flow.id.value, productOptions),
+      );
 
       if (flowAnswer !== undefined) routes[`flows/${flow.ref}`] = flowAnswer;
+
+      if (productFlowAnswer !== undefined) routes[`product/flows/${flow.ref}`] = productFlowAnswer;
     }
   }
 
@@ -142,6 +161,79 @@ function inlineCode(code: string): string {
   return code.replace(/<\/(script)/gi, "<\\/$1").replaceAll("<!--", "<\\!--");
 }
 
+/** The image types the export copies (the same list the devtools panel serves). */
+const SCREENSHOT_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
+
+/** Every `WrittenScreenshot.path` in the written files, once each. */
+export function collectScreenshotPaths(written: unknown): string[] {
+  const found = new Set<string>();
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item);
+    } else if (value !== null && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+
+      if (
+        typeof record.path === "string" &&
+        typeof record.written === "string" &&
+        typeof record.alt === "string"
+      )
+        found.add(record.path);
+
+      for (const item of Object.values(record)) walk(item);
+    }
+  };
+
+  walk(written);
+
+  return [...found].sort();
+}
+
+/**
+ * Copy the screenshots the written files use into `<out>/screenshots/`. A path that leaves
+ * `grimoire/screenshots/`, has another extension or does not exist is skipped.
+ *
+ * @returns The paths that were copied.
+ */
+export async function copyScreenshots(
+  root: string,
+  outFolder: string,
+  paths: readonly string[],
+): Promise<string[]> {
+  const folder = await realpath(path.join(root, GRIMOIRE_PATHS.screenshots)).catch(() => null);
+  const copied: string[] = [];
+
+  if (folder === null) return copied;
+
+  for (const written of paths) {
+    const segments = written.split("/");
+
+    if (
+      written === "" ||
+      written.includes("\\") ||
+      written.includes("\0") ||
+      path.isAbsolute(written) ||
+      segments.some((segment) => segment === "" || segment === "." || segment === "..") ||
+      !SCREENSHOT_EXTENSIONS.has(path.extname(written).toLowerCase())
+    )
+      continue;
+
+    const source = await realpath(path.join(folder, ...segments)).catch(() => null);
+
+    if (source === null || !source.startsWith(folder + path.sep)) continue;
+
+    if (!(await stat(source)).isFile()) continue;
+
+    const target = path.join(outFolder, "screenshots", ...segments);
+
+    await mkdir(path.dirname(target), { recursive: true });
+    await copyFile(source, target);
+    copied.push(written);
+  }
+
+  return copied;
+}
+
 /** The answer, or `undefined` when the item cannot be answered (the export skips it). */
 function attempt<Value>(answer: () => Value): Value | undefined {
   try {
@@ -162,6 +254,19 @@ export function inlineView(source: string): string {
 }
 
 /**
+ * The product map module as inline code: its `export` keywords are removed and the Grimoire view
+ * finds it as `globalThis.grimoireProductMap`.
+ */
+export function inlineProductMap(source: string): string {
+  const marker = "export default renderProductMap;";
+
+  if (!source.includes(marker))
+    throw new Error("product-map.js must end with `export default renderProductMap;`.");
+
+  return `${source.replace(marker, "").replace(/^export (async )?function /gm, "$1function ")}\nglobalThis.grimoireProductMap = { productMapView };\n`;
+}
+
+/**
  * The page's own styles: it defines every devtools panel token (light, then dark under
  * `prefers-color-scheme`), so `grimoire.css` renders the same here as in the dashboard.
  * The values keep text AA on `--background` and `--card`.
@@ -177,11 +282,11 @@ main{max-width:1180px;margin:0 auto;padding:16px}
 /** The `index.html` text. */
 export function renderSiteHtml(
   siteData: unknown,
-  sources: { view: string; loader: string; css: string },
+  sources: { view: string; loader: string; css: string; productMap?: string; productCss?: string },
 ): string {
   const json = inlineJson(siteData);
   const script = inlineCode(
-    `${inlineView(sources.view)}\n${sources.loader}\ngrimoireStaticMount(JSON.parse(document.getElementById("grimoire-data").textContent), document.getElementById("grimoire-root"), renderGrimoire);\n`,
+    `${sources.productMap === undefined ? "" : inlineProductMap(sources.productMap)}${inlineView(sources.view)}\n${sources.loader}\ngrimoireStaticMount(JSON.parse(document.getElementById("grimoire-data").textContent), document.getElementById("grimoire-root"), renderGrimoire);\n`,
   );
 
   return `<!doctype html>
@@ -190,7 +295,7 @@ export function renderSiteHtml(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grimoire</title>
-<style>${PAGE_STYLE}${sources.css}</style>
+<style>${PAGE_STYLE}${sources.css}${sources.productCss ?? ""}</style>
 </head>
 <body>
 <main id="grimoire-root"><p class="empty">Opening the book…</p></main>
@@ -227,20 +332,27 @@ export async function exportGrimoireSite(
       root,
       options.adapter === undefined ? {} : { adapter: options.adapter },
     ).get());
-  const [view, loader, css] = await Promise.all(
-    ["grimoire-view.js", "grimoire-static.js", "grimoire.css"].map((name) =>
-      readFile(path.join(uiFolder, name), "utf8"),
-    ),
+  const [view, loader, css, productMapSource, productCss] = await Promise.all(
+    [
+      "grimoire-view.js",
+      "grimoire-static.js",
+      "grimoire.css",
+      "product-map.js",
+      "product-map.css",
+    ].map((name) => readFile(path.join(uiFolder, name), "utf8")),
   );
   const html = renderSiteHtml(buildSiteData(snapshot), {
     view: view ?? "",
     loader: loader ?? "",
     css: css ?? "",
+    productMap: productMapSource ?? "",
+    productCss: productCss ?? "",
   });
   const absolute = path.resolve(root, outDir);
 
   await mkdir(absolute, { recursive: true });
   await writeFile(path.join(absolute, "index.html"), html);
+  await copyScreenshots(root, absolute, collectScreenshotPaths(snapshot.written));
 
   return outDir;
 }

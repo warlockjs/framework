@@ -26,7 +26,7 @@ import type { GrimoireSnapshot, OpenGrimoireOptions } from "../contracts/snapsho
 import { resolveOwnership } from "../ownership";
 import { toPosixPath } from "../paths";
 import { scanProofs } from "../proves";
-import { readTestResults } from "../test-results";
+import { readTestResults, resultsFileLabel } from "../test-results";
 import { parseGrimoire } from "../written";
 
 /** The current sha256 of each test file: the manifest's, else read now (missing files are left out). */
@@ -95,7 +95,8 @@ export async function runGrimoire(
   const apps = matchApps(written.apps, book.facts);
   const ownership = resolveOwnership(written, book.facts);
   const { proofs, findings: proofFindings } = await scanProofs(root, book.facts.tests);
-  const results = await readTestResults(root);
+  const resultsFile = resultsFileLabel(root, options.testResultsFile);
+  const results = await readTestResults(root, options.testResultsFile);
   const testHashes = await testFileHashes(root, book.facts.tests, book.manifest.tests);
 
   const input: CollectedInput = {
@@ -128,6 +129,7 @@ export async function runGrimoire(
       proofs,
       proofFindings,
       results,
+      resultsFile,
       collected,
       annotations,
       routes: book.routes,

@@ -39,7 +39,9 @@ describe("PanelHost", () => {
 
     expect(await screen.findByText("route=flow/a run=1")).toBeInTheDocument();
     expect(seen?.id).toBe("book");
-    expect(seen?.asset("graph.js")).toBe("panels/book/graph.js");
+    // Absolute, so a view can `import()` it: a bare relative path is a module specifier import() refuses.
+    expect(seen?.asset("graph.js")).toBe(new URL("panels/book/graph.js", document.baseURI).href);
+    expect(seen?.asset("graph.js")).toMatch(/^https?:\/\//);
     expect(seen?.href("flow/b")).toBe("#book/flow/b");
     expect(seen?.href()).toBe("#book");
     expect(seen?.empty("Nothing").className).toBe("empty");
@@ -51,6 +53,44 @@ describe("PanelHost", () => {
     rerender(<PanelHost id="book" title="Book" route="flow/b" />);
     expect(await screen.findByText("route=flow/b run=3")).toBeInTheDocument();
     expect(screen.queryByText("route=flow/a run=2")).not.toBeInTheDocument();
+  });
+
+  it("gives a normal mount file(), shared false and the share value it was given", async () => {
+    let seen: LegacyPanelContext | undefined;
+
+    setPanelModuleLoader(async () => ({
+      default(context) {
+        seen = context;
+        context.root.append(context.el("p", { text: "ready" }));
+      },
+    }));
+
+    const share = { enabled: true, manageHref: "#/admin/shares?panel=book" };
+
+    render(<PanelHost id="book" title="Book" route="" share={share} />);
+    await screen.findByText("ready");
+
+    expect(seen?.shared).toBe(false);
+    expect(seen?.share).toEqual(share);
+    expect(seen?.file("a b/shot.png")).toBe(
+      new URL("panels/book/files/a%20b/shot.png", document.baseURI).href,
+    );
+  });
+
+  it("gives share null when the panel cannot be shared", async () => {
+    let seen: LegacyPanelContext | undefined;
+
+    setPanelModuleLoader(async () => ({
+      default(context) {
+        seen = context;
+        context.root.append(context.el("p", { text: "ready" }));
+      },
+    }));
+    mockApi({ "api/book/flows/a": { body: {} } });
+    render(<PanelHost id="book" title="Book" route="" />);
+    await screen.findByText("ready");
+
+    expect(seen?.share).toBeNull();
   });
 
   it("navigate sets the hash, or refreshes when it is already there", async () => {

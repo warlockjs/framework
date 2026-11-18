@@ -22,6 +22,28 @@ describe("import graph", () => {
     expect(importClosure(graph, ["missing.ts"])).toEqual([]);
   });
 
+  it("leaves out type-only edges when asked to", () => {
+    const typed = fileGraph([
+      {
+        file: "page.ts",
+        imports: [
+          { specifier: "./form", file: "form.ts" },
+          { specifier: "./types", file: "types.ts", typeOnly: true },
+        ],
+        importedBy: [],
+      },
+      { file: "form.ts", imports: [], importedBy: ["page.ts"] },
+      { file: "types.ts", imports: [{ specifier: "./db", file: "db.ts" }], importedBy: ["page.ts"] },
+      { file: "db.ts", imports: [], importedBy: ["types.ts"] },
+    ]);
+
+    expect(importClosure(typed, ["page.ts"])).toEqual(["db.ts", "form.ts", "page.ts", "types.ts"]);
+    expect(importClosure(typed, ["page.ts"], { skipTypeOnly: true })).toEqual([
+      "form.ts",
+      "page.ts",
+    ]);
+  });
+
   it("reads package names", () => {
     expect(packageNameOf("@warlock.js/core/tooling")).toBe("@warlock.js/core");
     expect(packageNameOf("dayjs/plugin/utc")).toBe("dayjs");

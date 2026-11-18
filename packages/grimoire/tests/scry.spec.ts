@@ -149,7 +149,9 @@ describe("scry over the shop fixture", () => {
     expect(
       result.type === "flow" && result.bookmap.criteria.map((criterion) => criterion.status),
     ).toEqual(["not-run", "not-run", "no-test"]);
-    expect(formatScryResult(result)[1]).toMatch(/home\.page\.tsx \(\+5 files\)$/);
+    const stepLine = formatScryResult(result).find((line) => line.includes("home.page.tsx"));
+
+    expect(stepLine).toMatch(/home\.page\.tsx \(\+5 reachable(, \d+ type-only)?\)$/);
   });
 
   it("takes either separator and absolute paths", () => {

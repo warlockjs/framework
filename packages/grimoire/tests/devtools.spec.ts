@@ -65,7 +65,18 @@ describe("the panel", () => {
     expect(panel.id).toBe("grimoire");
     expect(panel.title).toBe("Grimoire");
     expect(String(panel.view)).toMatch(/ui\/grimoire-view\.js$/);
-    expect(Object.keys(panel.assets ?? {})).toEqual(["grimoire.css"]);
+    expect(Object.keys(panel.assets ?? {})).toEqual([
+      "grimoire.css",
+      "product-map.js",
+      "product-map.css",
+    ]);
+    expect(panel.files?.dir).toMatch(/grimoire[\\/]screenshots$/);
+    expect(panel.share?.routes).toEqual([
+      "/product",
+      "/product/features/:feature",
+      "/product/flows/:feature/:flow",
+    ]);
+    expect(panel.share?.files).toBe(true);
     expect(panel.routes?.map((route) => route.path)).toEqual(
       expect.arrayContaining([
         "/summary",
@@ -78,6 +89,58 @@ describe("the panel", () => {
       ]),
     );
     expect(readFileSync(new URL(panel.view), "utf8")).toContain("export default renderGrimoire;");
+  });
+
+  it("answers the compact flow, step files, check pages and groups through the routes", async () => {
+    const { panel } = await shopPanel();
+    const params = { feature: "catalog", flow: "new-arrivals" };
+    const flow = await call(panel, "/flows/:feature/:flow", { params });
+
+    expect(flow.bookmap.steps[0]).toHaveProperty("counts");
+    expect(flow.bookmap.steps[0]).not.toHaveProperty("files");
+    expect((await call(panel, "/summary")).results).toMatchObject({ recorded: false });
+
+    const files = await call(panel, "/flows/:feature/:flow/steps/:index/files", {
+      params: { ...params, index: "1" },
+      query: { set: "direct", limit: "1" },
+    });
+
+    expect(files.set).toBe("direct");
+    expect(files.files.length).toBeLessThanOrEqual(1);
+
+    const page = await call(panel, "/check", { query: { severity: "warning", limit: "2" } });
+
+    expect(page.limit).toBe(2);
+    expect(page.findings.length).toBeLessThanOrEqual(2);
+    expect((await call(panel, "/check")).total).toBeUndefined();
+    expect((await call(panel, "/check/groups")).groups).toBeInstanceOf(Array);
+  });
+
+  it("passes the share flag and the monitor's errors to the product routes", async () => {
+    copy = copyFixture();
+    await openGrimoire(copy.root, createShopAdapter(), { routes: "fresh" });
+
+    const panel = await grimoireDevtoolsPanel({
+      root: copy.root,
+      adapter: createShopAdapter(),
+      ttlMs: 0,
+      errors: async () => {
+        throw new Error("monitor down");
+      },
+    });
+    const flow = panel.routes?.find((item) => item.path === "/product/flows/:feature/:flow");
+    const params = { feature: "catalog", flow: "new-arrivals" };
+    const request = { params, query: {}, body: undefined };
+    const signedIn = (await flow?.handler(request)) as { developer: unknown; health: { errors: unknown } };
+    const shared = (await flow?.handler({ ...request, shared: true })) as { developer: unknown };
+
+    expect(signedIn.developer).not.toBeNull();
+    expect(signedIn.health.errors).toBeNull();
+    expect(shared.developer).toBeNull();
+
+    const map = panel.routes?.find((item) => item.path === "/product");
+
+    expect(((await map?.handler({ ...request, shared: true })) as { developer: boolean }).developer).toBe(false);
   });
 
   it("answers the summary, lists and reports from the snapshot without booting the app", async () => {
@@ -374,7 +437,7 @@ describe("exportGrimoireSite", () => {
     expect(page.root.links).toContain("#grimoire/feature/catalog");
 
     await page.goTo("#grimoire/flow/catalog/new-arrivals");
-    expect(page.root.text).toContain("Acceptance criteria");
+    expect(page.root.text).toContain("Proof");
     expect(page.root.text).toContain("AC-1");
 
     await page.goTo("#grimoire/tasks");

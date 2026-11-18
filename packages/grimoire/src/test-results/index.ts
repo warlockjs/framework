@@ -1,6 +1,6 @@
 /**
  * Test results per criterion: reading, merging, writing the store the Vitest
- * reporter fills, and the check rules over it (`GR4006`–`GR4008`).
+ * reporter fills, and the check rules over it (`GR4006`–`GR4010`).
  */
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -10,7 +10,12 @@ import { createFinding } from "../codes";
 import { GRIMOIRE_PATHS, toPosixPath } from "../paths";
 import type { GrimoireFinding } from "../contracts/findings";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
-import type { ProofResult, TestResultsStore } from "../contracts/test-results";
+import type {
+  ProofResult,
+  TestResultsInfo,
+  TestResultsStore,
+  UnmatchedProof,
+} from "../contracts/test-results";
 
 export { criterionStatus, type CriterionTestResult } from "./criterion-status";
 
@@ -19,12 +24,38 @@ export function hashTestFile(content: string | Uint8Array): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
-/** Read `grimoire/book/test-results.json`; `null` when absent or unreadable. */
-export async function readTestResults(root: string): Promise<TestResultsStore | null> {
+/**
+ * The absolute path of the results file: `file` (project-relative or
+ * absolute) when given, else `grimoire/book/test-results.json`.
+ */
+export function resolveResultsFile(root: string, file?: string): string {
+  return file === undefined || file === ""
+    ? path.join(root, ...GRIMOIRE_PATHS.testResults.split("/"))
+    : path.resolve(root, file);
+}
+
+/**
+ * The results file as the snapshot reports it: project-relative POSIX when it
+ * lies inside the project, else the absolute path.
+ */
+export function resultsFileLabel(root: string, file?: string): string {
+  const absolute = resolveResultsFile(root, file);
+  const relative = path.relative(root, absolute);
+
+  if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) return toPosixPath(absolute);
+
+  return toPosixPath(relative);
+}
+
+/**
+ * Read the results store (`grimoire/book/test-results.json`, or `file`);
+ * `null` when absent or unreadable.
+ *
+ * @param file Project-relative or absolute path of another results file.
+ */
+export async function readTestResults(root: string, file?: string): Promise<TestResultsStore | null> {
   try {
-    const parsed: unknown = JSON.parse(
-      await readFile(path.join(root, GRIMOIRE_PATHS.testResults), "utf8"),
-    );
+    const parsed: unknown = JSON.parse(await readFile(resolveResultsFile(root, file), "utf8"));
 
     if (!isStore(parsed)) return null;
 
@@ -40,6 +71,34 @@ function isStore(value: unknown): value is TestResultsStore {
   const store = value as Partial<TestResultsStore>;
 
   return store.schemaVersion === 1 && Array.isArray(store.results);
+}
+
+/**
+ * What the readers know about the results store: whether one was read, where
+ * from, and how many `@proves` lines have a result. Lets a view tell "never
+ * recorded" from "did not run".
+ */
+export function testResultsInfo(snapshot: GrimoireSnapshot): TestResultsInfo {
+  const store = snapshot.results;
+  const results = store?.results ?? [];
+  const withResult = snapshot.proofs.filter((proof) =>
+    results.some(
+      (result) =>
+        toPosixPath(result.testFile) === toPosixPath(proof.at.file) &&
+        result.feature === proof.feature &&
+        result.flow === proof.flow &&
+        result.criterion === proof.criterion,
+    ),
+  ).length;
+
+  return {
+    recorded: store !== null,
+    file: snapshot.resultsFile,
+    updatedAt: store?.updatedAt ?? null,
+    proofs: snapshot.proofs.length,
+    withResult,
+    unmatched: store?.unmatched?.length ?? 0,
+  };
 }
 
 function compareResults(a: ProofResult, b: ProofResult): number {
@@ -62,21 +121,33 @@ export function mergeTestResults(
   run: readonly ProofResult[],
   ranFiles: readonly string[],
   now: Date,
+  unmatched: readonly UnmatchedProof[] = [],
 ): TestResultsStore {
   const ran = new Set([...ranFiles, ...run.map((result) => result.testFile)].map(toPosixPath));
   const kept = (store?.results ?? []).filter((result) => !ran.has(toPosixPath(result.testFile)));
+  const keptUnmatched = (store?.unmatched ?? []).filter(
+    (entry) => !ran.has(toPosixPath(entry.testFile)),
+  );
+  const allUnmatched = [...keptUnmatched, ...unmatched].sort(
+    (a, b) => (a.testFile < b.testFile ? -1 : a.testFile > b.testFile ? 1 : 0) || a.line - b.line,
+  );
 
   return {
     schemaVersion: 1,
     updatedAt: now.toISOString(),
     runner: "vitest",
     results: [...kept, ...run].sort(compareResults),
+    ...(allUnmatched.length > 0 ? { unmatched: allUnmatched } : {}),
   };
 }
 
-/** Write the store (atomically: temp file, then rename). */
-export async function writeTestResults(root: string, store: TestResultsStore): Promise<void> {
-  const target = path.join(root, GRIMOIRE_PATHS.testResults);
+/** Write the store (atomically: temp file, then rename), to `file` when given. */
+export async function writeTestResults(
+  root: string,
+  store: TestResultsStore,
+  file?: string,
+): Promise<void> {
+  const target = resolveResultsFile(root, file);
   const temp = `${target}.${process.pid}.${Date.now()}.tmp`;
 
   await mkdir(path.dirname(target), { recursive: true });
@@ -91,11 +162,27 @@ export async function writeTestResults(root: string, store: TestResultsStore): P
   }
 }
 
-/** The GR4006–GR4008 rules. Read-only; nothing when no results exist. */
+/** The GR4006–GR4010 rules. Read-only. */
 export function checkTestResults(snapshot: GrimoireSnapshot): GrimoireFinding[] {
   const store = snapshot.results;
 
-  if (!store) return [];
+  if (!store) {
+    const first = snapshot.proofs[0];
+
+    // Proofs exist and no run ever wrote results: one finding for the project, at the first proof.
+    return first === undefined
+      ? []
+      : [
+          createFinding({
+            code: "GR4009",
+            message: `${snapshot.proofs.length} proving ${snapshot.proofs.length === 1 ? "test is" : "tests are"} written but no test results were found at ${snapshot.resultsFile}`,
+            at: first.at,
+            feature: first.feature,
+            flow: first.ref,
+            file: toPosixPath(first.at.file),
+          }),
+        ];
+  }
 
   const proposed = new Set(
     snapshot.written.features.flatMap((feature) =>
@@ -159,6 +246,34 @@ export function checkTestResults(snapshot: GrimoireSnapshot): GrimoireFinding[] 
 
       findings.push(finding);
     }
+  }
+
+  for (const entry of store.unmatched ?? []) {
+    const file = toPosixPath(entry.testFile);
+    const proof = snapshot.proofs.find(
+      (item) =>
+        toPosixPath(item.at.file) === file &&
+        item.at.line === entry.line &&
+        item.feature === entry.feature &&
+        item.flow === entry.flow &&
+        item.criterion === entry.criterion,
+    );
+
+    // The `@proves` line is gone or moved since the run: the next run replaces the entry.
+    if (!proof) continue;
+
+    const finding = createFinding({
+      code: "GR4010",
+      message: `${proof.ref} ${proof.criterion}: the reporter could not match the test under this @proves line to a result`,
+      at: proof.at,
+      feature: proof.feature,
+      flow: proof.ref,
+      file,
+    });
+
+    if (proposed.has(proof.ref)) finding.expected = true;
+
+    findings.push(finding);
   }
 
   return findings;

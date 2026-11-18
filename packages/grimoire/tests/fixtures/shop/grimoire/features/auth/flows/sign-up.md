@@ -8,6 +8,8 @@ origin: inferred
 
 # Sign up
 
+A guest creates an account to place orders.
+
 ## Steps
 1. route   POST /api/register
 2. job     delete-unverified — seven days later, if never verified

@@ -66,6 +66,7 @@ export function snapshot(patch: Partial<GrimoireSnapshot> = {}): GrimoireSnapsho
     proofs: [],
     proofFindings: [],
     results: null,
+    resultsFile: "grimoire/book/test-results.json",
     collected: {
       features: {},
       flows: {},
@@ -137,6 +138,8 @@ export function feature(id: string, input: FeatureInput = {}): WrittenFeature {
             origin: null,
             heading: null,
             summary: null,
+            audience: [],
+            why: null,
             flows: (input.flows ?? []).map((flow, index) =>
               listLine(flow.id.value, file, 15 + index),
             ),
@@ -185,6 +188,8 @@ export function flow(featureId: string, id: string, input: FlowInput = {}): Writ
     who: located("customer", file, 5),
     origin: null,
     heading: null,
+    summary: null,
+    story: [],
     steps: (input.steps ?? []).map(([type, target, app], index) =>
       step(file, index + 1, type, target, app ?? null),
     ),
@@ -267,7 +272,10 @@ export function bookmap(target: WrittenFlow, found: (boolean | null)[]): FlowBoo
       target: item.target,
       found: found[index] ?? true,
       entry: null,
+      entries: [],
+      direct: [],
       files: [],
+      typeOnlyFiles: [],
     })),
     criteria: [],
     shownBy: [],

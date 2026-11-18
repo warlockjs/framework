@@ -16,6 +16,7 @@
   ],
   "packages": [],
   "imports": [],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/app/auth/controllers/register.controller.ts"
   ],

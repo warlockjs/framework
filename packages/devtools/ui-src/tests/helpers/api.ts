@@ -97,6 +97,7 @@ export function sessionView(overrides: Partial<DevtoolsSessionView> = {}): Devto
     expiresAt: 9_999_999_999_999,
     instance: instanceInfo,
     methods: { totp: true, passkeys: false },
+    share: { enabled: false },
     ...overrides,
   };
 }
@@ -110,6 +111,7 @@ export const signedOut: DevtoolsSessionView = {
   expiresAt: null,
   instance: null,
   methods: null,
+  share: null,
 };
 
 export const developmentSession = sessionView({
@@ -119,4 +121,5 @@ export const developmentSession = sessionView({
   csrf: null,
   expiresAt: null,
   methods: null,
+  share: null,
 });

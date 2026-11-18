@@ -18,6 +18,7 @@
   "imports": [
     "src/app/auth/services/login.service.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/app/auth/routes.ts"
   ],

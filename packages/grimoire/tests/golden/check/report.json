@@ -3,12 +3,31 @@
   "root": "<root>",
   "findings": [
     {
+      "code": "GR4009",
+      "severity": "warning",
+      "message": "5 proving tests are written but no test results were found at grimoire/book/test-results.json",
+      "at": {
+        "file": "e2e/checkout.e2e.ts",
+        "line": 5,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "orders",
+        "flow": "orders/place-order",
+        "app": null,
+        "task": null,
+        "file": "e2e/checkout.e2e.ts"
+      },
+      "hint": "Add `grimoireReporter()` from `@warlock.js/grimoire/vitest` to `test.reporters` in the Vitest config and run the tests; in production, ship the results file with the deploy."
+    },
+    {
       "code": "GR4001",
       "severity": "warning",
       "message": "auth/login AC-1 has no test",
       "at": {
         "file": "grimoire/features/auth/flows/login.md",
-        "line": 29,
+        "line": 31,
         "column": null
       },
       "expected": false,
@@ -27,7 +46,7 @@
       "message": "auth/sign-up AC-1 has no test",
       "at": {
         "file": "grimoire/features/auth/flows/sign-up.md",
-        "line": 28,
+        "line": 30,
         "column": null
       },
       "expected": false,
@@ -46,7 +65,7 @@
       "message": "auth/sign-up AC-2 has no test",
       "at": {
         "file": "grimoire/features/auth/flows/sign-up.md",
-        "line": 29,
+        "line": 31,
         "column": null
       },
       "expected": false,
@@ -65,7 +84,7 @@
       "message": "catalog/browse-products AC-1 has no test",
       "at": {
         "file": "grimoire/features/catalog/flows/browse-products.md",
-        "line": 26,
+        "line": 34,
         "column": null
       },
       "expected": false,
@@ -84,7 +103,7 @@
       "message": "catalog/browse-products AC-2 has no test",
       "at": {
         "file": "grimoire/features/catalog/flows/browse-products.md",
-        "line": 27,
+        "line": 35,
         "column": null
       },
       "expected": false,
@@ -103,7 +122,7 @@
       "message": "catalog/browse-products AC-3 has no test",
       "at": {
         "file": "grimoire/features/catalog/flows/browse-products.md",
-        "line": 28,
+        "line": 36,
         "column": null
       },
       "expected": false,
@@ -122,7 +141,7 @@
       "message": "catalog/new-arrivals AC-3 has no test",
       "at": {
         "file": "grimoire/features/catalog/flows/new-arrivals.md",
-        "line": 30,
+        "line": 32,
         "column": null
       },
       "expected": false,
@@ -141,7 +160,7 @@
       "message": "orders/place-order AC-4 has no test",
       "at": {
         "file": "grimoire/features/orders/flows/place-order.md",
-        "line": 42,
+        "line": 44,
         "column": null
       },
       "expected": false,
@@ -231,6 +250,25 @@
       "hint": "Fix the route path in the flow, or add the page to one of the feature's apps. A step scoped like `page /support [web-admin]` looks only in that app."
     },
     {
+      "code": "GR1030",
+      "severity": "warning",
+      "message": "the flow has no summary; write one or two sentences under the title.",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 8,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Write one or two plain sentences under the flow's `# Title`: who does what, and what they get."
+    },
+    {
       "code": "GR4001",
       "severity": "warning",
       "message": "catalog/wishlist AC-1 has no test",
@@ -309,8 +347,8 @@
   ],
   "counts": {
     "errors": 0,
-    "warnings": 8,
-    "expected": 8
+    "warnings": 9,
+    "expected": 9
   },
   "ok": true,
   "routes": "fresh"

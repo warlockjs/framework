@@ -69,15 +69,23 @@ const absolutePath = (root: string, file: string): string => path.join(root, ...
 
 type StoredBook = { manifest: BookManifest; facts: BookFacts };
 
+/**
+ * `facts.json` as written since type-only import edges were recorded. A cache
+ * without the marker comes from an older version: it is not reused, so file
+ * facts are scanned once more.
+ */
+type StoredFactsCache = BookFactsCache & { typeOnlyEdges?: boolean };
+
 async function readStoredBook(root: string): Promise<StoredBook | null> {
   const manifest = await readJson<BookManifest>(absolutePath(root, GRIMOIRE_PATHS.bookManifest));
-  const cache = await readJson<BookFactsCache>(absolutePath(root, GRIMOIRE_PATHS.bookFactsCache));
+  const cache = await readJson<StoredFactsCache>(absolutePath(root, GRIMOIRE_PATHS.bookFactsCache));
 
   if (
     manifest === null ||
     cache === null ||
     manifest.schemaVersion !== BOOK_SCHEMA_VERSION ||
     cache.schemaVersion !== BOOK_SCHEMA_VERSION ||
+    cache.typeOnlyEdges !== true ||
     typeof manifest.files !== "object" ||
     typeof cache.facts !== "object"
   ) {
@@ -269,7 +277,7 @@ async function writeStoredBook(
   facts: BookFacts | null,
 ): Promise<void> {
   if (facts !== null) {
-    const cache: BookFactsCache = { schemaVersion: BOOK_SCHEMA_VERSION, facts };
+    const cache: StoredFactsCache = { schemaVersion: BOOK_SCHEMA_VERSION, typeOnlyEdges: true, facts };
     await writeBookFile(root, GRIMOIRE_PATHS.bookFactsCache, toJson(cache));
   }
 

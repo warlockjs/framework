@@ -89,6 +89,8 @@
         }
       },
       "summary": "Customers create an account, verify their email and sign in.",
+      "audience": [],
+      "why": null,
       "flows": [
         {
           "name": "sign-up",
@@ -211,6 +213,8 @@
             "column": null
           }
         },
+        "summary": "A guest signs in with their email and password.",
+        "story": [],
         "steps": [
           {
             "index": 1,
@@ -225,7 +229,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/auth/flows/login.md",
-              "line": 12,
+              "line": 14,
               "column": null
             }
           }
@@ -237,9 +241,10 @@
             "fixed": true,
             "answer": "a missing password → 422",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/auth/flows/login.md",
-              "line": 15,
+              "line": 17,
               "column": null
             }
           },
@@ -248,9 +253,10 @@
             "fixed": true,
             "answer": "an unverified account → 403",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/auth/flows/login.md",
-              "line": 16,
+              "line": 18,
               "column": null
             }
           },
@@ -259,9 +265,10 @@
             "fixed": true,
             "answer": "an unknown email → the same message as a wrong password",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/auth/flows/login.md",
-              "line": 17,
+              "line": 19,
               "column": null
             }
           }
@@ -272,7 +279,7 @@
             "text": "does not apply: no record is created",
             "at": {
               "file": "grimoire/features/auth/flows/login.md",
-              "line": 20,
+              "line": 22,
               "column": null
             }
           },
@@ -281,7 +288,7 @@
             "text": "no limit on attempts",
             "at": {
               "file": "grimoire/features/auth/flows/login.md",
-              "line": 21,
+              "line": 23,
               "column": null
             }
           },
@@ -290,7 +297,7 @@
             "text": "sessions never expire",
             "at": {
               "file": "grimoire/features/auth/flows/login.md",
-              "line": 22,
+              "line": 24,
               "column": null
             }
           },
@@ -299,7 +306,7 @@
             "text": "does not apply: idempotent",
             "at": {
               "file": "grimoire/features/auth/flows/login.md",
-              "line": 23,
+              "line": 25,
               "column": null
             }
           },
@@ -308,7 +315,7 @@
             "text": "does not apply: no outside service",
             "at": {
               "file": "grimoire/features/auth/flows/login.md",
-              "line": 24,
+              "line": 26,
               "column": null
             }
           }
@@ -318,7 +325,7 @@
             "text": "should sessions expire?",
             "at": {
               "file": "grimoire/features/auth/flows/login.md",
-              "line": 26,
+              "line": 28,
               "column": null
             }
           }
@@ -331,7 +338,7 @@
             "text": "valid credentials open a session",
             "at": {
               "file": "grimoire/features/auth/flows/login.md",
-              "line": 29,
+              "line": 31,
               "column": null
             }
           }
@@ -389,6 +396,8 @@
             "column": null
           }
         },
+        "summary": "A guest creates an account to place orders.",
+        "story": [],
         "steps": [
           {
             "index": 1,
@@ -403,7 +412,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 12,
+              "line": 14,
               "column": null
             }
           },
@@ -417,7 +426,7 @@
             "note": "seven days later, if never verified",
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 13,
+              "line": 15,
               "column": null
             }
           }
@@ -429,9 +438,10 @@
             "fixed": true,
             "answer": "a bad email → 422",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 16,
+              "line": 18,
               "column": null
             }
           },
@@ -440,9 +450,10 @@
             "fixed": true,
             "answer": "does not apply: guests only",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 17,
+              "line": 19,
               "column": null
             }
           },
@@ -451,9 +462,10 @@
             "fixed": true,
             "answer": "an email already used → 409",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 18,
+              "line": 20,
               "column": null
             }
           },
@@ -462,9 +474,10 @@
             "fixed": true,
             "answer": "an unverified account is deleted after seven days",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 19,
+              "line": 21,
               "column": null
             }
           }
@@ -475,7 +488,7 @@
             "text": "does not apply to the code as written",
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 22,
+              "line": 24,
               "column": null
             }
           },
@@ -484,7 +497,7 @@
             "text": "no limit on sign-ups per address",
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 23,
+              "line": 25,
               "column": null
             }
           },
@@ -493,7 +506,7 @@
             "text": "two quick submits create two accounts",
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 24,
+              "line": 26,
               "column": null
             }
           },
@@ -502,7 +515,7 @@
             "text": "the mail service down is not handled",
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 25,
+              "line": 27,
               "column": null
             }
           }
@@ -516,7 +529,7 @@
             "text": "a new account waits for email verification",
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 28,
+              "line": 30,
               "column": null
             }
           },
@@ -527,7 +540,7 @@
             "text": "an unverified account is deleted after seven days",
             "at": {
               "file": "grimoire/features/auth/flows/sign-up.md",
-              "line": 29,
+              "line": 31,
               "column": null
             }
           }
@@ -622,18 +635,37 @@
         "value": "Product catalog",
         "at": {
           "file": "grimoire/features/catalog/README.md",
-          "line": 11,
+          "line": 12,
           "column": null
         }
       },
       "summary": "Customers browse products, see what is new in their country, and will save products for later.",
+      "audience": [
+        {
+          "value": "shoppers",
+          "at": {
+            "file": "grimoire/features/catalog/README.md",
+            "line": 9,
+            "column": null
+          }
+        },
+        {
+          "value": "store staff",
+          "at": {
+            "file": "grimoire/features/catalog/README.md",
+            "line": 9,
+            "column": null
+          }
+        }
+      ],
+      "why": "Shoppers decide what to buy from this catalog, so it has to be fast and honest about what is in stock.\n\nStore staff use it to check what customers see.",
       "flows": [
         {
           "name": "browse-products",
           "text": "list products and open one",
           "at": {
             "file": "grimoire/features/catalog/README.md",
-            "line": 16,
+            "line": 23,
             "column": null
           }
         },
@@ -642,7 +674,7 @@
           "text": "the newest products sold in the customer's country",
           "at": {
             "file": "grimoire/features/catalog/README.md",
-            "line": 17,
+            "line": 24,
             "column": null
           }
         },
@@ -651,7 +683,7 @@
           "text": "save a product for later",
           "at": {
             "file": "grimoire/features/catalog/README.md",
-            "line": 18,
+            "line": 25,
             "column": null
           }
         }
@@ -664,7 +696,7 @@
           ],
           "at": {
             "file": "grimoire/features/catalog/README.md",
-            "line": 21,
+            "line": 28,
             "column": null
           }
         }
@@ -809,6 +841,40 @@
             "column": null
           }
         },
+        "summary": "A shopper looks through the products and opens one to see its price and details.",
+        "story": [
+          {
+            "index": 1,
+            "text": "The shopper opens the product list and sees 50 products.",
+            "screenshots": [],
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 13,
+              "column": null
+            }
+          },
+          {
+            "index": 2,
+            "text": "The shopper picks one and lands on its page. The price and the photos load with the page.",
+            "screenshots": [
+              {
+                "alt": "The product page",
+                "written": "../../../screenshots/web/product-page.png",
+                "path": "web/product-page.png",
+                "at": {
+                  "file": "grimoire/features/catalog/flows/browse-products.md",
+                  "line": 16,
+                  "column": null
+                }
+              }
+            ],
+            "at": {
+              "file": "grimoire/features/catalog/flows/browse-products.md",
+              "line": 14,
+              "column": null
+            }
+          }
+        ],
         "steps": [
           {
             "index": 1,
@@ -823,7 +889,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 11,
+              "line": 19,
               "column": null
             }
           },
@@ -837,7 +903,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 12,
+              "line": 20,
               "column": null
             }
           },
@@ -854,7 +920,7 @@
             "note": "the page loads it through its setup file",
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 13,
+              "line": 21,
               "column": null
             }
           }
@@ -866,9 +932,10 @@
             "fixed": true,
             "answer": "an unknown filter is ignored",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 16,
+              "line": 24,
               "column": null
             }
           },
@@ -877,9 +944,10 @@
             "fixed": true,
             "answer": "does not apply: every product is public",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 17,
+              "line": 25,
               "column": null
             }
           },
@@ -888,9 +956,12 @@
             "fixed": true,
             "answer": "an unknown product id → 404 page",
             "doesNotApply": false,
+            "criteria": [
+              "AC-2"
+            ],
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 18,
+              "line": 26,
               "column": null
             }
           },
@@ -899,9 +970,10 @@
             "fixed": true,
             "answer": "does not apply: nothing is created",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 19,
+              "line": 27,
               "column": null
             }
           },
@@ -910,9 +982,12 @@
             "fixed": true,
             "answer": "50 products per page",
             "doesNotApply": false,
+            "criteria": [
+              "AC-1"
+            ],
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 20,
+              "line": 28,
               "column": null
             }
           },
@@ -921,9 +996,10 @@
             "fixed": true,
             "answer": "does not apply: products do not expire",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 21,
+              "line": 29,
               "column": null
             }
           },
@@ -932,9 +1008,10 @@
             "fixed": true,
             "answer": "does not apply: reading only",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 22,
+              "line": 30,
               "column": null
             }
           },
@@ -943,9 +1020,10 @@
             "fixed": true,
             "answer": "does not apply: no outside service",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 23,
+              "line": 31,
               "column": null
             }
           }
@@ -960,7 +1038,7 @@
             "text": "the list shows 50 products per page",
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 26,
+              "line": 34,
               "column": null
             }
           },
@@ -971,7 +1049,7 @@
             "text": "an unknown product id shows the 404 page",
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 27,
+              "line": 35,
               "column": null
             }
           },
@@ -982,7 +1060,7 @@
             "text": "the product screen shows the price in the device currency",
             "at": {
               "file": "grimoire/features/catalog/flows/browse-products.md",
-              "line": 28,
+              "line": 36,
               "column": null
             }
           }
@@ -1033,6 +1111,8 @@
             "column": null
           }
         },
+        "summary": "The newest products sold in the shopper's country, newest first.",
+        "story": [],
         "steps": [
           {
             "index": 1,
@@ -1044,7 +1124,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 11,
+              "line": 13,
               "column": null
             }
           },
@@ -1061,7 +1141,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 12,
+              "line": 14,
               "column": null
             }
           }
@@ -1072,7 +1152,7 @@
             "text": "uses the device's country when the customer has none",
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 15,
+              "line": 17,
               "column": null
             }
           }
@@ -1083,9 +1163,10 @@
             "fixed": true,
             "answer": "an unknown country code → the global list",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 18,
+              "line": 20,
               "column": null
             }
           },
@@ -1094,9 +1175,10 @@
             "fixed": true,
             "answer": "does not apply: public",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 19,
+              "line": 21,
               "column": null
             }
           },
@@ -1105,9 +1187,10 @@
             "fixed": true,
             "answer": "no product in the country → the global list",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 20,
+              "line": 22,
               "column": null
             }
           },
@@ -1116,9 +1199,10 @@
             "fixed": true,
             "answer": "does not apply: reading only",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 21,
+              "line": 23,
               "column": null
             }
           },
@@ -1127,9 +1211,10 @@
             "fixed": true,
             "answer": "at most 20 products",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 22,
+              "line": 24,
               "column": null
             }
           },
@@ -1138,9 +1223,10 @@
             "fixed": true,
             "answer": "a product stays new for 30 days",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 23,
+              "line": 25,
               "column": null
             }
           },
@@ -1149,9 +1235,10 @@
             "fixed": true,
             "answer": "does not apply: reading only",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 24,
+              "line": 26,
               "column": null
             }
           },
@@ -1160,9 +1247,10 @@
             "fixed": true,
             "answer": "does not apply: no outside service",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 25,
+              "line": 27,
               "column": null
             }
           }
@@ -1177,7 +1265,7 @@
             "text": "the newest products come first",
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 28,
+              "line": 30,
               "column": null
             }
           },
@@ -1188,7 +1276,7 @@
             "text": "a customer with no country sees the global list",
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 29,
+              "line": 31,
               "column": null
             }
           },
@@ -1199,7 +1287,7 @@
             "text": "the device's country is used when the customer has none",
             "at": {
               "file": "grimoire/features/catalog/flows/new-arrivals.md",
-              "line": 30,
+              "line": 32,
               "column": null
             }
           }
@@ -1250,6 +1338,8 @@
             "column": null
           }
         },
+        "summary": null,
+        "story": [],
         "steps": [
           {
             "index": 1,
@@ -1328,6 +1418,7 @@
             "fixed": true,
             "answer": "the product does not exist → 404",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/wishlist.md",
               "line": 20,
@@ -1339,6 +1430,7 @@
             "fixed": true,
             "answer": "guest → sent to sign in, then back to the product",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/wishlist.md",
               "line": 21,
@@ -1350,6 +1442,7 @@
             "fixed": true,
             "answer": "already saved → stays saved, no error",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/wishlist.md",
               "line": 22,
@@ -1361,6 +1454,7 @@
             "fixed": true,
             "answer": "at most 200 products",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/wishlist.md",
               "line": 23,
@@ -1372,6 +1466,7 @@
             "fixed": true,
             "answer": "does not apply: saved products do not expire",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/wishlist.md",
               "line": 24,
@@ -1383,6 +1478,7 @@
             "fixed": true,
             "answer": "two taps save once",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/wishlist.md",
               "line": 25,
@@ -1394,6 +1490,7 @@
             "fixed": true,
             "answer": "does not apply: no outside service",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/wishlist.md",
               "line": 26,
@@ -1405,6 +1502,7 @@
             "fixed": true,
             "answer": "a removed product disappears from the list",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/catalog/flows/wishlist.md",
               "line": 27,
@@ -1569,6 +1667,8 @@
         }
       },
       "summary": "Customers place orders; staff see them in the admin site.",
+      "audience": [],
+      "why": null,
       "flows": [
         {
           "name": "place-order",
@@ -1687,6 +1787,8 @@
             "column": null
           }
         },
+        "summary": "A customer turns the products in their cart into an order and pays for it.",
+        "story": [],
         "steps": [
           {
             "index": 1,
@@ -1698,7 +1800,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 11,
+              "line": 13,
               "column": null
             }
           },
@@ -1715,7 +1817,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 12,
+              "line": 14,
               "column": null
             }
           },
@@ -1729,7 +1831,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 13,
+              "line": 15,
               "column": null
             }
           },
@@ -1743,7 +1845,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 14,
+              "line": 16,
               "column": null
             }
           },
@@ -1760,7 +1862,7 @@
             "note": "stock goes down",
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 15,
+              "line": 17,
               "column": null
             }
           },
@@ -1774,7 +1876,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 16,
+              "line": 18,
               "column": null
             }
           },
@@ -1788,7 +1890,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 17,
+              "line": 19,
               "column": null
             }
           },
@@ -1802,7 +1904,7 @@
             "note": null,
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 18,
+              "line": 20,
               "column": null
             }
           }
@@ -1813,7 +1915,7 @@
             "text": "pays with the device wallet",
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 21,
+              "line": 23,
               "column": null
             }
           },
@@ -1822,7 +1924,7 @@
             "text": "staff see the order in the orders list",
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 22,
+              "line": 24,
               "column": null
             }
           }
@@ -1833,9 +1935,10 @@
             "fixed": true,
             "answer": "an empty cart → 422 with the reason",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 25,
+              "line": 27,
               "column": null
             }
           },
@@ -1844,9 +1947,10 @@
             "fixed": true,
             "answer": "guest → sent to sign in",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 26,
+              "line": 28,
               "column": null
             }
           },
@@ -1855,9 +1959,10 @@
             "fixed": true,
             "answer": "a product removed meanwhile → the order is refused",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 27,
+              "line": 29,
               "column": null
             }
           },
@@ -1866,9 +1971,10 @@
             "fixed": true,
             "answer": "does not apply: each submit is a new order",
             "doesNotApply": true,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 28,
+              "line": 30,
               "column": null
             }
           },
@@ -1877,9 +1983,10 @@
             "fixed": true,
             "answer": "at most 50 products per order",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 29,
+              "line": 31,
               "column": null
             }
           },
@@ -1888,9 +1995,10 @@
             "fixed": true,
             "answer": "a payment session expires after 15 minutes",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 30,
+              "line": 32,
               "column": null
             }
           },
@@ -1899,9 +2007,10 @@
             "fixed": true,
             "answer": "the payment gateway is down → the order waits, the customer is told",
             "doesNotApply": false,
+            "criteria": [],
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 31,
+              "line": 33,
               "column": null
             }
           }
@@ -1912,7 +2021,7 @@
             "text": "two quick submits can place two orders",
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 34,
+              "line": 36,
               "column": null
             }
           }
@@ -1922,7 +2031,7 @@
             "text": "why does a vip skip the stock check?",
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 36,
+              "line": 38,
               "column": null
             }
           }
@@ -1935,7 +2044,7 @@
             "text": "the order is saved and the stock goes down",
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 39,
+              "line": 41,
               "column": null
             }
           },
@@ -1946,7 +2055,7 @@
             "text": "a product out of stock is refused",
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 40,
+              "line": 42,
               "column": null
             }
           },
@@ -1957,7 +2066,7 @@
             "text": "a customer places an order from the product page",
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 41,
+              "line": 43,
               "column": null
             }
           },
@@ -1968,7 +2077,7 @@
             "text": "a new order appears first in the orders list",
             "at": {
               "file": "grimoire/features/orders/flows/place-order.md",
-              "line": 42,
+              "line": 44,
               "column": null
             }
           }

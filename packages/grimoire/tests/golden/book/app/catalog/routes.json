@@ -16,6 +16,7 @@
     "src/app/catalog/controllers/new-arrivals.controller.ts",
     "src/app/catalog/controllers/products.controller.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [],
   "routes": [
     {

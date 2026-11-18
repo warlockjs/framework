@@ -142,7 +142,8 @@ class Walker {
     for (const name of top.dirs) {
       const dir = `${GRIMOIRE_DIR}/${name}`;
 
-      if (name === "book") continue;
+      // `book/` is generated; `screenshots/` holds the images the written files show.
+      if (name === "book" || name === "screenshots") continue;
       else if (name === "features") await this.walkFeatures(dir);
       else if (name === "apps") await this.walkApps(dir);
       else if (name === "tasks") await this.walkTasks(dir);

@@ -132,6 +132,52 @@ To open it again:
 - run `npx warlock devtools:enable`, or
 - deploy with a new `DEVTOOLS_PATH`. A disable switch matches only the path it was set for. Use this after a leak.
 
+## Share links
+
+An admin can give someone a read-only link to one panel, for example the Grimoire product map, so people without an
+account can read it. Sharing is off until you turn it on:
+
+```ts title="src/config/devtools.ts"
+export default {
+  production: {
+    enabled: true,
+    share: { enabled: true, maxDays: 30 },
+  },
+};
+```
+
+A panel can be shared only when it declares a shared view (`share`, see [Registering a panel](/v/latest/devtools/panels/#share-a-panel)).
+The Grimoire panel does.
+
+**Migration.** Links are stored in the `devtools_shares` table. `devtoolsMigrations` creates it; run `warlock migrate`
+before you turn sharing on. When `share.enabled` is `true` and the table is missing, the app refuses to boot with
+`DT008` naming `devtools_shares`. An app that does not share links needs no new table.
+
+**Create a link.** Sign in as an admin and open **Admin, Share links**. Choose the panel, give the link a label and a
+number of days (1 up to `share.maxDays`) and create it. The link looks like
+`https://app.example.com/ops-7f3k2q/#/share/<token>`. It is shown once: copy it then. Only a SHA-256 of the token is
+stored, so it cannot be shown again. The token sits after the `#`, so it never reaches an access log or a `Referer`
+header, and the page removes it from the address bar as soon as it opens.
+
+**Manage links.** The same page lists every link with its status (active, expired, revoked), expiry, last use and number
+of uses. **Revoke** stops one link. **Revoke all links** stops every active link and asks you to type `revoke all`. A
+revoke reaches every instance within 5 seconds.
+
+**What a link gives.** Opening it sets a cookie (`__Secure-warlock-devtools-share`) that lasts as long as the link, at
+most 12 hours, and that reaches one panel's shared view and nothing else: the panel's `share.routes`, `share.assets`
+and, when set, its images. It cannot reach another panel, the signed-in routes, the admin pages or the account. The
+cookie is `HttpOnly`, `Secure`, `SameSite=Strict` and limited to the dashboard path. What the shared view shows is up to
+the panel; the Grimoire product map shows titles, summaries, stories, screenshots, release history and test health
+counts, never file paths, code, test names or error messages.
+
+**When it does not work.** A wrong, expired or revoked link, a missing cookie and a closed dashboard all answer the same
+404 as any unknown URL of your app, and the page says "This link has expired or was revoked". Each failed token is
+written to the audit log as `share.failed` (with the reason, never the token) and counts toward the per-IP failure limit
+(`rateLimits.ip`), so a client that guesses tokens is refused. The HTTPS, allowed-IP and disabled-dashboard rules apply
+to links as they do to sign-in. Sharing is not available in development: the loopback dashboard cannot be shared.
+
+Creating and revoking links are audited as `share.created` and `share.revoked`.
+
 ## Recovery
 
 If no admin can sign in, run on the server:
@@ -309,6 +355,8 @@ All of them are optional. Only `enabled` must be set; the path and first admin c
 | `auditRetentionDays`        | `90`                | How long audit entries are kept.                                                      |
 | `passkeys.rpName`           | `"Warlock monitor"` | The name authenticators show.                                                         |
 | `passkeys.rpId`             | host of `origin`    | The WebAuthn relying party id.                                                        |
+| `share.enabled`             | `false`             | Turn on [read-only share links](#share-links).                                        |
+| `share.maxDays`             | `30`                | The longest life an admin may give a link, in days (1 to 365).                        |
 
 An invalid value stops the boot with `DT007`, naming the option.
 
@@ -325,8 +373,8 @@ A deploy fails at once instead of exposing a half-protected dashboard. `DEVTOOLS
 | `DT004` | `DEVTOOLS_ADMIN_PASSWORD` breaks the password rules (at least 8 characters, at most 72 bytes, not a common password, not the email). Choose another one.  |
 | `DT005` | The accounts are stored in the database. Install `@warlock.js/cascade` and configure a database connection.                                               |
 | `DT006` | Two-factor secrets are encrypted with the app key. Set `encryption.key` (64 hex characters) in `src/config/encryption.ts`.                                |
-| `DT007` | An option has an invalid value. The message names the option and the accepted values.                                                                     |
-| `DT008` | The devtools tables are missing. Add `devtoolsMigrations` to `database.migrations` in `warlock.config.ts` and run `warlock migrate`.                      |
+| `DT007` | An option has an invalid value (`share.maxDays` must be a whole number from 1 to 365). The message names the option and the accepted values.             |
+| `DT008` | The devtools tables are missing (`devtools_shares` too, when `share.enabled`). Add `devtoolsMigrations` to `database.migrations` in `warlock.config.ts` and run `warlock migrate`. |
 | `DT009` | Set either `DEVTOOLS_ADMIN_PASSWORD` or `DEVTOOLS_SETUP_TOKEN`, not both.                                                                                 |
 | `DT010` | `DEVTOOLS_SETUP_TOKEN` must be at least 32 characters. Generate one with `openssl rand -base64 32`.                                                       |
 

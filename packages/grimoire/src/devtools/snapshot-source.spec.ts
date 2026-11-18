@@ -1,4 +1,4 @@
-import { mkdirSync, utimesSync } from "node:fs";
+import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShopAdapter } from "../../tests/fixtures/shop-facts";
@@ -187,5 +187,57 @@ describe("the panel's snapshot source", () => {
     expect(adapter.calls.files).toBe(1);
     expect(await source.get()).toBe(snapshot);
     expect(adapter.calls.files).toBe(1);
+  });
+
+  it("picks up a results file written after the snapshot opened, without a restart", async () => {
+    copy = copyFixture();
+    const adapter = slowAdapter(0);
+    const source = createSnapshotSource(copy.root, { adapter, mode: "production" });
+
+    const first = await source.get();
+
+    expect(first.results).toBeNull();
+    expect(await source.get()).toBe(first);
+
+    const file = path.join(copy.root, "grimoire", "book", "test-results.json");
+
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(
+      file,
+      JSON.stringify({ schemaVersion: 1, updatedAt: "2026-11-18T00:00:00.000Z", runner: "vitest", results: [] }),
+    );
+    const later = new Date(Date.now() + 60_000);
+
+    utimesSync(file, later, later);
+
+    const second = await source.get();
+
+    expect(second).not.toBe(first);
+    expect(second.results?.updatedAt).toBe("2026-11-18T00:00:00.000Z");
+  });
+
+  it("reads and stamps the results file given in testResultsFile", async () => {
+    copy = copyFixture();
+    const adapter = slowAdapter(0);
+    const source = createSnapshotSource(copy.root, {
+      adapter,
+      mode: "production",
+      testResultsFile: "deploy/results.json",
+    });
+
+    const first = await source.get();
+
+    expect(first.resultsFile).toBe("deploy/results.json");
+    expect(first.results).toBeNull();
+
+    mkdirSync(path.join(copy.root, "deploy"), { recursive: true });
+    writeFileSync(
+      path.join(copy.root, "deploy", "results.json"),
+      JSON.stringify({ schemaVersion: 1, updatedAt: "2026-11-18T01:00:00.000Z", runner: "vitest", results: [] }),
+    );
+
+    const second = await source.get();
+
+    expect(second.results?.updatedAt).toBe("2026-11-18T01:00:00.000Z");
   });
 });

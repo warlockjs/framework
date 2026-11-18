@@ -14,7 +14,10 @@
  */
 import type { BookAdapter } from "../contracts/adapter";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
+import path from "node:path";
+import type { GrimoireCheckFilter } from "./answers";
 import * as data from "./data";
+import { productFeature, productFlow, productMap, type ProductErrorSummary } from "./product-map";
 import { createSnapshotSource } from "./snapshot-source";
 
 export { exportGrimoireSite } from "./site";
@@ -25,6 +28,16 @@ export type GrimoirePanelRequest = {
   params: Readonly<Record<string, string>>;
   query: Readonly<Record<string, string | readonly string[]>>;
   body: unknown;
+  /** `true` when the request came through a read-only share link. */
+  shared?: boolean;
+};
+
+/** Devtools' `DevtoolsPanelShare`, structurally: what a share link may show. */
+export type GrimoireDevtoolsPanelShare = {
+  view: string | URL;
+  routes: readonly string[];
+  assets?: readonly string[];
+  files?: boolean;
 };
 
 /** Devtools' `DevtoolsPanel`, structurally. */
@@ -38,6 +51,10 @@ export type GrimoireDevtoolsPanel = {
     handler: (request: GrimoirePanelRequest) => unknown;
   }[];
   assets?: Readonly<Record<string, string | URL>>;
+  /** A folder of images served next to the panel. */
+  files?: { dir: string; extensions?: readonly string[] };
+  /** What a read-only share link may show. */
+  share?: GrimoireDevtoolsPanelShare;
   /** Safe for the production monitor: the tab only reads (see `GrimoirePanelContext.mode`). */
   production?: boolean;
 };
@@ -59,6 +76,15 @@ export type GrimoirePanelContext = {
    * background open refreshes it. Default in production: until the book changes.
    */
   ttlMs?: number;
+  /**
+   * Where the test results are read from (project-relative or absolute).
+   * Default `grimoire/book/test-results.json`. Set it when the deploy ships
+   * the results from CI; the Vitest reporter writes there with
+   * `grimoireReporter({ file })`.
+   */
+  testResultsFile?: string;
+  /** Captured error groups of the monitor (counts only), for the product map's health. Devtools passes it. */
+  errors?: () => Promise<readonly ProductErrorSummary[]>;
 };
 
 /** The first value of a query parameter. */
@@ -80,6 +106,7 @@ export async function grimoireDevtoolsPanel(
     mode: context.mode ?? "development",
     ...(context.adapter === undefined ? {} : { adapter: context.adapter }),
     ...(context.ttlMs === undefined ? {} : { ttlMs: context.ttlMs }),
+    ...(context.testResultsFile === undefined ? {} : { testResultsFile: context.testResultsFile }),
   });
 
   // In production, start opening the book now so the first tab view is fast.
@@ -90,12 +117,75 @@ export async function grimoireDevtoolsPanel(
     async (request: GrimoirePanelRequest): Promise<Answer> =>
       read(await source.get(), request);
 
+  /** The product map answers: the shared flag from the request, the errors fetched per request. */
+  const product =
+    <Answer>(
+      read: (
+        snapshot: GrimoireSnapshot,
+        request: GrimoirePanelRequest,
+        options: { shared: boolean; errors: readonly ProductErrorSummary[] | null },
+      ) => Answer,
+    ) =>
+    async (request: GrimoirePanelRequest): Promise<Answer> => {
+      const snapshot = await source.get();
+      let errors: readonly ProductErrorSummary[] | null = null;
+
+      try {
+        errors = (await context.errors?.()) ?? null;
+      } catch {
+        errors = null;
+      }
+
+      return read(snapshot, request, { shared: request.shared === true, errors });
+    };
+
+  const number = (value: string | undefined): number | undefined => {
+    if (value === undefined || value === "") return undefined;
+
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
+  const checkFilter = (query: GrimoirePanelRequest["query"]): GrimoireCheckFilter | null => {
+    const filter: GrimoireCheckFilter = {};
+    const code = one(query, "code");
+    const feature = one(query, "feature");
+    const flow = one(query, "flow");
+    const severity = one(query, "severity");
+    const state = one(query, "state");
+    const offset = number(one(query, "offset"));
+    const limit = number(one(query, "limit"));
+    let any = false;
+
+    if (code) (filter.code = code), (any = true);
+    if (feature) (filter.feature = feature), (any = true);
+    if (flow) (filter.flow = flow), (any = true);
+    if (severity === "error" || severity === "warning") (filter.severity = severity), (any = true);
+    if (state === "expected" || state === "unexpected") (filter.state = state), (any = true);
+    if (offset !== undefined) (filter.offset = offset), (any = true);
+    if (limit !== undefined) (filter.limit = limit), (any = true);
+
+    return any ? filter : null;
+  };
+
   return {
     id: "grimoire",
     title: "Grimoire",
     production: true,
     view: new URL("../../ui/grimoire-view.js", import.meta.url),
-    assets: { "grimoire.css": new URL("../../ui/grimoire.css", import.meta.url) },
+    assets: {
+      "grimoire.css": new URL("../../ui/grimoire.css", import.meta.url),
+      "product-map.js": new URL("../../ui/product-map.js", import.meta.url),
+      "product-map.css": new URL("../../ui/product-map.css", import.meta.url),
+    },
+    files: { dir: path.join(context.root, "grimoire", "screenshots") },
+    share: {
+      view: new URL("../../ui/product-map.js", import.meta.url),
+      routes: ["/product", "/product/features/:feature", "/product/flows/:feature/:flow"],
+      assets: ["product-map.css"],
+      files: true,
+    },
     routes: [
       { path: "/summary", handler: answer((snapshot) => data.summary(snapshot)) },
       {
@@ -131,7 +221,32 @@ export async function grimoireDevtoolsPanel(
       },
       {
         path: "/flows/:feature/:flow",
-        handler: answer((snapshot, { params }) => data.flow(snapshot, params.feature, params.flow)),
+        handler: answer((snapshot, { params }) =>
+          data.flowAnswer(snapshot, params.feature, params.flow),
+        ),
+      },
+      {
+        path: "/flows/:feature/:flow/steps/:index/files",
+        handler: answer((snapshot, { params, query }) =>
+          data.stepFiles(snapshot, params.feature, params.flow, params.index, {
+            set: one(query, "set"),
+            offset: one(query, "offset"),
+            limit: one(query, "limit"),
+          }),
+        ),
+      },
+      { path: "/product", handler: product((snapshot, _request, options) => productMap(snapshot, options)) },
+      {
+        path: "/product/features/:feature",
+        handler: product((snapshot, { params }, options) =>
+          productFeature(snapshot, params.feature, options),
+        ),
+      },
+      {
+        path: "/product/flows/:feature/:flow",
+        handler: product((snapshot, { params }, options) =>
+          productFlow(snapshot, params.feature, params.flow, options),
+        ),
       },
       { path: "/apps", handler: answer((snapshot) => data.apps(snapshot)) },
       {
@@ -144,7 +259,15 @@ export async function grimoireDevtoolsPanel(
         path: "/releases/:release",
         handler: answer((snapshot, { params }) => data.release(snapshot, params.release)),
       },
-      { path: "/check", handler: answer((snapshot) => data.check(snapshot)) },
+      {
+        path: "/check",
+        handler: answer((snapshot, { query }) => {
+          const filter = checkFilter(query);
+
+          return filter === null ? data.check(snapshot) : data.checkPage(snapshot, filter);
+        }),
+      },
+      { path: "/check/groups", handler: answer((snapshot) => data.checkGroups(snapshot)) },
       {
         path: "/graph/file",
         handler: answer((snapshot, { query }) => data.graphOfFile(snapshot, one(query, "path"))),

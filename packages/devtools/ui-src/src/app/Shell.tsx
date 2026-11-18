@@ -58,7 +58,7 @@ export function Shell() {
     route.type === "account"
       ? "Account"
       : route.type === "admin"
-        ? `Admin: ${{ users: "Users and invites", audit: "Audit log", settings: "Settings" }[route.page]}`
+        ? `Admin: ${{ users: "Users and invites", audit: "Audit log", settings: "Settings", shares: "Share links" }[route.page]}`
         : viewName === "tab"
           ? "Dashboard"
           : viewName;
@@ -112,6 +112,7 @@ export function Shell() {
         ["users", "Admin: Users and invites"],
         ["audit", "Admin: Audit log"],
         ["settings", "Admin: Settings"],
+        ...(session.share?.enabled ? ([["shares", "Admin: Share links"]] as const) : []),
       ] as const) {
         items.push({
           id: `admin:${page}`,
@@ -134,7 +135,7 @@ export function Shell() {
     }
 
     return items;
-  }, [list, production, session.role, setChoice]);
+  }, [list, production, session.role, session.share?.enabled, setChoice]);
 
   if (route.type === "account") {
     content = <AccountPage />;
@@ -168,7 +169,23 @@ export function Shell() {
         />
       );
     } else if (info) {
-      content = <PanelHost key={info.id} id={info.id} title={info.title} route={tabRoute} />;
+      const canShare =
+        info.shareable &&
+        session.mode === "production" &&
+        session.role === "admin" &&
+        session.share?.enabled === true;
+
+      content = (
+        <PanelHost
+          key={info.id}
+          id={info.id}
+          title={info.title}
+          route={tabRoute}
+          share={
+            canShare ? { enabled: true, manageHref: `#/admin/shares?panel=${info.id}` } : null
+          }
+        />
+      );
     }
   }
 

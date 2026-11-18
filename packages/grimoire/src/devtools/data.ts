@@ -3,11 +3,11 @@
  * and the static export both call them; questions about one item go to
  * `scry()`, the rest read the snapshot directly.
  */
-import { isGrimoireCode } from "../codes";
+import { explainGrimoireCode, isGrimoireCode } from "../codes";
 import { checkGrimoire } from "../check";
 import type { BookPage, BookScreen } from "../contracts/adapter";
 import type { TasksIndex, FeaturesIndex } from "../contracts/bookmap";
-import type { GrimoireCheckReport, RouteFreshness } from "../contracts/findings";
+import type { GrimoireCheckReport, GrimoireFinding, RouteFreshness } from "../contracts/findings";
 import type {
   ScryFeatureResult,
   ScryFileResult,
@@ -19,7 +19,20 @@ import type {
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import type { WrittenApp, WrittenLayout, WrittenPage, WrittenRelease } from "../contracts/written";
 import { scry } from "../scry";
+import { compactFlow, STEP_FILE_SETS, stepFilePage } from "../scry/compact";
+import { testResultsInfo } from "../test-results";
 import { featureGraph, fileGraph, moduleGraph, pageGraph, type GrimoireGraph } from "./graphs";
+import {
+  STEP_FILES_PAGE_LIMIT,
+  type GrimoireCheckFilter,
+  type GrimoireCheckGroup,
+  type GrimoireCheckGroups,
+  type GrimoireCheckPage,
+  type GrimoireFlowAnswer,
+  type GrimoireStepFilesAnswer,
+  type StepFileSet,
+} from "./answers";
+import type { TestResultsInfo } from "../contracts/test-results";
 
 /** An error a route answers with a status (devtools turns `statusCode` into the response status). */
 export class GrimoirePanelError extends Error {
@@ -43,6 +56,8 @@ export type GrimoireSummary = {
   /** How many apps, pages, screens and releases are written (the tab's navigation and overview badges). */
   apps: { apps: number; pages: number; screens: number };
   releases: number;
+  /** Whether test results were read, from where, and how many proofs have one. */
+  results: TestResultsInfo;
 };
 
 /** One feature of the listing: the index entry plus what the cards show. */
@@ -135,6 +150,7 @@ export function summary(snapshot: GrimoireSnapshot): GrimoireSummary {
       screens: written.apps.reduce((total, app) => total + app.screens.length, 0),
     },
     releases: written.releases.length,
+    results: testResultsInfo(snapshot),
   };
 }
 
@@ -336,4 +352,149 @@ export function graphOfPage(
 
 export function graphOfModules(snapshot: GrimoireSnapshot): GrimoireGraph {
   return moduleGraph(snapshot);
+}
+
+// ── Compact flow, step files, check pages and groups ───────────────────────
+
+/** `GET /flows/:feature/:flow`: the compact flow answer (step counts, direct imports, health, neighbours). */
+export function flowAnswer(
+  snapshot: GrimoireSnapshot,
+  featureId: string | undefined,
+  flowId: string | undefined,
+): GrimoireFlowAnswer {
+  return compactFlow(snapshot, flow(snapshot, featureId, flowId));
+}
+
+/** A whole number from a query value, or a 400 naming the parameter. */
+function whole(value: string | undefined, name: string, fallback: number, min: number): number {
+  if (value === undefined || value === "") return fallback;
+
+  const number = Number(value);
+
+  if (!Number.isInteger(number) || number < min) {
+    throw new GrimoirePanelError(400, `"${name}" must be a whole number of ${min} or more.`);
+  }
+
+  return number;
+}
+
+/** `GET /flows/:feature/:flow/steps/:index/files`: one page of a step's files. */
+export function stepFiles(
+  snapshot: GrimoireSnapshot,
+  featureId: string | undefined,
+  flowId: string | undefined,
+  index: string | undefined,
+  query: { set?: string | undefined; offset?: string | undefined; limit?: string | undefined },
+): GrimoireStepFilesAnswer {
+  const feature = required(featureId, "feature");
+  const id = required(flowId, "flow");
+  const set = query.set === undefined || query.set === "" ? "reachable" : query.set;
+
+  if (!(STEP_FILE_SETS as readonly string[]).includes(set)) {
+    throw new GrimoirePanelError(
+      400,
+      `Unknown set "${set}". Use one of: ${STEP_FILE_SETS.join(", ")}.`,
+    );
+  }
+
+  const stepIndex = whole(required(index, "index"), "index", 0, 0);
+  const offset = whole(query.offset, "offset", 0, 0);
+  const limit = Math.min(whole(query.limit, "limit", STEP_FILES_PAGE_LIMIT, 1), STEP_FILES_PAGE_LIMIT);
+  const written = snapshot.written.features
+    .find((item) => item.id === feature)
+    ?.flows.find((item) => item.id.value === id);
+  const bookmap = written === undefined ? undefined : snapshot.collected.flows[written.ref];
+
+  if (written === undefined || bookmap === undefined) {
+    throw new GrimoirePanelError(404, `No flow ${feature}/${id} is written.`);
+  }
+
+  const step = bookmap.steps.find((item) => item.index === stepIndex);
+
+  if (step === undefined) {
+    throw new GrimoirePanelError(404, `${written.ref} has no step ${stepIndex}.`);
+  }
+
+  return stepFilePage(snapshot, bookmap, step, set as StepFileSet, offset, limit);
+}
+
+/** `GET /check?code=&feature=&flow=&severity=&state=&offset=&limit=`: matching findings, paged. */
+export function checkPage(snapshot: GrimoireSnapshot, filter: GrimoireCheckFilter): GrimoireCheckPage {
+  const report = checkGrimoire(snapshot);
+  const limit = Math.min(Math.max(1, Math.floor(filter.limit ?? 100)), 500);
+  const offset = Math.max(0, Math.floor(filter.offset ?? 0));
+  const code = filter.code?.trim().toUpperCase();
+  const matching = report.findings.filter((finding) => {
+    if (code !== undefined && code !== "" && finding.code !== code) return false;
+    if (filter.severity !== undefined && finding.severity !== filter.severity) return false;
+    if (filter.state !== undefined && finding.expected !== (filter.state === "expected")) return false;
+    if (filter.flow !== undefined && filter.flow !== "" && finding.subject.flow !== filter.flow) {
+      return false;
+    }
+
+    if (filter.feature !== undefined && filter.feature !== "") {
+      return featureOfFinding(finding) === filter.feature;
+    }
+
+    return true;
+  });
+
+  return {
+    ...report,
+    findings: matching.slice(offset, offset + limit),
+    total: matching.length,
+    offset,
+    limit,
+  };
+}
+
+/** The feature a finding belongs to: its subject, else the feature of its flow, else `(none)`. */
+function featureOfFinding(finding: GrimoireFinding): string {
+  return finding.subject.feature ?? finding.subject.flow?.split("/")[0] ?? "(none)";
+}
+
+/** `GET /check/groups`: the check by code, errors first, then by count. */
+export function checkGroups(snapshot: GrimoireSnapshot): GrimoireCheckGroups {
+  const report = checkGrimoire(snapshot);
+  const byCode = new Map<string, GrimoireFinding[]>();
+
+  for (const finding of report.findings) {
+    byCode.set(finding.code, [...(byCode.get(finding.code) ?? []), finding]);
+  }
+
+  const groups: GrimoireCheckGroup[] = [];
+
+  for (const [code, findings] of byCode) {
+    const definition = explainGrimoireCode(code);
+    const unexpected = findings.filter((finding) => !finding.expected);
+    const features = new Map<string, number>();
+
+    for (const finding of unexpected) {
+      const feature = featureOfFinding(finding);
+
+      features.set(feature, (features.get(feature) ?? 0) + 1);
+    }
+
+    groups.push({
+      code,
+      severity: findings[0]?.severity ?? definition?.severity ?? "warning",
+      area: definition?.area ?? "",
+      title: definition?.title ?? code,
+      fix: definition?.fix ?? findings[0]?.hint ?? "",
+      count: unexpected.length,
+      expected: findings.length - unexpected.length,
+      features: [...features]
+        .map(([feature, count]) => ({ feature, count }))
+        .sort((left, right) => right.count - left.count || (left.feature < right.feature ? -1 : 1)),
+    });
+  }
+
+  groups.sort(
+    (left, right) =>
+      (left.severity === right.severity ? 0 : left.severity === "error" ? -1 : 1) ||
+      right.count - left.count ||
+      (left.code < right.code ? -1 : 1),
+  );
+
+  return { counts: report.counts, ok: report.ok, groups };
 }

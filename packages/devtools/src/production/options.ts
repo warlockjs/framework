@@ -44,6 +44,8 @@ export type ResolvedDevtoolsProductionOptions = {
   logLevels: readonly DevtoolsLogEntry["level"][];
   auditRetentionDays: number;
   passkeys: { rpName: string; rpId: string | null };
+  /** Read-only share links. */
+  share: { enabled: boolean; maxDays: number };
 };
 
 /** The defaults `resolveProductionOptions` applies (environment values excluded). */
@@ -67,6 +69,7 @@ export const DEVTOOLS_PRODUCTION_DEFAULTS = {
   logLevels: ["warn", "error"],
   auditRetentionDays: 90,
   passkeys: { rpName: "Warlock monitor" },
+  share: { enabled: false, maxDays: 30 },
 } as const;
 
 /** The environment variables production mode reads. */
@@ -153,7 +156,7 @@ function resolvePath(value: string | undefined): string {
  * `env`, and validates everything.
  *
  * Throws `DevtoolsProductionConfigError`: DT001 (no path), DT002 (bad path),
- * DT007 (an option out of range: sampleRate outside 0–1, a non-positive
+ * DT007 (an option out of range: sampleRate outside 0–1, share.maxDays outside 1–365, a non-positive
  * limit, an unknown twoFactor value, a bad CIDR, an origin that is not
  * `https://host[:port]`), DT009 (both a password and a setup token), DT010
  * (setup token shorter than 32 characters). DT003/DT004 (admin) are checked
@@ -234,6 +237,15 @@ export function resolveProductionOptions(
     invalid("passkeys.rpId", "use a host name such as app.example.com");
   }
 
+  const shareEnabled: boolean = given.share?.enabled ?? defaults.share.enabled;
+  const shareMaxDays: number = given.share?.maxDays ?? defaults.share.maxDays;
+
+  if (typeof shareEnabled !== "boolean") invalid("share.enabled", "use true or false");
+
+  if (!Number.isInteger(shareMaxDays) || shareMaxDays < 1 || shareMaxDays > 365) {
+    invalid("share.maxDays", "use a whole number of days from 1 to 365");
+  }
+
   const limits = given.rateLimits ?? {};
   const session = given.session ?? {};
 
@@ -305,6 +317,7 @@ export function resolveProductionOptions(
       defaults.auditRetentionDays,
     ),
     passkeys: { rpName, rpId },
+    share: { enabled: shareEnabled, maxDays: shareMaxDays },
   };
 
   if (resolved.admin.password !== null && resolved.admin.setupToken !== null) {

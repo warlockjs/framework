@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { feature, flow, proof, snapshot } from "../../../tests/check/snapshot-builder";
 import type { GrimoireSnapshot, ProofLine } from "../../contracts";
-import { checkCriteriaTests, checkProofTargets } from "./criteria";
+import { checkCaseCriteria, checkCriteriaTests, checkProofTargets } from "./criteria";
 
 function criteriaSnapshot(
   proofs: ProofLine[],
@@ -61,5 +61,42 @@ describe("checkProofTargets", () => {
       'GR4002 src/app/x/tests/x.test.ts:3 "@proves shop/refund AC-1" names no flow shop/refund',
       'GR4002 e2e/order.e2e.ts:7 "@proves shop/order AC-9" names no AC-9 in shop/order',
     ]);
+  });
+});
+
+describe("checkCaseCriteria", () => {
+  function caseSnapshot(criteria: string[]): GrimoireSnapshot {
+    const target = criteriaSnapshot([]);
+    const order = target.written.features[0]?.flows[0];
+
+    if (order) {
+      order.cases = [
+        {
+          question: "limits",
+          fixed: true,
+          answer: "at most 5",
+          doesNotApply: false,
+          criteria,
+          at: { file: order.file, line: 12, column: null },
+        },
+      ];
+    }
+
+    return target;
+  }
+
+  it("reports nothing when every named criterion exists", () => {
+    expect(checkCaseCriteria(caseSnapshot(["AC-1", "AC-2"]))).toEqual([]);
+    expect(checkCaseCriteria(caseSnapshot([]))).toEqual([]);
+  });
+
+  it("GR2013: an error for each criterion the flow does not have", () => {
+    const findings = checkCaseCriteria(caseSnapshot(["AC-1", "AC-9"]));
+
+    expect(findings.map((finding) => [finding.code, finding.severity, finding.at?.line])).toEqual([
+      ["GR2013", "error", 12],
+    ]);
+    expect(findings[0]?.message).toContain("AC-9");
+    expect(findings[0]?.subject).toMatchObject({ feature: "shop", flow: "shop/order" });
   });
 });

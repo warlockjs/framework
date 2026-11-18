@@ -18,6 +18,7 @@
     "@warlock.js/notifications"
   ],
   "imports": [],
+  "typeOnlyImports": [],
   "importedBy": [],
   "routes": [],
   "pages": [],

@@ -7,6 +7,7 @@ import type { DevtoolsMode, DevtoolsPanelInfo } from "./production/contracts";
 import type {
   DevtoolsPanel,
   DevtoolsPanelEntry,
+  DevtoolsPanelErrorSummary,
   DevtoolsPanelExport,
   DevtoolsPanelMethod,
   DevtoolsPanelRoute,
@@ -22,9 +23,43 @@ export type MountedDevtoolsPanel = {
   view: string;
   routes: readonly (DevtoolsPanelRoute & { method: DevtoolsPanelMethod })[];
   assets: Readonly<Record<string, string>>;
+  /** The folder of images the panel serves; `null` when it declared none. */
+  files: MountedPanelFiles | null;
+  /** What a read-only share link of the panel opens; `null` when the panel cannot be shared. */
+  share: MountedPanelShare | null;
   /** Whether the panel declared itself safe for the production monitor. */
   production: boolean;
 };
+
+/** A panel's folder of images, validated: an absolute directory and lower-case extensions. */
+export type MountedPanelFiles = {
+  dir: string;
+  extensions: readonly string[];
+};
+
+/** A panel's shared view, validated. */
+export type MountedPanelShare = {
+  /** Absolute path of the shared view module. */
+  view: string;
+  /** Paths of the GET routes the shared page may call. */
+  routes: readonly string[];
+  /** Served names from `assets` the shared page may load. */
+  assets: readonly string[];
+  /** Whether the shared page may load images from `files`. */
+  files: boolean;
+};
+
+/** The extensions a panel serves from `files` when it lists none. */
+export const DEFAULT_PANEL_FILE_EXTENSIONS: readonly string[] = [
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".gif",
+];
+
+/** Extensions a panel may never serve from `files`: a browser runs or renders them as a page. */
+const BLOCKED_FILE_EXTENSIONS = new Set([".svg", ".html", ".htm", ".js", ".mjs"]);
 
 /**
  * Ids the dashboard already uses for its own tabs, API segments and URLs. A
@@ -52,6 +87,7 @@ const RESERVED_PANEL_IDS = new Set([
   "requests",
   "resources",
   "routes",
+  "share",
   "stream",
 ]);
 
@@ -67,6 +103,10 @@ const CONTENT_TYPES: Record<string, string> = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
   ".woff2": "font/woff2",
 };
 
@@ -188,9 +228,138 @@ export function checkDevtoolsPanel(
     assets[name] = file;
   }
 
+  const files = checkPanelFiles(id, panel.files);
+  const share = checkPanelShare(id, panel.share, routes, assets, files !== null);
+
   taken.set(id, panel.title);
 
-  return { id, title: panel.title, view, routes, assets, production: panel.production === true };
+  return {
+    id,
+    title: panel.title,
+    view,
+    routes,
+    assets,
+    files,
+    share,
+    production: panel.production === true,
+  };
+}
+
+const FILE_EXTENSION = /^\.[a-z0-9]{1,16}$/;
+
+/** Validates `files`; `null` when the panel declares none. */
+function checkPanelFiles(
+  id: string,
+  value: DevtoolsPanel["files"] | null,
+): MountedPanelFiles | null {
+  // A panel that was mounted before carries `null` for "none".
+  if (value === undefined || value === null) return null;
+
+  if (typeof value !== "object") {
+    throw new Error(
+      `Devtools panel "${id}" has files that is not an object; use { dir: "/absolute/folder" }.`,
+    );
+  }
+
+  const dir = toFilePath(value.dir);
+
+  if (dir === undefined) {
+    throw new Error(
+      `Devtools panel "${id}" needs files.dir to be an absolute path or a file: URL; got ${String(value.dir)}.`,
+    );
+  }
+
+  const given = value.extensions;
+
+  if (given !== undefined && (!Array.isArray(given) || given.length === 0)) {
+    throw new Error(
+      `Devtools panel "${id}" has files.extensions that is not a list; use [".png", ".jpg"] or leave it out.`,
+    );
+  }
+
+  for (const extension of given ?? []) {
+    if (typeof extension !== "string" || !FILE_EXTENSION.test(extension)) {
+      throw new Error(
+        `Devtools panel "${id}" has files.extensions entry ${JSON.stringify(extension)}; use lower-case extensions that start with a dot, such as ".png".`,
+      );
+    }
+
+    if (BLOCKED_FILE_EXTENSIONS.has(extension)) {
+      throw new Error(
+        `Devtools panel "${id}" lists files.extensions entry "${extension}", which can run as a page or script in the browser; remove it (images such as .png, .jpg, .webp and .gif are fine).`,
+      );
+    }
+  }
+
+  return { dir, extensions: [...(given ?? DEFAULT_PANEL_FILE_EXTENSIONS)] };
+}
+
+/** Validates `share` against the panel's own routes, assets and files. */
+function checkPanelShare(
+  id: string,
+  value: DevtoolsPanel["share"] | null,
+  routes: readonly { method: DevtoolsPanelMethod; path: string }[],
+  assets: Readonly<Record<string, string>>,
+  hasFiles: boolean,
+): MountedPanelShare | null {
+  // A panel that was mounted before carries `null` for "none".
+  if (value === undefined || value === null) return null;
+
+  if (typeof value !== "object") {
+    throw new Error(
+      `Devtools panel "${id}" has share that is not an object; use { view, routes }.`,
+    );
+  }
+
+  const view = toFilePath(value.view);
+
+  if (view === undefined) {
+    throw new Error(
+      `Devtools panel "${id}" needs share.view: an absolute path or file: URL of the shared view module.`,
+    );
+  }
+
+  if (!isFile(view)) {
+    throw new Error(`The share.view module of devtools panel "${id}" was not found at ${view}.`);
+  }
+
+  if (!Array.isArray(value.routes)) {
+    throw new Error(
+      `Devtools panel "${id}" needs share.routes: a list of the paths of its GET routes the shared page may call.`,
+    );
+  }
+
+  const getPaths = routes.filter((route) => route.method === "GET").map((route) => route.path);
+
+  for (const route of value.routes) {
+    if (typeof route !== "string" || !getPaths.includes(route)) {
+      throw new Error(
+        `Devtools panel "${id}" lists share.routes entry ${JSON.stringify(route)}, which is not the path of one of its GET routes${getPaths.length > 0 ? `; use one of ${getPaths.map((path) => JSON.stringify(path)).join(", ")}` : " (the panel has no GET routes)"}.`,
+      );
+    }
+  }
+
+  for (const name of value.assets ?? []) {
+    if (typeof name !== "string" || !Object.hasOwn(assets, name)) {
+      throw new Error(
+        `Devtools panel "${id}" lists share.assets entry ${JSON.stringify(name)}, which is not a name in its assets; use one of ${Object.keys(assets).join(", ") || "(the panel has no assets)"}.`,
+      );
+    }
+  }
+
+  const files = value.files === true;
+
+  if (value.files !== undefined && typeof value.files !== "boolean") {
+    throw new Error(`Devtools panel "${id}" needs share.files to be true or false.`);
+  }
+
+  if (files && !hasFiles) {
+    throw new Error(
+      `Devtools panel "${id}" sets share.files, but the panel has no files folder; add files: { dir } or remove share.files.`,
+    );
+  }
+
+  return { view, routes: [...value.routes], assets: [...(value.assets ?? [])], files };
 }
 
 /** Validates a list of panels; the first invalid or duplicate one throws. */
@@ -212,6 +381,8 @@ export type LoadDevtoolsPanelsOptions = {
   importModule?: (specifier: string) => Promise<unknown>;
   /** Where the dashboard runs; panel factories receive it as `context.mode`. @default "development" */
   mode?: DevtoolsMode;
+  /** The captured error groups of the last hour; panel factories receive it as `context.errors`. */
+  errors?: () => Promise<readonly DevtoolsPanelErrorSummary[]>;
 };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -351,9 +522,12 @@ async function panelsOf(
   root: string,
   mode: DevtoolsMode,
   panelOptions: Readonly<Record<string, unknown>> = {},
+  errors?: () => Promise<readonly DevtoolsPanelErrorSummary[]>,
 ): Promise<readonly unknown[]> {
   const value =
-    typeof exported === "function" ? await exported({ ...panelOptions, root, mode }) : exported;
+    typeof exported === "function"
+      ? await exported({ ...panelOptions, root, mode, ...(errors ? { errors } : {}) })
+      : exported;
 
   return Array.isArray(value) ? value : [value];
 }
@@ -410,7 +584,13 @@ export async function loadDevtoolsPanels(
           throw new Error("the module has no default export");
         }
 
-        candidates = await panelsOf(module.default, options.root, mode, panelOptions);
+        candidates = await panelsOf(
+          module.default,
+          options.root,
+          mode,
+          panelOptions,
+          options.errors,
+        );
       } else {
         candidates = [entry];
       }
@@ -470,15 +650,27 @@ export function productionPanels(
  * in registration order.
  */
 export function listPanelInfos(
-  panels: readonly Pick<MountedDevtoolsPanel, "id" | "title">[],
+  panels: readonly (Pick<MountedDevtoolsPanel, "id" | "title"> &
+    Partial<Pick<MountedDevtoolsPanel, "share">>)[],
   builtIn?: readonly string[],
 ): DevtoolsPanelInfo[] {
   const tabs: DevtoolsPanelInfo[] = DEVTOOLS_BUILT_IN_PANELS.filter(
     (tab) => builtIn === undefined || builtIn.includes(tab.id),
-  ).map((tab) => ({ id: tab.id, title: tab.title, type: "built-in" as const }));
+  ).map((tab) => ({
+    id: tab.id,
+    title: tab.title,
+    type: "built-in" as const,
+    shareable: false,
+  }));
 
-  for (const panel of panels)
-    tabs.push({ id: panel.id, title: panel.title, type: "package" as const });
+  for (const panel of panels) {
+    tabs.push({
+      id: panel.id,
+      title: panel.title,
+      type: "package" as const,
+      shareable: panel.share !== undefined && panel.share !== null,
+    });
+  }
 
   return tabs;
 }

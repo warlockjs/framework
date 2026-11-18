@@ -7,6 +7,8 @@ who: everyone
 
 # New arrivals
 
+The newest products sold in the shopper's country, newest first.
+
 ## Steps
 1. page           /
 2. route          GET /api/products/new-arrivals

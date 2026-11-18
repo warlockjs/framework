@@ -18,6 +18,7 @@
     "@warlock.js/queue"
   ],
   "imports": [],
+  "typeOnlyImports": [],
   "importedBy": [],
   "routes": [],
   "pages": [],

@@ -12,10 +12,12 @@ import {
   rowToReport,
   rowToSample,
   rowToSession,
+  rowToShare,
   rowToState,
   sampleToRow,
   sessionPatchToRow,
   sessionToRow,
+  shareToRow,
   stateToRow,
   statePatchToRow,
   toBoolean,
@@ -143,5 +145,40 @@ describe("row mapping", () => {
     expect(toBoolean("t")).toBe(true);
     expect(parseJson("not json", [])).toEqual([]);
     expect(parseJson(undefined, { a: 1 })).toEqual({ a: 1 });
+  });
+});
+
+describe("share row mapping", () => {
+  const record = {
+    id: "s1",
+    tokenHash: "h".repeat(64),
+    panel: "grimoire",
+    label: "Review",
+    createdBy: "a1",
+    createdAt: 1,
+    expiresAt: 2,
+    revokedAt: null,
+    lastUsedAt: 3,
+    uses: 4,
+  };
+
+  it("round-trips a share link with snake_case columns", () => {
+    const row = shareToRow(record);
+
+    expect(row).toMatchObject({
+      token_hash: record.tokenHash,
+      created_by: "a1",
+      expires_at: 2,
+      revoked_at: null,
+      last_used_at: 3,
+      uses: 4,
+    });
+    expect(rowToShare(row)).toEqual(record);
+  });
+
+  it("reads bigint columns a driver returns as strings", () => {
+    expect(
+      rowToShare({ ...shareToRow(record), created_at: "10", expires_at: "20", revoked_at: "30" }),
+    ).toMatchObject({ createdAt: 10, expiresAt: 20, revokedAt: 30 });
   });
 });

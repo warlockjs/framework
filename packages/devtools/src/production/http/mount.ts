@@ -22,6 +22,7 @@ import { setDevtoolsRequestContext, devtoolsRequestContext } from "./context";
 import { readCookie, sessionCookieName } from "./cookie";
 import { DASHBOARD_CSP, DASHBOARD_HEADERS, DOCS_CSP } from "./headers";
 import { DEVTOOLS_CSRF_HEADER } from "./constants";
+import { createDevtoolsShare } from "./share";
 import { ipMatches } from "./ip";
 import type { DevtoolsRouteAccess, MountProductionDevtoolsDeps } from "./types";
 
@@ -36,6 +37,9 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /** The routes of the opt-in API documentation pages (they keep a CSP of their own). */
 const DOCS_PATTERNS = new Set(["/docs", "/docs/swagger"]);
+
+/** The grant exchange of a share link: every failure of it answers the uniform 404. */
+const SHARE_OPEN_PATTERN = "/api/share/open";
 
 /** The mail preview's HTML: framed by the dashboard, with a policy of its own. */
 const MAIL_HTML_PATTERN = "/api/mails/:id/html";
@@ -124,7 +128,13 @@ export function mountProductionDevtools(
   const prefix = production.path;
   const cookieName = sessionCookieName(production.requireHttps);
   const enabledTabs = new Set(deps.builtInPanels);
-  const lookup = createAccessLookup(productionRouteAccess(deps.panels.map((panel) => panel.id)));
+  const share = production.share.enabled ? createDevtoolsShare(deps) : null;
+  const lookup = createAccessLookup(
+    productionRouteAccess(
+      deps.panels.map((panel) => panel.id),
+      { share: share !== null },
+    ),
+  );
   const streamsPerSession = new Map<string, number>();
   let streamsInstance = 0;
   let lastWarningAt = 0;
@@ -287,6 +297,24 @@ export function mountProductionDevtools(
         const access: DevtoolsRouteAccess = rule?.access ?? { type: "admin" };
         let authenticated: DevtoolsAuthenticated | null = null;
 
+        // A share link has no account: its cookie grants one panel's shared view and nothing else.
+        if (access.type === "share") {
+          const grant = share ? await share.authorize(request, meta) : null;
+
+          if (grant === null) return notFound(request, reply);
+
+          setDevtoolsRequestContext(request, {
+            client,
+            meta,
+            rule,
+            pattern,
+            authenticated: null,
+            share: grant,
+          });
+
+          return;
+        }
+
         if (access.type !== "public") {
           try {
             authenticated = await auth.authenticate(readCookie(request.headers.cookie, cookieName));
@@ -318,7 +346,11 @@ export function mountProductionDevtools(
           throw new DevtoolsApiError("csrf.invalid");
         }
 
-        if (hasBody(request) && !isJson(request)) throw new DevtoolsApiError("input.invalid");
+        if (hasBody(request) && !isJson(request)) {
+          if (pattern === SHARE_OPEN_PATTERN) return notFound(request, reply);
+
+          throw new DevtoolsApiError("input.invalid");
+        }
 
         if (authenticated !== null) {
           const header = request.headers[DEVTOOLS_CSRF_HEADER];
@@ -389,6 +421,11 @@ export function mountProductionDevtools(
       // ---- Errors ---------------------------------------------------------
       instance.setErrorHandler(
         (error: Error & { statusCode?: number; code?: string }, request, reply) => {
+          // A malformed grant exchange (bad JSON, too large) answers like any unknown URL.
+          if (devtoolsRequestContext(request)?.pattern === SHARE_OPEN_PATTERN) {
+            return notFound(request, reply);
+          }
+
           if (error instanceof DevtoolsApiError) {
             return reply.code(error.statusCode).send(error.toBody());
           }
@@ -434,7 +471,9 @@ export function mountProductionDevtools(
       registerInsightsRoutes(instance, routes);
       registerLogRoutes(instance, routes);
       registerShapeExplainRoute(instance, routes);
-      registerPanelRoutes(instance, deps.panels);
+      registerPanelRoutes(instance, deps.panels, { notFound });
+
+      share?.register(instance, notFound);
 
       if (enabledTabs.has("mail")) registerMailRoutes(instance, routes);
       if (enabledTabs.has("ai") || enabledTabs.has("agents")) registerAiRoutes(instance, routes);

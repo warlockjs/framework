@@ -335,6 +335,20 @@ Options under `production` (all optional, defaults in brackets):
   `panels: { id: true }`. A package panel needs `production: true` or the same.
 - Panel writes in production need an admin and the `X-Devtools-Csrf` header
   (`api()` adds it); they are audited.
+- Share links: `production.share = { enabled: true, maxDays: 30 }` lets an
+  admin (Admin, Share links) give a read-only link to one panel that declares
+  `share`. The table `devtools_shares` is in `devtoolsMigrations` (`DT008`
+  names it when `share.enabled` and it is missing; `maxDays` is 1 to 365 or
+  `DT007`). The URL is `<origin><path>/#/share/<token>`: the token is in the
+  fragment, shown once, stored only as a SHA-256 hash, and the page removes it
+  from the address bar. Opening it sets the cookie `__Secure-warlock-devtools-share`
+  (at most 12 hours, HMAC-signed) that reaches only that panel's `share.routes`,
+  `share.assets` and images. A wrong, expired or revoked token, a bad cookie and
+  sharing being off all answer the uniform 404; a failed token is audited as
+  `share.failed` (counts toward `rateLimits.ip`); `share.created` and
+  `share.revoked` are audited too. A revoke reaches every instance within 5 s.
+  Not available in development. Tell people not to put the link in tickets or
+  chat they do not trust: anyone holding it can read the shared view.
 
 ### When something fails
 
@@ -349,8 +363,8 @@ The app refuses to boot with a `DevtoolsProductionConfigError`
 | `DT004` | The env password breaks the rules (8+ characters, at most 72 bytes, not common, not the email).                             |
 | `DT005` | Install `@warlock.js/cascade` and configure a database.                                                                     |
 | `DT006` | Set `encryption.key` (64 hex characters).                                                                                   |
-| `DT007` | An option is invalid; the message names it.                                                                                 |
-| `DT008` | Add `devtoolsMigrations` to `database.migrations` and run `warlock migrate`.                                                |
+| `DT007` | An option is invalid (`share.maxDays` must be 1 to 365); the message names it.                                              |
+| `DT008` | Add `devtoolsMigrations` to `database.migrations` and run `warlock migrate` (`devtools_shares` when sharing is on).         |
 | `DT009` | Set the password or the setup token, not both.                                                                              |
 | `DT010` | The setup token needs 32+ characters (`openssl rand -base64 32`).                                                           |
 
@@ -415,11 +429,27 @@ export default queuePanel;
   headers; in production: sign-in). A reused id (the built-in `processes` included) or a dashboard id
   such as `mail` is refused; devtools logs why and leaves the panel out.
 
+- `files: { dir, extensions? }` serves a folder of images at
+  `/__warlock/panels/<id>/files/<path>` (default `.png .jpg .jpeg .webp .gif`;
+  `.svg`, `.html`, `.htm`, `.js` and `.mjs` are refused when the panel loads;
+  `..`, backslashes, absolute paths and links that leave the folder answer
+  404). The view builds the URL with `file("login/step-1.png")`.
+- `share: { view, routes, assets?, files? }` (`DevtoolsPanelShare`) declares
+  the view a read-only share link opens. `routes` are paths of the panel's GET
+  routes; each such route gets `shared: true` in its `DevtoolsPanelRequest`
+  and must leave file paths, code, test names and error messages out of its
+  answer. The view context also has `shared` and `share` (`{ enabled,
+  manageHref }` for an admin when sharing is on, else `null`).
+- The factory also receives `errors()`: the captured error groups of the last
+  hour as `DevtoolsPanelErrorSummary[]` (route, status, class name, source,
+  count, first and last seen; no message, no stack; every instance in
+  production). Call it per request.
+
 A panel can set `production: true` when it is safe in the production monitor
 (otherwise it needs `production.panels[id]: true`). The factory receives
-`{ root, mode }`; `mode` is `"development"` or `"production"`, and a panel must
+`{ root, mode, errors }`; `mode` is `"development"` or `"production"`, and a panel must
 not write files in production. The ids `resources`, `health`, `errors`, `jobs`,
-`instances`, `auth`, `account` and `admin` are reserved.
+`instances`, `auth`, `account`, `admin` and `share` are reserved.
 
 Full reference: the "Registering a panel" page of the devtools docs.
 

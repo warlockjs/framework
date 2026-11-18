@@ -7,7 +7,7 @@ who: customer
 
 # Find a product
 
-
+A customer types some words and sees the products that match.
 ## Steps
 1. page	/search
 2. route   get /api/search -- the page calls it on every key press

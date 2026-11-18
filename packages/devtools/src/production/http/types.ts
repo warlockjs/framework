@@ -15,6 +15,7 @@ import type { MountDevtoolsRoutesDeps } from "../../server/types";
  * - `pending`: a session in one of `stages` (sign-in steps), or active.
  * - `viewer`: an active session of any role.
  * - `admin`: an active admin session.
+ * - `share`: a valid read-only share grant (the share cookie), no account.
  *
  * A route with no entry in the access table is `admin` (fail closed).
  */
@@ -22,7 +23,8 @@ export type DevtoolsRouteAccess =
   | { type: "public" }
   | { type: "pending"; stages: readonly Exclude<DevtoolsSessionStage, "signed-out" | "active">[] }
   | { type: "viewer" }
-  | { type: "admin" };
+  | { type: "admin" }
+  | { type: "share" };
 
 /** One row of the production access table: method + Fastify URL pattern (relative to the dashboard path). */
 export type DevtoolsRouteAccessRule = {
@@ -58,6 +60,11 @@ export type MountProductionDevtoolsDeps = {
   builtInPanels: readonly string[];
   state: DevtoolsDashboardState;
   warn?: (message: string) => void;
+  /**
+   * HMAC-SHA256 of a value, keyed with the app key (core's `hmacHash`):
+   * signs the share cookie. Required when `production.share.enabled`.
+   */
+  hmac?: (value: string) => string;
 };
 
 /** The client as the trusted-proxy rules see it. */

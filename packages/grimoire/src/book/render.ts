@@ -63,6 +63,18 @@ function routeRef(route: BookRoute): BookRouteRef {
   return { method: route.method, path: route.path, name: route.name };
 }
 
+/** Project files whose every import edge from the file is type-only: sorted, unique. */
+function typeOnlyImportsOf(file: BookFile): string[] {
+  const edges = new Map<string, boolean>();
+
+  for (const entry of file.imports) {
+    if (entry.file === null) continue;
+    edges.set(entry.file, (edges.get(entry.file) ?? true) && entry.typeOnly === true);
+  }
+
+  return [...edges].flatMap(([target, typeOnly]) => (typeOnly ? [target] : [])).sort(byText);
+}
+
 /** External package names a file imports: sorted, unique, Node builtins left out. */
 export function packagesOf(file: BookFile): string[] {
   const names = new Set<string>();
@@ -166,6 +178,7 @@ export function buildEntries(
       imports: [
         ...new Set(file.imports.flatMap((entry) => (entry.file === null ? [] : [entry.file]))),
       ].sort(byText),
+      typeOnlyImports: typeOnlyImportsOf(file),
       importedBy: [...new Set(file.importedBy)].sort(byText),
       routes: fileRoutes,
       pages: (pages.get(file.file) ?? []).sort(

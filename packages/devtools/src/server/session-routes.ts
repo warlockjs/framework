@@ -17,13 +17,15 @@ export function developmentSessionView(deps: MountDevtoolsRoutesDeps): DevtoolsS
     expiresAt: null,
     instance: deps.instance ?? null,
     methods: null,
+    share: null,
   };
 }
 
 /** The tabs `GET api/panels` lists: the built-in tabs in `deps.builtInPanels` (default all), then the package panels. */
 export function panelInfos(
   deps: MountDevtoolsRoutesDeps,
-  panels: readonly Pick<MountedDevtoolsPanel, "id" | "title">[],
+  panels: readonly (Pick<MountedDevtoolsPanel, "id" | "title"> &
+    Partial<Pick<MountedDevtoolsPanel, "share">>)[],
 ): DevtoolsPanelInfo[] {
   return listPanelInfos(panels, deps.builtInPanels);
 }

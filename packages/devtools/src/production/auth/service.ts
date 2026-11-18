@@ -907,6 +907,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
         expiresAt: null,
         instance: null,
         methods: null,
+        share: null,
       };
     }
 
@@ -919,6 +920,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
       expiresAt: auth.session.expiresAt,
       instance,
       methods: { totp: true, passkeys: passkeys !== null },
+      share: { enabled: options.share.enabled },
     };
   }
 

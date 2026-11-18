@@ -5,6 +5,7 @@ type Method = DevtoolsRouteAccessRule["method"];
 const PUBLIC: DevtoolsRouteAccess = { type: "public" };
 const VIEWER: DevtoolsRouteAccess = { type: "viewer" };
 const ADMIN: DevtoolsRouteAccess = { type: "admin" };
+const SHARE: DevtoolsRouteAccess = { type: "share" };
 
 const pending = (...stages: Extract<DevtoolsRouteAccess, { type: "pending" }>["stages"]) =>
   ({ type: "pending", stages }) satisfies DevtoolsRouteAccess;
@@ -16,9 +17,13 @@ const ALL_STEPS = ["password-change", "mfa-enrol", "mfa-verify"] as const;
  * A route with no entry is `admin` (fail closed). A package panel `<id>`
  * gets `GET /api/<id>` and `GET /api/<id>/*` for viewers and every other
  * method there for admins, audited as `panel.action`; a url ending in `/*`
- * matches every pattern below it.
+ * matches every pattern below it. The share routes exist only when
+ * `options.share` is `true` (`production.share.enabled`).
  */
-export function productionRouteAccess(panelIds: readonly string[]): DevtoolsRouteAccessRule[] {
+export function productionRouteAccess(
+  panelIds: readonly string[],
+  options: { share?: boolean } = {},
+): DevtoolsRouteAccessRule[] {
   const rule = (
     method: Method,
     url: string,
@@ -85,6 +90,7 @@ export function productionRouteAccess(panelIds: readonly string[]): DevtoolsRout
     rule("POST", "/api/queries/:shapeId/explain", ADMIN, "explain.run"),
     rule("GET", "/api/routes", VIEWER),
     rule("GET", "/panels/:id/:name", VIEWER),
+    rule("GET", "/panels/:id/files/*", VIEWER),
 
     // Tabs that are off unless the project turns them on.
     rule("GET", "/api/mails", VIEWER),
@@ -99,6 +105,25 @@ export function productionRouteAccess(panelIds: readonly string[]): DevtoolsRout
     rule("GET", "/docs", VIEWER),
     rule("GET", "/docs/swagger", VIEWER),
   ];
+
+  if (options.share === true) {
+    rules.push(
+      // The grant exchange: public, answered only for a valid token.
+      rule("POST", "/api/share/open", PUBLIC),
+      // What a share grant may reach.
+      rule("GET", "/api/share/info", SHARE),
+      rule("GET", "/api/share/view.js", SHARE),
+      rule("GET", "/api/share/assets/:name", SHARE),
+      rule("GET", "/api/share/files/*", SHARE),
+      rule("GET", "/api/share/panel", SHARE),
+      rule("GET", "/api/share/panel/*", SHARE),
+      // Managing the links.
+      rule("GET", "/api/admin/shares", ADMIN),
+      rule("POST", "/api/admin/shares", ADMIN),
+      rule("DELETE", "/api/admin/shares/:id", ADMIN),
+      rule("POST", "/api/admin/shares/revoke-all", ADMIN),
+    );
+  }
 
   for (const id of panelIds) {
     rules.push(rule("GET", `/api/${id}`, VIEWER), rule("GET", `/api/${id}/*`, VIEWER));

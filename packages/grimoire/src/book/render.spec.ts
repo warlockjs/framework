@@ -167,6 +167,31 @@ describe("book entries", () => {
     ]);
   });
 
+  it("lists the project files a file imports only as types", () => {
+    const typed = buildEntries(
+      {
+        ...facts,
+        files: facts.files.map((item) =>
+          item.file === "src/web/home.setup.ts"
+            ? {
+                ...item,
+                imports: [
+                  { specifier: "app/shared/slug", file: "src/app/shared/slug.ts", typeOnly: true },
+                  { specifier: "./layout", file: "src/web/layout.tsx" },
+                  { specifier: "./layout-type", file: "src/web/layout.tsx", typeOnly: true },
+                ],
+              }
+            : item,
+        ),
+      },
+      annotations,
+    );
+
+    // `layout.tsx` is imported once as a value and once as a type: it is not type-only.
+    expect(typed.get("src/web/home.setup.ts")?.typeOnlyImports).toEqual(["src/app/shared/slug.ts"]);
+    expect(entries.get("src/web/home.setup.ts")?.typeOnlyImports).toEqual([]);
+  });
+
   it("takes feature, borrowers and flows from the annotations, sorted", () => {
     const entry = entries.get("src/app/shared/slug.ts");
 

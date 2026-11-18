@@ -4,6 +4,14 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.58.0 - 2026-11-18
+
+### Added
+
+- Read-only share links in the production monitor (`production.share.enabled`): an admin creates an expiring, revocable link to a shareable panel (the Grimoire product map) under Admin, Share links, with a label. The token stays in the URL fragment and is stored hashed; the link opens only that panel's shared view. Needs the new `devtools_shares` table from `devtoolsMigrations`.
+- Panels can serve a folder of images (`files`), declare a shared view (`share`), and receive captured error counts (`errors`). View contexts gain `file()`, `shared` and `share`, and panel requests carry `shared` when they come through a share link.
+- A panel view's `asset()` and `file()` return absolute URLs, so a view can `import()` another of its modules.
+
 ## 5.57.0 - 2026-11-18
 
 ### Upgrading

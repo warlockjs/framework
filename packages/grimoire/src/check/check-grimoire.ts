@@ -5,8 +5,9 @@ import { checkReleases } from "../releases";
 import { checkTasks } from "../tasks";
 import { checkTestResults } from "../test-results";
 import { checkBookNotes } from "./rules/book-notes";
-import { checkCriteriaTests, checkProofTargets } from "./rules/criteria";
+import { checkCaseCriteria, checkCriteriaTests, checkProofTargets } from "./rules/criteria";
 import { checkAppNames, checkChangelogLinks, checkRelations, checkSteps } from "./rules/links";
+import { checkScreenshots } from "./rules/screenshots";
 import { checkFolders, checkHeaders, checkOwners, checkUnreached } from "./rules/source-files";
 import { checkChangeWords, checkFlowVersions, checkReadmeDates } from "./rules/versions";
 
@@ -20,6 +21,8 @@ export const CHECK_RULES: readonly GrimoireRule[] = [
   checkOwners,
   checkFolders,
   checkUnreached,
+  checkCaseCriteria,
+  checkScreenshots,
   checkCriteriaTests,
   checkProofTargets,
   checkReadmeDates,

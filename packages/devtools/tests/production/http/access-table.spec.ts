@@ -318,3 +318,41 @@ describe("the access table at the gate", () => {
     ).toEqual({ received: { a: 1 } });
   });
 });
+
+describe("the share rules", () => {
+  const find = (method: string, url: string) =>
+    productionRouteAccess([], { share: true }).find(
+      (rule) => rule.method === method && rule.url === url,
+    );
+
+  it("exist only when sharing is on", () => {
+    expect(productionRouteAccess([]).some((rule) => rule.url.includes("share"))).toBe(false);
+    expect(productionRouteAccess([], { share: false }).some((rule) => rule.url.includes("share"))).toBe(
+      false,
+    );
+  });
+
+  it("keeps the grant exchange public, the shared view behind the grant, and the management admin only", () => {
+    expect(find("POST", "/api/share/open")?.access).toEqual({ type: "public" });
+
+    for (const url of [
+      "/api/share/info",
+      "/api/share/view.js",
+      "/api/share/assets/:name",
+      "/api/share/files/*",
+      "/api/share/panel",
+      "/api/share/panel/*",
+    ]) {
+      expect(find("GET", url)?.access, url).toEqual({ type: "share" });
+    }
+
+    expect(find("GET", "/api/admin/shares")?.access).toEqual({ type: "admin" });
+    expect(find("POST", "/api/admin/shares")?.access).toEqual({ type: "admin" });
+    expect(find("DELETE", "/api/admin/shares/:id")?.access).toEqual({ type: "admin" });
+    expect(find("POST", "/api/admin/shares/revoke-all")?.access).toEqual({ type: "admin" });
+  });
+
+  it("lets signed-in viewers read a panel's images", () => {
+    expect(find("GET", "/panels/:id/files/*")?.access).toEqual({ type: "viewer" });
+  });
+});

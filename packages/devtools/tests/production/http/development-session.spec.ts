@@ -43,6 +43,7 @@ describe("the development dashboard's session and panel routes", () => {
       expiresAt: null,
       instance: null,
       methods: null,
+      share: null,
     });
   });
 
@@ -74,8 +75,8 @@ describe("the development dashboard's session and panel routes", () => {
       "api",
     ]);
     expect(tabs.slice(12)).toEqual([
-      { id: "processes", title: "Processes", type: "package" },
-      { id: "test-panel", title: "Test panel", type: "package" },
+      { id: "processes", title: "Processes", type: "package", shareable: false },
+      { id: "test-panel", title: "Test panel", type: "package", shareable: false },
     ]);
   });
 

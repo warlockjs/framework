@@ -277,13 +277,45 @@ describe("buildCollectedFiles: flow book maps", () => {
       target: "GET /api/products",
       found: true,
       entry: "src/app/catalog/list.controller.ts",
+      entries: ["src/app/catalog/list.controller.ts", "src/app/catalog/routes.ts"],
+      direct: ["src/app/catalog/repo.ts"],
       files: [
         "src/app/catalog/list.controller.ts",
         "src/app/catalog/repo.ts",
         "src/app/catalog/routes.ts",
         "src/app/shared/money.ts",
       ],
+      typeOnlyFiles: [],
     });
+  });
+
+  it("keeps type-only reach out of a step's files but still counts it as reached", () => {
+    const input = world();
+    const controller = input.facts.files.find(
+      (file) => file.file === "src/app/catalog/list.controller.ts",
+    );
+    const repo = input.facts.files.find((file) => file.file === "src/app/catalog/repo.ts");
+
+    controller?.imports.push({
+      specifier: "../shared/money",
+      file: "src/app/shared/money.ts",
+      typeOnly: true,
+    });
+    // `repo` now reaches `money` only through a type, and `controller` also imports it directly as a type.
+    if (repo) repo.imports = [{ ...repo.imports[0]!, typeOnly: true }];
+
+    const collected = buildCollectedFiles(input);
+    const routeStep = collected.flows["catalog/browse"]?.steps[0];
+
+    expect(routeStep?.direct).toEqual(["src/app/catalog/repo.ts", "src/app/shared/money.ts"]);
+    expect(routeStep?.files).toEqual([
+      "src/app/catalog/list.controller.ts",
+      "src/app/catalog/repo.ts",
+      "src/app/catalog/routes.ts",
+    ]);
+    expect(routeStep?.typeOnlyFiles).toEqual(["src/app/shared/money.ts"]);
+    // Coverage counts the type-only reach: `money` is not reported as unreached.
+    expect(collected.features["catalog"]?.unreached ?? []).not.toContain("src/app/shared/money.ts");
   });
 
   it("matches a page step against pages and screens of the feature's apps, layouts left out", () => {

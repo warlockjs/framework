@@ -94,6 +94,39 @@ describe("grimoireReporter", () => {
     });
   });
 
+  it("writes to the file option and leaves the default file alone", async () => {
+    const reporter = grimoireReporter({ root, file: "deploy/results.json" });
+
+    await reporter.onTestRunEnd?.(
+      [testModule(path.join(root, "src/a.spec.ts"), [testCase("adds", 2, "passed")])],
+      [],
+      "passed",
+    );
+
+    expect((await readTestResults(root, "deploy/results.json"))?.results).toHaveLength(1);
+    expect(await readTestResults(root)).toBeNull();
+  });
+
+  it("records a proof whose test it could not match as unmatched, and replaces it on the next run", async () => {
+    const reporter = grimoireReporter({ root });
+    const module = (tests: ReturnType<typeof testCase>[]) =>
+      testModule(path.join(root, "src/a.spec.ts"), tests);
+
+    await reporter.onTestRunEnd?.([module([testCase("adds", 2, "passed")])], [], "passed");
+
+    const first = await readTestResults(root);
+
+    expect(first?.unmatched?.map((item) => [item.criterion, item.line])).toEqual([["AC-2", 4]]);
+
+    await reporter.onTestRunEnd?.(
+      [module([testCase("adds", 2, "passed"), testCase("removes", 5, "passed")])],
+      [],
+      "passed",
+    );
+
+    expect((await readTestResults(root))?.unmatched).toBeUndefined();
+  });
+
   it("matches by test name when the run has no task locations", async () => {
     const reporter = grimoireReporter({ root });
 

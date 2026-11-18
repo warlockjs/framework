@@ -423,6 +423,8 @@ export type DevtoolsPanelInfo = {
   title: string;
   /** `built-in` tabs are React views in the bundle; `package` tabs load `panels/<id>/view.js`. */
   type: "built-in" | "package";
+  /** Whether the panel declares a shared view (`DevtoolsPanel.share`); always `false` for built-in tabs. */
+  shareable: boolean;
 };
 
 /**
@@ -482,6 +484,8 @@ export type DevtoolsSessionView = {
   instance: DevtoolsInstanceInfo | null;
   /** Sign-in methods the server offers; `null` when signed out. */
   methods: { totp: true; passkeys: boolean } | null;
+  /** Read-only share links: `enabled` mirrors `production.share.enabled`; `null` when signed out and in development. */
+  share: { enabled: boolean } | null;
 };
 
 /** `POST api/auth/login` body. */
@@ -535,6 +539,67 @@ export type DevtoolsSessionInfo = {
 };
 
 // ---------------------------------------------------------------------------
+// Share links
+// ---------------------------------------------------------------------------
+
+/** Where a share link stands. `revoked` wins over `expired`. */
+export type DevtoolsShareStatus = "active" | "expired" | "revoked";
+
+/** A share link as the admin screen shows it (never the token or its hash). */
+export type DevtoolsShareView = {
+  id: string;
+  /** The id of the panel the link opens. */
+  panel: string;
+  /** What the admin called it, 1-80 characters. */
+  label: string;
+  /** The email of the admin who made it; `null` when that account is gone. */
+  createdBy: string | null;
+  createdAt: number;
+  expiresAt: number;
+  revokedAt: number | null;
+  lastUsedAt: number | null;
+  /** How many times the link was used, counted at most once a minute. */
+  uses: number;
+  status: DevtoolsShareStatus;
+};
+
+/** `GET api/admin/shares`. */
+export type DevtoolsShareList = {
+  enabled: boolean;
+  /** The longest life a link may have, in days. */
+  maxDays: number;
+  /** The panels that declare a shared view. */
+  panels: { id: string; title: string }[];
+  /** Newest first. */
+  shares: DevtoolsShareView[];
+};
+
+/** `POST api/admin/shares` body. `label` is 1-80 characters, `days` a whole number from 1 to `maxDays`. */
+export type DevtoolsShareCreateInput = { panel: string; label: string; days: number };
+
+/** `POST api/admin/shares`: the URL (with the token in its fragment) appears only in this answer. */
+export type DevtoolsCreatedShare = { share: DevtoolsShareView; url: string };
+
+/**
+ * What a share link opens, answered by `POST api/share/open` and
+ * `GET api/share/info`: the panel and the names the shared view may load.
+ */
+export type DevtoolsShareOpenAnswer = {
+  panel: string;
+  /** The panel's title. */
+  title: string;
+  label: string;
+  expiresAt: number;
+  /** Served names from the panel's `assets` the shared page may load. */
+  assets: string[];
+  /** Whether the shared page may load images from the panel's `files`. */
+  files: boolean;
+};
+
+/** The longest label of a share link. */
+export const DEVTOOLS_SHARE_LABEL_MAX = 80;
+
+// ---------------------------------------------------------------------------
 // Audit log
 // ---------------------------------------------------------------------------
 
@@ -569,12 +634,16 @@ export type DevtoolsAuditType =
   | "dashboard.locked"
   | "explain.run"
   | "requests.cleared"
-  | "panel.action";
+  | "panel.action"
+  | "share.created"
+  | "share.revoked"
+  | "share.failed";
 
 /** The audit types that count toward the account, IP and global failure limits. */
 export const DEVTOOLS_FAILURE_AUDIT_TYPES: readonly DevtoolsAuditType[] = [
   "login.failed",
   "mfa.failed",
+  "share.failed",
 ];
 
 /** One audit log entry. */
@@ -632,6 +701,7 @@ export type DevtoolsErrorCode =
   | "explain.failed"
   | "request.not-found"
   | "request.invalid-filter"
+  | "share.not-found"
   | "stream.too-many"
   | "input.invalid"
   | "server.error";

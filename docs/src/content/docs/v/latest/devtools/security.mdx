@@ -55,6 +55,10 @@ exists. The login page is the one public exception, and only while the gate abov
 | Someone triggering the global lock    | Accepted: the dashboard closes, which is the safe side. `warlock devtools:enable` opens it again.                                                                                                                |
 | The monitor slowing the app           | Sampling, bounded memory, a write budget for samples, a size cap on reports, and limits on live streams (3 per session, 50 per instance).                                                                        |
 | Audit tampering                       | No route removes audit entries. Only the retention clean-up does.                                                                                                                                                |
+| A share link leaks or is guessed      | The token is 32 random bytes in the URL fragment (never in a log or `Referer`), stored as a SHA-256 hash, valid for at most `share.maxDays`, and revocable (every instance within 5 seconds). Failed tokens count toward the IP limit. |
+| A share link reaching too much        | The link grants a signed cookie for one panel. It reaches only that panel's `share.routes`, `share.assets` and images, never another panel, the signed-in routes, the admin pages or a write. A tampered or expired cookie answers the uniform 404. |
+| Telling a bad link from a closed one  | A wrong, expired or revoked token, a bad cookie and a disabled share route all answer the uniform 404.                                                                                                           |
+| Path tricks on image routes           | A panel's image folder serves listed image extensions only (never `.svg`, `.html`, `.htm`, `.js`), rejects `..`, backslashes, NUL bytes and absolute paths, and the real path must stay inside the folder.          |
 | Weak configuration                    | The app refuses to boot (codes `DT001` to `DT010`).                                                                                                                                                              |
 
 ## Cookies
@@ -62,6 +66,18 @@ exists. The login page is the one public exception, and only while the gate abov
 The cookie is named `__Secure-warlock-devtools` (`warlock-devtools` when `requireHttps` is `false`). It holds 32 random
 bytes, has no `Domain`, and has no expiry, so it ends with the browser session. The server also ends sessions after 30
 idle minutes (`session.idleMinutes`) and 8 hours (`session.maxHours`). Sign-in steps expire after 10 minutes.
+
+## Share cookie
+
+A share link sets `__Secure-warlock-devtools-share` (`warlock-devtools-share` when `requireHttps` is `false`). Its value
+is `<link id>.<expiry>.<HMAC>`: the signature uses the app key (`encryption.key`), so the server needs no session
+table, and the link's record is read again (cached for 5 seconds) on every request, so a revoke takes effect. It has no
+`Domain`, is `HttpOnly`, `Secure`, `SameSite=Strict`, is limited to the dashboard path, and ends with the link or after
+12 hours, whichever is first. It is a different cookie from the session cookie: neither opens the other's routes.
+
+A share link contains the dashboard path, so everyone who receives one learns where the dashboard is. Sign-in,
+two-factor and the rate limits still guard every other route. If that matters to you, revoke the links and move the
+dashboard to a new path.
 
 ## Response headers
 
@@ -78,7 +94,7 @@ the API tab.
 Failed sign-ins and failed second-factor checks are counted in the audit log over a sliding window (15 minutes):
 
 - 5 per account: that account is refused until the window clears,
-- 20 per IP: an IPv4 address counts alone, an IPv6 address counts with its whole /64 network (one host usually holds a
+- 20 per IP (failed share-link tokens count here too): an IPv4 address counts alone, an IPv6 address counts with its whole /64 network (one host usually holds a
   whole /64), and an IPv4-mapped IPv6 address counts as its IPv4 address,
 - 100 in total: the whole path answers 404 for 15 minutes.
 
@@ -113,6 +129,7 @@ Admins read it from **Admin, Audit**. These events are written:
 | Invites         | `invite.created`, `invite.revoked`, `invite.accepted`                                                                 |
 | Dashboard state | `dashboard.disabled`, `dashboard.enabled`, `dashboard.locked`                                                         |
 | Actions         | `explain.run`, `requests.cleared`, `panel.action`                                                                     |
+| Share links     | `share.created`, `share.revoked`, `share.failed` (the reason and link id, never the token)                            |
 
 Entries hold the time, the event, the account, the client IP and short details. They never hold passwords, tokens, codes or
 query values.
@@ -124,6 +141,7 @@ query values.
 | Accounts and hashed secrets      | Your database  | Until removed                                                  |
 | Sessions                         | Your database  | Until they expire                                              |
 | Invites                          | Your database  | Until used, revoked or expired                                 |
+| Share links                      | Your database  | Until 30 days after they expire or are revoked                 |
 | Audit entries                    | Your database  | `auditRetentionDays` (90)                                      |
 | Request samples                  | Your database  | `requestRetentionHours` (24)                                   |
 | Instance reports                 | Your database  | Replaced every 10 seconds; dropped when not seen for 5 minutes |
@@ -148,12 +166,17 @@ and can call the dashboard's API. Install panels only from packages you trust. I
 - its GET routes need a signed-in user,
 - every other method needs an admin and the CSRF header, and is written to the audit log as `panel.action`.
 
+A panel that declares `share` can be opened through a read-only link without an account when an admin turns on
+`share.enabled`. Its shared routes receive `shared: true` and must leave developer detail out of their answer. See
+[Share links](/v/latest/devtools/production/#share-links).
+
 See [Registering a panel](/v/latest/devtools/panels/).
 
 ## Known limits
 
 - The live stream is per instance. Shared tabs read the database and refresh by polling.
 - EXPLAIN works only on the instance that holds the query example.
+- Failed share-link tokens count with failed sign-ins, so enough of them from many addresses close the dashboard in the same way.
 - Anyone who can send many failed sign-ins can close the dashboard. That is the safe failure; an admin reopens it with
   the CLI.
 - The per-IP limit counts an IPv4 address or an IPv6 /64. A client with many networks (a botnet, a larger IPv6

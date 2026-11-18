@@ -93,6 +93,8 @@ layout: site
 
 The first page a visitor sees.
 
+![The home page](../../../../screenshots/web/home.png)
+
 ## Blocks
 
 | Block             | Flow                    | Who sees it | Changes with           |
@@ -126,10 +128,20 @@ flow: catalog/new-arrivals
 
 # New arrivals on the home page
 
+![The new arrivals row](../../../../../screenshots/web/home-new-arrivals.png)
+
 - position second row, under Featured products
 - shows a grid of up to 20 products
 - phones one row that scrolls sideways
 ```
+
+## Screenshots
+
+Keep image files in `grimoire/screenshots/` (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`), for example
+`grimoire/screenshots/web/home.png`. Write an image line `![alt](path)` anywhere in a page, screen
+or block file, with the path relative to the Markdown file or starting with `/grimoire/screenshots/`.
+The Product map shows these as "where you see it". An image outside the folder is a warning
+(`GR1029`); a missing file is a warning (`GR2014`).
 
 ## Where a difference between apps goes
 

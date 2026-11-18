@@ -15,10 +15,12 @@ import {
   rowToSample,
   rowToSampleSummary,
   rowToSession,
+  rowToShare,
   rowToState,
   sampleToRow,
   sessionPatchToRow,
   sessionToRow,
+  shareToRow,
   statePatchToRow,
   stateToRow,
   type Row,
@@ -28,6 +30,7 @@ import type {
   DevtoolsAccountRecord,
   DevtoolsInviteRecord,
   DevtoolsSessionRecord,
+  DevtoolsShareRecord,
   DevtoolsStore,
 } from "./types";
 
@@ -53,6 +56,12 @@ type RowClass = ModelsModule["DevtoolsAccountRow"];
 export type CascadeStoreOptions = {
   /** The clock for `updatedAt` stamps; defaults to `Date.now`. */
   now?: () => number;
+  /**
+   * Whether `verify()` also checks the `devtools_shares` table. Set it when
+   * `production.share.enabled` is on; apps that do not share links need no
+   * migration for it.
+   */
+  shares?: boolean;
 };
 
 /** The most rows scanned for a sample filter the database cannot apply (route, text). */
@@ -126,13 +135,21 @@ export async function createCascadeStore(
     DevtoolsStateRow: State,
     DevtoolsSampleRow: Samples,
     DevtoolsReportRow: Reports,
+    DevtoolsShareRow: Shares,
   } = models;
   const tables: RowClass[] = [Accounts, Sessions, Invites, Audit, State, Samples, Reports];
+
+  if (options.shares === true) tables.push(Shares);
 
   const accountById = async (id: string): Promise<DevtoolsAccountRecord | null> => {
     const row = await byId(Accounts, id);
 
     return row ? rowToAccount(row) : null;
+  };
+  const shareById = async (id: string): Promise<DevtoolsShareRecord | null> => {
+    const row = await byId(Shares, id);
+
+    return row ? rowToShare(row) : null;
   };
   const sessionById = async (id: string): Promise<DevtoolsSessionRecord | null> => {
     const row = await byId(Sessions, id);
@@ -478,6 +495,61 @@ export async function createCascadeStore(
       },
       async remove(instanceId) {
         return removeWhere(Reports, "id", instanceId);
+      },
+    },
+
+    shares: {
+      async create(input) {
+        const record: DevtoolsShareRecord = {
+          ...structuredClone(input),
+          id: randomUUID(),
+          revokedAt: null,
+          lastUsedAt: null,
+          uses: 0,
+        };
+
+        await insert(Shares, shareToRow(record));
+
+        return record;
+      },
+      async findByTokenHash(tokenHash) {
+        const row = await rows(Shares).where("token_hash", "=", tokenHash).first();
+
+        return row ? rowToShare(row) : null;
+      },
+      get: shareById,
+      async list() {
+        return (await rows(Shares).orderBy("created_at", "desc").get()).map(rowToShare);
+      },
+      async revoke(id, at) {
+        const updated = await Shares.atomic(
+          { id, revoked_at: null },
+          { $set: { revoked_at: at } },
+          // Code-authored filter: `id` is a string the route checked, never an operator object.
+          { trustedFilter: true },
+        );
+
+        return updated > 0;
+      },
+      async revokeAll(at) {
+        return Shares.atomic(
+          { revoked_at: null, expires_at: { $gt: at } },
+          { $set: { revoked_at: at } },
+          { trustedFilter: true },
+        );
+      },
+      async touch(id, at) {
+        await Shares.atomic(
+          { id },
+          { $set: { last_used_at: at }, $inc: { uses: 1 } },
+          { trustedFilter: true },
+        );
+      },
+      async removeOld(before) {
+        const expired = await query(Shares).where("expires_at", "<", before).delete();
+        const revoked = await query(Shares).where("revoked_at", "<", before).delete();
+
+        return expired + revoked;
       },
     },
   };

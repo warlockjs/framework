@@ -28,6 +28,7 @@ import path from "node:path";
 import type { BookAdapter } from "../contracts/adapter";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import { GRIMOIRE_PATHS } from "../paths";
+import { resolveResultsFile } from "../test-results";
 import { openGrimoire } from "../workspace";
 
 /** Options of the panel's snapshot source. */
@@ -45,6 +46,13 @@ export type SnapshotSourceOptions = {
   mode?: "development" | "production";
   /** Let `openGrimoire` write the generated book and collected files (never agent-written files). Default `false`; the devtools panel passes `true`. */
   write?: boolean;
+  /**
+   * Where the test results are read from (project-relative or absolute).
+   * Default `grimoire/book/test-results.json`. The file's modified time is part
+   * of the change stamp, so results written after the snapshot opened show up
+   * without a restart.
+   */
+  testResultsFile?: string;
 };
 
 /** A cached, shared snapshot of one project. */
@@ -70,11 +78,12 @@ const STAMPED = [
   GRIMOIRE_PATHS.releases,
 ];
 
-async function changeStamp(root: string): Promise<string> {
+async function changeStamp(root: string, resultsFile: string): Promise<string> {
+  const files = [...STAMPED.map((entry) => path.join(root, ...entry.split("/"))), resultsFile];
   const times = await Promise.all(
-    STAMPED.map(async (entry) => {
+    files.map(async (file) => {
       try {
-        return (await stat(path.join(root, ...entry.split("/")))).mtimeMs;
+        return (await stat(file)).mtimeMs;
       } catch {
         return 0;
       }
@@ -102,6 +111,8 @@ export function createSnapshotSource(
   let cached: { snapshot: GrimoireSnapshot; at: number; stamp: string; took: number } | null = null;
   let opening: Promise<GrimoireSnapshot> | null = null;
 
+  const resultsFile = resolveResultsFile(root, options.testResultsFile);
+
   const keepUntilChanged = options.mode === "production" && options.ttlMs === undefined;
   const reuseFor = (took: number): number => options.ttlMs ?? Math.max(2000, took * 5);
 
@@ -111,11 +122,12 @@ export function createSnapshotSource(
     const snapshot = await openGrimoire(root, adapter, {
       routes: "cached",
       write: options.write ?? false,
+      ...(options.testResultsFile === undefined ? {} : { testResultsFile: options.testResultsFile }),
     });
 
     const at = Date.now();
 
-    cached = { snapshot, at, stamp: await changeStamp(root), took: at - started };
+    cached = { snapshot, at, stamp: await changeStamp(root, resultsFile), took: at - started };
 
     return snapshot;
   }
@@ -134,7 +146,7 @@ export function createSnapshotSource(
       if (cached === null) return ensureOpening();
 
       const known = cached;
-      const changed = (await changeStamp(root)) !== known.stamp;
+      const changed = (await changeStamp(root, resultsFile)) !== known.stamp;
 
       if (changed || options.mode === "production") {
         if (!changed && (keepUntilChanged || Date.now() - known.at < reuseFor(known.took))) {

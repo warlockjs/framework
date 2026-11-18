@@ -61,6 +61,12 @@ export type BookImport = {
   specifier: string;
   /** The project file it resolves to, or `null` for a package or an unresolved alias. */
   file: string | null;
+  /**
+   * `true` when every import and re-export of the specifier in the file is
+   * type-only (`import type`, `export type`, `import { type A }`); erased at
+   * runtime. Absent for a value import, and in facts from older adapters.
+   */
+  typeOnly?: boolean;
 };
 
 /** Facts about one source file. Code files only (`.ts`, `.tsx`, `.js`, …). */

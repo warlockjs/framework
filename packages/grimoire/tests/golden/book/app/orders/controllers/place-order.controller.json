@@ -20,6 +20,7 @@
   "imports": [
     "src/app/orders/services/place-order.service.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/app/orders/routes.ts"
   ],

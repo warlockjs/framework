@@ -10,13 +10,22 @@
       "target": "/products/:id",
       "found": true,
       "entry": "src/web/$sites/client/products/show.page.tsx",
+      "entries": [
+        "mobile/app/products/[id].tsx",
+        "src/web/$sites/client/products/show.page.tsx",
+        "src/web/$sites/client/products/show.setup.ts"
+      ],
+      "direct": [
+        "src/app/catalog/repositories/products.repository.ts"
+      ],
       "files": [
         "mobile/app/products/[id].tsx",
         "src/app/catalog/models/product.model.ts",
         "src/app/catalog/repositories/products.repository.ts",
         "src/web/$sites/client/products/show.page.tsx",
         "src/web/$sites/client/products/show.setup.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     },
     {
       "index": 2,
@@ -24,6 +33,13 @@
       "target": "POST /api/orders",
       "found": true,
       "entry": "src/app/orders/controllers/place-order.controller.ts",
+      "entries": [
+        "src/app/orders/controllers/place-order.controller.ts",
+        "src/app/orders/routes.ts"
+      ],
+      "direct": [
+        "src/app/orders/services/place-order.service.ts"
+      ],
       "files": [
         "src/app/catalog/models/product.model.ts",
         "src/app/catalog/repositories/products.repository.ts",
@@ -33,7 +49,8 @@
         "src/app/orders/mails/order-confirmation.mail.ts",
         "src/app/orders/routes.ts",
         "src/app/orders/services/place-order.service.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     },
     {
       "index": 3,
@@ -41,7 +58,10 @@
       "target": "payment gateway",
       "found": null,
       "entry": null,
-      "files": []
+      "entries": [],
+      "direct": [],
+      "files": [],
+      "typeOnlyFiles": []
     },
     {
       "index": 4,
@@ -49,9 +69,14 @@
       "target": "order.placed",
       "found": true,
       "entry": "src/app/orders/events/order-placed.event.ts",
+      "entries": [
+        "src/app/orders/events/order-placed.event.ts"
+      ],
+      "direct": [],
       "files": [
         "src/app/orders/events/order-placed.event.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     },
     {
       "index": 5,
@@ -59,7 +84,10 @@
       "target": "catalog/browse-products",
       "found": true,
       "entry": null,
-      "files": []
+      "entries": [],
+      "direct": [],
+      "files": [],
+      "typeOnlyFiles": []
     },
     {
       "index": 6,
@@ -67,9 +95,14 @@
       "target": "order-confirmation",
       "found": true,
       "entry": "src/app/orders/mails/order-confirmation.mail.ts",
+      "entries": [
+        "src/app/orders/mails/order-confirmation.mail.ts"
+      ],
+      "direct": [],
       "files": [
         "src/app/orders/mails/order-confirmation.mail.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     },
     {
       "index": 7,
@@ -77,9 +110,14 @@
       "target": "send-receipt",
       "found": true,
       "entry": "src/app/orders/jobs/send-receipt.job.ts",
+      "entries": [
+        "src/app/orders/jobs/send-receipt.job.ts"
+      ],
+      "direct": [],
       "files": [
         "src/app/orders/jobs/send-receipt.job.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     },
     {
       "index": 8,
@@ -87,9 +125,14 @@
       "target": "order-shipped",
       "found": true,
       "entry": "src/app/orders/notifications/order-shipped.notification.ts",
+      "entries": [
+        "src/app/orders/notifications/order-shipped.notification.ts"
+      ],
+      "direct": [],
       "files": [
         "src/app/orders/notifications/order-shipped.notification.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     }
   ],
   "criteria": [

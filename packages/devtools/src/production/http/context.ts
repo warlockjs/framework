@@ -1,5 +1,6 @@
 import type { FastifyRequest } from "fastify";
 import type { DevtoolsAuthenticated, DevtoolsRequestMeta } from "../auth/types";
+import type { DevtoolsShareGrant } from "./share-session";
 import type { DevtoolsClientInfo, DevtoolsRouteAccessRule } from "./types";
 
 /** What the gate learned about a dashboard request, for the handlers that follow. */
@@ -12,6 +13,8 @@ export type DevtoolsRequestContext = {
   pattern: string;
   /** The session, for every route that is not public. */
   authenticated: DevtoolsAuthenticated | null;
+  /** The share grant, for a request that passed the `share` access check. */
+  share?: DevtoolsShareGrant | null;
 };
 
 const contexts = new WeakMap<FastifyRequest, DevtoolsRequestContext>();

@@ -282,4 +282,73 @@ describe("parseLayout, parsePage and parseBlockFile", () => {
     ]);
     expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([["GR1004", 2]]);
   });
+  it("reads the image lines of a page README: relative, absolute and outside the folder", () => {
+    const { sink, findings } = collect();
+    const page = parsePage(
+      PAGE,
+      [
+        "---",
+        "route: /",
+        "---",
+        "# Home",
+        "![Hero](../../../../screenshots/web/home.png)",
+        "The first page.",
+        "![Absolute](/grimoire/screenshots/web/other.jpg)",
+        "![Outside](../../../../images/home.png)",
+        "![Web](https://example.com/a.png)",
+        "```",
+        "![Not read](../x.png)",
+        "```",
+      ].join("\n"),
+      "web-client",
+      "page",
+      "home",
+      sink,
+    );
+
+    expect(page.purpose).toBe("The first page.");
+    expect(page.screenshots.map((shot) => [shot.alt, shot.path, shot.at.line])).toEqual([
+      ["Hero", "web/home.png", 5],
+      ["Absolute", "web/other.jpg", 7],
+      ["Outside", null, 8],
+      ["Web", null, 9],
+    ]);
+    expect(page.screenshots[0]?.written).toBe("../../../../screenshots/web/home.png");
+    expect(findings.map((finding) => [finding.code, finding.severity, finding.at?.line])).toEqual([
+      ["GR1029", "warning", 8],
+      ["GR1029", "warning", 9],
+    ]);
+  });
+
+  it("reads the image lines of a block file", () => {
+    const { sink, findings } = collect();
+    const block = parseBlockFile(
+      "grimoire/apps/web-client/pages/home/blocks/new-arrivals.md",
+      "---\nflow: catalog/new-arrivals\n---\n# New arrivals\n![Row](../../../../../screenshots/web/row.png)\n- position   second row\n",
+      "web-client",
+      "home",
+      "new-arrivals",
+      sink,
+    );
+
+    expect(findings).toEqual([]);
+    expect(block.screenshots.map((shot) => [shot.alt, shot.path])).toEqual([
+      ["Row", "web/row.png"],
+    ]);
+    expect(block.details.map((detail) => detail.name)).toEqual(["position"]);
+  });
+
+  it("a page with no image lines has no screenshots", () => {
+    const { sink } = collect();
+    const page = parsePage(
+      PAGE,
+      "---\nroute: /\n---\n# Home\n",
+      "web-client",
+      "page",
+      "home",
+      sink,
+    );
+
+    expect(page.screenshots).toEqual([]);
+  });
 });

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { readCookie, sessionCookie, sessionCookieName } from "../../../src/production/http/cookie";
+import {
+  readCookie,
+  sessionCookie,
+  sessionCookieName,
+  shareCookie,
+  shareCookieName,
+} from "../../../src/production/http/cookie";
 import {
   DEVTOOLS_SESSION_COOKIE,
   DEVTOOLS_SESSION_COOKIE_INSECURE,
@@ -168,5 +174,28 @@ describe("the session cookie on the wire", () => {
     expect(header).toMatch(/^warlock-devtools=/);
     expect(header).not.toContain("Secure");
     expect(ORIGIN).toBe(`https://${HOST}`);
+  });
+});
+
+describe("shareCookie", () => {
+  it("is HttpOnly, SameSite=Strict, Secure, path-scoped and ends after its lifetime", () => {
+    const cookie = shareCookie("id.1.sig", { path: PATH, secure: true, maxAgeSeconds: 3600.9 });
+
+    expect(cookie).toBe(
+      `__Secure-warlock-devtools-share=id.1.sig; Path=${PATH}; HttpOnly; SameSite=Strict; Secure; Max-Age=3600`,
+    );
+    expect(cookie).not.toMatch(/Domain/i);
+  });
+
+  it("uses the plain name and no Secure attribute when HTTPS is not required", () => {
+    expect(shareCookieName(false)).toBe("warlock-devtools-share");
+    expect(shareCookie("v", { path: PATH, secure: false, maxAgeSeconds: 5 })).toBe(
+      `warlock-devtools-share=v; Path=${PATH}; HttpOnly; SameSite=Strict; Max-Age=5`,
+    );
+  });
+
+  it("never lives less than a second and clears with a zero lifetime", () => {
+    expect(shareCookie("v", { path: PATH, secure: true, maxAgeSeconds: 0 })).toContain("Max-Age=1");
+    expect(shareCookie(null, { path: PATH, secure: true })).toContain("Max-Age=0");
   });
 });

@@ -58,7 +58,10 @@ describe("parseGrimoire on the shop fixture", () => {
   it("reads every written file with no structure finding", async () => {
     const { written, findings } = await parseGrimoire(shopRoot);
 
-    expect(findings).toEqual([]);
+    // The wishlist flow has no summary on purpose; it is the only finding.
+    expect(findings.map((finding) => [finding.code, finding.at?.file])).toEqual([
+      ["GR1030", "grimoire/features/catalog/flows/wishlist.md"],
+    ]);
     expect(written.exists).toBe(true);
     expect(written.root).toBe(path.resolve(shopRoot));
     expect(written.hash).toMatch(/^[0-9a-f]{64}$/);
@@ -91,7 +94,9 @@ describe("parseGrimoire on the shop fixture", () => {
 
     const crlf = await parseGrimoire(fixture.root);
 
-    expect(crlf.findings).toEqual([]);
+    expect(crlf.findings.map((finding) => finding.code)).toEqual(
+      base.findings.map((finding) => finding.code),
+    );
     expect(portable(crlf.written)).toEqual(portable(base.written));
     expect(crlf.written.hash).not.toBe(base.written.hash);
   });
@@ -106,7 +111,9 @@ describe("parseGrimoire on the shop fixture", () => {
 
     const spaced = await parseGrimoire(fixture.root);
 
-    expect(spaced.findings).toEqual([]);
+    expect(spaced.findings.map((finding) => finding.code)).toEqual(
+      base.findings.map((finding) => finding.code),
+    );
     expect(portable(spaced.written)).toEqual(portable(base.written));
   });
 });

@@ -31,8 +31,10 @@ export interface DevtoolsStore {
   readonly state: DevtoolsStateStore;
   readonly samples: DevtoolsSampleStore;
   readonly reports: DevtoolsReportStore;
+  readonly shares: DevtoolsShareStore;
   /**
-   * Checks that every table or collection exists. Throws
+   * Checks that every table or collection exists (`devtools_shares` only when
+   * the store was created with `shares: true`). Throws
    * `DevtoolsProductionConfigError("DT008")` when one is missing.
    */
   verify(): Promise<void>;
@@ -300,4 +302,41 @@ export interface DevtoolsReportStore {
   /** Removes reports last written before `seenBefore`. */
   prune(seenBefore: number): Promise<number>;
   remove(instanceId: string): Promise<boolean>;
+}
+
+/** One read-only share link (table/collection `devtools_shares`). */
+export type DevtoolsShareRecord = {
+  id: string;
+  /** SHA-256 hex of the link's token; the token itself is never stored. */
+  tokenHash: string;
+  /** The id of the panel the link opens. */
+  panel: string;
+  /** 1-80 characters. */
+  label: string;
+  /** The admin account that made it; `null` for none. */
+  createdBy: string | null;
+  createdAt: number;
+  expiresAt: number;
+  revokedAt: number | null;
+  lastUsedAt: number | null;
+  /** How many times the link was used, counted at most once a minute. */
+  uses: number;
+};
+
+export type NewDevtoolsShare = Omit<DevtoolsShareRecord, "id" | "revokedAt" | "lastUsedAt" | "uses">;
+
+export interface DevtoolsShareStore {
+  create(input: NewDevtoolsShare): Promise<DevtoolsShareRecord>;
+  findByTokenHash(tokenHash: string): Promise<DevtoolsShareRecord | null>;
+  get(id: string): Promise<DevtoolsShareRecord | null>;
+  /** Newest first, revoked and expired ones included. */
+  list(): Promise<DevtoolsShareRecord[]>;
+  /** Sets `revokedAt` when it is empty. Returns `false` when the link is gone or already revoked. */
+  revoke(id: string, at: number): Promise<boolean>;
+  /** Revokes every link that is neither revoked nor expired at `at`; returns how many. */
+  revokeAll(at: number): Promise<number>;
+  /** Records one use: `lastUsedAt = at`, `uses + 1`. A missing link is ignored. */
+  touch(id: string, at: number): Promise<void>;
+  /** Removes links that expired, or were revoked, before `before`; returns how many. */
+  removeOld(before: number): Promise<number>;
 }

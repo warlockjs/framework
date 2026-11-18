@@ -56,6 +56,42 @@ export type TestResultsStore = {
   updatedAt: string;
   runner: "vitest";
   results: ProofResult[];
+  /**
+   * `@proves` lines of the files the runs covered whose test the reporter
+   * could not match to a result (`GR4010`). Replaced per test file like
+   * `results`. Absent in stores written before 5.58.
+   */
+  unmatched?: UnmatchedProof[];
+};
+
+/** A proving test the reporter saw in a run file but could not match to a test result. */
+export type UnmatchedProof = {
+  feature: string;
+  flow: string;
+  criterion: CriterionId;
+  testFile: string;
+  /** Line of the `@proves` comment. */
+  line: number;
+};
+
+/**
+ * What the readers know about the results store: whether one was read, from
+ * where, and how many proving tests have a result. The devtools answers carry
+ * it so a view can tell "never recorded" apart from "did not run".
+ */
+export type TestResultsInfo = {
+  /** `true` when a results store was read. */
+  recorded: boolean;
+  /** Project-relative path the store was read from, or would be read from. */
+  file: string;
+  /** `updatedAt` of the store, or `null`. */
+  updatedAt: string | null;
+  /** `@proves` lines in the project. */
+  proofs: number;
+  /** Proving tests with a result in the store. */
+  withResult: number;
+  /** Entries of `unmatched` (0 when absent). */
+  unmatched: number;
 };
 
 /**

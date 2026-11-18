@@ -5,6 +5,8 @@ import {
   logicalLines,
   paragraphAfterTitle,
   readDocument,
+  readScreenshots,
+  screenshotPath,
   splitLines,
   textAfterTitle,
 } from "./markdown";
@@ -170,5 +172,60 @@ describe("paragraphs", () => {
     const { sink } = sinkWith();
 
     expect(paragraphAfterTitle(readDocument(FILE, "# T\n## H\nx", "none", sink))).toBeNull();
+  });
+});
+
+describe("screenshotPath", () => {
+  const FILE = "grimoire/features/catalog/flows/wishlist.md";
+
+  it("resolves a path relative to the file or from /grimoire/screenshots/", () => {
+    expect(screenshotPath(FILE, "../../../screenshots/web/a.png")).toBe("web/a.png");
+    expect(screenshotPath(FILE, "/grimoire/screenshots/a.png")).toBe("a.png");
+    expect(screenshotPath(FILE, "../../../screenshots/web/a.png?v=2#x")).toBe("web/a.png");
+  });
+
+  it("returns null outside the folder, for the folder itself, URLs and escapes", () => {
+    expect(screenshotPath(FILE, "../../images/a.png")).toBeNull();
+    expect(screenshotPath(FILE, "../../../screenshots/")).toBeNull();
+    expect(screenshotPath(FILE, "https://example.com/a.png")).toBeNull();
+    expect(screenshotPath(FILE, "//example.com/a.png")).toBeNull();
+    expect(screenshotPath(FILE, "../../../screenshots/../../secret.png")).toBeNull();
+  });
+});
+
+describe("readScreenshots", () => {
+  it("reads several images on a line, skips fenced lines and decodes %20", () => {
+    const { sink, findings } = sinkWith();
+    const document = readDocument(
+      FILE,
+      [
+        "# T",
+        '![a](../../../screenshots/a%20b.png) text ![b](../../../screenshots/c.png "title")',
+        "```",
+        "![no](../../../screenshots/no.png)",
+        "```",
+      ].join("\n"),
+      "none",
+      sink,
+    );
+    const shots = readScreenshots(FILE, document.body, sink);
+
+    expect(shots.map((shot) => [shot.alt, shot.path])).toEqual([
+      ["a", "a b.png"],
+      ["b", "c.png"],
+    ]);
+    expect(findings).toEqual([]);
+  });
+
+  it("paragraphAfterTitle skips an image line under the title", () => {
+    const { sink } = sinkWith();
+    const document = readDocument(
+      FILE,
+      "# T\n![x](../../../screenshots/a.png)\n\nThe words.\n",
+      "none",
+      sink,
+    );
+
+    expect(paragraphAfterTitle(document)).toBe("The words.");
   });
 });

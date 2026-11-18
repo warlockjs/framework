@@ -89,6 +89,7 @@ Files of a mobile app go under `mobile/<app id>/`. Two cases keep the full file 
   "exports": [{ "name": "listNewArrivals", "about": "Returns up to 20 products, newest first." }],
   "packages": [],
   "imports": ["src/app/catalog/repositories/products.repository.ts"],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/app/catalog/controllers/new-arrivals.controller.ts",
     "src/app/catalog/tests/new-arrivals.test.ts",
@@ -114,6 +115,7 @@ Files of a mobile app go under `mobile/<app id>/`. Two cases keep the full file 
 | `exports`       | Each export with the first sentence of the comment above it (`about`, or `null`). `default` and `*` stand for default and star exports.                                     |
 | `packages`      | External packages the file imports, by package name (`@warlock.js/core`, `dayjs`). Node built-ins are left out. Sorted.                                                     |
 | `imports`       | Project files it imports. Sorted.                                                                                                                                           |
+| `typeOnlyImports` | The project files from `imports` that the file imports only as types (`import type`, `import { type A }`, `export type … from`). Erased at build time. Sorted.                |
 | `importedBy`    | Project files that import it. Sorted.                                                                                                                                       |
 | `routes`        | Routes the file registers (`"via": "registers"`, a routes file) or handles (`"via": "handles"`, the controller or page that answers). Each has `method`, `path` and `name`. |
 | `pages`         | Pages the file is the page, setup or layout file of: `site`, `route`, `via` (`page`, `setup`, `layout`).                                                                    |
@@ -264,7 +266,8 @@ Route freshness is reported as one of:
 ## What to trust
 
 - **Exports, imports, importers, routes, middleware and pages** are read from the code. Trust them.
-- **Files behind a route** are every file the handler can reach through imports. That is not the exact call path;
+- After an upgrade from a version that did not record type-only imports, the book scans file facts once more on the next run.
+- **Files behind a route** are every file the handler can reach through imports that run (type-only imports are listed separately). That is not the exact call path;
   open the handler to see which ones it really uses.
 - **Reached from** lists only links and redirects written as plain values. `null` (shown as "unknown") means look.
 - **Feature, borrowers and flows** come from the written files. When the code disagrees with a flow, the written

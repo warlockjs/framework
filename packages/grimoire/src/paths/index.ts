@@ -31,6 +31,8 @@ export const GRIMOIRE_PATHS = {
   /** Warlock. */
   tasksIndex: "grimoire/tasks/index.json",
   releases: "grimoire/releases",
+  /** Images that written files show (`![alt](path)` lines point inside this folder). */
+  screenshots: "grimoire/screenshots",
 } as const;
 
 /** Lines a project's `.gitignore` needs so Warlock's files stay out of git. */

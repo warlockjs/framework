@@ -8,6 +8,8 @@ origin: inferred
 
 # Log in
 
+A guest signs in with their email and password.
+
 ## Steps
 1. route   POST /api/login
 

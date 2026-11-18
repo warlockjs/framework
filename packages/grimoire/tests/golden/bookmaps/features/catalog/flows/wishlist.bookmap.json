@@ -10,13 +10,22 @@
       "target": "/products/:id",
       "found": true,
       "entry": "src/web/$sites/client/products/show.page.tsx",
+      "entries": [
+        "mobile/app/products/[id].tsx",
+        "src/web/$sites/client/products/show.page.tsx",
+        "src/web/$sites/client/products/show.setup.ts"
+      ],
+      "direct": [
+        "src/app/catalog/repositories/products.repository.ts"
+      ],
       "files": [
         "mobile/app/products/[id].tsx",
         "src/app/catalog/models/product.model.ts",
         "src/app/catalog/repositories/products.repository.ts",
         "src/web/$sites/client/products/show.page.tsx",
         "src/web/$sites/client/products/show.setup.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     },
     {
       "index": 2,
@@ -24,7 +33,10 @@
       "target": "POST /api/wishlist",
       "found": false,
       "entry": null,
-      "files": []
+      "entries": [],
+      "direct": [],
+      "files": [],
+      "typeOnlyFiles": []
     },
     {
       "index": 3,
@@ -32,7 +44,10 @@
       "target": "wishlist-price-drop",
       "found": false,
       "entry": null,
-      "files": []
+      "entries": [],
+      "direct": [],
+      "files": [],
+      "typeOnlyFiles": []
     },
     {
       "index": 4,
@@ -40,7 +55,10 @@
       "target": "/wishlist",
       "found": false,
       "entry": null,
-      "files": []
+      "entries": [],
+      "direct": [],
+      "files": [],
+      "typeOnlyFiles": []
     }
   ],
   "criteria": [

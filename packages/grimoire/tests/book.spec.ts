@@ -412,6 +412,24 @@ describe("freshness", () => {
     expectGolden(copy);
   });
 
+  it("scans file facts again when the facts cache predates type-only edges", async () => {
+    const copy = fixture();
+    await buildAndWrite(copy, createShopAdapter(), { routes: "fresh" });
+
+    const cachePath = path.join(copy.root, "grimoire", "book", ".cache", "facts.json");
+    const cache = JSON.parse(readFileSync(cachePath, "utf8")) as Record<string, unknown>;
+
+    expect(cache.typeOnlyEdges).toBe(true);
+    delete cache.typeOnlyEdges;
+    writeFileSync(cachePath, JSON.stringify(cache));
+
+    const adapter = createShopAdapter();
+    const result = await buildBook(copy.root, adapter, { routes: "cached" });
+
+    expect(adapter.calls.files).toBe(1);
+    expect(result.rebuilt).toBe(true);
+  });
+
   it("rebuilds when the adapter version changes", async () => {
     const copy = fixture();
     await buildAndWrite(copy, createShopAdapter(), { routes: "fresh" });

@@ -10,11 +10,19 @@
       "target": "POST /api/login",
       "found": true,
       "entry": "src/app/auth/controllers/login.controller.ts",
+      "entries": [
+        "src/app/auth/controllers/login.controller.ts",
+        "src/app/auth/routes.ts"
+      ],
+      "direct": [
+        "src/app/auth/services/login.service.ts"
+      ],
       "files": [
         "src/app/auth/controllers/login.controller.ts",
         "src/app/auth/routes.ts",
         "src/app/auth/services/login.service.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     }
   ],
   "criteria": [

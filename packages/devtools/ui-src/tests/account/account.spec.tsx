@@ -34,7 +34,7 @@ const sessions = [
 function routes(extra: Record<string, never | object> = {}) {
   return {
     "api/auth/session": { body: sessionView() },
-    "api/panels": { body: [{ id: "requests", title: "Requests", type: "built-in" }] },
+    "api/panels": { body: [{ id: "requests", title: "Requests", type: "built-in", shareable: false }] },
     "api/instances": { body: { current: instanceInfo.id, instances: [instanceInfo] } },
     "api/account": { body: account() },
     "api/account/sessions": { body: sessions },

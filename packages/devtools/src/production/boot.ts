@@ -3,6 +3,7 @@ import { type MountedDevtoolsPanel, productionPanels } from "../panels";
 import type { MountDevtoolsRoutesDeps } from "../server/types";
 import type { DevtoolsDisposer, ResolvedDevtoolsOptions } from "../types";
 import { DevtoolsProductionConfigError } from "./errors";
+import type { DevtoolsInsights } from "./insights/types";
 import { resolveProductionOptions } from "./options";
 
 /** What the connector hands production boot. */
@@ -16,6 +17,8 @@ export type BootProductionDevtoolsInput = {
   routes: Omit<MountDevtoolsRoutesDeps, "collector" | "options" | "isDevelopment">;
   /** Reads one config value (`encryption.key`); defaults to core's `config.get`. */
   readConfig?: (key: string) => unknown;
+  /** Called once the shared insights exist (panels read captured error counts through them). */
+  onInsights?: (insights: DevtoolsInsights) => void;
   log: {
     info(module: string, action: string, message: string): unknown;
     warn(module: string, action: string, message: string): unknown;
@@ -68,7 +71,7 @@ export async function bootProductionDevtools(
       import("./http"),
     ]);
 
-  const store = await createCascadeStore();
+  const store = await createCascadeStore({ shares: production.share.enabled });
 
   await store.verify();
 
@@ -136,6 +139,8 @@ export async function bootProductionDevtools(
       reporter,
       sampleRate: production.sampleRate,
     });
+    input.onInsights?.(insights);
+
     const state = httpModule.createDashboardState(store, production.path);
     const { builtIn, panels } = productionPanels(input.panels, production.panels);
 
@@ -168,6 +173,7 @@ export async function bootProductionDevtools(
       builtInPanels: builtIn,
       state,
       warn,
+      hmac: (value) => crypto.hmac(value),
     });
 
     log.info(

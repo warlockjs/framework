@@ -18,6 +18,11 @@
  *   no trailing `/`; the entry is the first page or screen file; files are the
  *   import closures of the page and setup files (layouts left out).
  * - `mail`, `job`, `event`, `notification`: the named thing's file and its closure.
+ * - Every step lists `entries` (all its entry files), `direct` (what the entries
+ *   import directly), `files` (the entries and what they reach through imports
+ *   that run: type-only imports are not followed) and `typeOnlyFiles` (reached
+ *   only through type-only imports). `unreached` (GR3006) and each book entry's
+ *   `flows` count `files` and `typeOnlyFiles` together.
  * - `outside service`: `found: null`. `affects`: found when the feature (and
  *   flow) exists; no files.
  */

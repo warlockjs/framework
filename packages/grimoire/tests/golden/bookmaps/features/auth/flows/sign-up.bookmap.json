@@ -10,11 +10,19 @@
       "target": "POST /api/register",
       "found": true,
       "entry": "src/app/auth/controllers/register.controller.ts",
+      "entries": [
+        "src/app/auth/controllers/register.controller.ts",
+        "src/app/auth/routes.ts"
+      ],
+      "direct": [
+        "src/app/auth/services/register.service.ts"
+      ],
       "files": [
         "src/app/auth/controllers/register.controller.ts",
         "src/app/auth/routes.ts",
         "src/app/auth/services/register.service.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     },
     {
       "index": 2,
@@ -22,9 +30,14 @@
       "target": "delete-unverified",
       "found": true,
       "entry": "src/app/shared/jobs/delete-unverified.job.ts",
+      "entries": [
+        "src/app/shared/jobs/delete-unverified.job.ts"
+      ],
+      "direct": [],
       "files": [
         "src/app/shared/jobs/delete-unverified.job.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     }
   ],
   "criteria": [

@@ -64,7 +64,9 @@ A feature **borrows** a file it does not own when one of its own files imports i
 ## The files behind a step
 
 Each step of a flow points at something in the book. The flow's book map lists the file the step starts from (the
-**entry**) and every project file the entry imports, directly or not.
+**entry**) and the project files the entry reaches through imports that run. Imports that are erased at build time
+(`import type`, `export type … from`, `import { type A }`, `typeof import("…")`) are not followed: a page that takes a
+type from a barrel does not list the server files behind the barrel.
 
 | Step                                   | Matches                                                                                                                       | Entry                                    | Files                                                             |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------- |
@@ -77,8 +79,21 @@ Each step of a flow points at something in the book. The flow's book map lists t
 `found` is `true` when the step matched, `false` when it did not, and `null` when the book cannot tell (an outside
 service, or a route step before the routes were ever read).
 
-The files behind a route are every file the handler can reach through imports. That is not the exact call path:
-open the handler to see which ones it really uses.
+The files behind a route are every file the handler can reach through imports that run. That is not the exact call
+path: open the handler to see which ones it really uses.
+
+Each step has four file lists, all sorted:
+
+| Field           | Holds                                                                                                                         |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `entries`       | Every file the step starts from: a page and its setup file, each matching route's handler and routes file, each named file.   |
+| `direct`        | Project files the entries import directly (type-only imports included), minus the entries. Not the routes file's own imports. |
+| `files`         | The entries plus everything they reach through imports that run. This is what the step "lists".                               |
+| `typeOnlyFiles` | Files reached only through type-only imports. They are not in `files`.                                                        |
+
+`entry` is the first entry. Ownership coverage counts both lists: a file that only a type import reaches still counts
+as reached, so [`GR3006`](../04-check/#gr3006) does not change because of type-only imports. The same holds for the
+`flows` of a book entry and for `warlock scry --impact`.
 
 ## Feature book map
 
@@ -147,7 +162,10 @@ open the handler to see which ones it really uses.
       "target": "GET /api/products/new-arrivals",
       "found": true,
       "entry": "src/app/catalog/controllers/new-arrivals.controller.ts",
-      "files": ["src/app/catalog/controllers/new-arrivals.controller.ts", "..."]
+      "entries": ["src/app/catalog/controllers/new-arrivals.controller.ts", "src/app/catalog/routes.ts"],
+      "direct": ["src/app/catalog/repositories/products.repository.ts"],
+      "files": ["src/app/catalog/controllers/new-arrivals.controller.ts", "..."],
+      "typeOnlyFiles": []
     }
   ],
   "criteria": [

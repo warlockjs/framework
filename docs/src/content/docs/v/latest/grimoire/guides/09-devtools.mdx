@@ -33,7 +33,7 @@ still never boots your app.
 
 ## What it shows
 
-The tab opens with a bar of seven views: Overview, Features, Apps, Tasks, Releases, Check and Modules. The one you are
+The tab opens with a bar of eight views: Product map, Overview, Features, Apps, Tasks, Releases, Check and Modules. The Product map is the view for readers who do not read code; see [the product map](/v/latest/grimoire/guides/10-product-map/). The one you are
 in is marked, and small counts show how much each holds. Detail views (a feature, a flow, a page, a task, a release, a
 file) belong to the view they came from and show a breadcrumb back to it, such as Features, then `auth`, then the flow.
 
@@ -50,11 +50,11 @@ failed view says what failed, why and what to do next, with a button to try agai
 | Overview        | Cards for the features by status, flows, apps, pages and screens, open and waiting tasks, check errors and warnings, and the size of the book; the route facts with the build hint when they are old or missing; recent releases and the top check problems. |
 | Features        | Every feature as a card with its status, version, flow count and flow names. Filter by status or text, sort by name, status, flows or last update; the count reads "12 of 30 features".                                                                      |
 | Feature         | The README header, its flows, owned and borrowed files, routes, pages, files no flow reaches, open tasks, recent changes, findings, and a graph of the feature and its neighbours.                                                                           |
-| Flow            | The steps with the files behind each, the acceptance criteria with their tests and last results, the pages that show the flow, the cases and unknowns, and its history from the changelog.                                                                   |
+| Flow            | See [The flow page](#the-flow-page).                                                                   |
 | Apps            | One card per written app (site or mobile) with its root and counts. Pages and screens are grouped by the first segment of their route, with a text filter and a confirmed, inferred or unmarked status per row.                                              |
 | Page or screen  | Its blocks (with the layout's), who sees each, what each changes with, the files in the book, and a graph of the page and its blocks.                                                                                                                        |
 | Tasks, Releases | The open, waiting and done tasks from the index (a task waiting for approval is listed only under waiting) with a filter, and each release with what it collected, grouped by feature.                                                                       |
-| Check           | The same findings as `warlock grimoire check`, as a list with severity, code, message, what to do and where. What to fix comes first; the expected findings of proposed work are kept apart.                                                                 |
+| Check           | The findings of `warlock grimoire check`, grouped by code. See [The Check tab](#the-check-tab).                                                                 |
 | File, route     | The book entry: exports, imports, importers, owner, flows, routes, and a graph of the file's neighbours; or a route with the files behind it.                                                                                                                |
 | Modules         | Module coupling as a graph, with the modules listed by how many imports tie them to others.                                                                                                                                                                  |
 
@@ -62,6 +62,43 @@ The graphs are plain SVG with at most 60 nodes. Click a node to open it.
 
 With no features written, the tab still works from the book: search, files, routes and the module graph. The overview
 says that no features are written yet.
+
+## The flow page
+
+The flow page reads top to bottom:
+
+1. **Header**: breadcrumb, title, the summary (the paragraph under the title, or a hint to add one), status, origin
+   (`inferred` or `confirmed`), version, who, the apps, and links to the previous and next flow of the feature.
+2. **Health strip**: criteria proven, the last test run (or "no results recorded"), findings (a link to the Check tab
+   filtered to this flow) and steps resolved.
+3. **Fix next**: the first failing criterion, else the first without a test, else one that has not run or is stale. For a
+   criterion without a test it shows the `// @proves <feature>/<flow> AC-n` line with a Copy button.
+4. **Journey**: the steps as a stepper. Each step shows its type, target, note, the file it starts from and counts such as
+   "6 direct · 8 in feature · 1192 reachable". "Show files" opens tabs (direct imports, in this feature, all reachable,
+   type-only) that load from the server 200 files at a time, grouped by module. An `affects` step shows the linked flow.
+5. **Proof**: one row per criterion with one status and its tests (file, line, name, result).
+6. **Differs by app**, **Cases** (handled cases first with buttons that jump to their criteria; "Does not apply" is
+   collapsed), **Not handled**, **Unknowns**, **Where users see it**, **History** and any remaining findings.
+
+When the project has `@proves` lines but no test results were ever recorded, the page says "No test results recorded
+yet" once, with the fix (add `grimoireReporter()`, run the tests, or set the panel option `testResultsFile`), and tagged
+criteria read "tagged" instead of "not-run". Text in `` `backticks` `` shows as code.
+
+## The Check tab
+
+The tab shows the headline "0 errors · 12 warnings in 3 kinds", then one card per code with its count, the fix written
+once, and its features with a count each. "Show" loads that feature's findings a page at a time; "Show all" loads the
+whole code. Files no flow reaches (`GR3006`) are listed one row per feature, with "Show files" for the paths. Filter by
+severity, state (to fix or expected), code, feature or flow. The filters live in the address, for example
+`#grimoire/check?code=GR3006&feature=cart`, so you can share or bookmark a filtered view. The Overview's "Top problems"
+ranks the codes (errors first, then the largest count) and links to the filtered tab.
+
+## On a phone
+
+At 390 px wide the tab has no horizontal page scroll. The tab bar scrolls sideways and keeps the open tab in view; tables
+become cards that name each column; ids never wrap; graphs scroll inside their card and label only small graphs (point at
+a node for its name); the flow page keeps a small header with its title in view, and the previous and next links sit at the
+bottom. It follows the dashboard's light and dark colours.
 
 ## Performance
 
@@ -107,9 +144,14 @@ Served at `/__warlock/api/grimoire`, all `GET`:
 | `/search?q=&limit=`                                                                        | Ranked hits, as `warlock scry --search`.                                                                                                                     |
 | `/file?path=`, `/impact?path=`, `/route?method=&path=`                                     | Answers of `warlock scry`.                                                                                                                                   |
 | `/features`                                                                                | The features listing: the index with each README summary and flow headings.                                                                                  |
-| `/features/:feature`, `/flows/:feature/:flow`                                              | The feature or flow with its book map, changes and findings.                                                                                                 |
+| `/features/:feature`                                                                       | The feature with its book map, changes and findings.                                                                                                 |
 | `/apps`, `/apps/:app/pages/:page`                                                          | Written apps with a row per page and screen (route, title, layout, blocks, confirmed or inferred); one page (by id or route) with its layout and book facts. |
-| `/tasks`, `/releases`, `/releases/:release`, `/check`                                      | Tasks index, releases, one release, the check report.                                                                                                        |
+| `/flows/:feature/:flow`                                                                    | The flow with counts per step (never every file), the first 50 direct imports, health, the test results state, and the previous and next flow. |
+| `/flows/:feature/:flow/steps/:index/files?set=&offset=&limit=`                             | One page (up to 200) of a step's files; `set` is `direct`, `feature`, `reachable` (default) or `type-only`. |
+| `/check`                                                                                   | The whole report; with `code`, `feature`, `flow`, `severity`, `state`, `offset` or `limit` one page of matching findings. |
+| `/check/groups`                                                                            | The check by code: count, expected count, title, fix and features. |
+| `/product`, `/product/features/:feature`, `/product/flows/:feature/:flow`                  | The product map answers. |
+| `/tasks`, `/releases`, `/releases/:release`                                                | Tasks index, releases, one release.                                                                                                        |
 | `/graph/file?path=`, `/graph/feature/:feature`, `/graph/page?app=&page=`, `/graph/modules` | `{ nodes, edges }`, at most 60 nodes.                                                                                                                        |
 
 An unknown item answers `404` with a message, and a missing parameter `400`.

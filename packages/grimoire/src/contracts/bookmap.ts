@@ -79,8 +79,26 @@ export type FlowBookmapStep = {
   found: boolean | null;
   /** The file the step starts from (handler, page, mail file…), or `null`. */
   entry: string | null;
-  /** The entry file and every project file it imports, transitively, sorted. */
+  /**
+   * Every file the step starts from, sorted: a page and its setup file, each
+   * matching route's handler file and routes file, each named file. Empty
+   * when nothing matched.
+   */
+  entries: string[];
+  /** Project files the entries import directly (any import, type-only included), minus the entries, sorted. */
+  direct: string[];
+  /**
+   * The entries and every project file they reach through imports that run
+   * (type-only imports are not followed), sorted.
+   */
   files: string[];
+  /**
+   * Files reached only through type-only imports (not in `files`), sorted.
+   * `files` plus these is the step's full reach: ownership coverage
+   * (`unreached`, `GR3006`), the book entries' `flows` and `scry --impact`
+   * count both.
+   */
+  typeOnlyFiles: string[];
 };
 
 /** One acceptance criterion with its tests and their last results. */

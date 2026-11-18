@@ -2,6 +2,103 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+## 5.58.0 (2026-11-18)
+
+### T-152 [bug] Flows have no summary
+
+- Source: owner, 2026-11-18, write-up https://claude.ai/artifact/CVZWgVr2qL8jEufUrQSXnx (measured on `@warlock.js/grimoire` 5.57.0 in a large app: 82 flows, 11,272 files).
+- What and why: the paragraph under a flow's `# Title` is dropped, so the flow page, `scry --flow` and every reader
+  have no one-line description of the flow; the feature README already has one.
+- Evidence: `packages/grimoire/src/written/features.ts:510-526` (5.57.0, `parseFlow` builds no summary; the README
+  reads one at `:158`); `packages/grimoire/src/contracts/written.ts:178-201` (`WrittenFlow` has no `summary`);
+  `packages/grimoire/src/devtools/data.ts:195-205`; the flow template in `packages/grimoire/skills/write-a-feature/SKILL.md`.
+- Decision: D1 (`summary` via `paragraphAfterTitle`, warning GR1030 when missing). Contract field added 2026-11-18.
+- Acceptance: parser, devtools flow answer, flow page and skill template carry the summary; GR1030 in the check and
+  docs; specs.
+- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+
+### T-153 [bug] Flow page shows "does not apply: does not apply: …"
+
+- Source: owner, 2026-11-18, write-up https://claude.ai/artifact/CVZWgVr2qL8jEufUrQSXnx (measured on `@warlock.js/grimoire` 5.57.0 in a large app: 82 flows, 11,272 files).
+- What and why: a case answered "does not apply: …" is rendered with the prefix twice.
+- Evidence: `packages/grimoire/src/written/features.ts:444-445` keeps the prefix in `answer`;
+  `packages/grimoire/ui/grimoire-view.js:1028` adds it again.
+- Decision: D2 (view-only fix; "Does not apply" cases collapsed in their own group).
+- Acceptance: the prefix appears once; view spec.
+- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+
+### T-154 [bug] Flow steps list the whole import closure, through type-only imports; flow answers reach megabytes
+
+- Source: owner, 2026-11-18, write-up https://claude.ai/artifact/CVZWgVr2qL8jEufUrQSXnx (measured on `@warlock.js/grimoire` 5.57.0 in a large app: 82 flows, 11,272 files).
+- What and why: a page or route step lists every file its entry reaches, including through `import type` of barrels
+  that re-export server code (step 1 of a sign-in flow listed 1,192 files; flow answers 0.5–2.7 MB).
+- Evidence: core records every import with no type-only flag (`packages/core/src/tooling/inspect/collect-files.ts:234-251`,
+  `inspect-report.types.ts:315`); grimoire walks every edge (`packages/grimoire/src/graph/index.ts:42-46`,
+  `src/bookmap/steps.ts:56-145`); the flow route sends the whole book map (`src/devtools/index.ts:133-134`).
+  Fixture `packages/grimoire/tests/type-only-imports.spec.ts` ran 2026-11-18 on the 5.57.0 code: the page's closure
+  contains the barrel, the model and the database connection (1 passed, 1 expected fail for the fix). The app's exact
+  numbers were not re-measured.
+- Decision: D4–D8 (core marks `typeOnly`; steps store `entries`, `direct`, `files` without type-only edges and
+  `typeOnlyFiles`; coverage keeps the full reach; devtools and MCP send counts first, file lists paged on request).
+- Acceptance: the fixture's regression passes as `it`; flow answers on the shop fixture carry no full file lists;
+  GR3006 counts unchanged by the type-only change; docs, specs, goldens.
+- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+
+### T-155 [feature] Grimoire tab UX: flow page, grouped Check tab, Overview ranking, phone layout, display bugs
+
+- Source: owner, 2026-11-18, write-up https://claude.ai/artifact/CVZWgVr2qL8jEufUrQSXnx (measured on `@warlock.js/grimoire` 5.57.0 in a large app: 82 flows, 11,272 files).
+- What and why: the flow page is swamped by files and has no summary or health; duplicate no-test pills; the Check tab
+  is one flat list (2,347 findings, GR3006 1,881 one-per-file rows, "no unexpected errors" next to 2,347 warnings);
+  Overview "Top problems" takes the first five findings in report order; data never shown (`differs`, origin, the
+  linked flow of an `affects` step, case `fixed`, previous/next flow); literal backticks in criteria and task text;
+  phone layout unusable (Files column ~30 px, Apps table 558 px wide, task ids wrap, sub-tabs hidden); overlapping
+  Modules labels.
+- Evidence: `packages/grimoire/ui/grimoire-view.js:915-1049` (flow page), `:972`/`:989`/`:1046` (duplicates),
+  `:1451-1505` (Check tab, headline `:1461`), `:664` (Top problems); `ui/grimoire.css` (no phone rules for tables).
+- Decision: D9, D10, D12, D13 (owner's proposed flow page and Check tab).
+- Acceptance: the flow page and Check tab as designed; works at 390 px with no horizontal scroll; view specs; docs.
+- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+
+### T-156 [bug] Tagged tests read "not-run" in the devtools tab
+
+- Source: owner, 2026-11-18, write-up https://claude.ai/artifact/CVZWgVr2qL8jEufUrQSXnx (measured on `@warlock.js/grimoire` 5.57.0 in a large app: 82 flows, 11,272 files).
+- What and why: criteria with `@proves` tests show `not-run` even after test runs. Three causes in the framework:
+  the production snapshot's change stamp ignores the results file, so new results never show until something else
+  changes; `grimoire/book/` is git-ignored, so a deployed app has no results and there is no option to read them from
+  elsewhere; nothing tells "never recorded" from "did not run".
+- Evidence: `packages/grimoire/src/devtools/snapshot-source.ts:62-71` (stamped files) and `:105` (`keepUntilChanged`);
+  `packages/grimoire/src/paths/index.ts:38`; `packages/grimoire/src/test-results/index.ts:23-35` (fixed path);
+  `packages/grimoire/src/contracts/bookmap.ts:95-96`. Unconfirmed: which cause hit the app, and whether the reporter
+  matched its tests (name fallback at `packages/grimoire/src/vitest/index.ts:203-208`).
+- Decision: D11 (stamp the results file; `testResultsFile` panel/open option and `grimoireReporter({ file })`;
+  `TestResultsInfo` in answers; GR4009 no results recorded; GR4010 unmatched proving test).
+- Acceptance: a new results file shows in production without a restart (spec); the tab shows "No test results
+  recorded yet" with the fix when none exist; docs show the CI → deploy path.
+- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+
+### T-157 [feature] Product map in the Grimoire tab, with read-only share links
+
+- Source: owner, 2026-11-18, write-up https://claude.ai/artifact/CVZWgVr2qL8jEufUrQSXnx (measured on `@warlock.js/grimoire` 5.57.0 in a large app: 82 flows, 11,272 files).
+- What and why: owner decision: a business-facing map so non-technical readers understand the product: feature map
+  (cards with plain summary, audience, apps, health light), feature page (what, why, who, flows as short stories, where
+  you see it per app with screenshots, release history in plain words, planned work), flow page (summary, steps in the
+  user's words with screenshots, what proves it), code detail behind "For developers"; format additions (feature
+  `audience` and `## Why`, flow summary, `## Story`, screenshot image lines, `(AC-n)` on a case line); a devtools
+  setting that lets an admin create read-only share links, otherwise signed-in devtools users only.
+- Evidence: no such view or data exists in 5.57.0 (`packages/grimoire/src/devtools/index.ts` routes; `ui/` files);
+  devtools panels can serve only fixed assets and have no public route (`packages/devtools/src/types.ts`,
+  `src/production/http/access.ts`).
+- Decision: D14–D27 (map inside the Grimoire tab plus a share page from the same module; reports backed by real data
+  only: release history, test health, planned work, captured error counts; share links in the production monitor with
+  the token in the URL fragment, a scoped HMAC cookie, a `devtools_shares` table, revocation and audit; a shared view
+  never shows file paths, code, tests or error messages).
+- Acceptance: map, feature and flow pages render from the shop fixture at 390 px and desktop, light and dark; a share
+  link opens in a private window, exposes no file path, and stops working after revoke; security specs per the WP-6
+  checklist; docs pages (grimoire product map, devtools panels/production/security), skills, changelogs.
+- Status: shipped in 5.58.0, the `release: 5.58.0` commit.
+- Verified by: one typecheck + full tests + release gates, single review, real-browser screenshots at 1440/390 px light/dark; share-link store run on Postgres 16 and MongoDB 7.
+
+
 ## 5.57.0 (2026-11-18)
 
 ### T-150 [feature] Modern devtools UI, a readable Grimoire tab with a Features view, faster Grimoire loads

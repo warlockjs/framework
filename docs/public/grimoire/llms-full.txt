@@ -98,6 +98,11 @@ folders: [src/app/auth]
 ```
 
 - `origin: inferred` on the README and on each flow. The owner changes it to `confirmed`.
+- **Summaries and stories in plain words.** Write the paragraph under each flow's title (what a user
+  does and gets, in one or two sentences) and, where the route and page names make the path clear,
+  a `## Story` of numbered sentences in the user's words. Add `audience` and a short `## Why` to
+  the README when the code shows who uses the feature and for what. Mark all of it inferred and
+  leave a screenshot out unless you can capture it; the owner confirms the wording.
 - Start every feature at `1.0`. Do not reconstruct history; the changelog gets one line under `## Unreleased`
   in the feature's own `CHANGELOG.md` (`grimoire/features/auth/CHANGELOG.md`), never in the README:
 
@@ -263,6 +268,8 @@ layout: site
 
 The first page a visitor sees.
 
+![The home page](../../../../screenshots/web/home.png)
+
 ## Blocks
 
 | Block             | Flow                    | Who sees it | Changes with           |
@@ -296,10 +303,20 @@ flow: catalog/new-arrivals
 
 # New arrivals on the home page
 
+![The new arrivals row](../../../../../screenshots/web/home-new-arrivals.png)
+
 - position second row, under Featured products
 - shows a grid of up to 20 products
 - phones one row that scrolls sideways
 ```
+
+## Screenshots
+
+Keep image files in `grimoire/screenshots/` (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`), for example
+`grimoire/screenshots/web/home.png`. Write an image line `![alt](path)` anywhere in a page, screen
+or block file, with the path relative to the Markdown file or starting with `/grimoire/screenshots/`.
+The Product map shows these as "where you see it". An image outside the folder is a warning
+(`GR1029`); a missing file is a warning (`GR2014`).
 
 ## Where a difference between apps goes
 
@@ -494,10 +511,18 @@ npx warlock grimoire check
 | A step names a route, page, mail or job that does not exist         | Fix the name in the flow, or the code                 |
 | A criterion has no test                                             | Write the test, or say in the task why not            |
 | A test points at a criterion that does not exist                    | Fix the `@proves` line                                |
+| Proofs exist but no test results were found (`GR4009`)              | Record results, see below                             |
+| A proving test the reporter could not match (`GR4010`)              | Fix the `@proves` line or the test name               |
 | A file has no header, or no feature                                 | `document-a-file`                                     |
 | A file in the feature's folders that no flow reaches                | Describe the behaviour in a flow, or delete dead code |
 | A README `updated` older than its newest changelog entry            | Reshape the README                                    |
 | A changelog version that does not fit the word (`added` with `2.1`) | Fix the version                                       |
+
+**Recording results.** The check and the devtools tab read test results from
+`grimoire/book/test-results.json`, written by the Grimoire Vitest reporter when the tests run. That
+folder is not committed, so run the tests with the reporter in CI and ship the results file with the
+deploy. To write it elsewhere, pass `grimoireReporter({ file })` and point the devtools panel at it
+with the `testResultsFile` option.
 
 Fix every line it prints. Do not finish with problems you caused. Findings on a flow or feature
 with `status: proposed` print with `(expected)` and do not fail the check: leave them until the
@@ -678,6 +703,11 @@ From `@warlock.js/grimoire` (no dependency on core or web):
   release between `COLLECTED_START_MARKER` and `COLLECTED_END_MARKER`.
 - `scanProofs` and `scanProofsInText` read `// @proves` lines; `criterionStatus` turns test
   results into a criterion's status; `CASE_QUESTIONS` lists the questions every flow answers.
+- Flow steps list `entries` (every file the step starts from), `direct` (their direct imports), `files` (what
+  runs: type-only imports are not followed) and `typeOnlyFiles` (reached only through type-only imports).
+  `importClosure(graph, start, { skipTypeOnly: true })` leaves type-only edges out. `warlock scry --flow --json`
+  keeps every list; the MCP tool `grimoire_flow` and the devtools flow route send counts and the first 50 direct
+  imports per step, and list one step's files on request (`files: "reachable"` or `"type-only"` with `step`).
 - Helpers: `loadBook`, `readFrontMatter`, `fileGraph`, `importClosure`, `importerClosure`,
   `bookEntryPath`, `bookEntryPaths`, `toPosixPath`, `GRIMOIRE_DIR`, `GRIMOIRE_PATHS`,
   `GRIMOIRE_IGNORE_RULES` (the `.gitignore` lines) and `BOOK_SCHEMA_VERSION`.
@@ -689,12 +719,20 @@ the `grimoire` and `scry` commands for `cli.commands` in `warlock.config.ts`;
 
 From `@warlock.js/grimoire/vitest`: `grimoireReporter` records the last result of every test marked
 `// @proves` into `grimoire/book/test-results.json`. Add it to the Vitest `reporters` list.
+`grimoireReporter({ file })` writes to another path (for a deploy that ships CI results); `readTestResults(root, file?)`
+reads it, and the panel option `testResultsFile` and `openGrimoire` option `testResultsFile` point the tab at it.
+The check warns with `GR4009` when `@proves` lines exist and no results were found, and with `GR4010` when the
+reporter could not match a proving test.
 
 From `@warlock.js/grimoire/devtools`: `grimoireDevtoolsPanel` (the default export) is the Grimoire
 tab for `@warlock.js/devtools`, listed in `panels` of `src/config/devtools.ts`;
 `exportGrimoireSite` writes the same view as a static site.
 The tab keeps its snapshot until the book changes in production and refreshes it in the background in
-development; set `ttlMs` with `panels: [["@warlock.js/grimoire/devtools", { ttlMs: 60_000 }]]`.
+development; the results file's modified time is part of the change stamp, so new results show without a restart.
+The tab also has a Product map: the features, flows, apps, releases and planned work in plain words, from the written
+files (summaries, `audience`, `## Why`, `## Story`) and the images in `grimoire/screenshots/`. Its routes are
+`/product`, `/product/features/:feature` and `/product/flows/:feature/:flow`; `/check/groups` and `/check?code=`
+give the check by code and a page of one code's findings. Set `ttlMs` with `panels: [["@warlock.js/grimoire/devtools", { ttlMs: 60_000 }]]`.
 
 
 ## write-a-feature  `@warlock.js/grimoire/skills/write-a-feature/SKILL.md`
@@ -763,11 +801,16 @@ version: 3.0
 updated: 2026-11-16
 apps: [web-client, mobile]
 folders: [src/app/catalog, src/web/$sites/client/products]
+audience: [shoppers, store staff]
 ---
 
 # Product catalog
 
 Customers browse products, search them and see what is new.
+
+## Why
+
+Shoppers decide what to buy from the catalog, so it has to be quick to browse and clear about what is new.
 
 ## Flows
 
@@ -779,6 +822,9 @@ Customers browse products, search them and see what is new.
 
 - affected by orders/place-order (lowers stock)
 ```
+
+`audience` (optional) lists who the feature is for, in plain words. `## Why` (optional) says why the
+feature exists in a few sentences. Without `audience`, readers use the `who` of the flows.
 
 `id` never changes. `folders` are the folders whose files belong to this feature. An entry with a
 code-file extension names one file (`src/web/components/client/home/pricing-table.tsx`), for a
@@ -801,6 +847,15 @@ who: customer
 
 # Save a product to the wishlist
 
+A customer saves a product they like and finds it again later on their wishlist.
+
+## Story
+
+1. The customer opens a product and taps "Save for later".
+2. The product shows a filled heart.
+   ![The saved product](../../../screenshots/web/wishlist-saved.png)
+3. Later, the customer opens their wishlist and sees the product there.
+
 ## Steps
 
 1. page /products/:id
@@ -817,7 +872,7 @@ who: customer
 - invalid input a product id that is not an id → 422
 - not allowed guest → sent to sign in, then back to the product
 - not found the product does not exist → 404
-- duplicate already saved → stays saved, no error
+- duplicate already saved → stays saved, no error (AC-2)
 - limits at most 200 products
 - expiry does not apply: saved products do not expire
 - double submit two taps save once
@@ -831,6 +886,23 @@ who: customer
 - AC-4 [mobile] the product card has a save button
 ```
 
+**Summary.** The paragraph under the `# Title`: one or two plain sentences saying who does what and
+what they get. A flow with none gets a warning (`GR1030`).
+
+**Story.** Optional. Numbered sentences in the user's words, without file names or code, for readers
+who do not read code. Indent a second line to continue a sentence. An image line
+`![alt](path)` under a step attaches a screenshot to it.
+
+**Screenshots.** Keep image files in `grimoire/screenshots/` (any subfolders; `.png`, `.jpg`,
+`.jpeg`, `.webp` or `.gif`). Write the path relative to the Markdown file, so it also shows on a git
+host (`../../../screenshots/web/wishlist-saved.png` from a flow file), or start it with
+`/grimoire/screenshots/`. An image outside that folder is a warning (`GR1029`), a missing file too
+(`GR2014`).
+
+**Product map.** The Grimoire tab has a Product map for readers who are not developers. They see the
+flow summary, the feature's why and audience, the story in plain words and the screenshots there,
+so write them for a person who has never opened the code.
+
 **Steps.** Each step has a kind and the name used in code: `page`, `route`, `mail`,
 `notification`, `job`, `event`, `outside service`. Use `affects` for an effect on another
 feature (`affects   catalog/stock`). Warlock checks every name exists. A mail is a `*.mail.ts` or
@@ -841,7 +913,8 @@ When two sites, or a site and the mobile app, have a page with the same path, na
 the path in brackets: `page   /support [web-admin]`. The step then looks in that app only (its
 pages, or its screens for a mobile app). Without brackets it looks in the apps the feature lists.
 
-**Cases.** Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
+**Cases.** End a case line with `(AC-n)` (or `(AC-1, AC-2)`) to link it to the criterion that
+proves it; a number the flow does not have is an error (`GR2013`). Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
 expiry, double submit, outside service down), each with a case or "does not apply" and the
 reason. A flow that skips one gets a finding. Do not invent cases beyond the questions unless the owner described one.
 

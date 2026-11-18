@@ -11,5 +11,7 @@ export { DevtoolsSamplesMigration } from "./sample.migration";
 export { DevtoolsSampleRow } from "./sample.model";
 export { DevtoolsSessionsMigration } from "./session.migration";
 export { DevtoolsSessionRow } from "./session.model";
+export { DevtoolsSharesMigration } from "./share.migration";
+export { DevtoolsShareRow } from "./share.model";
 export { DevtoolsStateMigration } from "./state.migration";
 export { DevtoolsStateRow } from "./state.model";

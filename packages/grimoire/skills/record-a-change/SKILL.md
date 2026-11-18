@@ -79,10 +79,18 @@ npx warlock grimoire check
 | A step names a route, page, mail or job that does not exist         | Fix the name in the flow, or the code                 |
 | A criterion has no test                                             | Write the test, or say in the task why not            |
 | A test points at a criterion that does not exist                    | Fix the `@proves` line                                |
+| Proofs exist but no test results were found (`GR4009`)              | Record results, see below                             |
+| A proving test the reporter could not match (`GR4010`)              | Fix the `@proves` line or the test name               |
 | A file has no header, or no feature                                 | `document-a-file`                                     |
 | A file in the feature's folders that no flow reaches                | Describe the behaviour in a flow, or delete dead code |
 | A README `updated` older than its newest changelog entry            | Reshape the README                                    |
 | A changelog version that does not fit the word (`added` with `2.1`) | Fix the version                                       |
+
+**Recording results.** The check and the devtools tab read test results from
+`grimoire/book/test-results.json`, written by the Grimoire Vitest reporter when the tests run. That
+folder is not committed, so run the tests with the reporter in CI and ship the results file with the
+deploy. To write it elsewhere, pass `grimoireReporter({ file })` and point the devtools panel at it
+with the `testResultsFile` option.
 
 Fix every line it prints. Do not finish with problems you caused. Findings on a flow or feature
 with `status: proposed` print with `(expected)` and do not fail the check: leave them until the

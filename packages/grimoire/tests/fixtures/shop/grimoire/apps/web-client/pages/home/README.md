@@ -7,6 +7,8 @@ layout: site
 
 The first page a visitor sees.
 
+![The home page](../../../../screenshots/web/product-page.png)
+
 ## Blocks
 | Block             | Flow                     | Who sees it | Changes with                                  |
 | ----------------- | ------------------------ | ----------- | --------------------------------------------- |

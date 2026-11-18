@@ -10,7 +10,7 @@ vi.mock("@/panels/registry", async () => (await import("../helpers/fake-panels")
 const other = account({ id: "a2", email: "viewer@example.com", role: "viewer" });
 const base = {
   "api/auth/session": { body: sessionView() },
-  "api/panels": { body: [{ id: "requests", title: "Requests", type: "built-in" }] },
+  "api/panels": { body: [{ id: "requests", title: "Requests", type: "built-in", shareable: false }] },
   "api/instances": { body: { current: instanceInfo.id, instances: [instanceInfo] } },
   "api/admin/users": { body: { accounts: [account(), other], invites: [] } },
 } as Record<string, { status?: number; body?: unknown }>;

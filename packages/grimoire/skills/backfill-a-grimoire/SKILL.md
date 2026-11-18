@@ -60,6 +60,11 @@ folders: [src/app/auth]
 ```
 
 - `origin: inferred` on the README and on each flow. The owner changes it to `confirmed`.
+- **Summaries and stories in plain words.** Write the paragraph under each flow's title (what a user
+  does and gets, in one or two sentences) and, where the route and page names make the path clear,
+  a `## Story` of numbered sentences in the user's words. Add `audience` and a short `## Why` to
+  the README when the code shows who uses the feature and for what. Mark all of it inferred and
+  leave a screenshot out unless you can capture it; the owner confirms the wording.
 - Start every feature at `1.0`. Do not reconstruct history; the changelog gets one line under `## Unreleased`
   in the feature's own `CHANGELOG.md` (`grimoire/features/auth/CHANGELOG.md`), never in the README:
 

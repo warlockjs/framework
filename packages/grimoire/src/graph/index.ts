@@ -35,13 +35,31 @@ function walk(
   return [...seen].sort();
 }
 
+/** Options of {@link importClosure}. */
+export type ImportClosureOptions = {
+  /**
+   * Leave out import edges marked `typeOnly` (erased at runtime), so a page
+   * that imports a type through a barrel does not reach the barrel's server
+   * files. Default `false`: every edge is followed.
+   */
+  skipTypeOnly?: boolean;
+};
+
 /**
  * The start files and every project file they import, transitively, sorted.
  * Files not in the graph are left out. Cycles are walked once.
  */
-export function importClosure(graph: FileGraph, start: readonly string[]): string[] {
+export function importClosure(
+  graph: FileGraph,
+  start: readonly string[],
+  options: ImportClosureOptions = {},
+): string[] {
+  const skipTypeOnly = options.skipTypeOnly === true;
+
   return walk(graph, start, (file) =>
-    (graph.get(file)?.imports ?? []).flatMap((entry) => (entry.file === null ? [] : [entry.file])),
+    (graph.get(file)?.imports ?? []).flatMap((entry) =>
+      entry.file === null || (skipTypeOnly && entry.typeOnly === true) ? [] : [entry.file],
+    ),
   );
 }
 

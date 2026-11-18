@@ -48,13 +48,59 @@ function sortedUnique(files: Iterable<string>): string[] {
   return [...new Set(files)].sort();
 }
 
-/** What the step matched: its entry file and the files behind it. */
-type StepMatch = Pick<FlowBookmapStep, "found" | "entry" | "files">;
+/** What the step matched: its entry files and the files behind them. */
+type StepMatch = Pick<
+  FlowBookmapStep,
+  "found" | "entry" | "entries" | "direct" | "files" | "typeOnlyFiles"
+>;
 
-const NOTHING: StepMatch = { found: false, entry: null, files: [] };
+const NOTHING: StepMatch = {
+  found: false,
+  entry: null,
+  entries: [],
+  direct: [],
+  files: [],
+  typeOnlyFiles: [],
+};
+
+const UNKNOWN: StepMatch = { ...NOTHING, found: null };
+
+/**
+ * Work out a step's files from its entry files. `extra` are files that belong
+ * to the step without being imported by an entry (a route's routes file).
+ */
+function reach(
+  graph: FileGraph,
+  entries: readonly string[],
+  extra: readonly string[] = [],
+): Pick<StepMatch, "entries" | "direct" | "files" | "typeOnlyFiles"> {
+  const entryFiles = sortedUnique(entries);
+  const known = new Set(entryFiles);
+  const direct = new Set<string>();
+
+  for (const entry of entryFiles) {
+    for (const edge of graph.get(entry)?.imports ?? []) {
+      if (edge.file !== null && !known.has(edge.file)) direct.add(edge.file);
+    }
+  }
+
+  const files = new Set([
+    ...entryFiles,
+    ...extra,
+    ...importClosure(graph, entryFiles, { skipTypeOnly: true }),
+  ]);
+  const everything = importClosure(graph, entryFiles);
+
+  return {
+    entries: entryFiles,
+    direct: sortedUnique(direct),
+    files: sortedUnique(files),
+    typeOnlyFiles: everything.filter((file) => !files.has(file)),
+  };
+}
 
 function routeStep(step: WrittenStep, facts: BookFacts, graph: FileGraph): StepMatch {
-  if (facts.routes === null || step.route === null) return { found: null, entry: null, files: [] };
+  if (facts.routes === null || step.route === null) return UNKNOWN;
 
   const target = step.route;
   const routes = facts.routes.filter((route) => routeMatches(route, target.method, target.path));
@@ -62,15 +108,19 @@ function routeStep(step: WrittenStep, facts: BookFacts, graph: FileGraph): StepM
 
   if (!first) return NOTHING;
 
-  const files = new Set<string>();
+  const handlers = routes.flatMap((route) => (route.handlerFile === null ? [] : [route.handlerFile]));
+  const sources = routes.flatMap((route) => (route.sourceFile === null ? [] : [route.sourceFile]));
+  const handlerReach = reach(graph, handlers, sources);
+  // The routes files are entries too, but their own imports are not part of the step.
+  const entries = sortedUnique([...handlers, ...sources]);
 
-  for (const route of routes) {
-    if (route.handlerFile !== null)
-      importClosure(graph, [route.handlerFile]).forEach((file) => files.add(file));
-    if (route.sourceFile !== null) files.add(route.sourceFile);
-  }
-
-  return { found: true, entry: first.handlerFile ?? first.sourceFile, files: sortedUnique(files) };
+  return {
+    found: true,
+    entry: first.handlerFile ?? first.sourceFile,
+    ...handlerReach,
+    entries,
+    direct: handlerReach.direct.filter((file) => !entries.includes(file)),
+  };
 }
 
 function pageStep(
@@ -81,8 +131,8 @@ function pageStep(
   graph: FileGraph,
 ): StepMatch {
   const wanted = normalizeRoutePath(step.target);
-  const entries: string[] = [];
-  const files = new Set<string>();
+  const matched: string[] = [];
+  const starts: string[] = [];
 
   // `page /support [web-admin]` looks in that app only; without a scope, in the feature's apps.
   const appIds =
@@ -99,10 +149,9 @@ function pageStep(
       for (const page of facts.pages) {
         if (page.site !== siteId || normalizeRoutePath(page.route) !== wanted) continue;
 
-        entries.push(page.file);
-        const start = page.setupFile === null ? [page.file] : [page.file, page.setupFile];
-        importClosure(graph, start).forEach((file) => files.add(file));
-        start.forEach((file) => files.add(file));
+        matched.push(page.file);
+        starts.push(page.file);
+        if (page.setupFile !== null) starts.push(page.setupFile);
       }
     }
 
@@ -110,18 +159,17 @@ function pageStep(
       for (const screen of match.mobile.screens) {
         if (normalizeRoutePath(screen.route) !== wanted) continue;
 
-        entries.push(screen.file);
-        importClosure(graph, [screen.file]).forEach((file) => files.add(file));
-        files.add(screen.file);
+        matched.push(screen.file);
+        starts.push(screen.file);
       }
     }
   }
 
-  const entry = entries[0];
+  const entry = matched[0];
 
   if (entry === undefined) return NOTHING;
 
-  return { found: true, entry, files: sortedUnique(files) };
+  return { found: true, entry, ...reach(graph, starts) };
 }
 
 function namedStep(step: WrittenStep, facts: BookFacts, graph: FileGraph): StepMatch {
@@ -132,16 +180,9 @@ function namedStep(step: WrittenStep, facts: BookFacts, graph: FileGraph): StepM
 
   if (!first) return NOTHING;
 
-  const files = new Set<string>();
+  const entries = named.flatMap((thing) => (thing.file === null ? [] : [thing.file]));
 
-  for (const thing of named) {
-    if (thing.file === null) continue;
-
-    importClosure(graph, [thing.file]).forEach((file) => files.add(file));
-    files.add(thing.file);
-  }
-
-  return { found: true, entry: first.file, files: sortedUnique(files) };
+  return { found: true, entry: first.file, ...reach(graph, entries) };
 }
 
 function affectsStep(step: WrittenStep, written: WrittenGrimoire): StepMatch {
@@ -154,7 +195,7 @@ function affectsStep(step: WrittenStep, written: WrittenGrimoire): StepMatch {
     feature !== undefined &&
     (target.flow === null || feature.flows.some((flow) => flow.id.value === target.flow));
 
-  return { found, entry: null, files: [] };
+  return { ...NOTHING, found };
 }
 
 /** Everything the step resolver reads. */
@@ -178,7 +219,7 @@ export function resolveStep(
     match = pageStep(step, feature, context.facts, context.apps, context.graph);
   else if (NAMED_TYPES.has(step.type)) match = namedStep(step, context.facts, context.graph);
   else if (step.type === "affects") match = affectsStep(step, context.written);
-  else match = { found: null, entry: null, files: [] };
+  else match = UNKNOWN;
 
   const target = step.app === null ? step.target : `${step.target} [${step.app}]`;
 

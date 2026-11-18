@@ -40,6 +40,7 @@ function page(id: string, patch: Partial<WrittenPage> = {}): WrittenPage {
     origin: null,
     heading: null,
     purpose: null,
+    screenshots: [],
     blocks: [],
     alsoReachedFrom: [],
     blockFiles: [],
@@ -156,6 +157,7 @@ describe("checkApps", () => {
                 flow: { value: "catalog/also-gone", at: at("b", 2) },
                 heading: null,
                 details: [],
+                screenshots: [],
               },
             ],
           }),
@@ -255,6 +257,7 @@ describe("checkApps", () => {
         flow: null,
         heading: null,
         details: [],
+        screenshots: [],
       },
     ];
     const failing = build({ app: { pages: [page("home", { blockFiles })] } });

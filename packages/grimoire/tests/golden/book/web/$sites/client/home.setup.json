@@ -18,6 +18,7 @@
   "imports": [
     "src/app/catalog/services/new-arrivals.service.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/web/$sites/client/home.page.tsx"
   ],

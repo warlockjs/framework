@@ -50,8 +50,9 @@ test name.
 | Option | Default                                  | Meaning                              |
 | ------ | ---------------------------------------- | ------------------------------------ |
 | `root` | Vitest's `root`, else the current folder | Project root that holds `grimoire/`. |
+| `file` | `grimoire/book/test-results.json`        | Where to write the results (project-relative or absolute). |
 
-At the end of each run the reporter writes `grimoire/book/test-results.json` once, atomically. It never fails the
+At the end of each run the reporter writes `grimoire/book/test-results.json` (or `file`) once, atomically. It never fails the
 run and adds no work while tests run. When it cannot write the file, it prints one warning and the run goes on.
 The reporter does not import `@warlock.js/core`.
 
@@ -65,6 +66,26 @@ For each proving test: the feature, flow and criterion, the test file, the full 
 - A skipped test keeps the last real result when the test file has not changed since.
 - A run that was cut short leaves the results of unfinished files as they were.
 - `test-results.json` is not committed. The book builder never deletes it.
+
+## Where the tab reads the results
+
+The devtools tab reads `grimoire/book/test-results.json`. The file is not committed, so a deployed app has none until
+you ship it. Run the tests in CI with the reporter and put the file in the deploy, then tell the panel where it is:
+
+```ts
+// vitest.config.ts
+reporters: ["default", grimoireReporter({ file: "deploy/test-results.json" })];
+
+// src/config/devtools.ts
+panels: [["@warlock.js/grimoire/devtools", { testResultsFile: "deploy/test-results.json" }]];
+```
+
+The same path can be given to `openGrimoire(root, adapter, { testResultsFile })`. The tab watches the file's modified
+time, so results written after the app started show up on the next view without a restart.
+
+When no results were ever recorded, the tab says "No test results recorded yet" and where it looked, instead of
+showing every test as not run. The flow and summary routes carry `results`: whether a file was read, its path, when it
+was written, how many `@proves` lines exist and how many have a result.
 
 ## Criterion status
 
@@ -80,12 +101,14 @@ Book maps, `warlock scry --flow` and the devtools tab show these statuses.
 
 ## Check
 
-`warlock grimoire check` reads the results. It reports nothing until a run has written them.
+`warlock grimoire check` reads the results.
 
 | Code     | Severity | Meaning                                                                |
 | -------- | -------- | ---------------------------------------------------------------------- |
 | `GR4006` | error    | A test proving a criterion failed in its last run.                     |
 | `GR4007` | warning  | A criterion's result is older than its test file. Run the tests again. |
 | `GR4008` | warning  | A criterion's test did not run (or was skipped) in the last run.       |
+| `GR4009` | warning  | `@proves` lines exist, but no results file was found. Add the reporter and run the tests, or ship the file with the deploy. One finding for the project, at the first proof. |
+| `GR4010` | warning  | The reporter saw a proving test it could not match to a result. Keep the `it(...)` or `test(...)` call on the line right under the `@proves` comment, with a plain string name. |
 
 Findings of a flow whose status is `proposed` are shown as expected and never fail the check.

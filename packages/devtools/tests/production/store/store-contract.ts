@@ -7,7 +7,23 @@ import type {
   NewDevtoolsAccount,
   NewDevtoolsInvite,
   NewDevtoolsSession,
+  NewDevtoolsShare,
 } from "../../../src/production/store/types";
+
+export function newShare(
+  tokenHash: string,
+  overrides: Partial<NewDevtoolsShare> = {},
+): NewDevtoolsShare {
+  return {
+    tokenHash,
+    panel: "grimoire",
+    label: "Product review",
+    createdBy: null,
+    createdAt: 1000,
+    expiresAt: 5000,
+    ...overrides,
+  };
+}
 
 /** A store under test and the clock it stamps with. */
 export type StoreUnderTest = {
@@ -764,6 +780,88 @@ export function describeStoreContract(name: string, makeStore: MakeStore): void 
 
     it("verifies", async () => {
       await expect(store.verify()).resolves.toBeUndefined();
+    });
+
+    describe("shares", () => {
+      it("creates, finds by token hash and by id, and copies records", async () => {
+        const created = await store.shares.create(newShare("hash-a", { createdBy: "admin-1" }));
+
+        expect(created).toMatchObject({
+          tokenHash: "hash-a",
+          panel: "grimoire",
+          label: "Product review",
+          createdBy: "admin-1",
+          expiresAt: 5000,
+          revokedAt: null,
+          lastUsedAt: null,
+          uses: 0,
+        });
+        expect(created.id).toBeTruthy();
+        expect(await store.shares.findByTokenHash("hash-a")).toEqual(created);
+        expect(await store.shares.get(created.id)).toEqual(created);
+        expect(await store.shares.findByTokenHash("nope")).toBeNull();
+        expect(await store.shares.get("nope")).toBeNull();
+      });
+
+      it("lists newest first, revoked and expired ones included", async () => {
+        const older = await store.shares.create(newShare("h1", { createdAt: 1000 }));
+        const newer = await store.shares.create(newShare("h2", { createdAt: 2000 }));
+
+        await store.shares.revoke(older.id, 1500);
+
+        expect((await store.shares.list()).map((share) => share.id)).toEqual([newer.id, older.id]);
+      });
+
+      it("revokes once", async () => {
+        const created = await store.shares.create(newShare("h1"));
+
+        expect(await store.shares.revoke(created.id, 1200)).toBe(true);
+        expect(await store.shares.revoke(created.id, 1300)).toBe(false);
+        expect(await store.shares.revoke("missing", 1300)).toBe(false);
+        expect((await store.shares.get(created.id))?.revokedAt).toBe(1200);
+      });
+
+      it("revokes every link that is still alive", async () => {
+        const live = await store.shares.create(newShare("h1", { expiresAt: 9000 }));
+        const expired = await store.shares.create(newShare("h2", { expiresAt: 1100 }));
+        const gone = await store.shares.create(newShare("h3", { expiresAt: 9000 }));
+
+        await store.shares.revoke(gone.id, 1100);
+
+        expect(await store.shares.revokeAll(2000)).toBe(1);
+        expect((await store.shares.get(live.id))?.revokedAt).toBe(2000);
+        expect((await store.shares.get(expired.id))?.revokedAt).toBeNull();
+        expect((await store.shares.get(gone.id))?.revokedAt).toBe(1100);
+      });
+
+      it("counts uses and keeps the last use time", async () => {
+        const created = await store.shares.create(newShare("h1"));
+
+        await store.shares.touch(created.id, 1500);
+        await store.shares.touch(created.id, 1800);
+        await store.shares.touch("missing", 1800);
+
+        expect(await store.shares.get(created.id)).toMatchObject({ uses: 2, lastUsedAt: 1800 });
+      });
+
+      it("removes links that expired or were revoked before a time", async () => {
+        const expired = await store.shares.create(newShare("h1", { expiresAt: 1500 }));
+        const revoked = await store.shares.create(newShare("h2", { expiresAt: 9000 }));
+        const live = await store.shares.create(newShare("h3", { expiresAt: 9000 }));
+
+        await store.shares.revoke(revoked.id, 1600);
+
+        expect(await store.shares.removeOld(2000)).toBe(2);
+        expect(await store.shares.get(expired.id)).toBeNull();
+        expect(await store.shares.get(revoked.id)).toBeNull();
+        expect(await store.shares.get(live.id)).not.toBeNull();
+      });
+
+      it("keeps the token hash unique", async () => {
+        await store.shares.create(newShare("same"));
+
+        await expect(store.shares.create(newShare("same"))).rejects.toBeDefined();
+      });
     });
   });
 }

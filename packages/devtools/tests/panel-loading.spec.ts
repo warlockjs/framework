@@ -190,3 +190,44 @@ describe("loadDevtoolsPanels", () => {
     );
   });
 });
+
+describe("loadDevtoolsPanels errors", () => {
+  it("hands the factory the error source, and the loader's own options and root win over a clash", async () => {
+    const errors = vi.fn(async () => []);
+    const seen: Record<string, unknown>[] = [];
+    const factory = (context: Record<string, unknown>) => {
+      seen.push(context);
+
+      return panel("with-errors");
+    };
+
+    await loadDevtoolsPanels([["factory-module", { size: 3, errors: "mine" }]], {
+      root: packageRoot,
+      warn: vi.fn(),
+      mode: "production",
+      errors,
+      importModule: async () => ({ default: factory }),
+    });
+
+    expect(seen[0]).toMatchObject({ size: 3, root: packageRoot, mode: "production", errors });
+  });
+
+  it("leaves errors out when none is given", async () => {
+    const seen: Record<string, unknown>[] = [];
+
+    await loadDevtoolsPanels(["factory-module"], {
+      root: packageRoot,
+      warn: vi.fn(),
+      importModule: async () => ({
+        default: (context: Record<string, unknown>) => {
+          seen.push(context);
+
+          return panel("no-errors");
+        },
+      }),
+    });
+
+    expect(Object.hasOwn(seen[0] ?? {}, "errors")).toBe(false);
+  });
+});
+

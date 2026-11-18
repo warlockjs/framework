@@ -110,6 +110,35 @@ describe("read and write", () => {
     expect(await readTestResults(root)).toBeNull();
   });
 
+  it("reads and writes another results file, relative or absolute", async () => {
+    const value = store([result()]);
+
+    await writeTestResults(root, value, "deploy/results.json");
+    expect(await readTestResults(root, "deploy/results.json")).toEqual(value);
+    expect(await readTestResults(root, path.join(root, "deploy/results.json"))).toEqual(value);
+    expect(await readTestResults(root)).toBeNull();
+  });
+
+  it("keeps unmatched entries of files a run did not cover and replaces the rest", () => {
+    const entry = (testFile: string) => ({
+      feature: "catalog",
+      flow: "wishlist",
+      criterion: "AC-1" as const,
+      testFile,
+      line: 1,
+    });
+    const merged = mergeTestResults(
+      { ...store([]), unmatched: [entry("a.spec.ts"), entry("b.spec.ts")] },
+      [],
+      ["a.spec.ts"],
+      new Date(),
+      [],
+    );
+
+    expect(merged.unmatched?.map((item) => item.testFile)).toEqual(["b.spec.ts"]);
+    expect(mergeTestResults(null, [], ["a.spec.ts"], new Date()).unmatched).toBeUndefined();
+  });
+
   it("writes the store atomically and reads it back", async () => {
     const value = store([result()]);
 
@@ -152,13 +181,35 @@ describe("checkTestResults", () => {
       written: { features: [{ flows: [{ ref: "catalog/wishlist", status: { value: status } }] }] },
       proofs: [proof],
       results,
+      resultsFile: "grimoire/book/test-results.json",
     } as unknown as GrimoireSnapshot;
   }
 
   const hash = hashTestFile(content);
 
-  it("reports nothing without results", () => {
-    expect(checkTestResults(snapshot(null))).toEqual([]);
+  it("reports one GR4009 at the first proof when proofs exist and no results were read", () => {
+    const findings = checkTestResults(snapshot(null));
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.code).toBe("GR4009");
+    expect(findings[0]?.severity).toBe("warning");
+    expect(findings[0]?.at?.file).toBe("src/a.spec.ts");
+    expect(findings[0]?.message).toContain("grimoire/book/test-results.json");
+  });
+
+  it("reports nothing without results and without proofs", () => {
+    expect(checkTestResults({ ...snapshot(null), proofs: [] })).toEqual([]);
+  });
+
+  it("reports an unmatched proof as GR4010 while its @proves line is still there", () => {
+    const unmatched = { feature: "catalog", flow: "wishlist", criterion: "AC-1", testFile: "src/a.spec.ts", line: 1 };
+    const gone = { ...unmatched, line: 9 };
+    const findings = checkTestResults(
+      snapshot({ ...store([result({ testFileHash: hash })]), unmatched: [unmatched, gone] }),
+    );
+
+    expect(findings.map((finding) => finding.code)).toEqual(["GR4010"]);
+    expect(findings[0]?.at?.line).toBe(1);
   });
 
   it("reports nothing for a passing, fresh result", () => {

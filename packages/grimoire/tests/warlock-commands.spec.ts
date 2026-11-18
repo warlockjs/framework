@@ -142,7 +142,7 @@ describe("warlock grimoire check", () => {
     const io = capture();
 
     expect(await runCheck({ root: copy.root, adapter: createShopAdapter(), io })).toBe(0);
-    expect(io.stdout.at(-3)).toBe("0 errors, 8 warnings, 8 expected  (routes: fresh)");
+    expect(io.stdout.at(-3)).toBe("0 errors, 9 warnings, 9 expected  (routes: fresh)");
   });
 
   it("exits 1 on an unexpected error and prints JSON with --json", async () => {
@@ -184,7 +184,7 @@ describe("warlock grimoire check", () => {
     expect(io.stdout).toContain(
       "-  GR8002  warning  route facts could not be read: the app did not boot (src/app/orders/routes.ts: boom)",
     );
-    expect(io.stdout.at(-3)).toBe("0 errors, 10 warnings, 8 expected  (routes: stale)");
+    expect(io.stdout.at(-3)).toBe("0 errors, 11 warnings, 9 expected  (routes: stale)");
   });
 });
 
@@ -420,6 +420,18 @@ describe("Grimoire MCP tools", () => {
     expect(await run("grimoire_flow", { flow: "catalog/new-arrivals" })).toMatchObject({
       type: "flow",
     });
+    const compact = (await run("grimoire_flow", { flow: "catalog/new-arrivals" })) as {
+      bookmap: { steps: { counts: { reachable: number }; files?: unknown }[] };
+    };
+
+    expect(compact.bookmap.steps[0]?.counts.reachable).toBeGreaterThan(0);
+    expect(compact.bookmap.steps[0]).not.toHaveProperty("files");
+    expect(
+      await run("grimoire_flow", { flow: "catalog/new-arrivals", files: "reachable", step: 1 }),
+    ).toMatchObject({ set: "reachable", index: 1 });
+    await expect(
+      byName.get("grimoire_flow")?.run({ flow: "catalog/new-arrivals", files: "reachable", step: 99 }),
+    ).rejects.toThrow(/^GR9006: Pass step/);
     expect(await run("grimoire_search", { text: "order", limit: 2 })).toMatchObject({
       type: "search",
     });

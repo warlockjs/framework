@@ -2,6 +2,26 @@
 
 `@warlock.js/grimoire` is new in 5.55.0 and experimental: its file layout, `GR` codes and API may change in any release until it is marked stable.
 
+## 5.58.0 - 2026-11-18
+
+### Added
+
+- Flows have a summary: the paragraph under the `# Title`. It shows on the flow page, in `scry --flow` and in the product map. A flow without one gets the warning GR1030.
+- The devtools Grimoire tab has a flow page: summary, status and origin, previous and next flow, a health strip, a "Fix next" box with a ready `@proves` line, the journey as a stepper with file counts, one row per criterion with its tests, and edge cases with "does not apply" collapsed.
+- A "Product map" view in the Grimoire tab for readers who do not read code: feature cards with a plain summary, audience, apps and a health light; feature pages with why, flows as short stories, where each appears in the apps with screenshots, release history and planned work; flow pages with the steps in the user's words and what proves them. Code detail sits behind "For developers". In the production monitor an admin can share it with a read-only link.
+- Written format: feature `audience` and `## Why`, flow `## Story`, screenshots as image lines pointing into `grimoire/screenshots/` (pages, blocks and story steps), and `(AC-n)` at the end of a case line to link it to a criterion. New checks GR1029, GR2013 and GR2014.
+- The panel option `testResultsFile` reads test results from another file; the reporter writes there with `grimoireReporter({ file })`. New warnings GR4009 (proofs but no recorded results) and GR4010 (a proving test the reporter could not match).
+- The static export includes the product map and its screenshots.
+- A new route pages through the files of one flow step.
+
+### Changed
+
+- Flow steps list the files that run: type-only imports are no longer followed, so a page that imports a type through a barrel no longer lists the server files behind it. Book maps add `entries`, `direct` and `typeOnlyFiles` per step, and book entries add `typeOnlyImports`. Ownership coverage (GR3006) still counts type-only reach.
+- The devtools flow answer and the MCP `grimoire_flow` tool send counts and direct imports per step instead of every reachable file. Flow answers on large apps drop from megabytes to kilobytes.
+- The Check tab groups findings by code with counts and the fix shown once, filters by severity, code, feature and flow, and shows "files no flow reaches" (GR3006) one row per feature. The Overview's top problems rank by severity, then by count.
+- The devtools tab works on phones: cards instead of tables, scrolling sub-tabs, no overflowing tables or wrapped ids, and readable module graph labels. Code spans in criteria and task text render as code.
+- The Test results view tells "no results recorded" apart from "did not run" and picks up new results without a restart.
+
 ## 5.57.0 - 2026-11-18
 
 ### Added

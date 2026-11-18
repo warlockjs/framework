@@ -15,6 +15,7 @@
   "imports": [
     "src/app/catalog/services/new-arrivals.service.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [],
   "routes": [],
   "pages": [],

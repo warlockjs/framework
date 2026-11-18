@@ -16,6 +16,7 @@
     "src/app/auth/controllers/login.controller.ts",
     "src/app/auth/controllers/register.controller.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [],
   "routes": [
     {

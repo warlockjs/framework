@@ -5,6 +5,26 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 ## Owner decisions waiting
 
 - T-148: keep request paths as served in production samples, or store only the route pattern.
+- T-158: product map usage analytics and member feedback: leave out, add a project extension point, or build first-party sources.
+
+## 5.58.0: Grimoire flow pages, type-only reach and product map
+
+Design: `findings/5.58/ARCHITECTURE.md` (decisions D1–D28); work-package briefs in `findings/5.58/briefs/`.
+
+### T-158 [decision] Product map: usage analytics and member feedback per feature
+
+- Source: owner, 2026-11-18, write-up https://claude.ai/artifact/CVZWgVr2qL8jEufUrQSXnx (measured on `@warlock.js/grimoire` 5.57.0 in a large app: 82 flows, 11,272 files).
+- What and why: the owner listed usage per feature (app analytics events) and member feedback per feature among the
+  wanted reports. The framework has no source for either: no analytics events and no feedback store exist in any
+  package, so 5.58.0 leaves them out instead of inventing data.
+- Evidence: `grep -rli "analytics\|feedback" packages/*/src` (2026-11-18) finds only the AI skills' own usage events
+  (`packages/ai/src/skills/skills.ts:50`), an example database name and agent tool-error feedback; no app analytics
+  events and no member feedback store. The product map answers in
+  `packages/grimoire/src/devtools/answers.ts` carry only release history, test health, planned work and error counts.
+- Decision needed: (a) leave them out; (b) add an extension point: a panel option naming a project module that returns
+  per-feature numbers (`usage(featureId)`, `feedback(featureId)`), shown only when present; or (c) build first-party
+  sources (an analytics event API in core and a feedback store) in a later release.
+- Status: waiting for the owner.
 
 ## After 5.56.0: production monitor follow-ups
 

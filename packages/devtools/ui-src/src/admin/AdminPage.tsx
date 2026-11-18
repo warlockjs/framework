@@ -4,12 +4,14 @@ import { useSession } from "@/app/session";
 import type { AdminPage as AdminPageId } from "@/lib/route";
 import { AuditPage } from "./AuditPage";
 import { SettingsPage } from "./SettingsPage";
+import { SharesPage } from "./SharesPage";
 import { UsersPage } from "./UsersPage";
 
 const PAGES: { id: AdminPageId; label: string }[] = [
   { id: "users", label: "Users and invites" },
   { id: "audit", label: "Audit log" },
   { id: "settings", label: "Settings" },
+  { id: "shares", label: "Share links" },
 ];
 
 /** The admin area: users and invites, the audit log, and settings. Viewers see why it is closed to them. */
@@ -31,7 +33,7 @@ export function AdminPage({ page }: { page: AdminPageId }) {
         aria-label="Admin pages"
         className="flex gap-1 overflow-x-auto rounded-lg border bg-card p-1 text-sm"
       >
-        {PAGES.map((item) => (
+        {PAGES.filter((item) => item.id !== "shares" || session.share?.enabled).map((item) => (
           <a
             key={item.id}
             href={`#/admin/${item.id}`}
@@ -47,7 +49,15 @@ export function AdminPage({ page }: { page: AdminPageId }) {
           </a>
         ))}
       </nav>
-      {page === "users" ? <UsersPage /> : page === "audit" ? <AuditPage /> : <SettingsPage />}
+      {page === "users" ? (
+        <UsersPage />
+      ) : page === "audit" ? (
+        <AuditPage />
+      ) : page === "shares" && session.share?.enabled ? (
+        <SharesPage />
+      ) : (
+        <SettingsPage />
+      )}
     </div>
   );
 }

@@ -65,6 +65,7 @@ export function baseOptions(
     logLevels: ["warn", "error"],
     auditRetentionDays: 90,
     passkeys: { rpName: "Warlock monitor", rpId: null },
+    share: { enabled: false, maxDays: 30 },
     ...overrides,
   };
 }

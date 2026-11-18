@@ -20,6 +20,7 @@
   "imports": [
     "src/app/catalog/repositories/products.repository.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/app/catalog/controllers/new-arrivals.controller.ts",
     "src/app/catalog/tests/new-arrivals.test.ts",

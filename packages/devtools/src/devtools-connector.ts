@@ -8,6 +8,7 @@
  * this mirrors.
  */
 import type { Connector, ConnectorLifecyclePhase } from "@warlock.js/core";
+import { createPanelErrorSource } from "./panel-errors";
 import { checkDevtoolsPanels, loadDevtoolsPanels } from "./panels";
 import { loadProcessPanel, processesDevtoolsPanel } from "./process-panel";
 import { createCollector } from "./collector";
@@ -127,13 +128,17 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
       const builtIn = processesDevtoolsPanel(processPanel);
       // A panel that fails to load or reuses an id is reported and left out;
       // it never stops the dashboard or the app.
+      const panelErrors = createPanelErrorSource();
       const panels = await loadDevtoolsPanels(resolved.panels ?? [], {
         root: "rootPath" in core ? core.rootPath() : process.cwd(),
         warn: (message) => log.warn("devtools", "panel", message),
         taken: new Map([[builtIn.id, builtIn.title]]),
+        errors: panelErrors.read,
       });
 
       const insightsWiring = await wireDevelopmentInsights(collector, resolved, log, disposers);
+
+      panelErrors.bind(insightsWiring.insights ?? null);
 
       mountDevtoolsRoutes(getHttpServer(), {
         collector,
@@ -322,11 +327,13 @@ async function bootProduction(
   const processPanel =
     resolved.production?.panels?.processes === true ? await loadProcessPanel() : undefined;
   const builtIn = processesDevtoolsPanel(processPanel);
+  const panelErrors = createPanelErrorSource();
   const packagePanels = await loadDevtoolsPanels(resolved.panels ?? [], {
     root: "rootPath" in core ? core.rootPath() : process.cwd(),
     warn: (message) => log.warn("devtools", "panel", message),
     taken: new Map([[builtIn.id, builtIn.title]]),
     mode: "production",
+    errors: panelErrors.read,
   });
   // `warlock start` registers no development OpenAPI provider: the API tab, when turned on, builds its own.
   const { createProductionOpenApi } = await import("./production/openapi");
@@ -345,6 +352,7 @@ async function bootProduction(
       getPostmanCollection: openApi.getPostmanCollection,
     },
     log,
+    onInsights: (insights) => panelErrors.bind(insights),
   });
 }
 

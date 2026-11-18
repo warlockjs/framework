@@ -235,6 +235,7 @@ export async function createApp(config: AppConfig = {}) {
     ],
     state,
     warn: (message) => warnings.push(message),
+    hmac: fakeCrypto().hmac,
   });
 
   await app.ready();

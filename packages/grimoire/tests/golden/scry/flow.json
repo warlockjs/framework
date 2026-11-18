@@ -47,6 +47,8 @@
         "column": null
       }
     },
+    "summary": "The newest products sold in the shopper's country, newest first.",
+    "story": [],
     "steps": [
       {
         "index": 1,
@@ -58,7 +60,7 @@
         "note": null,
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 11,
+          "line": 13,
           "column": null
         }
       },
@@ -75,7 +77,7 @@
         "note": null,
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 12,
+          "line": 14,
           "column": null
         }
       }
@@ -86,7 +88,7 @@
         "text": "uses the device's country when the customer has none",
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 15,
+          "line": 17,
           "column": null
         }
       }
@@ -97,9 +99,10 @@
         "fixed": true,
         "answer": "an unknown country code → the global list",
         "doesNotApply": false,
+        "criteria": [],
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 18,
+          "line": 20,
           "column": null
         }
       },
@@ -108,9 +111,10 @@
         "fixed": true,
         "answer": "does not apply: public",
         "doesNotApply": true,
+        "criteria": [],
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 19,
+          "line": 21,
           "column": null
         }
       },
@@ -119,9 +123,10 @@
         "fixed": true,
         "answer": "no product in the country → the global list",
         "doesNotApply": false,
+        "criteria": [],
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 20,
+          "line": 22,
           "column": null
         }
       },
@@ -130,9 +135,10 @@
         "fixed": true,
         "answer": "does not apply: reading only",
         "doesNotApply": true,
+        "criteria": [],
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 21,
+          "line": 23,
           "column": null
         }
       },
@@ -141,9 +147,10 @@
         "fixed": true,
         "answer": "at most 20 products",
         "doesNotApply": false,
+        "criteria": [],
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 22,
+          "line": 24,
           "column": null
         }
       },
@@ -152,9 +159,10 @@
         "fixed": true,
         "answer": "a product stays new for 30 days",
         "doesNotApply": false,
+        "criteria": [],
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 23,
+          "line": 25,
           "column": null
         }
       },
@@ -163,9 +171,10 @@
         "fixed": true,
         "answer": "does not apply: reading only",
         "doesNotApply": true,
+        "criteria": [],
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 24,
+          "line": 26,
           "column": null
         }
       },
@@ -174,9 +183,10 @@
         "fixed": true,
         "answer": "does not apply: no outside service",
         "doesNotApply": true,
+        "criteria": [],
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 25,
+          "line": 27,
           "column": null
         }
       }
@@ -191,7 +201,7 @@
         "text": "the newest products come first",
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 28,
+          "line": 30,
           "column": null
         }
       },
@@ -202,7 +212,7 @@
         "text": "a customer with no country sees the global list",
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 29,
+          "line": 31,
           "column": null
         }
       },
@@ -213,7 +223,7 @@
         "text": "the device's country is used when the customer has none",
         "at": {
           "file": "grimoire/features/catalog/flows/new-arrivals.md",
-          "line": 30,
+          "line": 32,
           "column": null
         }
       }
@@ -231,6 +241,14 @@
         "target": "/",
         "found": true,
         "entry": "src/web/$sites/client/home.page.tsx",
+        "entries": [
+          "mobile/app/index.tsx",
+          "src/web/$sites/client/home.page.tsx",
+          "src/web/$sites/client/home.setup.ts"
+        ],
+        "direct": [
+          "src/app/catalog/services/new-arrivals.service.ts"
+        ],
         "files": [
           "mobile/app/index.tsx",
           "src/app/catalog/models/product.model.ts",
@@ -238,7 +256,8 @@
           "src/app/catalog/services/new-arrivals.service.ts",
           "src/web/$sites/client/home.page.tsx",
           "src/web/$sites/client/home.setup.ts"
-        ]
+        ],
+        "typeOnlyFiles": []
       },
       {
         "index": 2,
@@ -246,13 +265,21 @@
         "target": "GET /api/products/new-arrivals",
         "found": true,
         "entry": "src/app/catalog/controllers/new-arrivals.controller.ts",
+        "entries": [
+          "src/app/catalog/controllers/new-arrivals.controller.ts",
+          "src/app/catalog/routes.ts"
+        ],
+        "direct": [
+          "src/app/catalog/services/new-arrivals.service.ts"
+        ],
         "files": [
           "src/app/catalog/controllers/new-arrivals.controller.ts",
           "src/app/catalog/models/product.model.ts",
           "src/app/catalog/repositories/products.repository.ts",
           "src/app/catalog/routes.ts",
           "src/app/catalog/services/new-arrivals.service.ts"
-        ]
+        ],
+        "typeOnlyFiles": []
       }
     ],
     "criteria": [
@@ -366,7 +393,7 @@
       "message": "catalog/new-arrivals AC-3 has no test",
       "at": {
         "file": "grimoire/features/catalog/flows/new-arrivals.md",
-        "line": 30,
+        "line": 32,
         "column": null
       },
       "expected": false,

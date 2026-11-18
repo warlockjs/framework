@@ -11,7 +11,8 @@ import { AuthLayout } from "@/auth/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { LoadingRows } from "@/components/common/LoadingRows";
-import { clearHash, parseHash, type HashRoute } from "@/lib/route";
+import { clearHash, isShareHash, parseHash, type HashRoute } from "@/lib/route";
+import { ShareScreen } from "@/share/ShareScreen";
 import { Shell } from "./Shell";
 import { SessionContext, type SessionContextValue } from "./session";
 import { useColorScheme } from "./useColorScheme";
@@ -33,6 +34,13 @@ function readLink(): SignInLink | null {
  * returns to sign-in when the server stops answering the session.
  */
 export function App() {
+  // A read-only share link needs no sign-in: it never reads the session.
+  const [sharing] = useState(() => isShareHash(location.hash));
+
+  return sharing ? <ShareScreen /> : <Dashboard />;
+}
+
+function Dashboard() {
   useColorScheme();
 
   const [session, setSession] = useState<DevtoolsSessionView | null>(null);

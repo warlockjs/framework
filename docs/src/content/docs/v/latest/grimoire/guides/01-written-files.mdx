@@ -40,9 +40,10 @@ grimoire/
     open/T-<n>-<slug>.md
     done/<yyyy-mm>/T-<n>-<slug>.md
   releases/<release>.md
+  screenshots/<any folders>/<image>   images the written files show (.png .jpg .jpeg .webp .gif)
 ```
 
-Warlock's own files are skipped: everything under `grimoire/book/`, `features/index.json`, `tasks/index.json`, any
+Warlock's own files are skipped: everything under `grimoire/book/` and `grimoire/screenshots/`, `features/index.json`, `tasks/index.json`, any
 `.json` file in a feature folder and `flows/*.bookmap.json`. Files whose name starts with a dot (`.gitkeep`) are
 skipped too. Any other file in these folders is reported as not part of the layout (`GR1020`, a warning).
 
@@ -100,11 +101,16 @@ version: 2.1
 updated: 2026-11-10
 apps: [web-client, mobile]
 folders: [src/app/catalog, src/web/$sites/client/products]
+audience: [shoppers, store staff]
 ---
 
 # Product catalog
 
 Customers browse products, see what is new in their country, and will save products for later.
+
+## Why
+
+Shoppers decide what to buy from the catalog, so it has to be quick to browse and clear about what is new.
 
 ## Flows
 
@@ -117,18 +123,23 @@ Customers browse products, see what is new in their country, and will save produ
 - affected by orders/place-order (lowers stock)
 ```
 
-| Key       | Required | Value                                                                  |
-| --------- | -------- | ---------------------------------------------------------------------- |
-| `id`      | yes      | an id, equal to the folder name                                        |
-| `title`   | yes      | free text                                                              |
-| `status`  | yes      | `proposed`, `building`, `shipped` or `retired`                         |
-| `version` | yes      | the feature version                                                    |
-| `updated` | yes      | the date the README last changed                                       |
-| `apps`    | yes      | app ids under `grimoire/apps/` (may be empty)                          |
-| `folders` | yes      | the folders and single files that belong to the feature (may be empty) |
-| `origin`  | no       | `inferred` (described from the code) or `confirmed` (the default)      |
+| Key        | Required | Value                                                                        |
+| ---------- | -------- | ---------------------------------------------------------------------------- |
+| `id`       | yes      | an id, equal to the folder name                                              |
+| `title`    | yes      | free text                                                                    |
+| `status`   | yes      | `proposed`, `building`, `shipped` or `retired`                               |
+| `version`  | yes      | the feature version                                                          |
+| `updated`  | yes      | the date the README last changed                                             |
+| `apps`     | yes      | app ids under `grimoire/apps/` (may be empty)                                |
+| `folders`  | yes      | the folders and single files that belong to the feature (may be empty)       |
+| `origin`   | no       | `inferred` (described from the code) or `confirmed` (the default)            |
+| `audience` | no       | a list of who the feature is for, in plain words (`[shoppers, store staff]`) |
 
-Headings: the `# ` title is required. `## Flows` and `## Affects and affected by` are optional.
+Headings: the `# ` title is required. `## Why`, `## Flows` and `## Affects and affected by` are optional.
+
+- `## Why` says why the feature exists, in plain paragraphs. Parsed as `why` (the paragraphs joined with a blank
+  line), and `null` when the section is missing or empty.
+- Without `audience`, readers such as the Product map use the `who` of the feature's flows.
 
 - `## Flows` lists each flow as `- <flow-id>   <what it does>`. Each listed flow needs its file
   `flows/<flow-id>.md` (`GR1026`), and each flow file should be listed (`GR1027`, a warning).
@@ -177,6 +188,15 @@ who: customer
 
 # Save a product to the wishlist
 
+A customer saves a product they like and finds it again later on their wishlist.
+
+## Story
+
+1. The customer opens a product and taps "Save for later".
+2. The product shows a filled heart.
+   ![The saved product](../../../screenshots/web/wishlist-saved.png)
+3. Later, the customer opens their wishlist and sees the product there.
+
 ## Steps
 
 1. page /products/:id
@@ -193,10 +213,10 @@ who: customer
 - invalid input the product does not exist → 404
 - not allowed guest → sent to sign in, then back to the product
 - not found a removed product disappears from the list
-- duplicate already saved → stays saved, no error
+- duplicate already saved → stays saved, no error (AC-2)
 - limits at most 200 products
 - expiry does not apply: saved products do not expire
-- double submit two taps save once
+- double submit two taps save once (AC-2)
 - outside service down does not apply: no outside service
 
 ## Acceptance criteria
@@ -215,8 +235,23 @@ who: customer
 | `who`    | yes      | who walks the flow: `customer`, `guest`, `admin`, `system`, … |
 | `origin` | no       | `inferred` or `confirmed`                                     |
 
-Headings: the `# ` title, `## Steps`, `## Cases` and `## Acceptance criteria` are required. `## Differs by app`
-and `## Not handled` are optional.
+Headings: the `# ` title, `## Steps`, `## Cases` and `## Acceptance criteria` are required. `## Story`,
+`## Differs by app` and `## Not handled` are optional.
+
+**Summary.** The paragraph under the `# ` title says what the flow does in one or two plain sentences. It is read as
+the flow's `summary`. A flow without one gets `GR1030` (a warning).
+
+**Story.** `## Story` tells the flow in the user's words, for readers who do not read code. Each step is
+`<n>. <sentence>`, numbered from 1 in order (a wrong number is `GR1010`, and the message says "story step"). Indented
+lines continue the sentence. An image line (see below) under a step attaches a screenshot to it. A line that is
+none of these is `GR1008`.
+
+**Screenshots.** An image line is Markdown `![alt](path)`, outside a code fence. Keep the files in
+`grimoire/screenshots/`, in any subfolders, as `.png`, `.jpg`, `.jpeg`, `.webp` or `.gif`. The path is relative to the
+Markdown file, so it also shows on a git host (`../../../screenshots/web/product.png` from a flow file), or starts
+with `/grimoire/screenshots/`. A path that points outside the folder is `GR1029` (a warning) and a file that does not
+exist, or is not an image type, is `GR2014` (a warning). Image lines are read in a flow's story, in page and screen
+READMEs and in block files.
 
 A flow is named `<feature>/<flow>` everywhere else: in blocks, tasks, `affects` steps and `@proves` lines.
 
@@ -263,6 +298,9 @@ ignored; a route's method matches whatever its case, and `ALL` matches any metho
 
 An answer that starts with `does not apply` marks the question as not relevant; say why after it. A case with
 another question is read as the owner's own case.
+
+End a case line with `(AC-<n>)`, or `(AC-<n>, AC-<m>)`, to say which criterion proves it. The part in brackets is
+read as the case's `criteria` and left out of its `answer`. A number the flow does not have is `GR2013` (an error).
 
 **Not handled** lists the questions the code does not handle yet, in the same `- <question>   <reason>` form.
 
@@ -376,7 +414,8 @@ One product with its price, stock and the order button.
 | `origin` | no                                | `inferred` or `confirmed`, as on a feature                        |
 
 Headings: the `# ` title is required, and the paragraph under it is the page's purpose. `## Blocks` and
-`## Also reached from` are optional. Entry points are `- <kind>   <name>` (`mail`, `notification`, `page`,
+`## Also reached from` are optional. Image lines in the README, anywhere outside code fences, show what the page
+looks like (see Screenshots under a flow). Entry points are `- <kind>   <name>` (`mail`, `notification`, `page`,
 `screen`, `outside service`).
 
 A mobile app with file-based routing gives each screen a `route`. A mobile app that defines its navigation in code
@@ -398,7 +437,8 @@ flow: catalog/new-arrivals
 - phones one row that scrolls sideways
 ```
 
-`flow` is required. Detail lines are `- <name>   <text>`; other text is free.
+`flow` is required. Detail lines are `- <name>   <text>`; other text is free. An image line shows what the block
+looks like.
 
 ## Tasks
 
@@ -507,6 +547,8 @@ Every code links to its entry on [the check page](/v/latest/grimoire/guides/04-c
 | [`GR1026`](/v/latest/grimoire/guides/04-check/#gr1026) | error    | the README lists a flow with no file                                                                                        |
 | [`GR1027`](/v/latest/grimoire/guides/04-check/#gr1027) | warning  | a flow file is not listed in the README                                                                                     |
 | [`GR1028`](/v/latest/grimoire/guides/04-check/#gr1028) | error    | another list line (Flows, Conditions, Differs by app, Not handled, Also reached from, block details) is not `- name   text` |
+| [`GR1029`](/v/latest/grimoire/guides/04-check/#gr1029) | warning  | an image line points outside `grimoire/screenshots/`                                                                        |
+| [`GR1030`](/v/latest/grimoire/guides/04-check/#gr1030) | warning  | a flow has no summary under its title                                                                                       |
 
 ## Reading the files from code
 

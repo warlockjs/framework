@@ -1,4 +1,9 @@
-import { DEVTOOLS_SESSION_COOKIE, DEVTOOLS_SESSION_COOKIE_INSECURE } from "./constants";
+import {
+  DEVTOOLS_SESSION_COOKIE,
+  DEVTOOLS_SESSION_COOKIE_INSECURE,
+  DEVTOOLS_SHARE_COOKIE,
+  DEVTOOLS_SHARE_COOKIE_INSECURE,
+} from "./constants";
 
 /** The cookie name for the HTTPS mode. */
 export function sessionCookieName(secure: boolean): string {
@@ -45,4 +50,33 @@ export function readCookie(header: string | undefined, name: string): string | u
   }
 
   return undefined;
+}
+
+/** The share cookie name for the HTTPS mode. */
+export function shareCookieName(secure: boolean): string {
+  return secure ? DEVTOOLS_SHARE_COOKIE : DEVTOOLS_SHARE_COOKIE_INSECURE;
+}
+
+/**
+ * `Set-Cookie` value for a share grant (or a clearing cookie when `value` is
+ * `null`). Scoped to the dashboard path, `HttpOnly`, `SameSite=Strict`, no
+ * `Domain`, and it ends after `maxAgeSeconds`.
+ */
+export function shareCookie(
+  value: string | null,
+  options: { path: string; secure: boolean; maxAgeSeconds?: number },
+): string {
+  const parts = [
+    `${shareCookieName(options.secure)}=${value ?? ""}`,
+    `Path=${options.path}`,
+    "HttpOnly",
+    "SameSite=Strict",
+  ];
+
+  if (options.secure) parts.push("Secure");
+
+  if (value === null) parts.push("Max-Age=0", "Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+  else parts.push(`Max-Age=${Math.max(1, Math.floor(options.maxAgeSeconds ?? 0))}`);
+
+  return parts.join("; ");
 }

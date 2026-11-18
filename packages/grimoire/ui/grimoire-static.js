@@ -104,6 +104,10 @@ function grimoireStaticContext(data, root, rerender) {
       else location.hash = next;
     },
     refresh: rerender,
+    // Screenshots sit next to index.html, in the same folder layout as grimoire/screenshots/.
+    file: (src) => `screenshots/${String(src).split("/").map(encodeURIComponent).join("/")}`,
+    shared: false,
+    share: null,
     el,
     svg: (tag, attrs = {}, children = []) =>
       build(document.createElementNS(GRIMOIRE_STATIC_SVG, tag), attrs, children),

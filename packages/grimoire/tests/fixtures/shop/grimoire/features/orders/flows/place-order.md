@@ -7,6 +7,8 @@ who: customer
 
 # Place an order
 
+A customer turns the products in their cart into an order and pays for it.
+
 ## Steps
 1. page              /products/:id
 2. route             POST /api/orders

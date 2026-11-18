@@ -35,6 +35,9 @@ warlock dev
 Without `production.enabled`, nothing is mounted and nothing is captured. The app refuses to start when the monitor
 is enabled but misconfigured. Full guide: https://warlock.js.org/v/latest/devtools/production/
 
+Optional: set `production.share.enabled` to let an admin give a read-only, expiring, revocable link to a panel that
+declares a shared view (such as the Grimoire product map). The token is stored hashed; see the production guide.
+
 ## Safe by construction
 
 - In development it answers loopback clients only. Anything else gets a 404, and `X-Forwarded-For` cannot unlock it.

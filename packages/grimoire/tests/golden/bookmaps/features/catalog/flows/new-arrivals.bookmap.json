@@ -10,6 +10,14 @@
       "target": "/",
       "found": true,
       "entry": "src/web/$sites/client/home.page.tsx",
+      "entries": [
+        "mobile/app/index.tsx",
+        "src/web/$sites/client/home.page.tsx",
+        "src/web/$sites/client/home.setup.ts"
+      ],
+      "direct": [
+        "src/app/catalog/services/new-arrivals.service.ts"
+      ],
       "files": [
         "mobile/app/index.tsx",
         "src/app/catalog/models/product.model.ts",
@@ -17,7 +25,8 @@
         "src/app/catalog/services/new-arrivals.service.ts",
         "src/web/$sites/client/home.page.tsx",
         "src/web/$sites/client/home.setup.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     },
     {
       "index": 2,
@@ -25,13 +34,21 @@
       "target": "GET /api/products/new-arrivals",
       "found": true,
       "entry": "src/app/catalog/controllers/new-arrivals.controller.ts",
+      "entries": [
+        "src/app/catalog/controllers/new-arrivals.controller.ts",
+        "src/app/catalog/routes.ts"
+      ],
+      "direct": [
+        "src/app/catalog/services/new-arrivals.service.ts"
+      ],
       "files": [
         "src/app/catalog/controllers/new-arrivals.controller.ts",
         "src/app/catalog/models/product.model.ts",
         "src/app/catalog/repositories/products.repository.ts",
         "src/app/catalog/routes.ts",
         "src/app/catalog/services/new-arrivals.service.ts"
-      ]
+      ],
+      "typeOnlyFiles": []
     }
   ],
   "criteria": [

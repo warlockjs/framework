@@ -25,6 +25,11 @@ export type GrimoireSnapshot = {
   proofFindings: GrimoireFinding[];
   /** `null` when no test run has written results. */
   results: TestResultsStore | null;
+  /**
+   * Project-relative path the results were read from (or would be): the
+   * `testResultsFile` option, else `grimoire/book/test-results.json`.
+   */
+  resultsFile: string;
   collected: CollectedFiles;
   annotations: BookAnnotations;
   routes: RouteFreshness;
@@ -38,6 +43,12 @@ export type OpenGrimoireOptions = {
   write?: boolean;
   /** Rebuild every book entry. */
   force?: boolean;
+  /**
+   * Where to read the test results from: a project-relative or absolute path.
+   * Default `grimoire/book/test-results.json` (what the Vitest reporter
+   * writes). A deploy that ships results from CI points here.
+   */
+  testResultsFile?: string;
   now?: () => Date;
 };
 

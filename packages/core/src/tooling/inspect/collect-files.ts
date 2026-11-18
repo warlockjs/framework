@@ -231,27 +231,48 @@ export function collectFiles(
         const doc = docAbove(statement.start);
         if (doc.text && !doc.fileoverview) for (const name of names) exportDocs[name] ??= doc.text;
       }
+      // A specifier is type-only when every occurrence of it in the file is erased at runtime.
+      const typeOnlySpecifier = new Map<string, boolean>();
+      const addImport = (specifier: string, typeOnly: boolean): void => {
+        imports.add(specifier);
+        typeOnlySpecifier.set(specifier, (typeOnlySpecifier.get(specifier) ?? true) && typeOnly);
+      };
       const visit = (node: Node): void => {
-        if (
-          (node.type === "ImportDeclaration" ||
-            node.type === "ExportNamedDeclaration" ||
-            node.type === "ExportAllDeclaration" ||
-            node.type === "TSImportType") &&
+        if (node.type === "ImportDeclaration" && node.source) {
+          const specifiers = node.specifiers ?? [];
+          addImport(
+            String(node.source.value),
+            node.importKind === "type" ||
+              (specifiers.length > 0 &&
+                specifiers.every(
+                  (item) => item.type === "ImportSpecifier" && item.importKind === "type",
+                )),
+          );
+        } else if (
+          (node.type === "ExportNamedDeclaration" || node.type === "ExportAllDeclaration") &&
           node.source
         )
-          imports.add(String(node.source.value));
+          addImport(
+            String(node.source.value),
+            node.exportKind === "type" ||
+              (node.type === "ExportNamedDeclaration" &&
+                node.specifiers.length > 0 &&
+                node.specifiers.every((item) => item.exportKind === "type")),
+          );
+        else if (node.type === "TSImportType" && node.source)
+          addImport(String(node.source.value), true);
         if (
           node.type === "ImportExpression" &&
           node.source.type === "Literal" &&
           typeof node.source.value === "string"
         )
-          imports.add(node.source.value);
+          addImport(node.source.value, false);
         if (
           node.type === "TSImportEqualsDeclaration" &&
           node.moduleReference.type === "TSExternalModuleReference" &&
           typeof node.moduleReference.expression.value === "string"
         )
-          imports.add(node.moduleReference.expression.value);
+          addImport(node.moduleReference.expression.value, node.importKind === "type");
         forEachChild(node, visit);
       };
       visit(parsed.program);
@@ -264,7 +285,10 @@ export function collectFiles(
             ? resolvePathAlias(tsconfig, specifier)
             : [];
         const resolved = bases.map(probe).find((candidate) => candidate !== undefined);
-        return { specifier, file: resolved ? projectFile(cwd, resolved) : null };
+        const file = resolved ? projectFile(cwd, resolved) : null;
+        return typeOnlySpecifier.get(specifier) === true
+          ? { specifier, file, typeOnly: true }
+          : { specifier, file };
       });
     } catch (error) {
       warnings.push({ code: null, source: file, message: String(error) });

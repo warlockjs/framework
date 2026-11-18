@@ -196,7 +196,11 @@ function toBookFile(file: InspectFile, mobile: readonly BookMobileApp[]): BookFi
     about: file.about ?? null,
     tags: file.tags ?? {},
     exports: file.exports.map((name) => ({ name, about: docs[name] ?? null })),
-    imports: file.imports.map((entry) => ({ specifier: entry.specifier, file: entry.file })),
+    imports: file.imports.map((entry) =>
+      entry.typeOnly === true
+        ? { specifier: entry.specifier, file: entry.file, typeOnly: true }
+        : { specifier: entry.specifier, file: entry.file },
+    ),
     importedBy: [...file.importedBy],
     mobileApp: app?.id ?? null,
   };

@@ -7,6 +7,7 @@ import type {
   DevtoolsPasskeyRecord,
   DevtoolsSessionPatch,
   DevtoolsSessionRecord,
+  DevtoolsShareRecord,
   DevtoolsStatePatch,
   DevtoolsStateRecord,
   DevtoolsStoredSample,
@@ -189,6 +190,40 @@ export function rowToInvite(row: Row): DevtoolsInviteRecord {
     expiresAt: toNumber(row.expires_at),
     usedAt: toNumberOrNull(row.used_at),
     accountId: toStringOrNull(row.account_id),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Share links
+// ---------------------------------------------------------------------------
+
+export function shareToRow(record: DevtoolsShareRecord): Row {
+  return {
+    id: record.id,
+    token_hash: record.tokenHash,
+    panel: record.panel,
+    label: record.label,
+    created_by: record.createdBy,
+    created_at: record.createdAt,
+    expires_at: record.expiresAt,
+    revoked_at: record.revokedAt,
+    last_used_at: record.lastUsedAt,
+    uses: record.uses,
+  };
+}
+
+export function rowToShare(row: Row): DevtoolsShareRecord {
+  return {
+    id: String(row.id),
+    tokenHash: String(row.token_hash),
+    panel: String(row.panel),
+    label: String(row.label),
+    createdBy: toStringOrNull(row.created_by),
+    createdAt: toNumber(row.created_at),
+    expiresAt: toNumber(row.expires_at),
+    revokedAt: toNumberOrNull(row.revoked_at),
+    lastUsedAt: toNumberOrNull(row.last_used_at),
+    uses: toNumber(row.uses),
   };
 }
 

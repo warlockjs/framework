@@ -1,0 +1,94 @@
+---
+title: The product map
+description: A plain-language view of what the product does, who it is for and how healthy each part is, made from the written files, with screenshots, release history, a read-only share link and a static export.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental. The structure of the written files and the commands may still change before
+  they are declared stable.
+</Aside>
+
+The product map is the first view in the Grimoire tab. It is written for people who do not read code: product owners,
+support, sales and managers. It shows what the product does, who it is for and how healthy each part is, using only
+words, screenshots and traffic lights.
+
+Everything on it comes from the files your agent already writes in `grimoire/`. Nothing is typed into the map itself.
+
+## What it shows
+
+- **The map.** One card per feature: its name, a short summary, who it is for, the apps it lives in, its status
+  (Live, Being built, Planned or Retired) and a health light. Search by name or summary, and filter by app or
+  audience. On a phone the cards stack in one column.
+- **A feature page.** What it is, why it exists, the things people can do with it (its flows, each a short story),
+  where you see it in each app with screenshots, what changed in each version (changes not released yet come first),
+  and what is coming next.
+- **A flow page.** The story step by step in the user's words, what proves it works, the "what if" cases (what is
+  handled and what does not apply), where you see it, and links to the previous and next flow.
+
+## Health lights
+
+Each light has a shape and words as well as a colour, so it reads without colour.
+
+| Light | Meaning |
+| --- | --- |
+| Working well | At least one check is written and every check passes. |
+| Needs attention | A check has no test, has not run, or its tests changed since the last run. Also shown when recent errors were captured, or when proofs are written but no test results were recorded. |
+| Has problems | A check fails, or the check report has an error for this feature. |
+| Not checked yet | No acceptance criteria are written. |
+
+The sentence next to the light says why, for example "All 12 checks pass" or "2 of 9 checks fail". The map shows only
+what the framework has real data for: release history, test results, open tasks and, in the production monitor, the
+count of captured errors in the last hour. It has no usage numbers and no member feedback.
+
+## Write the files so the map reads well
+
+Write for a reader who has never seen the code.
+
+- **Feature summary.** One plain sentence under the feature title in `grimoire/features/<id>/README.md`.
+- **Audience.** Optional `audience` in the README front matter, for example `audience: [shoppers, support]`. Without it,
+  the map lists the distinct `who` of the flows.
+- **Why.** An optional `## Why` section: the reason the feature exists, in a short paragraph.
+- **Flow summary.** One sentence under the flow title.
+- **Story.** An optional `## Story` section in a flow: numbered lines in the user's words, each with an optional image
+  line. Without it, the map derives steps from the technical `## Steps` and marks them "from the technical steps".
+- **Screenshots.** Put images in `grimoire/screenshots/` (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`) and refer to them
+  with a Markdown image line, `![The checkout page](../../screenshots/web/checkout.png)`. Use them in story steps,
+  page and screen files and block files. Write real alt text: it is what a screen reader says and what the map shows
+  under the enlarged image. Click or press a screenshot to enlarge it.
+
+The check warns when a summary is missing, an image path leaves the screenshots folder, or an image file is missing.
+
+## For developers
+
+When you are signed in to the dashboard, a "For developers" button on the feature and flow pages shows the code side:
+the feature's folders, routes, file count and check findings, and a flow's technical steps with file counts, with a link
+to the full flow page. The map remembers your choice in your browser.
+
+## Share the map with a read-only link
+
+In the production monitor an admin can share the product map with people who have no dashboard account. Turn it on in
+the devtools production options and create links from Admin, Share links. See
+[Production monitor](/v/latest/devtools/production/) for the options, expiry and revoking, and
+[Security](/v/latest/devtools/security/) for how the link is protected.
+
+A shared link opens the map and nothing else. It shows feature and flow titles, summaries, the story, screenshots,
+where things appear, release history, the titles of planned work, checks in words and error counts. It never shows
+file paths, folders, code, test names or files, check findings, error messages, the developer buttons, or any other
+Grimoire tab. The page says "Read-only view" at the bottom. Admins see a "Share this map" button on the map when
+sharing is on. In development the map is visible in the tab only; there are no share links.
+
+## The static export
+
+`warlock grimoire build --site` (see [Devtools](/v/latest/grimoire/guides/09-devtools/)) includes the product map, its
+answers and every screenshot the written files use. Screenshots are copied to a `screenshots/` folder next to
+`index.html`. Only images inside `grimoire/screenshots/` with a supported extension are copied. Open `index.html` and
+choose "Product map". The exported page is the signed-in view, so it keeps the developer buttons; do not publish it
+where non-developers should not see code detail.
+
+## When something is empty
+
+If the map says "No features are written yet", ask your agent to describe the product in `grimoire/features`. If a
+page cannot load, the message says what failed; check that the app is running and try again, or, for a shared link,
+ask for a new one.

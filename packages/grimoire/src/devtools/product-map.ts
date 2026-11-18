@@ -1,0 +1,564 @@
+/**
+ * The product map answers: the Grimoire in plain words for readers who do
+ * not read code. Built from the written files, the book maps, the test
+ * results, the open tasks, the changelogs and (when the devtools monitor
+ * reports them) the captured errors. A shared answer (`options.shared`)
+ * carries no file paths, code or test names.
+ */
+import { checkGrimoire } from "../check";
+import { normalizeRoutePath } from "../bookmap";
+import type { FlowBookmap, FlowBookmapCriterion } from "../contracts/bookmap";
+import type { GrimoireCheckReport } from "../contracts/findings";
+import type { GrimoireSnapshot } from "../contracts/snapshot";
+import type {
+  WrittenApp,
+  WrittenFeature,
+  WrittenFlow,
+  WrittenScreenshot,
+  WrittenStep,
+} from "../contracts/written";
+import { compactStep, flowOrder, neighboursOf } from "../scry/compact";
+import type {
+  ProductAppearance,
+  ProductFeatureAnswer,
+  ProductFeatureCard,
+  ProductFlowAnswer,
+  ProductFlowCard,
+  ProductHealth,
+  ProductMapAnswer,
+  ProductPlannedItem,
+  ProductRelease,
+  ProductScreenshot,
+  ProductStoryStep,
+} from "./answers";
+import { GrimoirePanelError } from "./data";
+
+/** One captured error group as devtools hands it to a panel: counts only. */
+export type ProductErrorSummary = {
+  /** The route pattern (`/products/:id`), or `null` outside a request. */
+  route: string | null;
+  status: number | null;
+  name: string | null;
+  source: "request" | "log";
+  count: number;
+  firstSeen: number;
+  lastSeen: number;
+};
+
+/** How the product map answers are built. */
+export type ProductMapOptions = {
+  /** `true` for a read-only share link: no developer detail. */
+  shared: boolean;
+  /** Captured error groups, or `null` when the monitor reports none. */
+  errors: readonly ProductErrorSummary[] | null;
+};
+
+/** How far back captured errors count (one hour). */
+const ERROR_WINDOW_MS = 3_600_000;
+
+type ErrorCount = { count: number; lastSeen: number };
+
+/** Everything the answers share, computed once per request. */
+type Context = {
+  snapshot: GrimoireSnapshot;
+  options: ProductMapOptions;
+  report: GrimoireCheckReport;
+  featureErrors: Map<string, number>;
+  flowErrors: Map<string, number>;
+  captured: { features: Map<string, ErrorCount>; flows: Map<string, ErrorCount> } | null;
+  resultsMissing: boolean;
+};
+
+function addCount(map: Map<string, ErrorCount>, key: string, group: ProductErrorSummary): void {
+  const known = map.get(key);
+
+  map.set(key, {
+    count: (known?.count ?? 0) + group.count,
+    lastSeen: Math.max(known?.lastSeen ?? 0, group.lastSeen),
+  });
+}
+
+/** Map the last hour's error groups to the features and flows that use their route. */
+function captureErrors(
+  snapshot: GrimoireSnapshot,
+  errors: readonly ProductErrorSummary[],
+  now: number,
+): NonNullable<Context["captured"]> {
+  const features = new Map<string, ErrorCount>();
+  const flows = new Map<string, ErrorCount>();
+  const routes = snapshot.book.facts.routes ?? [];
+
+  for (const group of errors) {
+    if (group.route === null || group.lastSeen < now - ERROR_WINDOW_MS) continue;
+
+    const path = normalizeRoutePath(group.route);
+
+    for (const route of routes) {
+      if (normalizeRoutePath(route.path) !== path) continue;
+
+      const file = route.handlerFile ?? route.sourceFile;
+      const owner = file === null ? null : (snapshot.ownership.files[file]?.owner ?? null);
+
+      if (owner !== null) addCount(features, owner, group);
+    }
+
+    for (const feature of snapshot.written.features) {
+      for (const flow of feature.flows) {
+        const hit = flow.steps.some(
+          (step) =>
+            (step.type === "route" &&
+              step.route !== null &&
+              normalizeRoutePath(step.route.path) === path) ||
+            (step.type === "page" && normalizeRoutePath(step.target) === path),
+        );
+
+        if (hit) addCount(flows, flow.ref, group);
+      }
+    }
+  }
+
+  return { features, flows };
+}
+
+/**
+ * The check report of a snapshot, run once per snapshot. A share link reaches
+ * these answers without an account, so a page view must not run the whole
+ * check again; a changed book opens a new snapshot and a new report.
+ */
+const reports = new WeakMap<GrimoireSnapshot, GrimoireCheckReport>();
+
+function reportOf(snapshot: GrimoireSnapshot): GrimoireCheckReport {
+  let report = reports.get(snapshot);
+
+  if (report === undefined) {
+    report = checkGrimoire(snapshot);
+    reports.set(snapshot, report);
+  }
+
+  return report;
+}
+
+function contextOf(snapshot: GrimoireSnapshot, options: ProductMapOptions): Context {
+  const report = reportOf(snapshot);
+  const featureErrors = new Map<string, number>();
+  const flowErrors = new Map<string, number>();
+
+  for (const finding of report.findings) {
+    if (finding.expected || finding.severity !== "error") continue;
+
+    const flow = finding.subject.flow;
+    const feature = finding.subject.feature ?? flow?.split("/")[0] ?? null;
+
+    if (feature !== null) featureErrors.set(feature, (featureErrors.get(feature) ?? 0) + 1);
+    if (flow !== null) flowErrors.set(flow, (flowErrors.get(flow) ?? 0) + 1);
+  }
+
+  return {
+    snapshot,
+    options,
+    report,
+    featureErrors,
+    flowErrors,
+    captured:
+      options.errors === null ? null : captureErrors(snapshot, options.errors, Date.now()),
+    resultsMissing: snapshot.results === null && snapshot.proofs.length > 0,
+  };
+}
+
+const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+/** The traffic light and its sentence (the rules of the product map). */
+function healthOf(
+  context: Context,
+  criteria: readonly Pick<FlowBookmapCriterion, "status">[],
+  checkErrors: number,
+  captured: ErrorCount | undefined,
+): ProductHealth {
+  const counts = { total: criteria.length, pass: 0, fail: 0, stale: 0, notRun: 0, noTest: 0 };
+
+  for (const criterion of criteria) {
+    if (criterion.status === "pass") counts.pass += 1;
+    else if (criterion.status === "fail") counts.fail += 1;
+    else if (criterion.status === "stale") counts.stale += 1;
+    else if (criterion.status === "not-run") counts.notRun += 1;
+    else counts.noTest += 1;
+  }
+
+  const errors =
+    context.captured === null ? null : { count: captured?.count ?? 0, lastSeen: captured?.lastSeen ?? null };
+  const recent = errors?.count ?? 0;
+  const total = counts.total;
+  let level: ProductHealth["level"];
+  let reason: string;
+
+  if (counts.fail > 0) {
+    level = "problem";
+    reason = `${counts.fail} of ${total} checks fail`;
+  } else if (checkErrors > 0) {
+    level = "problem";
+    reason = `The check found ${plural(checkErrors, "error")}`;
+  } else if (counts.noTest > 0) {
+    level = "attention";
+    reason = `${counts.noTest} of ${total} checks have no test`;
+  } else if (context.resultsMissing && total > 0) {
+    level = "attention";
+    reason = "No test results recorded";
+  } else if (counts.stale > 0 || counts.notRun > 0) {
+    level = "attention";
+    reason = "Tests have not run since they changed";
+  } else if (recent > 0) {
+    level = "attention";
+    reason = `${plural(recent, "error")} in the last hour`;
+  } else if (total > 0) {
+    level = "good";
+    reason = `All ${total} checks pass`;
+  } else {
+    level = "unknown";
+    reason = "No checks written yet";
+  }
+
+  return { level, reason, criteria: counts, errors };
+}
+
+function featureHealth(context: Context, feature: WrittenFeature): ProductHealth {
+  const criteria = feature.flows.flatMap(
+    (flow) => context.snapshot.collected.flows[flow.ref]?.criteria ?? [],
+  );
+
+  return healthOf(
+    context,
+    criteria,
+    context.featureErrors.get(feature.id) ?? 0,
+    context.captured?.features.get(feature.id),
+  );
+}
+
+function flowHealthOf(context: Context, flow: WrittenFlow): ProductHealth {
+  return healthOf(
+    context,
+    context.snapshot.collected.flows[flow.ref]?.criteria ?? [],
+    context.flowErrors.get(flow.ref) ?? 0,
+    context.captured?.flows.get(flow.ref),
+  );
+}
+
+function findFeature(snapshot: GrimoireSnapshot, id: string | undefined): WrittenFeature {
+  if (id === undefined || id === "") throw new GrimoirePanelError(400, 'Missing "feature".');
+
+  const feature = snapshot.written.features.find((item) => item.id === id);
+
+  if (feature === undefined || feature.readme === null) {
+    throw new GrimoirePanelError(404, `No feature "${id}" is written in grimoire/features.`);
+  }
+
+  return feature;
+}
+
+function audienceOf(feature: WrittenFeature): string[] {
+  const listed = (feature.readme?.audience ?? []).map((item) => item.value);
+
+  if (listed.length > 0) return listed;
+
+  return [...new Set(feature.flows.map((flow) => flow.who.value))];
+}
+
+function card(context: Context, feature: WrittenFeature): ProductFeatureCard {
+  const readme = feature.readme;
+
+  if (readme === null) throw new Error("A feature card needs a README.");
+
+  return {
+    id: feature.id,
+    title: readme.title.value,
+    summary: readme.summary,
+    audience: audienceOf(feature),
+    apps: readme.apps.map((app) => app.value),
+    status: readme.status.value,
+    version: readme.version.value,
+    flows: feature.flows.length,
+    health: featureHealth(context, feature),
+  };
+}
+
+/** `GET /product`: the feature map. */
+export function productMap(snapshot: GrimoireSnapshot, options: ProductMapOptions): ProductMapAnswer {
+  const context = contextOf(snapshot, options);
+
+  return {
+    builtAt: snapshot.book.manifest.builtAt,
+    features: snapshot.written.features
+      .filter((feature) => feature.readme !== null)
+      .map((feature) => card(context, feature)),
+    apps: snapshot.written.apps.map((app) => ({
+      id: app.id.value,
+      type: app.type.value,
+      title: app.heading?.value ?? null,
+    })),
+    developer: !options.shared,
+  };
+}
+
+const slugOf = (text: string): string =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+function screenshotsOf(items: readonly WrittenScreenshot[]): ProductScreenshot[] {
+  return items.flatMap((item) => (item.path === null ? [] : [{ src: item.path, alt: item.alt }]));
+}
+
+/** Where the flows are shown, with the screenshots of the block (else of the page). */
+function appearancesOf(snapshot: GrimoireSnapshot, bookmaps: readonly FlowBookmap[]): ProductAppearance[] {
+  const seen = new Set<string>();
+  const list: ProductAppearance[] = [];
+  const apps = new Map<string, WrittenApp>(snapshot.written.apps.map((app) => [app.id.value, app]));
+
+  for (const bookmap of bookmaps) {
+    for (const shown of bookmap.shownBy) {
+      const key = `${shown.app}|${shown.type}|${shown.id}|${shown.block}|${bookmap.ref}`;
+
+      if (seen.has(key)) continue;
+
+      seen.add(key);
+
+      const app = apps.get(shown.app);
+      let title: string | null = null;
+      let route: string | null = null;
+      let screenshots: ProductScreenshot[] = [];
+
+      if (app !== undefined && shown.type === "layout") {
+        title = app.layouts.find((layout) => layout.id === shown.id)?.heading?.value ?? null;
+      } else if (app !== undefined) {
+        const page = [...app.pages, ...app.screens].find((item) => item.id === shown.id);
+
+        if (page !== undefined) {
+          title = page.heading?.value ?? null;
+          route = page.route?.value ?? page.screen?.value ?? null;
+
+          const block =
+            page.blockFiles.find((item) => item.id === slugOf(shown.block)) ??
+            page.blockFiles.find((item) => item.flow?.value === bookmap.ref);
+
+          screenshots = screenshotsOf(block?.screenshots ?? []);
+
+          if (screenshots.length === 0) screenshots = screenshotsOf(page.screenshots);
+        }
+      }
+
+      list.push({
+        app: shown.app,
+        type: shown.type,
+        id: shown.id,
+        title,
+        route,
+        block: shown.block,
+        flow: bookmap.ref,
+        screenshots,
+      });
+    }
+  }
+
+  return list;
+}
+
+function releasesOf(snapshot: GrimoireSnapshot, feature: WrittenFeature): ProductRelease[] {
+  const dates = new Map(snapshot.written.releases.map((item) => [item.release.value, item.date.value]));
+  const entries = feature.changelog?.entries ?? [];
+  // Unreleased entries first, then the stamped ones in file order (newest first).
+  const ordered = [
+    ...entries.filter((entry) => entry.release === null),
+    ...entries.filter((entry) => entry.release !== null),
+  ];
+  const groups = new Map<string, ProductRelease>();
+
+  for (const entry of ordered) {
+    const key = `${entry.version.value}|${entry.release ?? ""}`;
+    let group = groups.get(key);
+
+    if (group === undefined) {
+      group = {
+        version: entry.version.value,
+        release: entry.release,
+        date: entry.date ?? (entry.release === null ? null : (dates.get(entry.release) ?? null)),
+        changes: [],
+      };
+      groups.set(key, group);
+    }
+
+    group.changes.push({ word: entry.word, flow: entry.flow, text: entry.text });
+  }
+
+  return [...groups.values()];
+}
+
+function plannedOf(snapshot: GrimoireSnapshot, feature: string): ProductPlannedItem[] {
+  return snapshot.collected.tasksIndex.open
+    .filter((task) => task.feature === feature)
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
+      type: task.type,
+      status: task.status,
+      flow: task.flow === null ? null : task.flow.replace(`${feature}/`, ""),
+    }));
+}
+
+function flowCard(context: Context, flow: WrittenFlow): ProductFlowCard {
+  return {
+    id: flow.id.value,
+    ref: flow.ref,
+    title: flow.heading?.value ?? flow.id.value,
+    summary: flow.summary,
+    who: flow.who.value,
+    status: flow.status.value,
+    health: flowHealthOf(context, flow),
+  };
+}
+
+/** `GET /product/features/:feature`. */
+export function productFeature(
+  snapshot: GrimoireSnapshot,
+  id: string | undefined,
+  options: ProductMapOptions,
+): ProductFeatureAnswer {
+  const feature = findFeature(snapshot, id);
+  const readme = feature.readme;
+
+  if (readme === null) throw new Error("unreachable");
+
+  const context = contextOf(snapshot, options);
+  const bookmaps = feature.flows.flatMap((flow) => {
+    const bookmap = snapshot.collected.flows[flow.ref];
+
+    return bookmap === undefined ? [] : [bookmap];
+  });
+  const own = snapshot.collected.features[feature.id];
+  const unexpected = context.report.findings.filter(
+    (finding) =>
+      (finding.subject.feature ?? finding.subject.flow?.split("/")[0]) === feature.id,
+  );
+  const unexpectedNow = unexpected.filter((finding) => !finding.expected);
+  const errors = unexpectedNow.filter((finding) => finding.severity === "error").length;
+
+  return {
+    feature: {
+      id: feature.id,
+      title: readme.title.value,
+      summary: readme.summary,
+      why: readme.why,
+      audience: audienceOf(feature),
+      apps: readme.apps.map((app) => app.value),
+      status: readme.status.value,
+      version: readme.version.value,
+      updated: readme.updated.value,
+      origin: readme.origin?.value ?? null,
+    },
+    flows: flowOrder(feature).map((flow) => flowCard(context, flow)),
+    appearances: appearancesOf(snapshot, bookmaps),
+    releases: releasesOf(snapshot, feature),
+    planned: plannedOf(snapshot, feature.id),
+    health: featureHealth(context, feature),
+    developer: options.shared
+      ? null
+      : {
+          folders: readme.folders.map((folder) => folder.value),
+          routes: (own?.routes ?? []).map(({ file: _file, ...route }) => route),
+          files: own?.own.length ?? 0,
+          findings: {
+            errors,
+            warnings: unexpectedNow.length - errors,
+            expected: unexpected.length - unexpectedNow.length,
+          },
+        },
+  };
+}
+
+const STEP_WORDS: Record<WrittenStep["type"], (target: string) => string> = {
+  page: (target) => `Open ${target}`,
+  route: () => "The server takes the request",
+  mail: (target) => `An email "${target}" is sent`,
+  notification: (target) => `A notification "${target}" is sent`,
+  job: (target) => `The job "${target}" runs in the background`,
+  event: (target) => `The event "${target}" happens`,
+  "outside service": (target) => `The outside service "${target}" is used`,
+  affects: (target) => `This also affects ${target}`,
+};
+
+function storyOf(flow: WrittenFlow): ProductStoryStep[] {
+  if (flow.story.length > 0) {
+    return flow.story.map((step) => ({
+      index: step.index,
+      text: step.text,
+      screenshots: screenshotsOf(step.screenshots),
+      derived: false,
+    }));
+  }
+
+  return flow.steps.map((step) => ({
+    index: step.index,
+    text: step.note ?? STEP_WORDS[step.type](step.target),
+    screenshots: [],
+    derived: true,
+  }));
+}
+
+const DOES_NOT_APPLY = /^does not apply\b[:\s—-]*/i;
+
+/** `GET /product/flows/:feature/:flow`. */
+export function productFlow(
+  snapshot: GrimoireSnapshot,
+  featureId: string | undefined,
+  flowId: string | undefined,
+  options: ProductMapOptions,
+): ProductFlowAnswer {
+  const feature = findFeature(snapshot, featureId);
+  const flow = feature.flows.find((item) => item.id.value === flowId);
+
+  if (flow === undefined) {
+    throw new GrimoirePanelError(404, `No flow "${flowId ?? ""}" in feature "${feature.id}".`);
+  }
+
+  const context = contextOf(snapshot, options);
+  const bookmap = snapshot.collected.flows[flow.ref];
+  const { previous, next } = neighboursOf(feature, flow.id.value);
+
+  return {
+    flow: {
+      ref: flow.ref,
+      feature: feature.id,
+      featureTitle: feature.readme?.title.value ?? feature.id,
+      title: flow.heading?.value ?? flow.id.value,
+      summary: flow.summary,
+      who: flow.who.value,
+      status: flow.status.value,
+      since: flow.since.value,
+    },
+    story: storyOf(flow),
+    proof: (bookmap?.criteria ?? []).map((criterion) => ({
+      id: criterion.id,
+      text: criterion.text,
+      status: criterion.status,
+      tests: options.shared ? null : criterion.tests,
+    })),
+    cases: flow.cases.map((item) => {
+      const answer = item.doesNotApply ? item.answer.replace(DOES_NOT_APPLY, "").trim() : item.answer;
+
+      return {
+        question: item.question,
+        answer: answer === "" ? "Does not apply" : answer,
+        handled: !item.doesNotApply,
+        criteria: item.criteria,
+      };
+    }),
+    appearances: bookmap === undefined ? [] : appearancesOf(snapshot, [bookmap]),
+    previous,
+    next,
+    health: flowHealthOf(context, flow),
+    developer: options.shared
+      ? null
+      : {
+          steps: (bookmap?.steps ?? []).map((step) => compactStep(snapshot, feature, step, flow)),
+        },
+  };
+}

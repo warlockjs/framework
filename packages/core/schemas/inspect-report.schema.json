@@ -666,6 +666,9 @@
                 },
                 "file": {
                   "type": ["string", "null"]
+                },
+                "typeOnly": {
+                  "type": "boolean"
                 }
               }
             }

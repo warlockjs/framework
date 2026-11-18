@@ -25,6 +25,7 @@
   "imports": [
     "src/app/catalog/models/product.model.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/app/catalog/controllers/products.controller.ts",
     "src/app/catalog/services/new-arrivals.service.ts",

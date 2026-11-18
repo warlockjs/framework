@@ -81,6 +81,20 @@ function mobileApp(snapshot: GrimoireSnapshot, mobile: string): string {
   return match?.app ?? mobile;
 }
 
+/** The project files a file imports only through type-only imports, sorted. */
+function typeOnlyImportsOf(file: BookFile): string[] {
+  const value = new Set<string>();
+  const typeOnly = new Set<string>();
+
+  for (const entry of file.imports) {
+    if (entry.file === null) continue;
+
+    (entry.typeOnly === true ? typeOnly : value).add(entry.file);
+  }
+
+  return sortedUnique([...typeOnly].filter((target) => !value.has(target)));
+}
+
 /** The book entry of one file, as the book writes it. */
 function entryOf(snapshot: GrimoireSnapshot, file: BookFile): BookEntry {
   const facts = snapshot.book.facts;
@@ -108,6 +122,8 @@ function entryOf(snapshot: GrimoireSnapshot, file: BookFile): BookEntry {
     imports: sortedUnique(
       file.imports.flatMap((entry) => (entry.file === null ? [] : [entry.file])),
     ),
+    // The same rule as the book entry: project files whose every import edge is type-only.
+    typeOnlyImports: typeOnlyImportsOf(file),
     importedBy: sortedUnique(file.importedBy),
     routes: [
       ...routes
@@ -237,7 +253,11 @@ function scryImpact(
     ),
   ];
   const flows = flowBookmaps(snapshot)
-    .filter((bookmap) => bookmap.steps.some((step) => step.files.includes(target.file)))
+    .filter((bookmap) =>
+      bookmap.steps.some(
+        (step) => step.files.includes(target.file) || step.typeOnlyFiles.includes(target.file),
+      ),
+    )
     .map((bookmap) => bookmap.ref);
   const ownership = snapshot.ownership.files;
   const owner = ownership[target.file]?.owner ?? null;

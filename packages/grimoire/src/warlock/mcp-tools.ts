@@ -141,17 +141,59 @@ export function createGrimoireMcpTools(
     {
       name: "grimoire_flow",
       description:
-        "One flow: steps with the files behind each, cases, criteria with their tests and last results (pass, fail, stale, not run, no test), where it is shown, history and findings. Read-only.",
+        "One flow: its summary, steps with file counts (direct, in the feature, reachable, type-only) and the first direct imports of each, cases, criteria with their tests and last results (pass, fail, stale, not run, no test), where it is shown, history and findings. Pass files with step to list one step's reachable or type-only files, a page at a time. Read-only.",
       input: inputSchema(
-        { flow: { type: "string", description: "<feature>/<flow>, like catalog/new-arrivals." } },
+        {
+          flow: { type: "string", description: "<feature>/<flow>, like catalog/new-arrivals." },
+          files: {
+            type: "string",
+            enum: ["reachable", "type-only"],
+            description: "With step: list the step's files that run (reachable) or only type imports reach (type-only).",
+          },
+          step: { type: "integer", description: "Step number, for files.", minimum: 0 },
+          offset: { type: "integer", description: "First file to list (default 0); a page holds 200.", minimum: 0 },
+        },
         ["flow"],
       ),
       writes: false,
-      run: ask(async (input) => {
-        const { parseFlowText } = await scryParts();
+      run: async (input) => {
+        try {
+          const [{ parseFlowText, scry }, { openGrimoire }, compact] = await Promise.all([
+            scryParts(),
+            import("../workspace"),
+            import("../scry/compact"),
+          ]);
+          const query = { type: "flow" as const, ...parseFlowText(text(input, "flow")) };
+          const snapshot = await openGrimoire(root, await loadAdapter(), { routes: "cached" });
+          const result = scry(snapshot, query);
 
-        return { type: "flow", ...parseFlowText(text(input, "flow")) };
-      }),
+          if (result.type !== "flow") return result;
+
+          const set = input.files;
+
+          if (set === undefined || set === null) return compact.compactFlow(snapshot, result);
+
+          if (set !== "reachable" && set !== "type-only") {
+            throw new GrimoireError("GR9006", 'Pass files as "reachable" or "type-only".');
+          }
+
+          const stepNumber = input.step;
+          const step = result.bookmap.steps.find((item) => item.index === stepNumber);
+
+          if (typeof stepNumber !== "number" || step === undefined) {
+            throw new GrimoireError(
+              "GR9006",
+              `Pass step as one of the step numbers of ${result.bookmap.ref} (${result.bookmap.steps.map((item) => item.index).join(", ")}).`,
+            );
+          }
+
+          const offset = typeof input.offset === "number" && input.offset > 0 ? input.offset : 0;
+
+          return compact.stepFilePage(snapshot, result.bookmap, step, set, offset, 200);
+        } catch (error) {
+          return toolError(error);
+        }
+      },
     },
     {
       name: "grimoire_search",

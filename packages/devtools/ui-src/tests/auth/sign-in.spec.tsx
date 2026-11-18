@@ -15,7 +15,7 @@ vi.mock("@simplewebauthn/browser", () => ({
 }));
 
 const shellRoutes = {
-  "api/panels": { body: [{ id: "requests", title: "Requests", type: "built-in" }] },
+  "api/panels": { body: [{ id: "requests", title: "Requests", type: "built-in", shareable: false }] },
   "api/instances": { body: { current: instanceInfo.id, instances: [instanceInfo] } },
 };
 

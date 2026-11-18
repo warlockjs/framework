@@ -7,6 +7,7 @@ const production = {
   reportIntervalMs: 10_000,
   requestRetentionHours: 24,
   auditRetentionDays: 90,
+  share: { enabled: true, maxDays: 30 },
 } as never;
 
 describe("startReportWriter", () => {
@@ -38,6 +39,7 @@ describe("startReportWriter", () => {
       sessions: vi.spyOn(store.sessions, "removeExpired"),
       invites: vi.spyOn(store.invites, "removeExpired"),
       audit: vi.spyOn(store.audit, "prune"),
+      shares: vi.spyOn(store.shares, "removeOld"),
     };
     const writer = startReportWriter({
       reporter: fakeReporter("a", () => report("a", Date.now())),
@@ -56,6 +58,21 @@ describe("startReportWriter", () => {
     expect(spies.sessions).toHaveBeenCalledWith(now);
     expect(spies.invites).toHaveBeenCalledWith(now);
     expect(spies.audit).toHaveBeenCalledWith(now - 90 * 86_400_000);
+    expect(spies.shares).toHaveBeenCalledWith(now - 30 * 86_400_000);
+    await writer.stop();
+  });
+
+  it("leaves the share table alone when sharing is off", async () => {
+    const store = createMemoryStore();
+    const removeOld = vi.spyOn(store.shares, "removeOld");
+    const writer = startReportWriter({
+      reporter: fakeReporter("a", () => report("a", Date.now())),
+      store,
+      production: { ...(production as object), share: { enabled: false, maxDays: 30 } } as never,
+    });
+
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(removeOld).not.toHaveBeenCalled();
     await writer.stop();
   });
 

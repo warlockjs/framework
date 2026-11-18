@@ -352,6 +352,22 @@ A list line has the wrong form.
 - **What to do:** Write list lines as `- name   text`: the name, spaces, then the text.
 - **Skill:** `write-a-feature`
 
+### GR1029
+
+An image line points outside grimoire/screenshots.
+
+- **Severity:** warning
+- **What to do:** Keep screenshots in `grimoire/screenshots/` and write the path relative to the Markdown file, like `![Product page](../../../screenshots/web/product.png)`.
+- **Skill:** `write-a-feature`
+
+### GR1030
+
+A flow has no summary.
+
+- **Severity:** warning
+- **What to do:** Write one or two plain sentences under the flow's `# Title`: who does what, and what they get.
+- **Skill:** `write-a-feature`
+
 ## GR2xxx: names that point at nothing
 
 ### GR2001
@@ -448,6 +464,22 @@ A README relation names a flow that does not exist.
 
 - **Severity:** error
 - **What to do:** Fix the `<feature>/<flow>` reference in Affects and affected by.
+- **Skill:** `write-a-feature`
+
+### GR2013
+
+A case names a criterion the flow does not have.
+
+- **Severity:** error
+- **What to do:** Fix the `(AC-n)` at the end of the case line, or add the criterion under Acceptance criteria.
+- **Skill:** `write-a-feature`
+
+### GR2014
+
+An image line names a screenshot file that does not exist.
+
+- **Severity:** warning
+- **What to do:** Add the image under `grimoire/screenshots/`, or fix the path.
 - **Skill:** `write-a-feature`
 
 ## GR3xxx: source files
@@ -564,6 +596,22 @@ A criterion's test did not run in the last run.
 
 - **Severity:** warning
 - **What to do:** Run the tests that prove the criterion.
+- **Skill:** `record-a-change`
+
+### GR4009
+
+Tests prove criteria but no test results are recorded.
+
+- **Severity:** warning
+- **What to do:** Add `grimoireReporter()` from `@warlock.js/grimoire/vitest` to `test.reporters` in the Vitest config and run the tests; in production, ship the results file with the deploy.
+- **Skill:** `record-a-change`
+
+### GR4010
+
+The reporter could not match a proving test to its result.
+
+- **Severity:** warning
+- **What to do:** Keep the `it(...)` or `test(...)` call on the line right under the `@proves` comment, with a plain string name.
 - **Skill:** `record-a-change`
 
 ## GR5xxx: apps, pages and blocks

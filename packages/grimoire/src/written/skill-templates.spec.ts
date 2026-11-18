@@ -140,6 +140,15 @@ describe("the skill templates", () => {
     const flow = catalog?.flows.find((item) => item.id.value === "wishlist");
 
     expect(findings.map((finding) => `${finding.code} ${finding.message}`)).toEqual([]);
+    expect(flow?.summary).not.toBeNull();
+    expect(flow?.story).toHaveLength(3);
+    expect(flow?.story[1]?.screenshots).toHaveLength(1);
+    expect(flow?.cases.some((entry) => entry.criteria.length > 0)).toBe(true);
+    expect(catalog?.readme?.audience.length).toBeGreaterThan(0);
+    expect(catalog?.readme?.why).not.toBeNull();
+    expect(
+      written.apps.find((app) => app.id.value === "web-client")?.pages[0]?.screenshots,
+    ).toHaveLength(1);
     expect(flow?.steps).toHaveLength(4);
     expect(flow?.cases.filter((entry) => entry.fixed)).toHaveLength(8);
     expect(flow?.criteria).toHaveLength(4);

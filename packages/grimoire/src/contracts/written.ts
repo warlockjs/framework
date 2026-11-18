@@ -27,6 +27,21 @@ export type FlowRef = string;
 /** A criterion id: `AC-<n>`. */
 export type CriterionId = string;
 
+/**
+ * An image line `![<alt>](<path>)` in a written file, outside code fences.
+ * The path is written relative to the Markdown file (so it renders on a git
+ * host) and must point inside `grimoire/screenshots/` (`GR1029` otherwise).
+ */
+export type WrittenScreenshot = {
+  /** The alt text; `""` when none is written. */
+  alt: string;
+  /** As written in the file. */
+  written: string;
+  /** Path under `grimoire/screenshots/` (`web/product-page.png`), or `null` when it points elsewhere. */
+  path: string | null;
+  at: SourceLocation;
+};
+
 /** One `- name   text` line of a list section. */
 export type WrittenListLine = {
   /** The first word or phrase (a flow id, an app id, a condition name, a question). */
@@ -57,6 +72,14 @@ export type WrittenFeatureReadme = {
   heading: Located<string> | null;
   /** The paragraph under the heading, or `null`. */
   summary: string | null;
+  /**
+   * Front matter `audience`: who the feature is for, in the owner's words
+   * (`[shoppers, store staff]`). Empty when not written; readers then use the
+   * flows' `who` values.
+   */
+  audience: Located<string>[];
+  /** `## Why`: the paragraphs of the optional section, joined with a blank line, or `null`. */
+  why: string | null;
   /** `## Flows`: `- <flow-id>   <what it does>`. */
   flows: WrittenListLine[];
   /** `## Affects and affected by`: free lines; references `<feature>/<flow>` are read from them. */
@@ -161,6 +184,21 @@ export type WrittenCase = {
   answer: string;
   /** The answer starts with `does not apply`. */
   doesNotApply: boolean;
+  /** Criteria named in a trailing `(AC-n[, AC-m])` of the answer (removed from `answer`). Empty when none. */
+  criteria: CriterionId[];
+  at: SourceLocation;
+};
+
+/**
+ * One `<n>. <sentence>` line of the optional `## Story` section: a step in
+ * the user's words, for readers who do not read code. Continuation lines are
+ * joined; image lines inside the item attach screenshots.
+ */
+export type WrittenStoryStep = {
+  index: number;
+  /** The sentence, without image lines. */
+  text: string;
+  screenshots: WrittenScreenshot[];
   at: SourceLocation;
 };
 
@@ -189,6 +227,10 @@ export type WrittenFlow = {
   who: Located<string>;
   origin: Located<WrittenOrigin> | null;
   heading: Located<string> | null;
+  /** The paragraph under the `# Title`: what the flow does, in one or two sentences. `null` when not written (`GR1030`). */
+  summary: string | null;
+  /** `## Story`: the steps in the user's words. Empty when the section is not written. */
+  story: WrittenStoryStep[];
   steps: WrittenStep[];
   /** `## Differs by app`: `- <app-id>   <what differs>`. */
   differs: WrittenListLine[];
@@ -269,6 +311,8 @@ export type WrittenBlockFile = {
   heading: Located<string> | null;
   /** `- <key>   <value>` lines. */
   details: WrittenListLine[];
+  /** Image lines of the file (what the block looks like). */
+  screenshots: WrittenScreenshot[];
 };
 
 /** One `- <kind>   <name>` line of `## Also reached from`. */
@@ -300,6 +344,8 @@ export type WrittenPage = {
   heading: Located<string> | null;
   /** The paragraph under the heading, or `null`. */
   purpose: string | null;
+  /** Image lines of the README (what the page or screen looks like). */
+  screenshots: WrittenScreenshot[];
   blocks: WrittenBlockRow[];
   alsoReachedFrom: WrittenEntryPoint[];
   blockFiles: WrittenBlockFile[];

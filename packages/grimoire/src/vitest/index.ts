@@ -1,6 +1,7 @@
 /**
  * `@warlock.js/grimoire/vitest`: a Vitest reporter that records the outcome
- * of every test proving a criterion in `grimoire/book/test-results.json`.
+ * of every test proving a criterion in `grimoire/book/test-results.json`
+ * (or the file given in `grimoireReporter({ file })`).
  *
  * ```ts
  * // vitest.config.ts
@@ -19,6 +20,7 @@ import type {
   ProofResult,
   TestOutcome,
   TestResultsStore,
+  UnmatchedProof,
 } from "../contracts/test-results";
 import { toPosixPath } from "../paths";
 import { scanProofsInText } from "../proves";
@@ -28,6 +30,12 @@ import { hashTestFile, mergeTestResults, readTestResults, writeTestResults } fro
 export type GrimoireReporterOptions = {
   /** Project root. Default: Vitest's `config.root`, else `process.cwd()`. */
   root?: string;
+  /**
+   * Where to write the results: a project-relative or absolute path. Default
+   * `grimoire/book/test-results.json`. Point it at a file the deploy ships
+   * and give the panel the same `testResultsFile`.
+   */
+  file?: string;
 };
 
 /** The reporter, typed structurally (only the hooks it implements). */
@@ -88,10 +96,11 @@ export function grimoireReporter(options: GrimoireReporterOptions = {}): Grimoir
       try {
         const modules = (Array.isArray(args[0]) ? args[0] : []) as ReportedModule[];
         const root = options.root ?? configRoot ?? process.cwd();
-        const previous = await readTestResults(root);
+        const previous = await readTestResults(root, options.file);
         const now = new Date();
         const run: ProofResult[] = [];
         const ranFiles: string[] = [];
+        const unmatched: UnmatchedProof[] = [];
 
         for (const module of modules) {
           const done = await recordModule(root, module, previous, now);
@@ -100,11 +109,16 @@ export function grimoireReporter(options: GrimoireReporterOptions = {}): Grimoir
 
           ranFiles.push(done.file);
           run.push(...done.results);
+          unmatched.push(...done.unmatched);
         }
 
         if (ranFiles.length === 0) return;
 
-        await writeTestResults(root, mergeTestResults(previous, run, ranFiles, now));
+        await writeTestResults(
+          root,
+          mergeTestResults(previous, run, ranFiles, now, unmatched),
+          options.file,
+        );
       } catch (error) {
         warn(error);
       }
@@ -112,7 +126,7 @@ export function grimoireReporter(options: GrimoireReporterOptions = {}): Grimoir
   };
 }
 
-type ModuleRecord = { file: string; results: ProofResult[] };
+type ModuleRecord = { file: string; results: ProofResult[]; unmatched: UnmatchedProof[] };
 
 /** Results of one test file, or `null` when the file did not finish (it must not erase old results). */
 async function recordModule(
@@ -144,8 +158,9 @@ async function recordModule(
   const hash = hashTestFile(buffer);
   const { proofs } = scanProofsInText(buffer.toString("utf8"), relative);
   const results: ProofResult[] = [];
+  const unmatched: UnmatchedProof[] = [];
 
-  if (proofs.length === 0) return { file: relative, results };
+  if (proofs.length === 0) return { file: relative, results, unmatched };
 
   const cases = [...module.children.allTests()];
 
@@ -155,7 +170,19 @@ async function recordModule(
 
     // A test still pending means the run was cut short: say nothing about this file.
     if (outcomes.some((item) => item.outcome === undefined)) return null;
-    if (outcomes.length === 0 || !proof.test) continue;
+    if (!proof.test) continue;
+
+    if (outcomes.length === 0) {
+      unmatched.push({
+        feature: proof.feature,
+        flow: proof.flow,
+        criterion: proof.criterion,
+        testFile: relative,
+        line: proof.at.line,
+      });
+
+      continue;
+    }
 
     const outcome = combine(outcomes.map((item) => item.outcome as TestOutcome));
     const first = outcomes[0]?.test;
@@ -192,7 +219,7 @@ async function recordModule(
     });
   }
 
-  return { file: relative, results };
+  return { file: relative, results, unmatched };
 }
 
 function matches(proof: ProofLine, test: ReportedCase): boolean {

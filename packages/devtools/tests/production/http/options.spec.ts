@@ -58,6 +58,7 @@ describe("resolveProductionOptions defaults", () => {
       logLevels: ["warn", "error"],
       auditRetentionDays: 90,
       passkeys: { rpName: "Warlock monitor", rpId: null },
+      share: { enabled: false, maxDays: 30 },
     });
     expect(resolved.sampleRate).toBe(DEVTOOLS_PRODUCTION_DEFAULTS.sampleRate);
   });
@@ -171,6 +172,10 @@ describe("resolveProductionOptions refusals", () => {
     ["a non-boolean requireHttps", { requireHttps: "no" }],
     ["a non-boolean explain.executing", { explain: { executing: "yes" } }],
     ["an empty passkeys.rpName", { passkeys: { rpName: " " } }],
+    ["a non-boolean share.enabled", { share: { enabled: "yes" } }],
+    ["share.maxDays of 0", { share: { maxDays: 0 } }],
+    ["share.maxDays over a year", { share: { maxDays: 366 } }],
+    ["a fractional share.maxDays", { share: { maxDays: 1.5 } }],
   ] as [string, Record<string, unknown>][])("DT007: %s", (_name, options) => {
     expect(codeOf(options as DevtoolsProductionOptions)).toBe("DT007");
   });
@@ -178,6 +183,22 @@ describe("resolveProductionOptions refusals", () => {
   it("DT007 names the option and what to use", () => {
     expect(() => resolveProductionOptions({ sampleRate: 2 }, env)).toThrow(
       /devtools\.production\.sampleRate.*0 to 1/,
+    );
+  });
+
+  it("DT007 names share.maxDays and the accepted range", () => {
+    expect(() => resolveProductionOptions({ share: { maxDays: 400 } }, env)).toThrow(
+      /devtools\.production\.share\.maxDays.*1 to 365/,
+    );
+  });
+
+  it("resolves the share options", () => {
+    expect(resolveProductionOptions({ share: { enabled: true } }, env).share).toEqual({
+      enabled: true,
+      maxDays: 30,
+    });
+    expect(resolveProductionOptions({ share: { enabled: true, maxDays: 365 } }, env).share).toEqual(
+      { enabled: true, maxDays: 365 },
     );
   });
 

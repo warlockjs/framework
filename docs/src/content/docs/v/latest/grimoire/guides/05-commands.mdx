@@ -241,8 +241,9 @@ npx warlock scry --flow catalog/new-arrivals
 
 ```
 catalog/new-arrivals  New arrivals  shipped since 2.0  who everyone
-1. page   /                              src/web/$sites/client/home.page.tsx (+5 files)
-2. route  GET /api/products/new-arrivals src/app/catalog/controllers/new-arrivals.controller.ts (+4 files)
+The newest products sold in the shopper's country, newest first.
+1. page   /                              src/web/$sites/client/home.page.tsx (+5 reachable)
+2. route  GET /api/products/new-arrivals src/app/catalog/controllers/new-arrivals.controller.ts (+4 reachable)
 differs   mobile: uses the device's country when the customer has none
 AC-1          not run   the newest products come first       src/app/catalog/tests/new-arrivals.test.ts:12
 AC-2          not run   a customer with no country sees …    src/app/catalog/tests/new-arrivals.test.ts:17
@@ -252,7 +253,9 @@ history   2.1 fixed (unreleased)   2.0 added (1.0.0, 2026-10-01)
 check     0 errors, 1 warning, 0 expected
 ```
 
-Each step shows the file it starts from and how many more files are behind it. A page step takes every page and
+The line under the title is the flow's summary. Each step shows the file it starts from and how many more files
+run behind it (`+5 reachable`). Imports that only carry types are not followed, because they are erased before the
+code runs; when a step reaches files only through them, they are counted apart (`2 type-only`). A page step takes every page and
 screen of the feature's apps that matches the route, so the count includes the mobile screen here. A step that names
 nothing shows `not found`. Each criterion shows its status from the last test run: `pass`, `fail`, `stale` (the test
 changed since it ran), `not run` or `no test` (see [Test results](/v/latest/grimoire/guides/08-test-results/)).
@@ -309,12 +312,18 @@ no route facts reads them once, as `warlock scry --route` does).
 | `grimoire_impact`  | `{ file }`                      | the impact answer                                 | no     |
 | `grimoire_route`   | `{ method, path }`              | the route answer                                  | no     |
 | `grimoire_feature` | `{ feature }`                   | the feature answer                                | no     |
-| `grimoire_flow`    | `{ flow }` (`<feature>/<flow>`) | the flow answer                                   | no     |
+| `grimoire_flow`    | `{ flow, files?, step?, offset? }` | the compact flow answer, or one page of a step's files | no     |
 | `grimoire_search`  | `{ text, limit? }`              | the search answer                                 | no     |
 | `grimoire_check`   | `{}`                            | the check report                                  | no     |
 | `grimoire_build`   | `{ force? }`                    | `{ rebuilt, written, removed, routes }`           | no     |
 | `grimoire_release` | `{ release }`                   | the release file, its list and whether it changed | yes    |
 | `grimoire_explain` | `{ code }`                      | the code's title, fix, skill and docs link        | no     |
+
+`grimoire_flow` answers with counts instead of file lists: each step has `counts` (`direct`, `feature`, `reachable`,
+`typeOnly`) and its first 50 direct imports, so the answer stays small on a large app. To see the files behind one
+step, call it again with `files` (`reachable` or `type-only`) and `step` (the step number); a page holds 200 files
+sorted by module, and `offset` moves to the next page. `warlock scry --flow --json` and the `scry()` function keep the
+full lists.
 
 The read tools and `grimoire_build` may refresh the book, which is a git-ignored cache, so they do not count as
 writes. `grimoire_build` reads the routes again when they changed (under `warlock mcp` this boots the app once, the

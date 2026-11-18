@@ -120,6 +120,11 @@ From `@warlock.js/grimoire` (no dependency on core or web):
   release between `COLLECTED_START_MARKER` and `COLLECTED_END_MARKER`.
 - `scanProofs` and `scanProofsInText` read `// @proves` lines; `criterionStatus` turns test
   results into a criterion's status; `CASE_QUESTIONS` lists the questions every flow answers.
+- Flow steps list `entries` (every file the step starts from), `direct` (their direct imports), `files` (what
+  runs: type-only imports are not followed) and `typeOnlyFiles` (reached only through type-only imports).
+  `importClosure(graph, start, { skipTypeOnly: true })` leaves type-only edges out. `warlock scry --flow --json`
+  keeps every list; the MCP tool `grimoire_flow` and the devtools flow route send counts and the first 50 direct
+  imports per step, and list one step's files on request (`files: "reachable"` or `"type-only"` with `step`).
 - Helpers: `loadBook`, `readFrontMatter`, `fileGraph`, `importClosure`, `importerClosure`,
   `bookEntryPath`, `bookEntryPaths`, `toPosixPath`, `GRIMOIRE_DIR`, `GRIMOIRE_PATHS`,
   `GRIMOIRE_IGNORE_RULES` (the `.gitignore` lines) and `BOOK_SCHEMA_VERSION`.
@@ -131,9 +136,17 @@ the `grimoire` and `scry` commands for `cli.commands` in `warlock.config.ts`;
 
 From `@warlock.js/grimoire/vitest`: `grimoireReporter` records the last result of every test marked
 `// @proves` into `grimoire/book/test-results.json`. Add it to the Vitest `reporters` list.
+`grimoireReporter({ file })` writes to another path (for a deploy that ships CI results); `readTestResults(root, file?)`
+reads it, and the panel option `testResultsFile` and `openGrimoire` option `testResultsFile` point the tab at it.
+The check warns with `GR4009` when `@proves` lines exist and no results were found, and with `GR4010` when the
+reporter could not match a proving test.
 
 From `@warlock.js/grimoire/devtools`: `grimoireDevtoolsPanel` (the default export) is the Grimoire
 tab for `@warlock.js/devtools`, listed in `panels` of `src/config/devtools.ts`;
 `exportGrimoireSite` writes the same view as a static site.
 The tab keeps its snapshot until the book changes in production and refreshes it in the background in
-development; set `ttlMs` with `panels: [["@warlock.js/grimoire/devtools", { ttlMs: 60_000 }]]`.
+development; the results file's modified time is part of the change stamp, so new results show without a restart.
+The tab also has a Product map: the features, flows, apps, releases and planned work in plain words, from the written
+files (summaries, `audience`, `## Why`, `## Story`) and the images in `grimoire/screenshots/`. Its routes are
+`/product`, `/product/features/:feature` and `/product/flows/:feature/:flow`; `/check/groups` and `/check?code=`
+give the check by code and a page of one code's findings. Set `ttlMs` with `panels: [["@warlock.js/grimoire/devtools", { ttlMs: 60_000 }]]`.

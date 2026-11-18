@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { buildPanelContext } from "./context";
+import type { LegacyPanelContext } from "./types";
 import { loadPanelModule } from "./modules";
 import { LoaderCircleIcon } from "lucide-react";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
@@ -11,6 +12,10 @@ export type PanelHostProps = {
   title: string;
   /** The panel's part of the hash: `#grimoire/flow/checkout` gives `flow/checkout`. */
   route: string;
+  /** Behind a read-only share link: loads the shared view and calls `api/share/*`. */
+  shared?: boolean;
+  /** The context's `share` value for a normal mount (see `LegacyPanelContext.share`). */
+  share?: LegacyPanelContext["share"];
 };
 
 /**
@@ -21,7 +26,7 @@ export type PanelHostProps = {
  * changes. While the module and its first render are pending it shows a
  * "Loading <title>…" note; a failed module shows an error that says what to check.
  */
-export function PanelHost({ id, title, route }: PanelHostProps) {
+export function PanelHost({ id, title, route, shared = false, share = null }: PanelHostProps) {
   const container = useRef<HTMLDivElement>(null);
   const [tick, setTick] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +47,7 @@ export function PanelHost({ id, title, route }: PanelHostProps) {
       let module;
 
       try {
-        module = await loadPanelModule(id);
+        module = await loadPanelModule(id, shared);
       } catch (reason) {
         const detail = reason instanceof Error ? reason.message : String(reason);
 
@@ -62,7 +67,7 @@ export function PanelHost({ id, title, route }: PanelHostProps) {
       root.className = "panel";
       root.dataset.panel = id;
 
-      const result = await module.default(buildPanelContext({ id, root, route, refresh }));
+      const result = await module.default(buildPanelContext({ id, root, route, refresh, shared, share }));
 
       if (!current) return;
 
@@ -78,7 +83,9 @@ export function PanelHost({ id, title, route }: PanelHostProps) {
     return () => {
       current = false;
     };
-  }, [id, title, route, tick]);
+    // `share` is an object built per render: only its content matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, title, route, tick, shared, share?.enabled, share?.manageHref]);
 
   return (
     <>

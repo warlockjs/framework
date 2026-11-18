@@ -10,7 +10,7 @@ const WARN_EVERY_MS = 60_000;
 /**
  * Writes the report every `production.reportIntervalMs`, and every 10
  * minutes prunes: reports unseen for 5 minutes, samples older than
- * `requestRetentionHours`, expired sessions and invites, audit entries older
+ * `requestRetentionHours`, expired sessions and invites, share links that expired or were revoked more than 30 days ago, audit entries older
  * than `auditRetentionDays`. Timers are `unref`ed; a failed write is logged
  * once per minute, never thrown.
  */
@@ -59,6 +59,12 @@ export function startReportWriter(input: {
       ],
       ["remove expired sessions", () => store.sessions.removeExpired(now)],
       ["remove expired invites", () => store.invites.removeExpired(now)],
+      [
+        "remove old share links",
+        // Links that expired or were revoked more than 30 days ago; the table exists only when sharing is on.
+        async () =>
+          production.share.enabled ? store.shares.removeOld(now - 30 * 86_400_000) : 0,
+      ],
       [
         "remove old audit entries",
         () => store.audit.prune(now - production.auditRetentionDays * 86_400_000),

@@ -8,8 +8,8 @@ import { developmentSession, instanceInfo, mockApi, sessionView, signedOut } fro
 vi.mock("@/panels/registry", async () => (await import("../helpers/fake-panels")).fakeRegistry());
 
 const panels = [
-  { id: "requests", title: "Requests", type: "built-in" },
-  { id: "queries", title: "Queries", type: "built-in" },
+  { id: "requests", title: "Requests", type: "built-in", shareable: false },
+  { id: "queries", title: "Queries", type: "built-in", shareable: false },
 ];
 
 describe("shell", () => {
@@ -32,7 +32,7 @@ describe("shell", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     mockApi({
       "api/auth/session": { body: sessionView() },
-      "api/panels": { body: [...panels, { id: "broken", title: "Broken", type: "built-in" }] },
+      "api/panels": { body: [...panels, { id: "broken", title: "Broken", type: "built-in", shareable: false }] },
     });
     render(<App />);
 
@@ -64,7 +64,7 @@ describe("shell", () => {
     window.location.hash = "#book";
     mockApi({
       "api/auth/session": { body: sessionView() },
-      "api/panels": { body: [...panels, { id: "book", title: "Book", type: "package" }] },
+      "api/panels": { body: [...panels, { id: "book", title: "Book", type: "package", shareable: false }] },
     });
     render(<App />);
 
@@ -183,7 +183,7 @@ describe("shell chrome", () => {
     mockApi({
       "api/auth/session": { body: developmentSession },
       "api/panels": {
-        body: [...panels, { id: "grimoire", title: "Grimoire", type: "package" }],
+        body: [...panels, { id: "grimoire", title: "Grimoire", type: "package", shareable: false }],
       },
     });
 

@@ -30,6 +30,7 @@ import {
   DevtoolsReportRow,
   DevtoolsSampleRow,
   DevtoolsSessionRow,
+  DevtoolsShareRow,
   DevtoolsStateRow,
 } from "../../../src/production/store/models";
 import { devtoolsMigrations } from "../../../src/production/store/migrations";
@@ -38,6 +39,7 @@ import { describeStoreContract } from "./store-contract";
 const TABLES = [
   DevtoolsAccountRow,
   DevtoolsSessionRow,
+  DevtoolsShareRow,
   DevtoolsInviteRow,
   DevtoolsAuditRow,
   DevtoolsStateRow,

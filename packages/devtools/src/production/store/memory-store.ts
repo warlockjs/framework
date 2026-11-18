@@ -11,6 +11,7 @@ import type {
   DevtoolsInviteRecord,
   DevtoolsSampleFilter,
   DevtoolsSessionRecord,
+  DevtoolsShareRecord,
   DevtoolsStateRecord,
   DevtoolsStore,
   DevtoolsStoredSample,
@@ -88,6 +89,7 @@ export function createMemoryStore(options: { now?: () => number } = {}): Devtool
   const accounts = new Map<string, DevtoolsAccountRecord>();
   const sessions = new Map<string, DevtoolsSessionRecord>();
   const invites = new Map<string, DevtoolsInviteRecord>();
+  const shares = new Map<string, DevtoolsShareRecord>();
   const audit: DevtoolsAuditEntry[] = [];
   const samples = new Map<string, DevtoolsStoredSample>();
   const reports = new Map<string, DevtoolsInstanceReport>();
@@ -402,6 +404,79 @@ export function createMemoryStore(options: { now?: () => number } = {}): Devtool
       },
       async remove(instanceId) {
         return reports.delete(instanceId);
+      },
+    },
+
+    shares: {
+      async create(input) {
+        for (const share of shares.values()) {
+          if (share.tokenHash === input.tokenHash) throw new DevtoolsStoreConflictError("tokenHash");
+        }
+
+        const record: DevtoolsShareRecord = {
+          ...copy(input),
+          id: randomUUID(),
+          revokedAt: null,
+          lastUsedAt: null,
+          uses: 0,
+        };
+
+        shares.set(record.id, record);
+
+        return copy(record);
+      },
+      async findByTokenHash(tokenHash) {
+        for (const share of shares.values()) {
+          if (share.tokenHash === tokenHash) return copy(share);
+        }
+
+        return null;
+      },
+      async get(id) {
+        const share = shares.get(id);
+
+        return share ? copy(share) : null;
+      },
+      async list() {
+        return [...shares.values()].sort((a, b) => b.createdAt - a.createdAt).map(copy);
+      },
+      async revoke(id, at) {
+        const share = shares.get(id);
+
+        if (!share || share.revokedAt !== null) return false;
+
+        shares.set(id, { ...share, revokedAt: at });
+
+        return true;
+      },
+      async revokeAll(at) {
+        let revoked = 0;
+
+        for (const share of [...shares.values()]) {
+          if (share.revokedAt === null && share.expiresAt > at) {
+            shares.set(share.id, { ...share, revokedAt: at });
+            revoked++;
+          }
+        }
+
+        return revoked;
+      },
+      async touch(id, at) {
+        const share = shares.get(id);
+
+        if (share) shares.set(id, { ...share, lastUsedAt: at, uses: share.uses + 1 });
+      },
+      async removeOld(before) {
+        let removed = 0;
+
+        for (const share of [...shares.values()]) {
+          if (share.expiresAt < before || (share.revokedAt !== null && share.revokedAt < before)) {
+            shares.delete(share.id);
+            removed++;
+          }
+        }
+
+        return removed;
       },
     },
   };

@@ -266,6 +266,22 @@ export const GRIMOIRE_CODE_LIST = [
     "Write list lines as `- name   text`: the name, spaces, then the text.",
     WRITE,
   ),
+  define(
+    "GR1029",
+    "structure",
+    "warning",
+    "An image line points outside grimoire/screenshots",
+    "Keep screenshots in `grimoire/screenshots/` and write the path relative to the Markdown file, like `![Product page](../../../screenshots/web/product.png)`.",
+    WRITE,
+  ),
+  define(
+    "GR1030",
+    "structure",
+    "warning",
+    "A flow has no summary",
+    "Write one or two plain sentences under the flow's `# Title`: who does what, and what they get.",
+    WRITE,
+  ),
 
   // ── GR2xxx links ─────────────────────────────────────────────────────────
   define(
@@ -362,6 +378,22 @@ export const GRIMOIRE_CODE_LIST = [
     "error",
     "A README relation names a flow that does not exist",
     "Fix the `<feature>/<flow>` reference in Affects and affected by.",
+    WRITE,
+  ),
+  define(
+    "GR2013",
+    "links",
+    "error",
+    "A case names a criterion the flow does not have",
+    "Fix the `(AC-n)` at the end of the case line, or add the criterion under Acceptance criteria.",
+    WRITE,
+  ),
+  define(
+    "GR2014",
+    "links",
+    "warning",
+    "An image line names a screenshot file that does not exist",
+    "Add the image under `grimoire/screenshots/`, or fix the path.",
     WRITE,
   ),
 
@@ -478,6 +510,22 @@ export const GRIMOIRE_CODE_LIST = [
     "warning",
     "A criterion's test did not run in the last run",
     "Run the tests that prove the criterion.",
+    RECORD,
+  ),
+  define(
+    "GR4009",
+    "tests",
+    "warning",
+    "Tests prove criteria but no test results are recorded",
+    "Add `grimoireReporter()` from `@warlock.js/grimoire/vitest` to `test.reporters` in the Vitest config and run the tests; in production, ship the results file with the deploy.",
+    RECORD,
+  ),
+  define(
+    "GR4010",
+    "tests",
+    "warning",
+    "The reporter could not match a proving test to its result",
+    "Keep the `it(...)` or `test(...)` call on the line right under the `@proves` comment, with a plain string name.",
     RECORD,
   ),
 

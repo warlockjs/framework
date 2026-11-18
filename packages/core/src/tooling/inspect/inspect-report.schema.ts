@@ -381,7 +381,11 @@ export const INSPECT_REPORT_JSON_SCHEMA: Record<string, unknown> = {
             items: {
               type: "object",
               required: ["specifier", "file"],
-              properties: { specifier: { type: "string" }, file: nullableString },
+              properties: {
+                specifier: { type: "string" },
+                file: nullableString,
+                typeOnly: { type: "boolean" },
+              },
             },
           },
         },

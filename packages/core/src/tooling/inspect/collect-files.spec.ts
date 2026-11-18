@@ -90,8 +90,49 @@ describe("source file inspection", () => {
     });
     expect(files.find((file) => file.role === "service")?.imports).toEqual([
       { specifier: "../../../shared", file: "src/shared/index.ts" },
-      { specifier: "shared", file: "src/shared/index.ts" },
+      { specifier: "shared", file: "src/shared/index.ts", typeOnly: true },
     ]);
+  });
+
+  it("marks an import type-only only when every occurrence of it is erased", () => {
+    write(
+      "src/kinds.ts",
+      [
+        'import type { A } from "./t-default";',
+        'import { type B, type C } from "./t-named";',
+        'import { type D, E } from "./mixed-specifiers";',
+        'import "./side-effect";',
+        'import type { F } from "./both"; import { f } from "./both";',
+        'export type { G } from "./t-reexport";',
+        'export type * from "./t-star";',
+        'export { type H, type I } from "./t-reexport-named";',
+        'export { type J, j } from "./mixed-reexport";',
+        'export type Typed = typeof import("./t-query");',
+        'export type Lazy = import("./t-lazy").Lazy;',
+        'export const load = () => import("./lazy-value");',
+        'export const keep = [E, f];',
+        "export type All = [A, B, C, D, F, G, H, I, J];",
+      ].join("\n"),
+    );
+    const imports = collectFiles(root).find((file) => file.file === "src/kinds.ts")?.imports ?? [];
+    const typeOnly = Object.fromEntries(
+      imports.map((item) => [item.specifier, item.typeOnly === true]),
+    );
+    expect(typeOnly).toEqual({
+      "./t-default": true,
+      "./t-named": true,
+      "./mixed-specifiers": false,
+      "./side-effect": false,
+      "./both": false,
+      "./t-reexport": true,
+      "./t-star": true,
+      "./t-reexport-named": true,
+      "./mixed-reexport": false,
+      "./t-query": true,
+      "./t-lazy": true,
+      "./lazy-value": false,
+    });
+    expect(imports.find((item) => item.specifier === "./both")).not.toHaveProperty("typeOnly");
   });
 
   it("includes type queries and import-equals without executing them", () => {

@@ -614,6 +614,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `docs/src/content/docs/v/latest/grimoire/guides/07-apps.mdx` - Apps, pages and blocks - How agents describe sites and mobile apps under grimoire/apps, with named conditions, lay…
 - `docs/src/content/docs/v/latest/grimoire/guides/08-test-results.mdx` - Test results - Prove an acceptance criterion with a test, and see its last result in the Grimoire with t…
 - `docs/src/content/docs/v/latest/grimoire/guides/09-devtools.mdx` - The devtools tab - Browse the Grimoire in the devtools dashboard (search, a features listing, flows, apps an…
+- `docs/src/content/docs/v/latest/grimoire/guides/10-product-map.mdx` - The product map - A plain-language view of what the product does, who it is for and how healthy each part i…
 - `docs/src/content/docs/v/latest/grimoire/index.mdx` - Grimoire - An experimental project map for Warlock.js apps, written partly by Warlock and partly by …
 - `docs/src/content/docs/v/latest/herald/essentials/01-the-messaging-model.md` - The messaging model - How herald maps onto RabbitMQ — channels, queues, ack semantics, and what the metadata en…
 - `docs/src/content/docs/v/latest/herald/essentials/02-connection-and-config.md` - Connection and config - How herald connects to RabbitMQ, what the connection options mean, multi-broker setups, a…
@@ -3068,6 +3069,9 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tooling/inspect/inspect-app.ts` - InspectOptions, isInspectSection, parseInspectSections, inspectApp
 - `packages/core/src/tooling/inspect/inspect-report.schema.ts` - nullableString, stringArray, jsonSchema, authSource, route, model, resource, configKey
 - `packages/core/src/tooling/inspect/inspect-report.types.ts` - InspectSection, JsonSchema, InspectRouteAuth, InspectRouteRateLimit, InspectRouteLogging, InspectParameter, InspectRoute, InspectModelColumn
+- `packages/core/src/tooling/inspect/lazy-value`
+- `packages/core/src/tooling/inspect/t-lazy`
+- `packages/core/src/tooling/inspect/t-query`
 - `packages/core/src/tooling/mcp/__fixtures__/fake-mcp-context.ts` - FakeContextCalls, fixtureReport, cleanCheckReport, fakeDevtools, fakeMcpContext
 - `packages/core/src/tooling/mcp/__fixtures__/stdio-server.ts` - main
 - `packages/core/src/tooling/mcp/configured-mcp-tools.ts` - configuredMcpTools
@@ -3493,7 +3497,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/tests/acceptance/starter-browser-gate.mjs` - Cdp, file, checkout, requireFromCheckout, options, candidate, state, output
 - `packages/create-warlock/vitest.config.ts` - create-warlock/vitest.config.ts
 
-## packages/devtools (87 test files not listed)
+## packages/devtools (93 test files not listed)
 
 - `packages/devtools/README.md`
 - `packages/devtools/bench/production-overhead.ts` - production, instance, body, noop, noopHooks, startServer, load, median
@@ -3509,8 +3513,9 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/index.ts` - devtools/src/index.ts
 - `packages/devtools/src/n-plus-one.ts` - detectNPlusOne, truncate, mostFrequentCaller
 - `packages/devtools/src/options.ts` - src/options.ts, resolveDevtoolsOptions
+- `packages/devtools/src/panel-errors.ts` - ErrorInsights, PanelErrorSource, createPanelErrorSource
 - `packages/devtools/src/panel-tokens.ts` - DEVTOOLS_PANEL_TOKENS
-- `packages/devtools/src/panels.ts` - MountedDevtoolsPanel, LoadDevtoolsPanelsOptions, DevtoolsProductionPanels, RESERVED_PANEL_IDS, METHODS, CONTENT_TYPES, panelContentType, toFilePath
+- `packages/devtools/src/panels.ts` - MountedDevtoolsPanel, MountedPanelFiles, MountedPanelShare, LoadDevtoolsPanelsOptions, DevtoolsProductionPanels, DEFAULT_PANEL_FILE_EXTENSIONS, BLOCKED_FILE_EXTENSIONS, RESERVED_PANEL_IDS
 - `packages/devtools/src/process-panel.ts` - ProcessPanel, loadProcessPanel, processesDevtoolsPanel
 - `packages/devtools/src/production/auth/common-passwords.ts` - COMMON_PASSWORDS
 - `packages/devtools/src/production/auth/default-crypto.ts` - defaultDevtoolsCrypto
@@ -3533,16 +3538,18 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/production/cli/index.ts` - production/cli/index.ts, PRELOAD, io, exitWith, openStore, registerDevtoolsCommands
 - `packages/devtools/src/production/contracts.ts` - DevtoolsMode, DevtoolsRole, DevtoolsSessionStage, DevtoolsPasswordSource, DevtoolsInstanceInfo, DevtoolsHistogram, DevtoolsQueryShapeStats, DevtoolsRoutePhaseStats
 - `packages/devtools/src/production/errors.ts` - DevtoolsConfigCode, DevtoolsProductionConfigError, DevtoolsApiError, DevtoolsStoreConflictError, production/errors.ts, DEVTOOLS_CONFIG_CODES, DEVTOOLS_ERROR_MESSAGES, DEVTOOLS_ERROR_STATUS
-- `packages/devtools/src/production/http/access.ts` - Method, http/access.ts, PUBLIC, VIEWER, ADMIN, pending, ALL_STEPS, productionRouteAccess
+- `packages/devtools/src/production/http/access.ts` - Method, http/access.ts, PUBLIC, VIEWER, ADMIN, SHARE, pending, ALL_STEPS
 - `packages/devtools/src/production/http/auth-routes.ts` - ROLES, bodyOf, text, optionalText, email, role, purpose, idParam
 - `packages/devtools/src/production/http/client.ts` - http/client.ts, firstValue, hostnameOf, forwardedClient, resolveClient
-- `packages/devtools/src/production/http/constants.ts` - DEVTOOLS_CSRF_HEADER, DEVTOOLS_SESSION_COOKIE, DEVTOOLS_SESSION_COOKIE_INSECURE
+- `packages/devtools/src/production/http/constants.ts` - DEVTOOLS_CSRF_HEADER, DEVTOOLS_SESSION_COOKIE, DEVTOOLS_SESSION_COOKIE_INSECURE, DEVTOOLS_SHARE_COOKIE, DEVTOOLS_SHARE_COOKIE_INSECURE, DEVTOOLS_SHARE_COOKIE_MAX_SECONDS
 - `packages/devtools/src/production/http/context.ts` - DevtoolsRequestContext, http/context.ts, contexts, setDevtoolsRequestContext, devtoolsRequestContext
-- `packages/devtools/src/production/http/cookie.ts` - sessionCookieName, sessionCookie, readCookie
+- `packages/devtools/src/production/http/cookie.ts` - sessionCookieName, sessionCookie, readCookie, shareCookieName, shareCookie
 - `packages/devtools/src/production/http/headers.ts` - DASHBOARD_HEADERS, DASHBOARD_CSP, DOCS_CSP
 - `packages/devtools/src/production/http/index.ts` - production/http/index.ts
 - `packages/devtools/src/production/http/ip.ts` - http/ip.ts, PRIVATE_V4, PRIVATE_V6, normalizeIp, parseCidr, isValidNetworkEntry, compiled, compile
 - `packages/devtools/src/production/http/mount.ts` - SAFE_METHODS, DOCS_PATTERNS, TAB_OF_ROUTE, tabOf, tokenHash, uniformNotFound, originAllowed, hasBody
+- `packages/devtools/src/production/http/share-session.ts` - DevtoolsShareGrant, DevtoolsShareRefusal, DevtoolsShareSessions, SHARE_CACHE_MS, createShareSessions, record, grantFor
+- `packages/devtools/src/production/http/share.ts` - Notfound, DevtoolsShareMount, matchSharePath, bodyOf, viewOf, openAnswer, createDevtoolsShare, overLimit
 - `packages/devtools/src/production/http/state.ts` - http/state.ts, hashDashboardPath, createDashboardState
 - `packages/devtools/src/production/http/types.ts` - DevtoolsRouteAccess, DevtoolsRouteAccessRule, DevtoolsDashboardState, MountProductionDevtoolsDeps, DevtoolsClientInfo, DevtoolsProxyRequest, DevtoolsRoleRequirement, production/http/types.ts
 - `packages/devtools/src/production/index.ts` - production/index.ts
@@ -3581,6 +3588,8 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/production/store/models/sample.model.ts` - DevtoolsSampleRow
 - `packages/devtools/src/production/store/models/session.migration.ts` - DevtoolsSessionsMigration
 - `packages/devtools/src/production/store/models/session.model.ts` - DevtoolsSessionRow
+- `packages/devtools/src/production/store/models/share.migration.ts` - DevtoolsSharesMigration
+- `packages/devtools/src/production/store/models/share.model.ts` - DevtoolsShareRow
 - `packages/devtools/src/production/store/models/state.migration.ts` - DevtoolsStateMigration
 - `packages/devtools/src/production/store/models/state.model.ts` - DevtoolsStateRow
 - `packages/devtools/src/production/store/types.ts` - DevtoolsStore, DevtoolsPasskeyRecord, DevtoolsAccountRecord, NewDevtoolsAccount, DevtoolsAccountPatch, DevtoolsAccountStore, DevtoolsSessionRecord, NewDevtoolsSession
@@ -3596,7 +3605,8 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/server/log-routes.ts` - LogsQuery, registerLogRoutes
 - `packages/devtools/src/server/mail-routes.ts` - registerMailRoutes
 - `packages/devtools/src/server/openapi-routes.ts` - registerOpenApiRoutes
-- `packages/devtools/src/server/panel-routes.ts` - registerPanelRoutes
+- `packages/devtools/src/server/panel-files.ts` - resolvePanelFile
+- `packages/devtools/src/server/panel-routes.ts` - PanelNotFound, sendPanelFile, registerPanelRoutes
 - `packages/devtools/src/server/requests-routes.ts` - UNIT_MS, parseTimeBound, sampleFilterFromQuery, sendApiError, registerProductionRequestsRoutes, registerRequestsRoutes
 - `packages/devtools/src/server/route-routes.ts` - registerRouteRoutes
 - `packages/devtools/src/server/session-routes.ts` - developmentSessionView, panelInfos, registerSessionRoutes
@@ -3610,7 +3620,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/sources/mail-source.ts` - addressToString, attachmentSize, toDevtoolsAttachment, attachMailSource
 - `packages/devtools/src/sources/query-source.ts` - QueryEvent, redactBindings, attachQuerySource
 - `packages/devtools/src/sources/tracing-source.ts` - attachTracingSource
-- `packages/devtools/src/types.ts` - DevtoolsOptions, DevtoolsProductionOptions, ResolvedDevtoolsOptions, DevtoolsPanelMethod, DevtoolsPanelRequest, DevtoolsPanelRoute, DevtoolsPanel, DevtoolsPanelEntry
+- `packages/devtools/src/types.ts` - DevtoolsOptions, DevtoolsProductionOptions, ResolvedDevtoolsOptions, DevtoolsPanelMethod, DevtoolsPanelRequest, DevtoolsPanelRoute, DevtoolsPanel, DevtoolsPanelFiles
 - `packages/devtools/src/ui-root.ts` - isPackageRoot, resolveUiRoot
 - `packages/devtools/tests/fixtures/test-panel/graph.js` - drawBars
 - `packages/devtools/tests/fixtures/test-panel/panel.ts` - devtoolsPanel
@@ -3622,7 +3632,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/tests/production/http/mock-registrars.ts`
 - `packages/devtools/tests/production/http/stubs.ts` - Module, http/stubs.ts, requestsRoutes, insightsRoutes, logRoutes, explainRoute, uiAssets
 - `packages/devtools/tests/production/insights/helpers.ts` - insights/helpers.ts, instance, point, snapshot, histogramOf, shape, route, errorGroup
-- `packages/devtools/tests/production/store/store-contract.ts` - StoreUnderTest, MakeStore, newAccount, newSession, newInvite, auditEntry, sample, report
+- `packages/devtools/tests/production/store/store-contract.ts` - StoreUnderTest, MakeStore, newShare, newAccount, newSession, newInvite, auditEntry, sample
 - `packages/devtools/ui-src/README.md`
 - `packages/devtools/ui-src/scripts/source-hash.d.mts` - DASHBOARD_BUILD_DEPENDENCIES
 - `packages/devtools/ui-src/scripts/source-hash.mjs` - DASHBOARD_BUILD_DEPENDENCIES, EXCLUDED_UI_DIRECTORIES, EXCLUDED_UI_FILES, listFiles, isBuildInput, dashboardSourceHash
@@ -3632,11 +3642,12 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/admin/AdminPage.tsx` - PAGES, AdminPage
 - `packages/devtools/ui-src/src/admin/AuditPage.tsx` - AUDIT_TYPES, FAILURES, query, AuditPage
 - `packages/devtools/ui-src/src/admin/SettingsPage.tsx` - SettingsPage
+- `packages/devtools/ui-src/src/admin/SharesPage.tsx` - CreateDialog, statusBadge, SharesPage
 - `packages/devtools/ui-src/src/admin/UsersPage.tsx` - Pending, inviteLink, InviteForm, dialogFor, UsersPage
 - `packages/devtools/ui-src/src/api/client.ts` - ApiError, ApiRequest, api/client.ts, NOT_FOUND_EVENT, setCsrfToken, getCsrfToken, apiUrl, apiFetch
 - `packages/devtools/ui-src/src/api/hooks.ts` - ApiState, StreamEvent, useApi, useInterval, useStream
 - `packages/devtools/ui-src/src/api/types.ts` - AuthStepWithCodes, api/types.ts
-- `packages/devtools/ui-src/src/app/App.tsx` - SignInLink, readLink, App
+- `packages/devtools/ui-src/src/app/App.tsx` - SignInLink, readLink, App, Dashboard
 - `packages/devtools/ui-src/src/app/CommandPalette.tsx` - PaletteItem, CommandPaletteProps, CommandPalette
 - `packages/devtools/ui-src/src/app/Header.tsx` - HeaderProps, Header
 - `packages/devtools/ui-src/src/app/InstancePicker.tsx` - InstancePickerProps, InstancePicker
@@ -3696,12 +3707,12 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/components/ui/skeleton.tsx` - Skeleton
 - `packages/devtools/ui-src/src/components/ui/switch.tsx` - src/components/ui/switch.tsx, Switch
 - `packages/devtools/ui-src/src/components/ui/table.tsx` - Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell, TableCaption
-- `packages/devtools/ui-src/src/lib/route.ts` - AdminPage, HashRoute, lib/route.ts, parseHash, tabHash, clearHash
+- `packages/devtools/ui-src/src/lib/route.ts` - AdminPage, HashRoute, lib/route.ts, parseHash, tabHash, clearHash, isShareHash, shareRouteOf
 - `packages/devtools/ui-src/src/lib/useAction.ts` - ActionResult, ActionState, useAction
 - `packages/devtools/ui-src/src/lib/utils.ts` - lib/utils.ts, cn
 - `packages/devtools/ui-src/src/main.tsx` - container
 - `packages/devtools/ui-src/src/panel-host/PanelHost.tsx` - PanelHostProps, PanelHost
-- `packages/devtools/ui-src/src/panel-host/context.ts` - PanelContextOptions, panel-host/context.ts, panelFetch, buildPanelContext
+- `packages/devtools/ui-src/src/panel-host/context.ts` - PanelContextOptions, panel-host/context.ts, panelFetch, encodePath, absoluteUrl, sharedApiUrl, buildPanelContext
 - `packages/devtools/ui-src/src/panel-host/dom.ts` - Attrs, fill, el, svg, empty, panelApiUrl, panelHref
 - `packages/devtools/ui-src/src/panel-host/modules.ts` - PanelModuleLoader, defaultLoader, modules, setPanelModuleLoader, loadPanelModule
 - `packages/devtools/ui-src/src/panel-host/types.ts` - LegacyPanelContext, LegacyPanelModule, panel-host/types.ts
@@ -3728,13 +3739,14 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/panels/resources/index.tsx` - Entry, resources/index.tsx, Metric, series, InstanceResources, ResourcesPanel
 - `packages/devtools/ui-src/src/panels/routes/index.tsx` - RouteEntry, SortKey, routes/index.tsx, PhaseBars, RouteStats, RouteRow, RouteMap, RoutesPanel
 - `packages/devtools/ui-src/src/panels/types.ts` - DevtoolsPanelProps, panels/types.ts
+- `packages/devtools/ui-src/src/share/ShareScreen.tsx` - State, ShareScreen
 - `packages/devtools/ui-src/tests/helpers/api.ts` - MockRequest, MockAnswer, MockHandler, mockApi, instanceInfo, account, sessionView, signedOut
 - `packages/devtools/ui-src/tests/helpers/fake-panels.tsx` - fakeRegistry, noop
 - `packages/devtools/ui-src/tests/panels/fixtures.ts` - histogram
 - `packages/devtools/ui-src/tests/panels/helpers.tsx` - Answer, Route, ApiCall, FakeEventSource, instanceA, instanceB, session, devSession
 - `packages/devtools/ui-src/tests/setup.ts` - tests/setup.ts
 - `packages/devtools/ui-src/vite.config.ts` - ui-src/vite.config.ts, devBase, proxied
-- `packages/devtools/ui/dashboard/assets/app.js` - i, me, v, be, le, xe, ye, ne
+- `packages/devtools/ui/dashboard/assets/app.js` - me, be, he, ie, i, le, oe, re
 - `packages/devtools/ui/docs-swagger.js`
 - `packages/devtools/ui/panels/processes.js` - renderProcesses
 - `packages/devtools/vitest.config.ts` - devtools/vitest.config.ts
@@ -3786,7 +3798,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/fs/tests/helpers.ts` - tests/helpers.ts, withTempDir
 - `packages/fs/vitest.config.ts` - fs/vitest.config.ts
 
-## packages/grimoire (51 test files not listed)
+## packages/grimoire (57 test files not listed)
 
 - `packages/grimoire/README.md`
 - `packages/grimoire/scripts/generate-llms.mjs` - grimoire/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -3800,23 +3812,24 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/grimoire/src/apps/check-apps.ts` - Subject, flowSubject, pageSubject, normalizeRoute, blockSlug, pagesOf, checkApps, checkReached
 - `packages/grimoire/src/apps/index.ts` - apps/index.ts
 - `packages/grimoire/src/apps/match-apps.ts` - sameRoot, matchApps
-- `packages/grimoire/src/book/build.ts` - StoredBook, Scan, book/build.ts, WRITE_STATE_PATH, grimoireVersion, absolutePath, readStoredBook, scanSourceRoots
+- `packages/grimoire/src/book/build.ts` - StoredBook, StoredFactsCache, Scan, book/build.ts, WRITE_STATE_PATH, grimoireVersion, absolutePath, readStoredBook
 - `packages/grimoire/src/book/index.ts` - book/index.ts
 - `packages/grimoire/src/book/io.ts` - IO_CONCURRENCY, isSkippedName, mapLimit, hashText, hashFile, hashIfExists, isMissing, cleanFolder
 - `packages/grimoire/src/book/normalize.ts` - cleanPath, cleanNullable, normalizeFiles, normalizeRoutes, normalizeSites, normalizePages, normalizeMobile, normalizeNamed
-- `packages/grimoire/src/book/render.ts` - PageUse, ScreenUse, NO_MODULE, byText, entryPathsFor, routeRef, packagesOf, groupBy
+- `packages/grimoire/src/book/render.ts` - PageUse, ScreenUse, NO_MODULE, byText, entryPathsFor, routeRef, typeOnlyImportsOf, packagesOf
 - `packages/grimoire/src/book/write.ts` - WriteState, book/write.ts, isKept, isGenerated, readDiskText, writeBook
 - `packages/grimoire/src/bookmap/build.ts` - CollectedInput, bookmap/build.ts, flowFileId, resultFor, flowCriteria, shownBy, flowBookmap, featureBookmap
 - `packages/grimoire/src/bookmap/index.ts` - bookmap/index.ts
-- `packages/grimoire/src/bookmap/steps.ts` - StepMatch, StepContext, NAMED_TYPES, normalizeRoutePath, routeMatches, sortedUnique, NOTHING, routeStep
+- `packages/grimoire/src/bookmap/steps.ts` - StepMatch, StepContext, NAMED_TYPES, normalizeRoutePath, routeMatches, sortedUnique, NOTHING, UNKNOWN
 - `packages/grimoire/src/bookmap/write.ts` - bookmap/write.ts, absolute, json, readText, writeAtomic, listDir, existingBookmaps, removeIfEmpty
 - `packages/grimoire/src/check/check-grimoire.ts` - CHECK_RULES, checkGrimoire, finishReport, proposedWork, isProposed, compareFindings, severityRank, compareText
 - `packages/grimoire/src/check/format-check-report.ts` - FormatCheckOptions, formatCheckReport, location, plural
 - `packages/grimoire/src/check/index.ts` - src/check/index.ts
 - `packages/grimoire/src/check/rules/book-notes.ts` - checkBookNotes
-- `packages/grimoire/src/check/rules/criteria.ts` - checkCriteriaTests, checkProofTargets
+- `packages/grimoire/src/check/rules/criteria.ts` - checkCriteriaTests, checkProofTargets, checkCaseCriteria
 - `packages/grimoire/src/check/rules/links.ts` - rules/links.ts, STEP_CODES, BOOT_TYPES, checkSteps, checkAppNames, checkChangelogLinks, checkRelations
 - `packages/grimoire/src/check/rules/lookup.ts` - WrittenLookup, writtenLookup, featureStatus, isRetired, parseVersion, compareVersions
+- `packages/grimoire/src/check/rules/screenshots.ts` - SCREENSHOT_EXTENSIONS, isFile, checkScreenshots
 - `packages/grimoire/src/check/rules/source-files.ts` - rules/source-files.ts, NO_HEADER_TYPES, NO_FEATURE_TYPES, top, checkHeaders, checkOwners, needsFeature, checkFolders
 - `packages/grimoire/src/check/rules/versions.ts` - checkReadmeDates, checkChangeWords, checkFlowVersions
 - `packages/grimoire/src/codes/codes.ts` - GrimoireCode, define, GRIMOIRE_CODE_LIST, GRIMOIRE_CODES
@@ -3830,27 +3843,30 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/grimoire/src/contracts/releases.ts` - ReleaseEntry, ReleaseCollection, CollectedListText, WriteReleaseResult
 - `packages/grimoire/src/contracts/scry.ts` - ScryQuery, ScryNotes, ScryPageRef, ScryFileResult, ScryImpactResult, ScryRouteResult, ScryFeatureResult, ScryFlowResult
 - `packages/grimoire/src/contracts/snapshot.ts` - GrimoireSnapshot, OpenGrimoireOptions, GrimoireRule, AppMatch, contracts/snapshot.ts
-- `packages/grimoire/src/contracts/test-results.ts` - ProofLine, TestOutcome, ProofResult, TestResultsStore, CriterionStatus
-- `packages/grimoire/src/contracts/written.ts` - WrittenStatus, WrittenOrigin, FeatureVersion, FlowRef, CriterionId, WrittenListLine, WrittenFeatureReadme, ChangeWord
+- `packages/grimoire/src/contracts/test-results.ts` - ProofLine, TestOutcome, ProofResult, TestResultsStore, UnmatchedProof, TestResultsInfo, CriterionStatus
+- `packages/grimoire/src/contracts/written.ts` - WrittenStatus, WrittenOrigin, FeatureVersion, FlowRef, CriterionId, WrittenScreenshot, WrittenListLine, WrittenFeatureReadme
+- `packages/grimoire/src/devtools/answers.ts` - StepFileCounts, GrimoireFlowStep, GrimoireFlowNeighbour, GrimoireFlowHealth, GrimoireFlowAnswer, StepFileSet, GrimoireStepFilesAnswer, GrimoireCheckFilter
 - `packages/grimoire/src/devtools/data.ts` - GrimoirePanelError, GrimoireSummary, GrimoireFeatureRow, GrimoireFeaturesAnswer, GrimoireAppRow, GrimoireAppsAnswer, GrimoirePageAnswer, GrimoireReleasesAnswer
 - `packages/grimoire/src/devtools/graphs.ts` - GraphNode, GraphEdge, GrimoireGraph, GraphBuilder, GRAPH_LIMIT, fileLabel, fileGraph, featureGraph
-- `packages/grimoire/src/devtools/index.ts` - GrimoirePanelRequest, GrimoireDevtoolsPanel, GrimoirePanelContext, devtools/index.ts, one, grimoireDevtoolsPanel
-- `packages/grimoire/src/devtools/site.ts` - ExportGrimoireSiteOptions, SearchItem, SITE_FILE_LIMIT, uiFolder, buildSiteData, inlineJson, inlineCode, attempt
+- `packages/grimoire/src/devtools/index.ts` - GrimoirePanelRequest, GrimoireDevtoolsPanelShare, GrimoireDevtoolsPanel, GrimoirePanelContext, devtools/index.ts, one, grimoireDevtoolsPanel
+- `packages/grimoire/src/devtools/product-map.ts` - ProductErrorSummary, ProductMapOptions, ErrorCount, Context, addCount, captureErrors, reports, reportOf
+- `packages/grimoire/src/devtools/site.ts` - ExportGrimoireSiteOptions, SearchItem, SITE_FILE_LIMIT, uiFolder, buildSiteData, inlineJson, inlineCode, SCREENSHOT_EXTENSIONS
 - `packages/grimoire/src/devtools/snapshot-source.ts` - SnapshotSourceOptions, SnapshotSource, STAMPED, changeStamp, loadAdapter, createSnapshotSource, open, ensureOpening
 - `packages/grimoire/src/front-matter/index.ts` - FrontMatterValue, FrontMatterField, FrontMatterResult, front-matter/index.ts, unquote, inlineList, readFrontMatter, frontMatterString
-- `packages/grimoire/src/graph/index.ts` - FileGraph, graph/index.ts, fileGraph, walk, importClosure, importerClosure, packageNameOf
+- `packages/grimoire/src/graph/index.ts` - FileGraph, ImportClosureOptions, graph/index.ts, fileGraph, walk, importClosure, importerClosure, packageNameOf
 - `packages/grimoire/src/index.ts` - grimoire/src/index.ts
 - `packages/grimoire/src/ownership/index.ts` - Claim, ownership/index.ts, isFileEntry, normalizeFolder, taggedFeatures, countsForFeature, decide, resolveOwnership
 - `packages/grimoire/src/paths/index.ts` - BookPathInput, paths/index.ts, GRIMOIRE_DIR, GRIMOIRE_PATHS, GRIMOIRE_IGNORE_RULES, toPosixPath, projectPath, isInsideFolder
 - `packages/grimoire/src/proves/index.ts` - proves/index.ts
 - `packages/grimoire/src/proves/scan-proofs.ts` - ScanProofsResult, ParsedProof, scanProofsInText, scanProofs, malformed, withoutBlockComments, testName, closingQuote
+- `packages/grimoire/src/scry/compact.ts` - STEP_FILE_SETS, byText, featureFiles, stepCounts, flowOrder, neighbour, neighboursOf, flowHealth
 - `packages/grimoire/src/scry/format.ts` - FormatScryOptions, section, countedSection, plural, shorten, notes, countsLine, releaseOf
 - `packages/grimoire/src/scry/index.ts` - scry/index.ts
 - `packages/grimoire/src/scry/parse.ts` - QUERY_OPTIONS, malformed, textOf, parseRouteText, parseFlowText, parseFeatureText, parseLimit, parseScryQuery
 - `packages/grimoire/src/scry/query.ts` - Candidate, byText, sortedUnique, notesOf, fileOf, bookFile, siteApp, mobileApp
 - `packages/grimoire/src/tasks/index.ts` - Subject, tasks/index.ts, subjectOf, resolveFlow, hasVersion, briefPath, checkTasks
 - `packages/grimoire/src/test-results/criterion-status.ts` - CriterionTestResult, criterionStatus
-- `packages/grimoire/src/test-results/index.ts` - test-results/index.ts, hashTestFile, readTestResults, isStore, compareResults, mergeTestResults, writeTestResults, checkTestResults
+- `packages/grimoire/src/test-results/index.ts` - test-results/index.ts, hashTestFile, resolveResultsFile, resultsFileLabel, readTestResults, isStore, testResultsInfo, compareResults
 - `packages/grimoire/src/vitest/index.ts` - GrimoireReporterOptions, GrimoireReporter, ReportedCase, ReportedModule, VitestContext, ModuleRecord, vitest/index.ts, OUTCOMES
 - `packages/grimoire/src/warlock/actions.ts` - CommandIO, CommandContext, Options, warlock/actions.ts, plural, reportError, printJson, withFreshRoutes
 - `packages/grimoire/src/warlock/adapter.ts` - WarlockInspect, WarlockAdapterOptions, ExportIndex, warlock/adapter.ts, versionIn, installedVersion, coreVersion, withConsoleOnStderr
@@ -3868,6 +3884,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/grimoire/src/written/parse-grimoire.ts` - ParseGrimoireResult, PageType, Job, Listing, Walker, decoder, mapLimited, readWritten
 - `packages/grimoire/src/written/sink.ts` - FindingSubject, FindingSink
 - `packages/grimoire/src/written/tasks-releases.ts` - TaskPlace, TASK_TYPES, TASK_STATUSES, heading, parseTask, parseRelease, readCollected
+- `packages/grimoire/tests/about-settings`
 - `packages/grimoire/tests/check/snapshot-builder.ts` - FeatureInput, FlowInput, ROOT, at, located, snapshot, withApps, feature
 - `packages/grimoire/tests/fixtures/apps-code-nav/grimoire/apps/rider/README.md`
 - `packages/grimoire/tests/fixtures/apps-code-nav/grimoire/apps/rider/screens/orders/README.md`
@@ -3958,6 +3975,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/grimoire/tests/support/written-model.ts` - FlowInput, FeatureInput, at, located, codeFile, facts, step, flow
 - `packages/grimoire/ui/grimoire-static.js` - grimoireStaticApi, grimoireStaticContext, grimoireStaticMount, show
 - `packages/grimoire/ui/grimoire-view.js` - TABS, decodeSegment, plain, plural, tabOf, targetOf, nodeTarget, shorten
+- `packages/grimoire/ui/product-map.js` - PRODUCT_STATUS, PRODUCT_LIGHT, PRODUCT_PROOF, PRODUCT_CHANGE, productKit, productPlural, productDecode, productEncode
 - `packages/grimoire/vitest.config.ts` - grimoire/vitest.config.ts
 
 ## packages/herald (14 test files not listed)

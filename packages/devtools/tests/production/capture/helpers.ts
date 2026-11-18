@@ -52,6 +52,7 @@ export function productionOptions(
     logLevels: ["warn", "error"],
     auditRetentionDays: defaults.auditRetentionDays,
     passkeys: { rpName: "Warlock monitor", rpId: null },
+    share: { enabled: false, maxDays: 30 },
     ...overrides,
   };
 }

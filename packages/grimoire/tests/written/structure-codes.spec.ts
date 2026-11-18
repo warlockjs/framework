@@ -23,6 +23,8 @@ type Case = {
   /** The line, or a text whose (first) line in the broken file is the finding's line. */
   line: number | string;
   subject?: Partial<GrimoireFinding["subject"]>;
+  /** How many findings of the code the unchanged fixture has (default 0). */
+  baseCount?: number;
 };
 
 const LOGIN = "grimoire/features/auth/flows/login.md";
@@ -148,7 +150,7 @@ const CASES: Case[] = [
   {
     code: "GR1012",
     name: "a case question answered nowhere",
-    breakIt: (copy) => copy.replace(BROWSE, "- limits                 50 products per page\n", ""),
+    breakIt: (copy) => copy.replace(BROWSE, "- limits                 50 products per page (AC-1)\n", ""),
     file: BROWSE,
     line: "## Cases",
     subject: { feature: "catalog", flow: "catalog/browse-products" },
@@ -304,6 +306,26 @@ const CASES: Case[] = [
     line: "- mobile",
     subject: { feature: "catalog", flow: "catalog/new-arrivals" },
   },
+  {
+    code: "GR1029",
+    name: "an image outside grimoire/screenshots",
+    breakIt: (copy) =>
+      copy.replace(BROWSE, "../../../screenshots/web/product-page.png", "../../../images/product-page.png"),
+    file: BROWSE,
+    line: "![The product page]",
+    subject: { feature: "catalog", flow: "catalog/browse-products" },
+  },
+  {
+    code: "GR1030",
+    name: "a flow with no summary",
+    breakIt: (copy) =>
+      copy.replace(LOGIN, "\nA guest signs in with their email and password.\n", ""),
+    file: LOGIN,
+    line: "# Log in",
+    subject: LOGIN_SUBJECT,
+    // The wishlist flow is written without a summary on purpose.
+    baseCount: 1,
+  },
 ];
 
 function cancelOrderFlow(): string {
@@ -387,7 +409,9 @@ describe("structure codes", () => {
     });
 
     it("is not reported on the base fixture", () => {
-      expect(base.filter((finding) => finding.code === entry.code)).toEqual([]);
+      expect(base.filter((finding) => finding.code === entry.code)).toHaveLength(
+        entry.baseCount ?? 0,
+      );
     });
   });
 });

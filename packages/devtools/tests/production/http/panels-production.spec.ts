@@ -101,9 +101,9 @@ describe("panel descriptions", () => {
 
   it("lists the enabled built-in tabs and then the package panels", () => {
     expect(listPanelInfos([panel("grimoire", true)], ["requests", "mail"])).toEqual([
-      { id: "requests", title: "Requests", type: "built-in" },
-      { id: "mail", title: "Mail", type: "built-in" },
-      { id: "grimoire", title: "grimoire", type: "package" },
+      { id: "requests", title: "Requests", type: "built-in", shareable: false },
+      { id: "mail", title: "Mail", type: "built-in", shareable: false },
+      { id: "grimoire", title: "grimoire", type: "package", shareable: false },
     ]);
     expect(listPanelInfos([]).map((tab) => tab.id)).toEqual(
       DEVTOOLS_BUILT_IN_PANELS.map((tab) => tab.id),
@@ -145,9 +145,9 @@ describe("panels in the production dashboard", () => {
     const response = await t.send("GET", "/api/panels", { session });
 
     expect(response.json()).toEqual([
-      { id: "requests", title: "Requests", type: "built-in" },
-      { id: "logs", title: "Logs", type: "built-in" },
-      { id: "test-panel", title: "Test panel", type: "package" },
+      { id: "requests", title: "Requests", type: "built-in", shareable: false },
+      { id: "logs", title: "Logs", type: "built-in", shareable: false },
+      { id: "test-panel", title: "Test panel", type: "package", shareable: false },
     ]);
   });
 

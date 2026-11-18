@@ -34,6 +34,7 @@ function session(overrides: Partial<DevtoolsSessionView>): DevtoolsSessionView {
     expiresAt: null,
     instance: instanceA,
     methods: null,
+    share: null,
     ...overrides,
   };
 }

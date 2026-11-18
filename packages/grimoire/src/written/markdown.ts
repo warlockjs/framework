@@ -4,7 +4,9 @@
  * written file starts from the `WrittenDocument` this module builds, so a
  * file is split once and scanned line by line, never re-scanned whole.
  */
+import path from "node:path";
 import type { SourceLocation } from "../contracts/location";
+import type { WrittenScreenshot } from "../contracts/written";
 import { readFrontMatter, type FrontMatterField } from "../front-matter";
 import type { FindingSink } from "./sink";
 
@@ -59,6 +61,10 @@ export type LogicalLine = {
 const HEADING = /^(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?$/;
 const FENCE = /^[ \t]*(?:```|~~~)/;
 const ITEM_START = /^(?:[-*][ \t]|\d+\.[ \t])/;
+const IMAGE = /!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g;
+const IMAGE_ONLY = /^(?:!\[[^\]]*\]\([^)]*\)\s*)+$/;
+/** Where screenshots live, relative to the project root. */
+const SCREENSHOTS_DIR = "grimoire/screenshots/";
 
 /** Lower-case a heading or a question and collapse its spaces. */
 export function normalizeKey(text: string): string {
@@ -276,6 +282,9 @@ export function paragraphAfterTitle(document: WrittenDocument): string | null {
       continue;
     }
 
+    // An image line is not text: a screenshot may sit right under the title.
+    if (IMAGE_ONLY.test(trimmed)) continue;
+
     parts.push(trimmed);
   }
 
@@ -293,4 +302,78 @@ export function textAfterTitle(document: WrittenDocument, endLine?: number): str
     .map((bodyLine) => bodyLine.text)
     .join("\n")
     .trim();
+}
+
+/**
+ * The path under `grimoire/screenshots/` an image line points at, or `null`
+ * when it points elsewhere. The path is relative to the Markdown file, or
+ * starts with `/grimoire/screenshots/`.
+ */
+export function screenshotPath(file: string, written: string): string | null {
+  const target = written.replace(/[?#].*$/, "").replace(/\\/g, "/");
+
+  if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith("//")) return null;
+
+  const resolved = target.startsWith("/")
+    ? path.posix.normalize(target.slice(1))
+    : path.posix.join(path.posix.dirname(file.replace(/\\/g, "/")), target);
+  const normal = path.posix.normalize(resolved);
+
+  if (!normal.startsWith(SCREENSHOTS_DIR) || normal.length === SCREENSHOTS_DIR.length) return null;
+
+  return normal.slice(SCREENSHOTS_DIR.length);
+}
+
+/**
+ * The image lines `![alt](path)` of some body lines, outside code fences.
+ * GR1029 (warning) for a path that is not inside `grimoire/screenshots/`;
+ * the screenshot is kept with `path: null`.
+ */
+export function readScreenshots(
+  file: string,
+  lines: readonly BodyLine[],
+  sink: FindingSink,
+): WrittenScreenshot[] {
+  const screenshots: WrittenScreenshot[] = [];
+
+  for (const bodyLine of lines) {
+    if (bodyLine.fenced) continue;
+
+    for (const match of bodyLine.text.matchAll(IMAGE)) {
+      const written = match[2] ?? "";
+      const resolved = screenshotPath(file, decodeUri(written));
+      const at = lineAt(file, bodyLine.line);
+
+      if (resolved === null) {
+        sink.report(
+          "GR1029",
+          `the image ${JSON.stringify(written)} is not inside grimoire/screenshots/.`,
+          at,
+        );
+      }
+
+      screenshots.push({ alt: (match[1] ?? "").trim(), written, path: resolved, at });
+    }
+  }
+
+  return screenshots;
+}
+
+/** `%20` and the like in an image path; a malformed escape is kept as written. */
+function decodeUri(value: string): string {
+  try {
+    return decodeURI(value);
+  } catch {
+    return value;
+  }
+}
+
+/** A line that holds only image markup. */
+export function isImageLine(text: string): boolean {
+  return IMAGE_ONLY.test(text.trim());
+}
+
+/** The line with its image markup removed, trimmed. */
+export function withoutImages(text: string): string {
+  return text.replace(IMAGE, "").replace(/\s+/g, " ").trim();
 }

@@ -21,6 +21,7 @@
     "src/app/orders/jobs/send-receipt.job.ts",
     "src/app/orders/mails/order-confirmation.mail.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/app/orders/controllers/place-order.controller.ts",
     "src/app/orders/tests/place-order.test.ts"

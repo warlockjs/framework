@@ -28,8 +28,18 @@ const FLOW = "grimoire/features/catalog/flows/wishlist.md";
 function flowText(
   body: string[],
   frontMatter = ["id: wishlist", "since: 3.0", "status: proposed", "who: customer"],
+  summary: string | null = "Saves a product for later.",
 ): string {
-  return ["---", ...frontMatter, "---", "", "# Save", "", ...body].join("\n");
+  return [
+    "---",
+    ...frontMatter,
+    "---",
+    "",
+    "# Save",
+    "",
+    ...(summary === null ? [] : [summary, ""]),
+    ...body,
+  ].join("\n");
 }
 
 const ALL_CASES = [
@@ -84,7 +94,7 @@ describe("parseFlow", () => {
     ]);
     expect(flow.steps[1]?.route).toEqual({ method: "POST", path: "/api/wishlist" });
     expect(flow.steps[3]?.affects).toEqual({ feature: "orders", flow: "place-order" });
-    expect(flow.steps[0]?.at).toEqual({ file: FLOW, line: 11, column: null });
+    expect(flow.steps[0]?.at).toEqual({ file: FLOW, line: 13, column: null });
     expect(flow.cases.find((entry) => entry.question === "expiry")?.doesNotApply).toBe(true);
   });
 
@@ -140,12 +150,12 @@ describe("parseFlow", () => {
     );
 
     expect(codes()).toEqual([
-      ["GR1008", 11],
-      ["GR1009", 12],
       ["GR1008", 13],
-      ["GR1008", 14],
+      ["GR1009", 14],
       ["GR1008", 15],
-      ["GR1010", 15],
+      ["GR1008", 16],
+      ["GR1008", 17],
+      ["GR1010", 17],
     ]);
   });
 
@@ -183,27 +193,27 @@ describe("parseFlow", () => {
       ["my own case", false],
     ]);
     expect(flow.notHandled.map((line) => line.name)).toEqual(["not found", "duplicate"]);
-    expect(flow.unknowns).toEqual([{ text: "why?", at: { file: FLOW, line: 18, column: null } }]);
+    expect(flow.unknowns).toEqual([{ text: "why?", at: { file: FLOW, line: 20, column: null } }]);
     expect(flow.criteria).toEqual([
       {
         id: "AC-1",
         number: 1,
         app: "mobile",
         text: "one continued",
-        at: { file: FLOW, line: 20, column: null },
+        at: { file: FLOW, line: 22, column: null },
       },
     ]);
     expect(codes()).toEqual([
-      ["GR1011", 13],
-      ["GR1014", 22],
-      ["GR1013", 23],
-      ["GR1013", 24],
+      ["GR1011", 15],
+      ["GR1014", 24],
+      ["GR1013", 25],
+      ["GR1013", 26],
       // not allowed, limits, expiry, double submit, outside service down are unanswered
-      ["GR1012", 11],
-      ["GR1012", 11],
-      ["GR1012", 11],
-      ["GR1012", 11],
-      ["GR1012", 11],
+      ["GR1012", 13],
+      ["GR1012", 13],
+      ["GR1012", 13],
+      ["GR1012", 13],
+      ["GR1012", 13],
     ]);
   });
 
@@ -234,15 +244,15 @@ describe("parseFlow", () => {
     expect(flow.cases.map((entry) => entry.question)).not.toContain("double");
     expect(flow.notHandled).toEqual([]);
     expect(findings.map((finding) => [finding.code, finding.at?.line, finding.message])).toEqual([
-      ["GR1011", 19, 'the case "- Double Submit" is not `- <question>   <answer>`.'],
+      ["GR1011", 21, 'the case "- Double Submit" is not `- <question>   <answer>`.'],
       [
         "GR1028",
-        21,
+        23,
         'the Not handled line "- double submit" is not `- name   text` (the name, spaces, then the text).',
       ],
       [
         "GR1012",
-        11,
+        13,
         'the case question "double submit" is answered neither under Cases nor under Not handled.',
       ],
     ]);
@@ -289,7 +299,7 @@ describe("parseFlow", () => {
       sink,
     );
 
-    expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([["GR1009", 15]]);
+    expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([["GR1009", 17]]);
     expect(flow.steps.map((step) => [step.type, step.target, step.note])).toEqual([
       ["page", "/products/:id", null],
       ["route", "POST /wishlist", "saves it"],
@@ -355,6 +365,160 @@ describe("parseFlow", () => {
     expect(flow.status.value).toBe("building");
     expect(flow.who).toEqual({ value: "", at: { file: FLOW, line: 1, column: null } });
     expect(flow.origin).toBeNull();
+  });
+});
+
+describe("parseFlow: summary, story and case criteria", () => {
+  const CASES_AND_CRITERIA = [...ALL_CASES, "", "## Acceptance criteria", "- AC-1   one"];
+
+  function read(
+    body: string[],
+    summary: string | null = "Saves a product.",
+  ): {
+    flow: ReturnType<typeof parseFlow>;
+    findings: GrimoireFinding[];
+  } {
+    const { sink, findings } = collect();
+    const flow = parseFlow(FLOW, flowText(body, undefined, summary), "catalog", "wishlist", sink);
+
+    return { flow, findings };
+  }
+
+  it("reads the summary under the title", () => {
+    const { flow, findings } = read(["## Steps", "1. page   /x", "", ...CASES_AND_CRITERIA]);
+
+    expect(flow.summary).toBe("Saves a product.");
+    expect(findings).toEqual([]);
+  });
+
+  it("GR1030: a flow with no summary, at the title line", () => {
+    const { flow, findings } = read(["## Steps", "1. page   /x", "", ...CASES_AND_CRITERIA], null);
+
+    expect(flow.summary).toBeNull();
+    expect(findings.map((finding) => [finding.code, finding.severity, finding.at?.line])).toEqual([
+      ["GR1030", "warning", 8],
+    ]);
+  });
+
+  it("reads story steps with continuation lines and image lines", () => {
+    const { flow, findings } = read([
+      "## Story",
+      "1. The shopper opens the list.",
+      "2. The shopper picks one",
+      "   and lands on its page.",
+      "   ![The page](../../../screenshots/web/page.png)",
+      "",
+      "![Second](/grimoire/screenshots/web/second.webp)",
+      "3. The shopper saves it.",
+      "",
+      "## Steps",
+      "1. page   /x",
+      "",
+      ...CASES_AND_CRITERIA,
+    ]);
+
+    expect(findings).toEqual([]);
+    expect(flow.story.map((step) => [step.index, step.text])).toEqual([
+      [1, "The shopper opens the list."],
+      [2, "The shopper picks one and lands on its page."],
+      [3, "The shopper saves it."],
+    ]);
+    expect(flow.story[1]?.screenshots.map((shot) => [shot.alt, shot.path])).toEqual([
+      ["The page", "web/page.png"],
+      ["Second", "web/second.webp"],
+    ]);
+    expect(flow.story[1]?.screenshots[0]?.at.line).toBe(16);
+    expect(flow.story[0]?.screenshots).toEqual([]);
+  });
+
+  it("reports story numbering with GR1010 and a stray line with GR1008", () => {
+    const { findings } = read([
+      "## Story",
+      "1. First.",
+      "3. Third.",
+      "Some loose text.",
+      "![Lonely](../../../screenshots/a.png)",
+      "",
+      "## Steps",
+      "1. page   /x",
+      "",
+      ...CASES_AND_CRITERIA,
+    ]);
+
+    expect(findings.map((finding) => [finding.code, finding.at?.line])).toEqual([
+      ["GR1008", 15],
+      ["GR1010", 14],
+    ]);
+    expect(findings[1]?.message).toContain("story step");
+    expect(findings[0]?.message).toContain("story line");
+  });
+
+  it("an image before any story step is a stray line", () => {
+    const { findings } = read([
+      "## Story",
+      "![Lonely](../../../screenshots/a.png)",
+      "1. First.",
+      "",
+      "## Steps",
+      "1. page   /x",
+      "",
+      ...CASES_AND_CRITERIA,
+    ]);
+
+    expect(findings.map((finding) => finding.code)).toEqual(["GR1008"]);
+  });
+
+  it("GR1029: an image outside grimoire/screenshots keeps path null", () => {
+    const { flow, findings } = read([
+      "## Story",
+      "1. First. ![Elsewhere](../../images/a.png)",
+      "",
+      "## Steps",
+      "1. page   /x",
+      "",
+      ...CASES_AND_CRITERIA,
+    ]);
+
+    expect(flow.story[0]?.text).toBe("First.");
+    expect(flow.story[0]?.screenshots[0]).toMatchObject({
+      path: null,
+      written: "../../images/a.png",
+    });
+    expect(findings.map((finding) => [finding.code, finding.severity])).toEqual([
+      ["GR1029", "warning"],
+    ]);
+  });
+
+  it("reads (AC-n) at the end of a case and removes it from the answer", () => {
+    const { flow, findings } = read([
+      "## Steps",
+      "1. page   /x",
+      "",
+      "## Cases",
+      "- invalid input   a (AC-3)",
+      "- not allowed   b (AC-1, AC-2)",
+      "- not found   c",
+      "- duplicate   d",
+      "- limits   e",
+      "- expiry   does not apply: f (AC-2)",
+      "- double submit   g",
+      "- outside service down   h",
+      "",
+      "## Acceptance criteria",
+      "- AC-1   one",
+    ]);
+
+    expect(findings).toEqual([]);
+    expect(flow.cases.map((entry) => [entry.answer, entry.criteria, entry.doesNotApply])).toEqual([
+      ["a", ["AC-3"], false],
+      ["b", ["AC-1", "AC-2"], false],
+      ["c", [], false],
+      ["d", [], false],
+      ["e", [], false],
+      ["does not apply: f", ["AC-2"], true],
+      ["g", [], false],
+      ["h", [], false],
+    ]);
   });
 });
 
@@ -427,6 +591,78 @@ describe("parseFeatureReadme", () => {
       ["GR1004", 10],
       ["GR1006", 12],
     ]);
+  });
+});
+
+describe("parseFeatureReadme: audience and why", () => {
+  const README = "grimoire/features/catalog/README.md";
+
+  function readme(extra: string[], body: string[]): ReturnType<typeof parseFeatureReadme> {
+    return parseFeatureReadme(
+      README,
+      [
+        "---",
+        "id: catalog",
+        "title: Catalog",
+        "status: shipped",
+        "version: 2.1",
+        "updated: 2026-02-28",
+        "apps: [web-client]",
+        "folders: [src/app/catalog]",
+        ...extra,
+        "---",
+        "# Catalog",
+        ...body,
+      ].join("\n"),
+      "catalog",
+      collect().sink,
+    );
+  }
+
+  it("reads audience and the Why paragraphs", () => {
+    const { sink, findings } = collect();
+    const result = parseFeatureReadme(
+      README,
+      [
+        "---",
+        "id: catalog",
+        "title: Catalog",
+        "status: shipped",
+        "version: 2.1",
+        "updated: 2026-02-28",
+        "apps: [web-client]",
+        "folders: [src/app/catalog]",
+        "audience: [shoppers, store staff]",
+        "---",
+        "# Catalog",
+        "",
+        "Shoppers browse products.",
+        "",
+        "## Why",
+        "",
+        "Shoppers decide here",
+        "what to buy.",
+        "",
+        "Staff check it too.",
+        "",
+        "## Flows",
+        "- browse   list products",
+      ].join("\n"),
+      "catalog",
+      sink,
+    );
+
+    expect(findings).toEqual([]);
+    expect(result.audience.map((item) => item.value)).toEqual(["shoppers", "store staff"]);
+    expect(result.why).toBe("Shoppers decide here what to buy.\n\nStaff check it too.");
+    expect(result.summary).toBe("Shoppers browse products.");
+  });
+
+  it("leaves audience empty and why null when not written", () => {
+    const result = readme([], ["", "Summary.", "", "## Why", "", "## Flows"]);
+
+    expect(result.audience).toEqual([]);
+    expect(result.why).toBeNull();
   });
 });
 

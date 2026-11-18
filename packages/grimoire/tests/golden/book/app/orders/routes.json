@@ -15,6 +15,7 @@
   "imports": [
     "src/app/orders/controllers/place-order.controller.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [],
   "routes": [
     {

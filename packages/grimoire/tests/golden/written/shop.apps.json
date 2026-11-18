@@ -83,6 +83,7 @@
           }
         },
         "purpose": null,
+        "screenshots": [],
         "blocks": [
           {
             "block": "New arrivals",
@@ -183,6 +184,7 @@
           }
         },
         "purpose": "Staff see the newest orders first.",
+        "screenshots": [],
         "blocks": [
           {
             "block": "Orders list",
@@ -376,6 +378,18 @@
           }
         },
         "purpose": "The first page a visitor sees.",
+        "screenshots": [
+          {
+            "alt": "The home page",
+            "written": "../../../../screenshots/web/product-page.png",
+            "path": "web/product-page.png",
+            "at": {
+              "file": "grimoire/apps/web-client/pages/home/README.md",
+              "line": 10,
+              "column": null
+            }
+          }
+        ],
         "blocks": [
           {
             "block": "Featured products",
@@ -396,7 +410,7 @@
             ],
             "at": {
               "file": "grimoire/apps/web-client/pages/home/README.md",
-              "line": 13,
+              "line": 15,
               "column": null
             }
           },
@@ -415,7 +429,7 @@
             ],
             "at": {
               "file": "grimoire/apps/web-client/pages/home/README.md",
-              "line": 14,
+              "line": 16,
               "column": null
             }
           },
@@ -431,7 +445,7 @@
             "changesWith": [],
             "at": {
               "file": "grimoire/apps/web-client/pages/home/README.md",
-              "line": 15,
+              "line": 17,
               "column": null
             }
           }
@@ -465,7 +479,7 @@
                 "text": "second row, under Featured products",
                 "at": {
                   "file": "grimoire/apps/web-client/pages/home/blocks/new-arrivals.md",
-                  "line": 7,
+                  "line": 9,
                   "column": null
                 }
               },
@@ -474,7 +488,7 @@
                 "text": "a grid of up to 20 products",
                 "at": {
                   "file": "grimoire/apps/web-client/pages/home/blocks/new-arrivals.md",
-                  "line": 8,
+                  "line": 10,
                   "column": null
                 }
               },
@@ -483,7 +497,19 @@
                 "text": "one row that scrolls sideways",
                 "at": {
                   "file": "grimoire/apps/web-client/pages/home/blocks/new-arrivals.md",
-                  "line": 9,
+                  "line": 11,
+                  "column": null
+                }
+              }
+            ],
+            "screenshots": [
+              {
+                "alt": "The new arrivals row",
+                "written": "../../../../../screenshots/web/product-page.png",
+                "path": "web/product-page.png",
+                "at": {
+                  "file": "grimoire/apps/web-client/pages/home/blocks/new-arrivals.md",
+                  "line": 7,
                   "column": null
                 }
               }
@@ -523,6 +549,7 @@
           }
         },
         "purpose": "One product with its price, stock and the order button.",
+        "screenshots": [],
         "blocks": [
           {
             "block": "Details",

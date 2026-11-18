@@ -84,6 +84,7 @@ export const DEVTOOLS_ERROR_MESSAGES: Record<DevtoolsErrorCode, string> = {
   "request.not-found":
     "This request is no longer stored. Requests are kept for a limited time (24 hours by default).",
   "request.invalid-filter": "A filter value is not valid. Check the status, method and dates.",
+  "share.not-found": "This share link no longer exists or is already revoked. Reload the list.",
   "stream.too-many":
     "Too many live views are open for this session. Close another dashboard tab and reload.",
   "input.invalid": "Some fields are missing or not valid. Check the form and try again.",
@@ -119,6 +120,7 @@ export const DEVTOOLS_ERROR_STATUS: Record<DevtoolsErrorCode, number> = {
   "explain.failed": 502,
   "request.not-found": 404,
   "request.invalid-filter": 400,
+  "share.not-found": 404,
   "stream.too-many": 429,
   "input.invalid": 422,
   "server.error": 500,

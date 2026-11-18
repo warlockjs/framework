@@ -11,6 +11,7 @@
   --gm-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --gm-focus: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--gm-gap);
   min-width: 0;
   max-width: 100%;
@@ -75,23 +76,56 @@
 /* Header: tabs and search */
 .grimoire-header {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+  min-width: 0;
 }
 .grimoire-tabs {
   display: flex;
   gap: 4px;
   padding: 4px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
   border-radius: var(--gm-radius);
-  background: var(--muted);
+  /* Scroll shadows: an edge darkens while more tabs sit past it (the "local" covers hide it at the ends). */
+  background-color: var(--muted);
+  background-image:
+    linear-gradient(to right, var(--muted) 40%, transparent),
+    linear-gradient(to left, var(--muted) 40%, transparent),
+    radial-gradient(
+      farthest-side at 0 50%,
+      color-mix(in srgb, var(--foreground) 28%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      farthest-side at 100% 50%,
+      color-mix(in srgb, var(--foreground) 28%, transparent),
+      transparent
+    );
+  background-position:
+    left center,
+    right center,
+    left center,
+    right center;
+  background-size:
+    32px 100%,
+    32px 100%,
+    14px 100%,
+    14px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
 }
 .grimoire-root .grimoire-tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   flex: none;
+  scroll-snap-align: center;
   min-height: 40px;
   padding: 0 14px;
+  white-space: nowrap;
   border-radius: calc(var(--gm-radius) - 3px);
   color: var(--muted-foreground);
   font-weight: 600;
@@ -208,6 +242,7 @@
 }
 .grimoire-view {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--gm-gap);
   min-width: 0;
 }
@@ -625,6 +660,287 @@
   overflow-wrap: anywhere;
 }
 
+
+/* Inline code, ids that never wrap, headline */
+.grimoire-root .grimoire-code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-family: var(--gm-mono);
+  font-size: 0.88em;
+  overflow-wrap: anywhere;
+}
+.grimoire-root .grimoire-nowrap {
+  white-space: nowrap;
+}
+.grimoire-headline {
+  color: var(--muted-foreground);
+  font-size: 15px;
+  font-weight: 600;
+}
+.grimoire-subhead {
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
+.grimoire-stat-small {
+  font-size: 20px;
+}
+div.grimoire-stat {
+  cursor: default;
+}
+
+/* Sub-tabs inside a view (file sets of a step) */
+.grimoire-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.grimoire-root .grimoire-subtab {
+  flex: none;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--input);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.grimoire-root .grimoire-subtab.is-active {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-foreground);
+}
+.grimoire-root .grimoire-filter.is-active {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-foreground);
+}
+.grimoire-root a.grimoire-filter {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+/* Flow page: mini header, switcher, health strip, fix next */
+.grimoire-minihead {
+  display: none;
+}
+.grimoire-switcher {
+  display: inline-flex;
+  gap: 12px;
+  margin-left: auto;
+}
+.grimoire-pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.grimoire-root .grimoire-neighbour {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+  text-decoration: none;
+}
+.grimoire-root .grimoire-neighbour.is-next {
+  margin-left: auto;
+  text-align: right;
+}
+.grimoire-fixnext {
+  border-left: 4px solid var(--warning);
+}
+.grimoire-fixnext.is-good {
+  border-left-color: var(--success);
+}
+.grimoire-fixnext-lead {
+  overflow-wrap: anywhere;
+}
+.grimoire-copyline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.grimoire-copyline .grimoire-code {
+  flex: 1 1 260px;
+  padding: 8px 10px;
+  user-select: all;
+}
+
+/* Journey: a vertical stepper */
+.grimoire-stepper {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.grimoire-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  padding-bottom: 18px;
+}
+.grimoire-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 36px;
+  bottom: 0;
+  left: 17px;
+  width: 2px;
+  background: var(--border);
+}
+.grimoire-step-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--brand);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--brand);
+}
+.grimoire-step-body {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+.grimoire-step-head,
+.grimoire-step-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+.grimoire-step-target {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.grimoire-linked {
+  padding: 8px 10px;
+  border-radius: calc(var(--gm-radius) - 2px);
+  background: var(--muted);
+  overflow-wrap: anywhere;
+}
+.grimoire-step-files {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--gm-radius) - 2px);
+  background: var(--background);
+}
+.grimoire-step-files-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.grimoire-module-group h5 {
+  margin: 8px 0 4px;
+  color: var(--muted-foreground);
+  font-family: var(--gm-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.grimoire-expand {
+  display: grid;
+  min-width: 0;
+}
+.grimoire-expand:empty {
+  display: none;
+}
+
+/* Proof rows */
+.grimoire-proofs,
+.grimoire-proof-tests,
+.grimoire-cases,
+.grimoire-check-features {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.grimoire-proof {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--gm-radius) - 2px);
+  background: var(--background);
+  scroll-margin-top: 72px;
+}
+.grimoire-proof-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.grimoire-proof-text {
+  overflow-wrap: anywhere;
+}
+.grimoire-proof-tests {
+  gap: 4px;
+  font-size: 13px;
+}
+.grimoire-proof-tests li {
+  overflow-wrap: anywhere;
+}
+.grimoire-cases li {
+  overflow-wrap: anywhere;
+}
+.grimoire-details summary {
+  min-height: 32px;
+  color: var(--muted-foreground);
+  font-weight: 600;
+  cursor: pointer;
+}
+.grimoire-details[open] summary {
+  margin-bottom: 6px;
+}
+
+/* Check groups */
+.grimoire-check-filters {
+  align-items: stretch;
+}
+.grimoire-check-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.grimoire-check-head h3 {
+  flex: 1 1 200px;
+  overflow-wrap: anywhere;
+}
+.grimoire-check-feature-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.grimoire-check-feature-row > :first-child {
+  flex: 1 1 140px;
+  overflow-wrap: anywhere;
+}
+.grimoire-paged {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 /* Small screens and touch */
 @media (max-width: 640px) {
   .grimoire-facts {
@@ -637,18 +953,127 @@
   .grimoire-root h2 {
     font-size: 19px;
   }
+  .grimoire-card {
+    padding: 12px;
+  }
+
+  /* No tables: every row is a card and every cell names its column. */
+  .grimoire-scroll:has(> .grimoire-table) {
+    overflow-x: visible;
+  }
+  .grimoire-table,
+  .grimoire-table tbody,
+  .grimoire-table tr,
+  .grimoire-table td {
+    display: block;
+    width: 100%;
+  }
+  .grimoire-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .grimoire-table tr {
+    margin-bottom: 10px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--gm-radius) - 2px);
+    background: var(--background);
+  }
+  .grimoire-table td {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--border);
+    overflow-wrap: anywhere;
+  }
+  .grimoire-table td:last-child {
+    border-bottom: 0;
+  }
+  .grimoire-table td::before {
+    content: attr(data-label);
+    color: var(--muted-foreground);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .grimoire-table td:empty {
+    display: none;
+  }
+  .grimoire-svg {
+    min-width: 560px;
+  }
+
+  /* The flow page keeps its title in view and moves prev/next to the bottom. */
+  .grimoire-minihead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 -2px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--gm-radius) - 2px);
+    background: var(--card);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--foreground) 10%, transparent);
+  }
+  .grimoire-minihead strong {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .grimoire-minihead .grimoire-pill,
+  .grimoire-minihead .grimoire-muted {
+    flex: none;
+  }
+  .grimoire-switcher {
+    display: none;
+  }
+  .grimoire-pager {
+    flex-direction: column;
+  }
+  .grimoire-root .grimoire-neighbour.is-next {
+    margin-left: 0;
+    text-align: left;
+  }
+  .grimoire-step {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .grimoire-step-marker {
+    width: 30px;
+    height: 30px;
+  }
+  .grimoire-step:not(:last-child)::before {
+    top: 30px;
+    left: 14px;
+  }
+  .grimoire-toolbar .grimoire-sort {
+    width: 100%;
+  }
 }
 @media (pointer: coarse) {
   .grimoire-root .grimoire-tab,
   .grimoire-root .grimoire-hit {
     min-height: 44px;
   }
-  .grimoire-root .grimoire-more {
+  .grimoire-root .grimoire-more,
+  .grimoire-root .grimoire-subtab {
     min-height: 44px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .grimoire-skeleton-block {
     animation: none;
+  }
+  .grimoire-tabs {
+    scroll-behavior: auto;
   }
 }

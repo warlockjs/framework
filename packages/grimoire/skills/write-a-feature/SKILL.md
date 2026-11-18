@@ -62,11 +62,16 @@ version: 3.0
 updated: 2026-11-16
 apps: [web-client, mobile]
 folders: [src/app/catalog, src/web/$sites/client/products]
+audience: [shoppers, store staff]
 ---
 
 # Product catalog
 
 Customers browse products, search them and see what is new.
+
+## Why
+
+Shoppers decide what to buy from the catalog, so it has to be quick to browse and clear about what is new.
 
 ## Flows
 
@@ -78,6 +83,9 @@ Customers browse products, search them and see what is new.
 
 - affected by orders/place-order (lowers stock)
 ```
+
+`audience` (optional) lists who the feature is for, in plain words. `## Why` (optional) says why the
+feature exists in a few sentences. Without `audience`, readers use the `who` of the flows.
 
 `id` never changes. `folders` are the folders whose files belong to this feature. An entry with a
 code-file extension names one file (`src/web/components/client/home/pricing-table.tsx`), for a
@@ -100,6 +108,15 @@ who: customer
 
 # Save a product to the wishlist
 
+A customer saves a product they like and finds it again later on their wishlist.
+
+## Story
+
+1. The customer opens a product and taps "Save for later".
+2. The product shows a filled heart.
+   ![The saved product](../../../screenshots/web/wishlist-saved.png)
+3. Later, the customer opens their wishlist and sees the product there.
+
 ## Steps
 
 1. page /products/:id
@@ -116,7 +133,7 @@ who: customer
 - invalid input a product id that is not an id → 422
 - not allowed guest → sent to sign in, then back to the product
 - not found the product does not exist → 404
-- duplicate already saved → stays saved, no error
+- duplicate already saved → stays saved, no error (AC-2)
 - limits at most 200 products
 - expiry does not apply: saved products do not expire
 - double submit two taps save once
@@ -130,6 +147,23 @@ who: customer
 - AC-4 [mobile] the product card has a save button
 ```
 
+**Summary.** The paragraph under the `# Title`: one or two plain sentences saying who does what and
+what they get. A flow with none gets a warning (`GR1030`).
+
+**Story.** Optional. Numbered sentences in the user's words, without file names or code, for readers
+who do not read code. Indent a second line to continue a sentence. An image line
+`![alt](path)` under a step attaches a screenshot to it.
+
+**Screenshots.** Keep image files in `grimoire/screenshots/` (any subfolders; `.png`, `.jpg`,
+`.jpeg`, `.webp` or `.gif`). Write the path relative to the Markdown file, so it also shows on a git
+host (`../../../screenshots/web/wishlist-saved.png` from a flow file), or start it with
+`/grimoire/screenshots/`. An image outside that folder is a warning (`GR1029`), a missing file too
+(`GR2014`).
+
+**Product map.** The Grimoire tab has a Product map for readers who are not developers. They see the
+flow summary, the feature's why and audience, the story in plain words and the screenshots there,
+so write them for a person who has never opened the code.
+
 **Steps.** Each step has a kind and the name used in code: `page`, `route`, `mail`,
 `notification`, `job`, `event`, `outside service`. Use `affects` for an effect on another
 feature (`affects   catalog/stock`). Warlock checks every name exists. A mail is a `*.mail.ts` or
@@ -140,7 +174,8 @@ When two sites, or a site and the mobile app, have a page with the same path, na
 the path in brackets: `page   /support [web-admin]`. The step then looks in that app only (its
 pages, or its screens for a mobile app). Without brackets it looks in the apps the feature lists.
 
-**Cases.** Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
+**Cases.** End a case line with `(AC-n)` (or `(AC-1, AC-2)`) to link it to the criterion that
+proves it; a number the flow does not have is an error (`GR2013`). Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
 expiry, double submit, outside service down), each with a case or "does not apply" and the
 reason. A flow that skips one gets a finding. Do not invent cases beyond the questions unless the owner described one.
 

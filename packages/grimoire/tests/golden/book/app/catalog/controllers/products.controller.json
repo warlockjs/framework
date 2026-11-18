@@ -19,6 +19,9 @@
     "src/app/catalog/repositories/products.repository.ts",
     "src/app/shared/utils/money.ts"
   ],
+  "typeOnlyImports": [
+    "src/app/shared/utils/money.ts"
+  ],
   "importedBy": [
     "src/app/catalog/routes.ts"
   ],

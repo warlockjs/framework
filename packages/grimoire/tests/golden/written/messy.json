@@ -91,6 +91,8 @@
           }
         },
         "summary": "Customers find products by name. A second line of the same paragraph.",
+        "audience": [],
+        "why": null,
         "flows": [
           {
             "name": "find",
@@ -234,6 +236,8 @@
               "column": null
             }
           },
+          "summary": "A customer types some words and sees the products that match.",
+          "story": [],
           "steps": [
             {
               "index": 1,
@@ -291,6 +295,7 @@
               "fixed": true,
               "answer": "an empty query shows nothing",
               "doesNotApply": false,
+              "criteria": [],
               "at": {
                 "file": "grimoire/features/search/flows/find.md",
                 "line": 17,
@@ -302,6 +307,7 @@
               "fixed": true,
               "answer": "does not apply: search is public",
               "doesNotApply": true,
+              "criteria": [],
               "at": {
                 "file": "grimoire/features/search/flows/find.md",
                 "line": 18,
@@ -313,6 +319,7 @@
               "fixed": true,
               "answer": "no match shows \"nothing found\"",
               "doesNotApply": false,
+              "criteria": [],
               "at": {
                 "file": "grimoire/features/search/flows/find.md",
                 "line": 19,
@@ -324,6 +331,7 @@
               "fixed": true,
               "answer": "at most 50 results, shown 10 at a time",
               "doesNotApply": false,
+              "criteria": [],
               "at": {
                 "file": "grimoire/features/search/flows/find.md",
                 "line": 20,
@@ -492,6 +500,7 @@
             }
           },
           "purpose": "What a customer sees after typing a query.",
+          "screenshots": [],
           "blocks": [
             {
               "block": "Result list",
@@ -577,7 +586,8 @@
                     "column": null
                   }
                 }
-              ]
+              ],
+              "screenshots": []
             }
           ]
         }

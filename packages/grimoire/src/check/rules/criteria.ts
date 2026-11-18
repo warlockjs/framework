@@ -1,5 +1,6 @@
 /**
- * GR4001–GR4002: criteria and the `@proves` lines that name them.
+ * GR2013 and GR4001–GR4002: criteria, the cases that name them and the
+ * `@proves` lines that name them.
  */
 import { createFinding } from "../../codes";
 import type { GrimoireFinding } from "../../contracts/findings";
@@ -58,6 +59,35 @@ export function checkProofTargets(snapshot: GrimoireSnapshot): GrimoireFinding[]
         flow: proof.ref,
       }),
     );
+  }
+
+  return findings;
+}
+
+/** GR2013: a case that ends in `(AC-n)` naming a criterion its flow does not have. */
+export function checkCaseCriteria(snapshot: GrimoireSnapshot): GrimoireFinding[] {
+  const findings: GrimoireFinding[] = [];
+
+  for (const feature of snapshot.written.features) {
+    for (const flow of feature.flows) {
+      const known = new Set(flow.criteria.map((criterion) => criterion.id));
+
+      for (const entry of flow.cases) {
+        for (const id of entry.criteria) {
+          if (known.has(id)) continue;
+
+          findings.push(
+            createFinding({
+              code: "GR2013",
+              message: `the case "${entry.question}" in ${flow.ref} names ${id}, which the flow does not have`,
+              at: entry.at,
+              feature: feature.id,
+              flow: flow.ref,
+            }),
+          );
+        }
+      }
+    }
   }
 
   return findings;

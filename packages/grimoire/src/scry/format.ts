@@ -272,6 +272,16 @@ const STATUS_TEXT: Record<CriterionStatus, string> = {
   "no-test": "no test",
 };
 
+/** ` (+12 reachable, 3 type-only)`: what a step reaches beyond its entry file; empty when nothing. */
+function reachNote(step: FlowBookmapStep): string {
+  const parts = [
+    ...(step.files.length > 1 ? [`+${step.files.length - 1} reachable`] : []),
+    ...(step.typeOnlyFiles.length > 0 ? [`${step.typeOnlyFiles.length} type-only`] : []),
+  ];
+
+  return parts.length === 0 ? "" : ` (${parts.join(", ")})`;
+}
+
 function stepLines(steps: readonly FlowBookmapStep[]): string[] {
   const typeWidth = Math.max(0, ...steps.map((step) => step.type.length));
   const targetWidth = Math.max(0, ...steps.map((step) => step.target.length));
@@ -284,7 +294,7 @@ function stepLines(steps: readonly FlowBookmapStep[]): string[] {
           ? step.found === null && step.type === "route"
             ? "no route facts"
             : "—"
-          : `${step.entry}${step.files.length > 1 ? ` (+${step.files.length - 1} files)` : ""}`;
+          : `${step.entry}${reachNote(step)}`;
 
     return `${step.index}. ${step.type.padEnd(typeWidth)}  ${step.target.padEnd(targetWidth)} ${where}`;
   });
@@ -323,6 +333,7 @@ function formatFlow(result: ScryFlowResult): string[] {
       `${flow.status.value} since ${flow.since.value}`,
       `who ${flow.who.value}`,
     ].join("  "),
+    ...(flow.summary === null ? [] : [flow.summary]),
     ...stepLines(result.bookmap.steps),
     ...section(
       "differs",

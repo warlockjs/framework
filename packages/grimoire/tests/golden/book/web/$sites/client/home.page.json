@@ -18,6 +18,7 @@
   "imports": [
     "src/web/$sites/client/home.setup.ts"
   ],
+  "typeOnlyImports": [],
   "importedBy": [],
   "routes": [
     {

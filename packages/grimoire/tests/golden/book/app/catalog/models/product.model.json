@@ -18,6 +18,7 @@
     "@warlock.js/cascade"
   ],
   "imports": [],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/app/catalog/repositories/products.repository.ts"
   ],

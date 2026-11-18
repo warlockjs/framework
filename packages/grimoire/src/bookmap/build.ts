@@ -274,7 +274,10 @@ function featureBookmap(
     );
   }
 
-  const reached = new Set(flows.flatMap((flow) => flow.steps.flatMap((step) => step.files)));
+  // Ownership coverage (GR3006) counts type-only reach too.
+  const reached = new Set(
+    flows.flatMap((flow) => flow.steps.flatMap((step) => [...step.files, ...step.typeOnlyFiles])),
+  );
 
   return {
     schemaVersion: BOOK_SCHEMA_VERSION,
@@ -425,7 +428,7 @@ export function annotationsFrom(
 
   for (const map of Object.values(collected.flows)) {
     for (const step of map.steps) {
-      for (const file of step.files) {
+      for (const file of [...step.files, ...step.typeOnlyFiles]) {
         const set = flowsOf.get(file) ?? new Set<string>();
         set.add(map.ref);
         flowsOf.set(file, set);

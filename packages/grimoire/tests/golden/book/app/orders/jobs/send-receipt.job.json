@@ -18,6 +18,7 @@
     "@warlock.js/queue"
   ],
   "imports": [],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/app/orders/services/place-order.service.ts"
   ],

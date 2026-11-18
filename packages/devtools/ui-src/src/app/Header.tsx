@@ -73,6 +73,11 @@ export function Header({
               <MenuLink href="#/admin/settings" onSelect={close}>
                 Settings
               </MenuLink>
+              {session.share?.enabled ? (
+                <MenuLink href="#/admin/shares" onSelect={close}>
+                  Share links
+                </MenuLink>
+              ) : null}
             </>
           )}
         </Menu>

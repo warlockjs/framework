@@ -18,6 +18,7 @@
   ],
   "packages": [],
   "imports": [],
+  "typeOnlyImports": [],
   "importedBy": [
     "src/app/catalog/controllers/products.controller.ts"
   ],

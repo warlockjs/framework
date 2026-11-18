@@ -10,6 +10,7 @@ import type {
 import type { DevtoolsInsights } from "../production/insights/types";
 import type { DevtoolsAgentTraceSource } from "../sources/agent-trace-source";
 import type { DevtoolsAiSource } from "../sources/ai-source";
+import type { MountedDevtoolsPanel } from "../panels";
 import type { ProcessPanel } from "../process-panel";
 import type {
   DevtoolsCollector,
@@ -68,7 +69,7 @@ export type MountDevtoolsRoutesDeps = {
   /** The app's process list behind the built-in Processes panel. */
   processPanel?: ProcessPanel;
   /** Panels mounted after the built-in ones; an invalid panel or a reused id throws. */
-  panels?: readonly DevtoolsPanel[];
+  panels?: readonly (DevtoolsPanel | MountedDevtoolsPanel)[];
   collector: DevtoolsCollector;
   /** Optional Panoptic feed, attached only in development. */
   ai?: DevtoolsAiSource;

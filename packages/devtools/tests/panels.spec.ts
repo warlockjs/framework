@@ -1,10 +1,12 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import Fastify from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCollector } from "../src/collector";
 import { resolveDevtoolsOptions } from "../src/options";
-import { checkDevtoolsPanels } from "../src/panels";
+import { checkDevtoolsPanels, listPanelInfos } from "../src/panels";
 import { mountDevtoolsRoutes } from "../src/server";
 import type { DevtoolsOptions, DevtoolsPanel } from "../src/types";
 
@@ -133,8 +135,8 @@ describe("registered panels", () => {
     expect(ids.slice(0, 3)).toEqual(["requests", "queries", "routes"]);
     expect(tabs.find((tab) => tab.id === "api")).toMatchObject({ type: "built-in" });
     expect(tabs.slice(-2)).toEqual([
-      { id: "processes", title: "Processes", type: "package" },
-      { id: "test-panel", title: "Test <panel>", type: "package" },
+      { id: "processes", title: "Processes", type: "package", shareable: false },
+      { id: "test-panel", title: "Test <panel>", type: "package", shareable: false },
     ]);
   });
 
@@ -294,5 +296,145 @@ describe("panel registration checks", () => {
         }),
       ]),
     ).not.toThrow();
+  });
+});
+
+describe("panel files and share declarations", () => {
+  const dir = path.join(fixtures, "..");
+
+  it("accepts files with the default extensions, and a file: URL folder", () => {
+    const [byPath] = checkDevtoolsPanels([testPanel({ files: { dir } })]);
+    const [byUrl] = checkDevtoolsPanels([testPanel({ files: { dir: pathToFileURL(dir) } })]);
+
+    expect(byPath?.files).toEqual({
+      dir,
+      extensions: [".png", ".jpg", ".jpeg", ".webp", ".gif"],
+    });
+    expect(byUrl?.files?.dir).toBe(dir);
+    expect(checkDevtoolsPanels([testPanel()])[0]?.files).toBeNull();
+    expect(checkDevtoolsPanels([testPanel()])[0]?.share).toBeNull();
+  });
+
+  it("keeps the listed extensions", () => {
+    const [panel] = checkDevtoolsPanels([testPanel({ files: { dir, extensions: [".png"] } })]);
+
+    expect(panel?.files?.extensions).toEqual([".png"]);
+  });
+
+  it.each([
+    ["a relative folder", { dir: "shots" }, "needs files.dir to be an absolute path"],
+    ["a missing folder value", { dir: undefined }, "needs files.dir to be an absolute path"],
+    ["an empty list", { dir, extensions: [] }, "files.extensions that is not a list"],
+    ["an upper-case extension", { dir, extensions: [".PNG"] }, 'files.extensions entry ".PNG"'],
+    ["an extension with no dot", { dir, extensions: ["png"] }, 'files.extensions entry "png"'],
+    ["an svg", { dir, extensions: [".png", ".svg"] }, 'lists files.extensions entry ".svg"'],
+    ["html", { dir, extensions: [".html"] }, 'entry ".html"'],
+    ["htm", { dir, extensions: [".htm"] }, 'entry ".htm"'],
+    ["js", { dir, extensions: [".js"] }, 'entry ".js"'],
+  ])("rejects files with %s, naming the panel and the field", (_name, files, message) => {
+    expect(() =>
+      checkDevtoolsPanels([testPanel({ files: files as never })]),
+    ).toThrow(new RegExp(`Devtools panel "test-panel".*${message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  });
+
+  const share = (overrides: Record<string, unknown> = {}) => ({
+    view: path.join(fixtures, "view.js"),
+    routes: ["/search", "/items/:name"],
+    assets: ["graph.js"],
+    ...overrides,
+  });
+
+  it("accepts a share that points at the panel's GET routes and assets", () => {
+    const [panel] = checkDevtoolsPanels([
+      testPanel({ files: { dir }, share: share({ files: true }) as never }),
+    ]);
+
+    expect(panel?.share).toEqual({
+      view: path.join(fixtures, "view.js"),
+      routes: ["/search", "/items/:name"],
+      assets: ["graph.js"],
+      files: true,
+    });
+    expect(
+      checkDevtoolsPanels([testPanel({ share: share({ routes: [], assets: undefined }) as never })])[0]
+        ?.share,
+    ).toEqual({ view: path.join(fixtures, "view.js"), routes: [], assets: [], files: false });
+  });
+
+  it.each([
+    ["a relative view", { view: "view.js" }, "needs share.view"],
+    ["a missing view", { view: path.join(fixtures, "absent.js") }, "share.view module of devtools panel"],
+    ["routes that are not a list", { routes: "/search" }, "needs share.routes"],
+    ["a route the panel does not have", { routes: ["/nope"] }, 'share.routes entry "/nope"'],
+    ["a POST route", { routes: ["/items"] }, 'share.routes entry "/items"'],
+    ["an asset the panel does not have", { assets: ["x.css"] }, 'share.assets entry "x.css"'],
+    ["files without a folder", { files: true }, "share.files, but the panel has no files folder"],
+    ["files that are not a boolean", { files: "yes" }, "share.files to be true or false"],
+  ])("rejects a share with %s, naming the panel and the field", (_name, overrides, message) => {
+    expect(() =>
+      checkDevtoolsPanels([testPanel({ share: share(overrides) as never })]),
+    ).toThrow(new RegExp(`Devtools panel "test-panel".*${message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}|${message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+  });
+
+  it("reserves the id share", () => {
+    expect(() => checkDevtoolsPanels([testPanel({ id: "share" })])).toThrow(
+      'Devtools panel id "share" is used by the dashboard itself',
+    );
+  });
+
+  it("marks a panel that declares share as shareable in the tab list", () => {
+    const panels = checkDevtoolsPanels([testPanel({ share: share() as never })]);
+
+    expect(listPanelInfos(panels, []).find((tab) => tab.id === "test-panel")?.shareable).toBe(true);
+  });
+});
+
+describe("a panel's folder of images in development", () => {
+  it("serves a listed image and answers 404 for everything else", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "devtools-dev-files-"));
+
+    try {
+      writeFileSync(path.join(dir, "a.png"), "png");
+      writeFileSync(path.join(dir, "b.svg"), "<svg/>");
+
+      const app = mount([testPanel({ files: { dir } })]);
+      const ok = await app.inject({ url: "/__warlock/panels/test-panel/files/a.png", ...local });
+
+      expect(ok.statusCode).toBe(200);
+      expect(ok.headers["content-type"]).toBe("image/png");
+      expect(ok.headers["x-content-type-options"]).toBe("nosniff");
+      expect(ok.headers["cache-control"]).toBe("no-store");
+      expect(ok.body).toBe("png");
+
+      for (const url of [
+        "/__warlock/panels/test-panel/files/b.svg",
+        "/__warlock/panels/test-panel/files/missing.png",
+        "/__warlock/panels/test-panel/files/..%2fa.png",
+        "/__warlock/panels/nope/files/a.png",
+      ]) {
+        expect((await app.inject({ url, ...local })).statusCode, url).toBe(404);
+      }
+
+      // Not from a non-loopback socket.
+      expect(
+        (
+          await app.inject({
+            url: "/__warlock/panels/test-panel/files/a.png",
+            remoteAddress: "192.0.2.10",
+            headers: { host: "localhost:3000" },
+          })
+        ).statusCode,
+      ).toBe(404);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("answers 404 for a panel with no folder", async () => {
+    const app = mount();
+
+    expect(
+      (await app.inject({ url: "/__warlock/panels/test-panel/files/a.png", ...local })).statusCode,
+    ).toBe(404);
   });
 });
