@@ -140,6 +140,141 @@
   ],
   "releases": [
     {
+      "version": "5.57.0",
+      "id": "v5-57-0",
+      "date": "November 18, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "A modern devtools dashboard and a rebuilt Grimoire tab with a Features view, readable in light and dark, and fast to open on large apps.",
+      "highlights": [
+        "New dashboard look: a sidebar with grouped, icon-labelled tabs, a command palette (Ctrl/Cmd+K), a system / light / dark theme toggle and a slide-over menu on phones; every text colour meets WCAG AA contrast in both themes.",
+        "Every built-in tab opens with a description, summary figures and a filter bar with result counts; statuses, methods and log levels are colour-coded and rows open with the keyboard.",
+        "The Grimoire tab is rebuilt: Overview, Features, Apps, Tasks, Releases, Check and Modules, search with <code>/</code> and arrow keys, grouped and filterable lists, and an \"Opening the book…\" state.",
+        "In production the Grimoire tab keeps the opened book until it changes and opens it when the app starts, so the first visit does not wait.",
+        "<code>panels</code> accepts <code>[specifier, options]</code> entries, and <code>DEVTOOLS_PANEL_TOKENS</code> lists the CSS variables a package panel may use."
+      ],
+      "upgradeNotes": [
+        "Nothing to change for apps. A package panel that styled itself with CSS variables outside <code>DEVTOOLS_PANEL_TOKENS</code> should switch to the listed tokens."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.57.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 11,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The <code>panels</code> option accepts <code>[specifier, options]</code> entries. The options object is passed to the panel factory next to <code>root</code> and <code>mode</code>, for example <code>panels: [[\"@warlock.js/grimoire/devtools\", { ttlMs: 60_000 }]]</code>. An invalid entry is reported with what to change and skipped; the other panels still load."
+            },
+            {
+              "type": "Added",
+              "html": "<code>DEVTOOLS_PANEL_TOKENS</code>: the CSS variables a package panel stylesheet may use. Every one is defined in the light and the dark theme, and a spec checks the definitions, their WCAG AA contrast and the built-in panel views."
+            },
+            {
+              "type": "Added",
+              "html": "A command palette (Ctrl/Cmd+K, or the search button in the top bar) jumps to any tab, the account page or an admin page."
+            },
+            {
+              "type": "Added",
+              "html": "A theme toggle (system, light, dark) in the top bar, saved in the browser."
+            },
+            {
+              "type": "Added",
+              "html": "Package panels show a \"Loading &lt;title&gt;…\" state while their view loads, so a slow panel is never a blank area."
+            },
+            {
+              "type": "Changed",
+              "html": "The dashboard has a new look: a left sidebar with grouped, icon-labelled tabs (Monitor, Application, AI, Packages), a slim top bar, and a slide-over menu on narrow screens. Light and dark themes use a tinted palette with one brand colour, and every text colour meets WCAG AA contrast on both themes."
+            },
+            {
+              "type": "Changed",
+              "html": "Every built-in tab opens with a description and its actions, a row of summary figures, and a filter bar with result counts and a Clear filters action. Requests gains a status-class filter, Queries a Slow / N+1 / Errors filter, Errors a Source filter, and Logs a message search and a level control."
+            },
+            {
+              "type": "Changed",
+              "html": "Status codes, methods and log levels are colour-coded pills, durations show a bar sized against the rest of the list, table headers stay in view while scrolling, and rows open their detail with the keyboard as well as the mouse. Tables scroll inside their card on narrow screens."
+            },
+            {
+              "type": "Changed",
+              "html": "Detail views are split into titled sections with key/value grids and code blocks with copy buttons. The request detail has a Close button and a waterfall legend."
+            },
+            {
+              "type": "Changed",
+              "html": "Badges gain <code>success</code>, <code>warning</code>, <code>info</code>, <code>brand</code> and <code>neutral</code> tones, buttons gain <code>brand</code> and <code>soft</code>, and empty states show an icon and what to do next."
+            },
+            {
+              "type": "Changed",
+              "html": "Sign-in, account and admin screens use the new look."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/grimoire",
+          "slug": "grimoire",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The devtools Grimoire tab has a Features view: every feature with its status, version, summary and flows, with a status filter, a text filter, sorting and counts."
+            },
+            {
+              "type": "Added",
+              "html": "New <code>/features</code> data route. <code>/apps</code> rows carry each page or screen's route, heading, layout, blocks and whether it is confirmed or inferred, and <code>/summary</code> gains app, page, screen and release counts. Existing fields are unchanged."
+            },
+            {
+              "type": "Changed",
+              "html": "The Grimoire tab is rebuilt: a tab bar (Overview, Features, Apps, Tasks, Releases, Check, Modules) with counts and breadcrumbs, and a search box with the <code>/</code> shortcut, results grouped by type and arrow-key navigation."
+            },
+            {
+              "type": "Changed",
+              "html": "The Overview shows stat cards, recent releases and the top check problems. Apps groups pages and screens by route segment with a filter. Tasks, Releases, Check and Modules are filterable lists, and Check keeps what to fix apart from expected findings."
+            },
+            {
+              "type": "Changed",
+              "html": "The tab shows an \"Opening the book…\" state while a large book opens, and a failed view says what failed and what to do next."
+            },
+            {
+              "type": "Changed",
+              "html": "The tab uses the dashboard's colour tokens, so links and status text are readable in the light and the dark theme. The static export defines the same tokens for both themes."
+            },
+            {
+              "type": "Changed",
+              "html": "The tab keeps its snapshot until the book changes in production (no time limit) and starts opening the book when the panel is created, so the first view is fast on large apps. In development it serves the cached snapshot at once and refreshes it in the background; a failed refresh keeps the old snapshot. Set <code>ttlMs</code> through the panel options (<code>[specifier, options]</code> in devtools' <code>panels</code>) to choose a fixed reuse time."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 0,
+          "counts": [],
+          "items": []
+        }
+      ]
+    },
+    {
       "version": "5.56.0",
       "id": "v5-56-0",
       "date": "November 17, 2026",

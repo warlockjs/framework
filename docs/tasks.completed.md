@@ -22,7 +22,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
   undefined variable; Grimoire has Overview, Features, Apps, Tasks, Releases, Check and Modules views with search,
   filters and counts; a second open of an unchanged book in production does not reopen it; specs, docs, skills and
   changelogs ship with it.
-- Shipped: 5.57.0 (2026-11-18), release commit on `main` (tag `v5.57.0`).
+- Shipped: 5.57.0 (2026-11-18 05:52 UTC), release commit 2d75c0dc9 (tag `v5.57.0`), publish run 44243517250.
 - Verified: devtools typecheck, 957 server specs and 143 dashboard specs (new token and contrast spec, shell, palette,
   drawer and listing specs); grimoire typecheck and 491 specs (tokens, data routes, view, snapshot source); oxlint 0
   errors, format check, public-text check, docs build, dashboard bundle rebuilt (141 KB gzipped); screenshots of the

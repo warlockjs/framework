@@ -1,4 +1,19 @@
 {
+  "5.57.0": {
+    "publishedAt": "2026-11-18T05:52:24.804Z",
+    "matrix": "none",
+    "headline": "A modern devtools dashboard and a rebuilt Grimoire tab with a Features view, readable in light and dark, and fast to open on large apps.",
+    "highlights": [
+      "New dashboard look: a sidebar with grouped, icon-labelled tabs, a command palette (Ctrl/Cmd+K), a system / light / dark theme toggle and a slide-over menu on phones; every text colour meets WCAG AA contrast in both themes.",
+      "Every built-in tab opens with a description, summary figures and a filter bar with result counts; statuses, methods and log levels are colour-coded and rows open with the keyboard.",
+      "The Grimoire tab is rebuilt: Overview, Features, Apps, Tasks, Releases, Check and Modules, search with `/` and arrow keys, grouped and filterable lists, and an \"Opening the book…\" state.",
+      "In production the Grimoire tab keeps the opened book until it changes and opens it when the app starts, so the first visit does not wait.",
+      "`panels` accepts `[specifier, options]` entries, and `DEVTOOLS_PANEL_TOKENS` lists the CSS variables a package panel may use."
+    ],
+    "upgradeNotes": [
+      "Nothing to change for apps. A package panel that styled itself with CSS variables outside `DEVTOOLS_PANEL_TOKENS` should switch to the listed tokens."
+    ]
+  },
   "5.56.0": {
     "publishedAt": "2026-11-17T15:17:48.849Z",
     "matrix": "none",
