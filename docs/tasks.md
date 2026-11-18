@@ -8,6 +8,32 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## After 5.56.0: production monitor follow-ups
 
+### T-151 [bug] Monitor's closed cases answer Fastify's default 404, not the app's, when the app answers unknown URLs from a wildcard route
+
+- Source: owner, 2026-11-18, write-up https://claude.ai/artifact/R1udpAk9joCUQB5Rtnq7ed (seen live on an app on 5.56.0).
+- What and why: every closed case of the production monitor (wrong host, plain http with `requireHttps`, disabled,
+  tab off, no session, unknown asset) calls `reply.callNotFound()` inside the monitor's encapsulated Fastify context.
+  That only reaches a handler registered with `setNotFoundHandler`; core and web register none, and a `@warlock.js/web`
+  site answers unknown URLs from a root `GET /*` route (`route_not_found` body). So the monitor path answers
+  `{"message":"Route GET:/<path> not found","error":"Not Found","statusCode":404}` while any unknown URL gets the app's
+  `route_not_found` JSON. One request per candidate path tells which path is the monitor. It leaks existence only
+  (sign-in and second factor still apply), but it breaks the documented promise in `devtools/security.mdx:28` ("The
+  answer is the same as for any unknown URL of your app").
+- Evidence: `packages/devtools/src/production/http/mount.ts:142-146` (`notFound` → `reply.callNotFound()`), used at
+  `:236`, `:240`, `:243`, `:275`, `:284`, `:298`, `:302`, `:316` and by `registerUiAssets(instance, { notFound })` at
+  `:427`; `grep setNotFoundHandler packages/core/src packages/web/src` finds nothing.
+- Repro (ran 2026-11-18 on fastify 5.12.8 from this workspace): a root `app.get("/*")` answering 404 JSON, plus a plugin
+  under `/monitor-path` whose `onRequest` hook calls `reply.callNotFound()`. `GET /__nope__/` returns the wildcard's
+  body; `GET /monitor-path/` returns Fastify's default body. Distinguishable.
+- Suggested fix: answer closed cases the way the app answers an unknown URL: forward to the root wildcard/not-found
+  path (e.g. re-dispatch through the root instance or a core-registered not-found responder shared with web's
+  `route_not_found` builder), or a `production.notFound(request, reply)` option with that as the default. Spec: an app
+  with a web site wildcard and the monitor mounted gives byte-identical status, headers and body (apart from the echoed
+  path and request id) for a closed monitor URL and an unknown URL, in JSON and in the HTML (browser) variant. Fix the
+  `security.mdx` sentence if any difference stays.
+- Acceptance: the spec above passes for every closed case; changelog and docs updated.
+- Status: open. Unconfirmed parts: the HTML variant was not compared.
+
 ### T-146 [feature] Scheduler run history and queue counts for the Jobs tab
 
 - Source: 5.56.0 build, 2026-11-17.
