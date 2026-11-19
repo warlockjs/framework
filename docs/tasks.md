@@ -23,7 +23,8 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 ### T-181 [chore] Testcontainers-based integration suites cannot start on this server
 
 - Source: 5.60.0 live PostgreSQL run, 2026-11-19. The 7 cascade PostgreSQL suites that start their own containers
-  fail with ECONNRESET here and left 21 idle `postgres:16-alpine` containers behind (removal needs the owner).
+  fail with ECONNRESET here and left 21 idle `postgres:16-alpine` containers behind (stopped and removed 2026-11-19
+  at the owner's request; Docker still lists them as "Removal In Progress" because overlay2 reports the mounts busy).
 - What: give the integration harness a way to use an existing database from env (`LOCAL_PG_*` / a Mongo URL) for every
   suite, so live runs need one named `--network host` container and no testcontainers.
 - Status: open.
