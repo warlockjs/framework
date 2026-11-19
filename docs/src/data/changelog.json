@@ -140,6 +140,177 @@
   ],
   "releases": [
     {
+      "version": "5.61.0",
+      "id": "v5-61-0",
+      "date": "November 19, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Scheduler run history and queue counts in the devtools Jobs tab, closed monitor URLs that answer like any unknown URL, and a Grimoire dev tab that reads route facts from the running dev server.",
+      "highlights": [
+        "The devtools Jobs tab shows each schedule's last duration, last error, runs, failures and recent runs, and each queue's waiting, active, delayed, failed and completed counts.",
+        "Scheduler jobs keep a bounded run history (<code>job.history</code>, <code>job.stats</code>, <code>job.keepHistory(n)</code>); queue drivers gain an optional <code>counts()</code> and <code>queueCounts(queue)</code>.",
+        "Closed production monitor URLs answer through the app's own catch-all route, with the same body, headers, rate-limit headers and 429 as any unknown URL; core exposes <code>answerUnknownUrl(request, reply)</code>.",
+        "The Grimoire dev tab shows fresh routes on the first open without <code>warlock grimoire build</code> or a second boot, and the book is warmed in the background at dev start.",
+        "Grimoire flows with no writes may skip the <code>duplicate</code> and <code>double submit</code> questions, and the new <code>GR5010</code> warning checks backticked condition names in \"Changes with\"."
+      ],
+      "upgradeNotes": [
+        "A custom queue driver keeps working; implement <code>counts(queue)</code> to show counts in the Jobs tab."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.61.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 4
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The Jobs tab shows each schedule's last duration, last error, runs, failures and recent runs, and the job counts (waiting, active, delayed, failed, completed) of each queue. \"Counts not available\" appears only for a queue driver without <code>counts()</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Closed production monitor URLs answer exactly like any unknown URL of the app, including a web site's <code>route_not_found</code> answer (JSON and document), instead of Fastify's default 404. The app's global rate limit applies to them as to any unknown URL (same <code>x-ratelimit-*</code> headers, same 429), and an error of the app's catch-all gets the app's own error answer."
+            },
+            {
+              "type": "Fixed",
+              "html": "The Jobs tab finds the active queue driver; before, it could not and always said the queue was not available."
+            },
+            {
+              "type": "Fixed",
+              "html": "Error messages in the Jobs tab (last error, recent runs) are scrubbed like request errors: quoted values, emails and documents are removed."
+            },
+            {
+              "type": "Fixed",
+              "html": "The Queries tab works when production mode is enabled only through <code>devtoolsConnector</code> options; <code>queryEvents: true</code> is no longer needed."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/grimoire",
+          "slug": "grimoire",
+          "total": 5,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out the <code>duplicate</code> and <code>double submit</code> case questions; the other six are still required (<code>GR1012</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "New check <code>GR5010</code> (warning): a name written in backticks in a block table's \"Changes with\" that is not a condition declared in the app README. Plain text is never reported."
+            },
+            {
+              "type": "Added",
+              "html": "The dev Grimoire tab reads route, event and job facts from the running dev server, so the first open shows fresh routes without <code>warlock grimoire build</code> and without booting the app a second time. New <code>createWarlockAdapter({ live: true })</code>, <code>liveInspect()</code> and snapshot source option <code>liveFacts</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The dev Grimoire tab warms the book in the background when the dev server starts. On a 10,400-file app, the first open after the warm-up takes about 0.1 s instead of about 6.6 s; an open that comes before the warm-up ends still waits for it (about 6.7 s). Concurrent first requests share one build, as before. Streaming partial answers is not part of this release."
+            },
+            {
+              "type": "Fixed",
+              "html": "Docs: items written <code>name: text</code> in \"Changes with\" are checked against the app's conditions (<code>GR5002</code>); this was always so, but the docs said otherwise."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>answerUnknownUrl(request, reply)</code> on the router lets a plugin answer a refused request exactly like an unknown URL: for <code>GET</code> and <code>HEAD</code> through the app route that would match the URL without the plugin (with its params), for other methods through the catch-all route, with that route's rate limit (same headers, same bucket, same 429), hooks and handler. An error the route throws goes to Fastify's error handling. It returns <code>false</code> when no app route matches."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock dev</code> records which module registers each event listener. <code>startLiveEventRecording()</code> and <code>liveInspectOptions()</code> are new on <code>@warlock.js/core/tooling</code>, so tools can read route, event and job facts from the running dev server."
+            },
+            {
+              "type": "Fixed",
+              "html": "MongoDB query events are also turned on when the devtools production monitor is enabled through <code>devtoolsConnector({ production })</code> options."
+            },
+            {
+              "type": "Fixed",
+              "html": "A path registered with <code>excludeFromRequestLog()</code> no longer gets <code>Starting Request</code> / <code>Completed Request</code> log lines, so a private path stays out of the log."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>QueueDriver</code> gains an optional <code>counts(queue)</code> that returns <code>QueueCounts</code> (waiting, active, delayed, failed, completed). The BullMQ, local and memory drivers implement it, and <code>queueCounts(queue)</code> reads it from the active driver."
+            },
+            {
+              "type": "Added",
+              "html": "<code>currentQueueDriver()</code> is exported: the active driver without creating one (<code>undefined</code> before the first dispatch or worker), for tools that only read."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/scheduler",
+          "slug": "scheduler",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Each job keeps a bounded in-memory run history (default 20 runs, <code>job.keepHistory(n)</code>): start time, duration, outcome (success, failed or skipped) and error message, plus totals in <code>job.stats</code> (runs, failures, skips, last run, last duration, last error). Read them with <code>job.history</code> and <code>job.stats</code>."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.60.0",
       "id": "v5-60-0",
       "date": "November 19, 2026",

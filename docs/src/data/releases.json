@@ -1,4 +1,19 @@
 {
+  "5.61.0": {
+    "publishedAt": "2026-11-19T23:05:52.475Z",
+    "matrix": "none",
+    "headline": "Scheduler run history and queue counts in the devtools Jobs tab, closed monitor URLs that answer like any unknown URL, and a Grimoire dev tab that reads route facts from the running dev server.",
+    "highlights": [
+      "The devtools Jobs tab shows each schedule's last duration, last error, runs, failures and recent runs, and each queue's waiting, active, delayed, failed and completed counts.",
+      "Scheduler jobs keep a bounded run history (`job.history`, `job.stats`, `job.keepHistory(n)`); queue drivers gain an optional `counts()` and `queueCounts(queue)`.",
+      "Closed production monitor URLs answer through the app's own catch-all route, with the same body, headers, rate-limit headers and 429 as any unknown URL; core exposes `answerUnknownUrl(request, reply)`.",
+      "The Grimoire dev tab shows fresh routes on the first open without `warlock grimoire build` or a second boot, and the book is warmed in the background at dev start.",
+      "Grimoire flows with no writes may skip the `duplicate` and `double submit` questions, and the new `GR5010` warning checks backticked condition names in \"Changes with\"."
+    ],
+    "upgradeNotes": [
+      "A custom queue driver keeps working; implement `counts(queue)` to show counts in the Jobs tab."
+    ]
+  },
   "5.60.0": {
     "publishedAt": "2026-11-19T17:29:59.020Z",
     "matrix": "none",
