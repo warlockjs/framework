@@ -27,7 +27,12 @@ afterEach(() => {
 describe("readAppInfo", () => {
   it("reads only the name and version", () => {
     const root = project({
-      "package.json": { name: "sample-app", version: "1.5.6", scripts: { x: "y" }, secret: "token" },
+      "package.json": {
+        name: "sample-app",
+        version: "1.5.6",
+        scripts: { x: "y" },
+        secret: "token",
+      },
     });
 
     expect(readAppInfo(root)).toEqual({ name: "sample-app", version: "1.5.6" });
