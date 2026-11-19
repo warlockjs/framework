@@ -27,15 +27,15 @@ afterEach(() => {
 describe("readAppInfo", () => {
   it("reads only the name and version", () => {
     const root = project({
-      "package.json": { name: "formai", version: "1.5.6", scripts: { x: "y" }, secret: "token" },
+      "package.json": { name: "sample-app", version: "1.5.6", scripts: { x: "y" }, secret: "token" },
     });
 
-    expect(readAppInfo(root)).toEqual({ name: "formai", version: "1.5.6" });
+    expect(readAppInfo(root)).toEqual({ name: "sample-app", version: "1.5.6" });
   });
 
   it("is null when the file is missing or lacks a name or version", () => {
     expect(readAppInfo(project({}))).toBeNull();
-    expect(readAppInfo(project({ "package.json": { name: "formai" } }))).toBeNull();
+    expect(readAppInfo(project({ "package.json": { name: "sample-app" } }))).toBeNull();
     expect(readAppInfo(project({ "package.json": { version: "1.0.0" } }))).toBeNull();
   });
 });
