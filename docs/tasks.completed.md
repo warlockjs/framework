@@ -4,7 +4,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 
 ## 5.61.0 (2026-11-20)
 
-Shipped in 5.61.0. Verified by one typecheck, the strictness gate and every package's test suite on the final tree, plus a live Redis run of BullMQ counts and measured Grimoire first-open timings (`findings/5.61/reports/`).
+Shipped in 5.61.0 (npm 2026-11-19 23:05 UTC; release commits fb11c741e and 1cde18e7d, tag v5.61.0, publish run 44630058688). Verified by one typecheck, the strictness gate and every package's test suite on the final tree, plus a live Redis run of BullMQ counts and measured Grimoire first-open timings (`findings/5.61/reports/`).
 
 ### T-178 [feature] Dev Grimoire tab: collect route facts without booting the app a second time
 
