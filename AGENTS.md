@@ -36,6 +36,20 @@ agent-kit derives each agent's guide (CLAUDE.md, etc.) from this file.
   never hand the publish command back to the owner.
 - Major releases still need the owner's explicit go-ahead.
 
+## Devtools preview
+
+- The owner reviews devtools and Grimoire UI changes on a private preview before
+  the final verify pass: a large real app running on the local packages of this
+  repository, behind a password. Its address and folder are in the git-ignored
+  root `.env` (`DEVTOOLS_PREVIEW_URL`, `DEVTOOLS_PREVIEW_HOME`); the setup, start,
+  stop and rebuild scripts are described in the `README.md` inside
+  `DEVTOOLS_PREVIEW_HOME`. Never write the address into tracked files.
+- For UI feedback rounds, edit the UI, refresh the preview (a dashboard rebuild or
+  a reload), and send the owner the link. Don't run typechecks or test suites
+  between rounds; run them once, after the owner approves the changes.
+- Keep the preview running between rounds. Stop only its own recorded process
+  group, never by name or port.
+
 ## Skills
 
 Reusable playbooks live in `skills/<slug>/SKILL.md` and are synced into every
