@@ -19,7 +19,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
   acceptance: the MCP tools and the dev server reuse one opened book until the manifest or a written file changes, and
   `build --site` skips the rebuild when the book is fresh. First-open time of the tab is T-169.
 - Status: in progress for 5.59.0 (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ### T-159 [feature] Warlock logo, versions and logo colours in devtools and Grimoire; new flows and "What changed" views
 
@@ -39,7 +39,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
   adapter); specs, docs, skills and CHANGELOG entries; owner reviews a preview on a large real app before the final
   verify and the release.
 - Status: in progress (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ### T-160 [bug] GR3006 "owned file no flow reaches" fires on route middleware, migrations, seeds, commands, layouts and spec-only helpers
 
@@ -55,7 +55,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Unconfirmed: the layout/root component case was simulated with an unimported file; a fixture with a real layout mounting the component is the missing step. The 429 total came from the real CLI in the app, not from the script.
 - Acceptance: the regression spec passes (middleware reached; migration, seed, command, main, layout exempt by role; spec-only helper reached); a file of no such role still warns; docs, `use-the-grimoire` / `describe-an-app` skill text and CHANGELOG entry updated.
 - Status: in progress for 5.59.0 (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ### T-161 [bug] Grimoire tab in dev reports false GR5008 errors and a red health light because route facts are missing; Overview and Check word the route-facts state differently
 
@@ -66,7 +66,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Suggested fix: skip GR5008 when `routes === "missing"`, count only steps really checked, keep unchecked facts out of the health light; collect route facts from the live app in dev (or once on first open) so the state is `fresh` without a manual build; one shared wording for the state in Overview and Check.
 - Acceptance: the spec passes; Overview and Check never disagree on the state in a spec over the same snapshot; docs and CHANGELOG entry.
 - Status: in progress for 5.59.0 (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review. Dev self-collection of route facts was removed for safety; follow-up T-178.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review. Dev self-collection of route facts was removed for safety; follow-up T-178.
 
 ### T-162 [bug] Grimoire search indexes only a flow's ref and heading, so flows by title, summary, case or criterion words never show
 
@@ -77,7 +77,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Suggested fix: index summary, story, case text and criteria; rank written content above file paths; group results by type so one type cannot crowd out the rest; a business mode on the Product map that hides files and exports.
 - Acceptance: the spec passes; criteria ids (AC-n) are findable; docs and CHANGELOG entry.
 - Status: in progress for 5.59.0 (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ### T-163 [bug] CLI progress lines print the command signature ("grimoire <action> [release] completed", "Running scry [file]...")
 
@@ -88,7 +88,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Suggested fix: strip `<...>` and `[...]` argument tokens from the name in the display helpers (not from the registered name).
 - Acceptance: the spec passes for `<x>` and `[x]` forms; CHANGELOG entry.
 - Status: in progress for 5.59.0 (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ### T-164 [feature] Business-only static export of the Product map (small and share-safe), plus PDF or Docs export
 
@@ -97,7 +97,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Evidence: `packages/grimoire/src/devtools/site.ts:47` (`productOptions = { shared: false, errors: null }`); `:28` (`SITE_FILE_LIMIT = 3000`); `:144` (the per-file cut).
 - Acceptance: a `--product` option exports the share-safe product view only (no file paths or test names, opens on the Product map, no per-file answers) and is much smaller than the full export; a spec checks the output carries no file path; PDF or Docs export is a follow-up decision. Docs, skill and CHANGELOG entry.
 - Status: in progress for 5.59.0 (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ### T-165 [feature] Product map: show a missing test-results file as neutral grey "not measured", not "Needs attention"
 
@@ -106,7 +106,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Evidence: `packages/grimoire/src/devtools/product-map.ts:171` (`healthOf`) and `:205` (the "No test results recorded" reason); `packages/grimoire/src/devtools/view.spec.ts:412` pins the text.
 - Acceptance: with no results file the product view shows a grey "not measured" state; the developer view keeps the yellow warning; specs for both; docs and CHANGELOG entry.
 - Status: in progress for 5.59.0 (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ### T-166 [feature] Product map: sort features and flows, and filter "changed since"
 
@@ -115,7 +115,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Evidence: the feature list and its order are built in `packages/grimoire/src/devtools/product-map.ts` and rendered in `packages/grimoire/ui/product-map.js`.
 - Acceptance: sort by id, name, last updated and health (default stays stable); a "changed since" filter (date or release) in the product view; specs for the ordering and the filter; docs and CHANGELOG entry. Ranking by traffic needs a source the framework lacks (see T-158); not part of this task.
 - Status: in progress for 5.59.0 (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ### T-167 [feature] Devtools production auth: optional two-factor and a configurable common-password check
 
@@ -124,7 +124,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Evidence: `packages/devtools/src/production/options.ts:34` (type), `:66` (default `"admins"`), `:188-191` (validation); `packages/devtools/src/production/auth/service.ts:177-178` (`twoFactorRequired`), `:1595` (admin without a factor); `packages/devtools/src/production/auth/helpers.ts:31` (the hard-coded `COMMON_PASSWORDS` check; list in `auth/common-passwords.ts`).
 - Acceptance: `"off"` skips enrolment and the second step for every role, with the boot warning; `passwords.rejectCommon: false` accepts a common password, `minLength` is enforced; specs for each, docs (`devtools/security.mdx`, options reference), `packages/devtools/skills/SKILL.md` and CHANGELOG entry.
 - Status: in progress for 5.59.0, alongside T-159.
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ### T-173 [feature] `warlock check` reuses a fresh Vitest result for the same tree and sizes its test timeout
 
@@ -134,7 +134,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Acceptance: accept a recorded result for the same tree (a Vitest JSON report or the Grimoire reporter's results file, with a content hash of the tree) and skip the run when it matches; derive the default timeout from the last run's duration or print the measured duration in the WL8007 message; specs; docs, `warlock-check` skill and CHANGELOG entry. Estimated size: M.
 - Workaround in the app: run `warlock check --skip tests` right after `vitest run`.
 - Status: in progress for 5.59.0 (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ### T-174 [feature] Shorter per-file app boot in integration tests
 
@@ -150,7 +150,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
   a documented reset hook for app caches; measured boot share before/after on the spike app; specs, docs,
   `test-service` skill and CHANGELOG entry.
 - Status: in progress for 5.59.0 (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review. Shipped as experimental `tests.lifetime: "worker-isolated"`; real-app check 148.8 s to 129.7 s, setup 27% to 3%.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review. Shipped as experimental `tests.lifetime: "worker-isolated"`; real-app check 148.8 s to 129.7 s, setup 27% to 3%.
 
 ### T-175 [feature] Grimoire feature and flow pages: architecture-first layout with three new visual views
 
@@ -170,7 +170,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
   dashboard tokens only; old hash links still open the right page; specs for the new answer fields and views; docs and
   skill updates. Covers T-172 item 2 (findings wall).
 - Status: in progress on the preview (2026-11-19).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ### T-176 [bug] Devtools AI tab: one generic install paragraph for every reason the tab is empty
 
@@ -187,7 +187,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 - Acceptance: a spec per case for the source's message; the UI empty state uses title + body + code; docs line on the
   AI tab; CHANGELOG entry.
 - Status: open, after T-175 (shares the preview rebuild).
-- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+- Shipped: 5.59.0 (commit 147078d6e), verified by the 5.59.0 verify pass + Forma preview review.
 
 ## 5.58.0 (2026-11-18)
 

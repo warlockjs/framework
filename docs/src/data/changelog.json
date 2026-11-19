@@ -140,6 +140,208 @@
   ],
   "releases": [
     {
+      "version": "5.59.0",
+      "id": "v5-59-0",
+      "date": "November 19, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "The Warlock look in devtools and Grimoire, flow cards and a \"What changed\" timeline, test-result reuse in warlock check, and an experimental per-file isolated test lifetime.",
+      "highlights": [
+        "Devtools and the Grimoire tab use the Warlock palette and logo, show the framework and app versions, and tell apart the four reasons the AI tab is empty.",
+        "The Grimoire tab has flow cards, a \"What changed\" timeline, tabbed feature and flow pages, a feature map, written-text search and a sortable Product map; <code>warlock grimoire build --site --product</code> exports the share-safe map alone.",
+        "<code>warlock check</code> reuses a passing test result for the same tree (<code>--rerun-tests</code> runs it anyway) and sizes its test time limit from the last full run.",
+        "Experimental <code>tests.lifetime: \"worker-isolated\"</code> gives every test file a fresh module graph and clean Vitest state; one large app's test step went from 148.8 s to 129.7 s.",
+        "GR3006 and GR5008 no longer report false findings, and production devtools accept <code>twoFactor: \"off\"</code> and <code>passwords: { minLength, rejectCommon }</code>."
+      ],
+      "upgradeNotes": [
+        "Nothing to change for existing apps; <code>warlock check</code> may report a recorded test result, and <code>--rerun-tests</code> runs the suite."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.59.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/grimoire",
+          "slug": "grimoire",
+          "total": 13,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 8
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The adapter has an optional <code>host()</code> that reports the framework name, version and logo and the app's name and version (its <code>package.json</code>). The devtools tab shows them in the header and footer, and the static export does too. The Warlock adapter implements it."
+            },
+            {
+              "type": "Added",
+              "html": "The flow list shows flow cards with the counts that matter (steps, cases, criteria, proven criteria, unexpected findings), and <code>scry --feature</code> answers carry the same counts per flow."
+            },
+            {
+              "type": "Added",
+              "html": "A \"What changed\" timeline lists releases, tasks and changes with reference chips that jump to the feature or flow they name."
+            },
+            {
+              "type": "Added",
+              "html": "Feature and flow pages are tabbed. A feature map shows flows against apps, and the flow page's journey and health strip sit in their own tabs. A loading skeleton shows while the book opens."
+            },
+            {
+              "type": "Added",
+              "html": "The Product map sorts its features and shows what changed since a release you pick."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock grimoire build --site --product</code> exports the share-safe Product map only: no file paths, test names or per-file answers, and the page opens on the map."
+            },
+            {
+              "type": "Added",
+              "html": "Search indexes the written text of flows (summary, who, story, cases and criteria such as AC-5), and written content ranks above files and exports; hits are grouped by type."
+            },
+            {
+              "type": "Added",
+              "html": "<code>openGrimoire</code>'s snapshot source takes an opt-in <code>collectRoutes</code> option that collects route, event and job facts once when the book has none. It boots the app for inspection, so it is meant for tooling processes only, never for a process that serves the app; the devtools panel does not use it."
+            },
+            {
+              "type": "Changed",
+              "html": "The MCP server (and any long-running process that queries the book) keeps the opened book in memory between calls and opens it again only when a file or folder it lists changed; a one-off <code>warlock scry</code> call still opens the book once. <code>build --site</code> leaves the page alone when it was built from the same book; <code>--force</code> writes it again."
+            },
+            {
+              "type": "Changed",
+              "html": "Steps that could not be checked (no route facts yet) are counted as unchecked, apart from the missing ones, and never count against a flow's health."
+            },
+            {
+              "type": "Changed",
+              "html": "The shared Product map shows a grey \"not measured\" instead of a problem when no test results were recorded."
+            },
+            {
+              "type": "Fixed",
+              "html": "GR3006 no longer reports files that are reached: route middleware is followed, files with a role that runs by being present (migration, seed, command, main, layout, root) are exempt, and test helpers (files under <code>tests/</code>, <code>__tests__/</code>, <code>fixtures/</code>, <code>support/</code> or named <code>*.test-utils.*</code>) that only specs import count as reached. A source file that only its own spec imports still warns."
+            },
+            {
+              "type": "Fixed",
+              "html": "GR5008 is skipped for mail and notification entries when the book has no route facts, instead of reporting an entry the booted app would have confirmed."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 7,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 5
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "The dashboard uses the Warlock gold palette and logo, in the light and the dark theme, and shows the Warlock.js version in the sidebar header and the app's name and version in its footer. <code>DevtoolsSessionView</code> gains <code>warlockVersion</code> and <code>app</code>; both are <code>null</code> when signed out or not found, and only the app's own <code>package.json</code> name and version are read."
+            },
+            {
+              "type": "Added",
+              "html": "Production option <code>twoFactor: \"off\"</code> requires no second factor (an account that has one is still asked for it); boot logs a warning when it is off."
+            },
+            {
+              "type": "Added",
+              "html": "Production option <code>passwords: { minLength, rejectCommon }</code> sets the password rules for accounts, invites and the first admin (<code>minLength</code> is 8 or more, <code>rejectCommon</code> defaults to <code>true</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "The AI tab tells which of four reasons it is empty: <code>@warlock.js/ai</code> is missing, <code>@warlock.js/ai-panoptic</code> is missing, Panoptic failed to load (with the load error and both versions), or observation is off. Each shows a title, one line and the command to run."
+            },
+            {
+              "type": "Added",
+              "html": "A reconnect banner shows while the app is unreachable and panels refetch when it returns."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>/ai</code> answer carries <code>reason</code>, <code>title</code>, <code>command</code> and <code>detail</code> when unavailable; <code>message</code> stays."
+            },
+            {
+              "type": "Changed",
+              "html": "A too-short password answers with the configured minimum length."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock check</code> reuses a passing test result for the same tree: when the working tree matches the last passing full run (or a vitest JSON report from <code>--test-report</code>, default <code>node_modules/.cache/warlock/vitest-report.json</code>, also <code>WARLOCK_CHECK_TEST_REPORT</code>), the tests step reports that result instead of running the suite. The tree hash covers tracked and untracked files, the root <code>.env*</code> files and linked packages; a report counts only when it passed, lists every spec file and is newer than every file and folder, and a failure recorded for the same tree always runs the tests again. <code>--rerun-tests</code> runs it anyway."
+            },
+            {
+              "type": "Added",
+              "html": "Experimental <code>tests.lifetime: \"worker-isolated\"</code>: connectors boot once per worker like <code>\"worker\"</code>, and every test file also gets a fresh module graph and clean Vitest state (<code>vi.mock</code>, spies, stubbed env and globals, fake timers, module-level caches of application modules). The new <code>tests.resetAppCaches</code> hook clears caches the app keeps outside its own modules. It needs the same Vitest setup as <code>\"worker\"</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The test step's time limit is sized from the last full run (1.5 times its duration when that is longer than the 600 s default). <code>--test-timeout</code> and <code>WARLOCK_CHECK_TEST_TIMEOUT</code> still win."
+            },
+            {
+              "type": "Changed",
+              "html": "WL8007 messages say how long the test run took before it timed out, was killed or stopped."
+            },
+            {
+              "type": "Changed",
+              "html": "The setup recommendation mentions <code>tests.lifetime: \"worker-isolated\"</code> for specs that need a fresh module graph per file."
+            },
+            {
+              "type": "Fixed",
+              "html": "The \"Running ...\" and \"completed successfully\" lines of a CLI command show the arguments you passed instead of the registered placeholders: <code>Running grimoire build</code>, not <code>Running grimoire &lt;action&gt; [release]</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "Registering a model under a name that is already registered no longer warns while a test file runs under the experimental <code>tests.lifetime: \"worker-isolated\"</code>: each file imports its models again by design, so the duplicates are counted instead (one debug line per file with <code>WARLOCK_TEST_PROFILE=1</code>). Every other context warns as before."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.58.0",
       "id": "v5-58-0",
       "date": "November 18, 2026",

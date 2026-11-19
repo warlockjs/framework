@@ -1,4 +1,19 @@
 {
+  "5.59.0": {
+    "publishedAt": "2026-11-19T13:57:51.592Z",
+    "matrix": "none",
+    "headline": "The Warlock look in devtools and Grimoire, flow cards and a \"What changed\" timeline, test-result reuse in warlock check, and an experimental per-file isolated test lifetime.",
+    "highlights": [
+      "Devtools and the Grimoire tab use the Warlock palette and logo, show the framework and app versions, and tell apart the four reasons the AI tab is empty.",
+      "The Grimoire tab has flow cards, a \"What changed\" timeline, tabbed feature and flow pages, a feature map, written-text search and a sortable Product map; `warlock grimoire build --site --product` exports the share-safe map alone.",
+      "`warlock check` reuses a passing test result for the same tree (`--rerun-tests` runs it anyway) and sizes its test time limit from the last full run.",
+      "Experimental `tests.lifetime: \"worker-isolated\"` gives every test file a fresh module graph and clean Vitest state; one large app's test step went from 148.8 s to 129.7 s.",
+      "GR3006 and GR5008 no longer report false findings, and production devtools accept `twoFactor: \"off\"` and `passwords: { minLength, rejectCommon }`."
+    ],
+    "upgradeNotes": [
+      "Nothing to change for existing apps; `warlock check` may report a recorded test result, and `--rerun-tests` runs the suite."
+    ]
+  },
   "5.58.0": {
     "publishedAt": "2026-11-18T18:29:39.170Z",
     "matrix": "none",
