@@ -186,6 +186,15 @@ describe("dashboardSourceHash", () => {
     assert.equal(await dashboardSourceHash(fixture.packageDir), before);
   });
 
+  it("ignores tool caches under ui-src/node_modules", async () => {
+    const fixture = await createFixture();
+    const before = await dashboardSourceHash(fixture.packageDir);
+    await writeTree(fixture.packageDir, {
+      "ui-src/node_modules/.vite/vitest/results.json": '{"results":{}}\n',
+    });
+    assert.equal(await dashboardSourceHash(fixture.packageDir), before);
+  });
+
   it("changes when a covered source, the contracts or a pinned dependency changes", async () => {
     const fixture = await createFixture();
     const before = await dashboardSourceHash(fixture.packageDir);

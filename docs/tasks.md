@@ -324,6 +324,13 @@ T-100 and later are checked against 5.53.1.
   and makes main look red after a release.
 - Evidence: Windows job logs of runs on f1af13d90 (2026-11-14), df75c43e5, ba5bf3e6a and 9c57b53a9 (2026-11-16); the
   evidence screenshots the test writes under `.warlock/e2e/web-development/shared/run-*`.
+- 2026-11-20 (5.61.0 release commit fb11c741e, Windows run 44621635918): 4 of 4 attempts failed in this file: "shared"
+  timed out on "Count 1" (twice) and "Revision 2", and "development regression: identifiers" failed twice with
+  `expected undefined to be '_R_16_'` (an input's `dataset.hookId` read right after a click, before hydration set it).
+  The identifiers failure had not been seen before. The 5.61.0 runtime diff touches no client or dev hot-update code,
+  and the file passes 3 of 3 on Linux. Both failures point to slow hydration on the Windows runner. The workflow
+  uploads no artifacts, so no browser console was available: upload `.warlock/e2e` on failure first.
 - Acceptance: the cause is named (file-watch latency on Windows, a missed update, or the wait itself); the test passes in
-  20 consecutive Windows runs, or waits on the update event instead of a fixed timeout.
+  20 consecutive Windows runs, or waits on the update event instead of a fixed timeout; the identifiers checks wait for
+  hydration before reading `dataset` values.
 - Status: open.

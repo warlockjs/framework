@@ -38,13 +38,18 @@ export const DASHBOARD_BUILD_DEPENDENCIES = [
 const EXCLUDED_UI_DIRECTORIES = ["tests", "scripts"];
 const EXCLUDED_UI_FILES = ["README.md"];
 
-/** Every file under `directory` as a posix path relative to `packageDir`. */
+/**
+ * Every file under `directory` as a posix path relative to `packageDir`. `node_modules`
+ * folders are skipped: tool caches written there (Vite, Vitest) are not sources and
+ * are absent from a fresh checkout.
+ */
 async function listFiles(packageDir, directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
     const absolute = path.join(directory, entry.name);
     if (entry.isDirectory()) {
+      if (entry.name === "node_modules") continue;
       files.push(...(await listFiles(packageDir, absolute)));
     } else if (entry.isFile()) {
       files.push(path.relative(packageDir, absolute).split(path.sep).join("/"));
