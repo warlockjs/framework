@@ -486,6 +486,10 @@ export type DevtoolsSessionView = {
   methods: { totp: true; passkeys: boolean } | null;
   /** Read-only share links: `enabled` mirrors `production.share.enabled`; `null` when signed out and in development. */
   share: { enabled: boolean } | null;
+  /** The installed `@warlock.js/core` version; `null` when signed out or not found. */
+  warlockVersion: string | null;
+  /** The app's own `package.json` name and version (nothing else is read); `null` when signed out or not found. */
+  app: { name: string; version: string } | null;
 };
 
 /** `POST api/auth/login` body. */

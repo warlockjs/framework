@@ -67,7 +67,9 @@ export function PanelHost({ id, title, route, shared = false, share = null }: Pa
       root.className = "panel";
       root.dataset.panel = id;
 
-      const result = await module.default(buildPanelContext({ id, root, route, refresh, shared, share }));
+      const result = await module.default(
+        buildPanelContext({ id, root, route, refresh, shared, share }),
+      );
 
       if (!current) return;
 

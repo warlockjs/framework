@@ -33,7 +33,11 @@ describe("import graph", () => {
         importedBy: [],
       },
       { file: "form.ts", imports: [], importedBy: ["page.ts"] },
-      { file: "types.ts", imports: [{ specifier: "./db", file: "db.ts" }], importedBy: ["page.ts"] },
+      {
+        file: "types.ts",
+        imports: [{ specifier: "./db", file: "db.ts" }],
+        importedBy: ["page.ts"],
+      },
       { file: "db.ts", imports: [], importedBy: ["types.ts"] },
     ]);
 

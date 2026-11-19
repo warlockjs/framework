@@ -170,7 +170,13 @@ const flowAnswer = {
       message: "AC-2 has no test",
       at: null,
       expected: false,
-      subject: { feature: "catalog", flow: "catalog/new-arrivals", app: null, task: null, file: null },
+      subject: {
+        feature: "catalog",
+        flow: "catalog/new-arrivals",
+        app: null,
+        task: null,
+        file: null,
+      },
       hint: "Add a test",
     },
     {
@@ -179,7 +185,13 @@ const flowAnswer = {
       message: "A different warning",
       at: null,
       expected: false,
-      subject: { feature: "catalog", flow: "catalog/new-arrivals", app: null, task: null, file: null },
+      subject: {
+        feature: "catalog",
+        flow: "catalog/new-arrivals",
+        app: null,
+        task: null,
+        file: null,
+      },
       hint: "Fix the other thing",
     },
   ],
@@ -204,7 +216,9 @@ describe("grimoire view: search", () => {
         ],
       },
     });
-    const input = view.find("input")[0] as FakeNode;
+    const input = view.findAll(
+      (node) => node.attributes.class === "grimoire-search",
+    )[0] as FakeNode;
 
     input.fire("input", { target: { value: "new" } });
     await new Promise((resolve) => setTimeout(resolve, 400));
@@ -252,8 +266,35 @@ describe("grimoire view: search", () => {
   });
 });
 
+/** Open the nth collapsed group of a page (a step on the Files tab). */
+function openStepGroup(view: FakeNode, index: number): void {
+  const head = view.findAll((node) => node.attributes.class === "grimoire-group-head")[
+    index
+  ] as FakeNode;
+
+  expect(head.attributes["aria-expanded"]).toBe("false");
+  head.fire("click");
+  expect(head.attributes["aria-expanded"]).toBe("true");
+}
+
 describe("grimoire view: flow", () => {
-  it("shows steps, criteria with results, where it is shown and the history", async () => {
+  it("shows steps resolved out of the steps that were checked, and how many were not checked", async () => {
+    const { view } = await renderView(
+      {
+        "flows/catalog/new-arrivals": {
+          ...flowAnswer,
+          health: { ...flowAnswer.health, steps: { total: 5, resolved: 2, unchecked: 3 } },
+        },
+      },
+      "flow/catalog/new-arrivals",
+    );
+
+    expect(view.text).toContain("Steps resolved");
+    expect(view.text).toContain("2/2");
+    expect(view.text).toContain("found in the book; 3 not checked");
+  });
+
+  it("shows the journey, the cases, where it is shown and the history on the default tab", async () => {
     const { view } = await renderView(
       { "flows/catalog/new-arrivals": flowAnswer },
       "flow/catalog/new-arrivals",
@@ -263,8 +304,6 @@ describe("grimoire view: flow", () => {
     expect(text).toContain("New arrivals");
     expect(text).toContain("catalog/new-arrivals");
     expect(text).toContain("GET /api/products/new-arrivals");
-    expect(text).toContain("the newest products come first");
-    expect(text).toContain("orders products");
     expect(text).toContain("as block New arrivals");
     expect(text).toContain("country fallback");
     expect(text).toContain("release 5.2.0, 2026-10-01");
@@ -272,18 +311,120 @@ describe("grimoire view: flow", () => {
     expect(text).toContain("uses the device country");
     expect(text).toContain("not guarded yet");
     expect(text).toContain("inferred");
+    // The criteria and their tests belong to the Proof tab, which is not built until it opens.
+    expect(text).not.toContain("orders products");
     expect(view.links).toEqual(
       expect.arrayContaining([
         "#grimoire/feature/catalog",
-        "#grimoire/route/GET/%2Fapi%2Fproducts%2Fnew-arrivals",
-        "#grimoire/file/e2e%2Fnew.spec.ts",
         "#grimoire/page/web-client/home",
         "#grimoire/flow/catalog/search",
       ]),
     );
   });
 
-  it("shows the sections in the planned order, with a health strip and the summary", async () => {
+  it("shows the criteria with their tests on the Proof tab", async () => {
+    const { view } = await renderView(
+      { "flows/catalog/new-arrivals": flowAnswer },
+      "flow/catalog/new-arrivals/proof",
+    );
+
+    expect(view.text).toContain("the newest products come first");
+    expect(view.text).toContain("orders products");
+    expect(view.links).toContain("#grimoire/file/e2e%2Fnew.spec.ts");
+  });
+
+  it("draws each written step as a node and opens its entry and files when clicked", async () => {
+    const { view } = await renderView(
+      { "flows/catalog/new-arrivals": flowAnswer },
+      "flow/catalog/new-arrivals",
+    );
+    const nodes = view.findAll(
+      (node) => node.attributes.class?.includes("grimoire-jnode ") ?? false,
+    );
+
+    expect(nodes).toHaveLength(2);
+    expect(nodes[0]?.attributes["aria-expanded"]).toBe("false");
+    expect(nodes[0]?.text).toContain("page");
+    expect(nodes[1]?.text).toContain("GET /api/products/new-arrivals");
+    expect(view.links).not.toContain("#grimoire/file/src%2Fpages%2Fhome.page.tsx");
+
+    (nodes[0] as FakeNode).fire("click");
+    expect((nodes[0] as FakeNode).attributes["aria-expanded"]).toBe("true");
+    expect(view.links).toContain("#grimoire/file/src%2Fpages%2Fhome.page.tsx");
+    expect(view.text).toContain("6 direct · 8 in feature · 1192 reachable · 40 type-only");
+
+    (nodes[1] as FakeNode).fire("click");
+    expect(view.links).toContain("#grimoire/route/GET/%2Fapi%2Fproducts%2Fnew-arrivals");
+  });
+
+  it("draws a step the book could not find as a dashed warn node and says so", async () => {
+    const answer = {
+      ...flowAnswer,
+      bookmap: {
+        ...flowAnswer.bookmap,
+        steps: [{ ...flowAnswer.bookmap.steps[0], found: false, entry: null, entries: [] }],
+      },
+    };
+    const { view } = await renderView(
+      { "flows/catalog/new-arrivals": answer },
+      "flow/catalog/new-arrivals",
+    );
+    const node = view.findAll(
+      (nodeItem) => nodeItem.attributes.class?.includes("grimoire-jnode ") ?? false,
+    )[0] as FakeNode;
+
+    expect(node.attributes.class).toContain("is-missing");
+    expect(node.text).toContain("not found");
+  });
+
+  it("lists the cases as a What if lane and ties none of them to a step", async () => {
+    const { view } = await renderView(
+      { "flows/catalog/new-arrivals": flowAnswer },
+      "flow/catalog/new-arrivals",
+    );
+    const cards = view.findAll((node) => node.attributes.class === "grimoire-whatif-card");
+
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.text).toContain("What if not found?");
+    expect(cards[0]?.text).toContain("the global list");
+    expect(view.links).toContain("#grimoire/flow/catalog/new-arrivals/proof");
+  });
+
+  it("opens the tab named in the hash, keeps tabs as real buttons and shows counts", async () => {
+    const { view } = await renderView(
+      { "flows/catalog/new-arrivals": flowAnswer },
+      "flow/catalog/new-arrivals/findings",
+    );
+    const tabs = view.findAll((node) => node.attributes.role === "tab");
+
+    expect(tabs.map((tab) => tab.tag)).toEqual(["button", "button", "button", "button"]);
+    expect(tabs.map((tab) => tab.attributes["aria-selected"])).toEqual([
+      "false",
+      "false",
+      "false",
+      "true",
+    ]);
+    expect(tabs[0]?.text).toContain("Journey");
+    expect(tabs[1]?.text).toContain("Proof");
+
+    // Opening another tab builds it then; an unknown tab opens the default one.
+    (tabs[1] as FakeNode).fire("click");
+    expect(view.text).toContain("the newest products come first");
+    expect(tabs[1]?.attributes["aria-selected"]).toBe("true");
+
+    const unknown = await renderView(
+      { "flows/catalog/new-arrivals": flowAnswer },
+      "flow/catalog/new-arrivals/nope",
+    );
+
+    expect(
+      unknown.view.findAll((node) => node.attributes.role === "tab")[0]?.attributes[
+        "aria-selected"
+      ],
+    ).toBe("true");
+  });
+
+  it("shows the Journey sections in the planned order, with a health strip and the summary", async () => {
     const { view } = await renderView(
       { "flows/catalog/new-arrivals": flowAnswer },
       "flow/catalog/new-arrivals",
@@ -291,30 +432,29 @@ describe("grimoire view: flow", () => {
     const headings = view.find("h3").map((node) => node.text);
 
     expect(headings).toEqual([
-      "Fix next",
       "Journey",
-      "Proof",
+      "What if…",
       "Differs by app",
-      "Cases",
       "Not handled",
       "Unknowns",
       "Where users see it",
       "History",
-      "Findings",
     ]);
     expect(view.text).toContain("Shows the newest products first, using");
     expect(view.text).toContain("1/2");
     expect(view.text).toContain("2 warnings");
     expect(view.text).toContain("2026-11-17");
     expect(view.links).toContain("#grimoire/check?flow=catalog%2Fnew-arrivals");
-    expect(view.text).toContain("6 direct · 8 in feature · 1192 reachable · 40 type-only");
     // Next flow at the top and the bottom.
     expect(view.links.filter((link) => link === "#grimoire/flow/catalog/search")).toHaveLength(2);
   });
 
   it("says when a flow has no summary", async () => {
     const answer = { ...flowAnswer, flow: { ...flowAnswer.flow, summary: null } };
-    const { view } = await renderView({ "flows/catalog/new-arrivals": answer }, "flow/catalog/new-arrivals");
+    const { view } = await renderView(
+      { "flows/catalog/new-arrivals": answer },
+      "flow/catalog/new-arrivals",
+    );
 
     expect(view.text).toContain("No summary yet. Add one sentence under the title");
   });
@@ -330,9 +470,11 @@ describe("grimoire view: flow", () => {
     try {
       const { view } = await renderView(
         { "flows/catalog/new-arrivals": flowAnswer },
-        "flow/catalog/new-arrivals",
+        "flow/catalog/new-arrivals/proof",
       );
-      const box = view.findAll((node) => node.attributes.class?.includes("grimoire-fixnext") ?? false)[0] as FakeNode;
+      const box = view.findAll(
+        (node) => node.attributes.class?.includes("grimoire-fixnext") ?? false,
+      )[0] as FakeNode;
 
       expect(box.text).toContain("AC-2 has no test");
       expect(box.text).toContain("// @proves catalog/new-arrivals AC-2");
@@ -362,8 +504,13 @@ describe("grimoire view: flow", () => {
         ],
       },
     };
-    const { view } = await renderView({ "flows/catalog/new-arrivals": failing }, "flow/catalog/new-arrivals");
-    const box = view.findAll((node) => node.attributes.class?.includes("grimoire-fixnext") ?? false)[0] as FakeNode;
+    const { view } = await renderView(
+      { "flows/catalog/new-arrivals": failing },
+      "flow/catalog/new-arrivals/proof",
+    );
+    const box = view.findAll(
+      (node) => node.attributes.class?.includes("grimoire-fixnext") ?? false,
+    )[0] as FakeNode;
 
     expect(box.text).toContain("AC-3 fails in e2e/x.spec.ts:4");
 
@@ -371,7 +518,10 @@ describe("grimoire view: flow", () => {
       ...flowAnswer,
       bookmap: { ...flowAnswer.bookmap, criteria: [criteria[0]] },
     };
-    const done = await renderView({ "flows/catalog/new-arrivals": proven }, "flow/catalog/new-arrivals");
+    const done = await renderView(
+      { "flows/catalog/new-arrivals": proven },
+      "flow/catalog/new-arrivals/proof",
+    );
 
     expect(done.view.text).toContain("Every criterion is proven");
   });
@@ -379,34 +529,58 @@ describe("grimoire view: flow", () => {
   it("shows one status per criterion and no duplicated no-test text or finding", async () => {
     const { view } = await renderView(
       { "flows/catalog/new-arrivals": flowAnswer },
-      "flow/catalog/new-arrivals",
+      "flow/catalog/new-arrivals/proof",
     );
     const proof = view.findAll((node) => node.attributes.id === "grimoire-ac-AC-2")[0] as FakeNode;
 
     expect(proof.text.match(/no-test/g)).toHaveLength(1);
     expect(proof.text).not.toContain("no test");
-    // The finding list has no GR4001 row; the Fix next box names the criterion once.
-    expect(view.text).not.toContain("GR4001");
+    // The Fix next box names the criterion once.
     expect(view.text.match(/AC-2 has no test/g)).toHaveLength(1);
-    expect(view.text).toContain("A different warning");
+
+    // The Findings tab has no GR4001 row: missing tests are shown per criterion.
+    const findings = await renderView(
+      { "flows/catalog/new-arrivals": flowAnswer },
+      "flow/catalog/new-arrivals/findings",
+    );
+
+    expect(findings.view.text).not.toContain("GR4001");
+    expect(findings.view.text).toContain("GR1030");
   });
 
   it("explains missing test results once and calls tagged tests tagged, not not-run", async () => {
     const answer = {
       ...flowAnswer,
-      results: { ...flowAnswer.results, recorded: false, updatedAt: null, withResult: 0, proofs: 1 },
+      results: {
+        ...flowAnswer.results,
+        recorded: false,
+        updatedAt: null,
+        withResult: 0,
+        proofs: 1,
+      },
       bookmap: {
         ...flowAnswer.bookmap,
         criteria: [
           {
             ...flowAnswer.bookmap.criteria[0],
             status: "not-run",
-            tests: [{ file: "e2e/new.spec.ts", line: 12, name: "orders products", result: "not-run", stale: false }],
+            tests: [
+              {
+                file: "e2e/new.spec.ts",
+                line: 12,
+                name: "orders products",
+                result: "not-run",
+                stale: false,
+              },
+            ],
           },
         ],
       },
     };
-    const { view } = await renderView({ "flows/catalog/new-arrivals": answer }, "flow/catalog/new-arrivals");
+    const { view } = await renderView(
+      { "flows/catalog/new-arrivals": answer },
+      "flow/catalog/new-arrivals/proof",
+    );
     const proof = view.findAll((node) => node.attributes.id === "grimoire-ac-AC-1")[0] as FakeNode;
 
     expect(view.text.match(/No test results recorded yet/g)).toHaveLength(1);
@@ -416,7 +590,7 @@ describe("grimoire view: flow", () => {
     expect(proof.text).not.toContain("not-run");
   });
 
-  it("groups cases: handled first with criteria buttons, does not apply collapsed without a repeated prefix", async () => {
+  it("groups cases: handled first as What if cards with criteria links, does not apply collapsed without a repeated prefix", async () => {
     const { view } = await renderView(
       { "flows/catalog/new-arrivals": flowAnswer },
       "flow/catalog/new-arrivals",
@@ -427,7 +601,7 @@ describe("grimoire view: flow", () => {
     expect(details.text).toContain("Does not apply (1)");
     expect(details.text).toContain("products never expire");
     expect(details.text).not.toContain("does not apply:");
-    expect(button(view, "AC-1")).toBeDefined();
+    expect(view.links).toContain("#grimoire/flow/catalog/new-arrivals/proof");
   });
 
   it("loads the files of a step on demand, a set and a page at a time", async () => {
@@ -450,13 +624,13 @@ describe("grimoire view: flow", () => {
         [`${base}?set=reachable&offset=1`]: page(1, 2),
         [`${base}?set=type-only&offset=0`]: { ...page(0, 1), set: "type-only" },
       },
-      "flow/catalog/new-arrivals",
+      "flow/catalog/new-arrivals/files",
     );
 
     // Nothing is requested until the files are asked for.
     expect(calls.filter((call) => call.includes("/files"))).toEqual([]);
 
-    (view.findAll((node) => node.tag === "button" && node.text === "Show files")[0] as FakeNode).fire("click");
+    openStepGroup(view, 0);
     await vi.waitFor(() => expect(view.text).toContain("src/f0.ts"));
     expect(calls).toContain(`${base}?set=direct&offset=0`);
 
@@ -475,10 +649,10 @@ describe("grimoire view: flow", () => {
   it("keeps a step files failure in place with a way to try again", async () => {
     const { view } = await renderView(
       { "flows/catalog/new-arrivals": flowAnswer },
-      "flow/catalog/new-arrivals",
+      "flow/catalog/new-arrivals/files",
     );
 
-    (view.findAll((node) => node.tag === "button" && node.text === "Show files")[0] as FakeNode).fire("click");
+    openStepGroup(view, 0);
     await vi.waitFor(() => expect(view.text).toContain("Could not load the files: no answer for"));
     expect(view.text).toContain("Try again");
   });
@@ -489,7 +663,10 @@ describe("grimoire view: flow", () => {
       ...flowAnswer,
       flow: { ...flowAnswer.flow, summary: `Uses \`${hostile}\` and \`created_at\`.` },
     };
-    const { view } = await renderView({ "flows/catalog/new-arrivals": answer }, "flow/catalog/new-arrivals");
+    const { view } = await renderView(
+      { "flows/catalog/new-arrivals": answer },
+      "flow/catalog/new-arrivals",
+    );
     const code = view.find("code").map((node) => node.text);
 
     expect(code).toEqual(expect.arrayContaining([hostile, "created_at"]));
@@ -599,6 +776,300 @@ describe("grimoire view: tasks", () => {
 
     expect(headings).toEqual(["Open (1)", "Waiting for approval (1)", "Done (1)"]);
     expect(view.links.filter((link) => link === "#grimoire/task/T-2")).toHaveLength(1);
+  });
+});
+
+const chip = (step: number, type: string, label: string, extra: Record<string, unknown> = {}) => ({
+  step,
+  type,
+  label,
+  found: true,
+  app: null,
+  page: null,
+  method: null,
+  path: null,
+  file: null,
+  ...extra,
+});
+
+const featurePageAnswer = {
+  type: "feature",
+  routes: "cached",
+  notes: [],
+  readme: {
+    id: located("catalog"),
+    title: located("Catalog"),
+    status: located("shipped"),
+    version: located("3.0"),
+    updated: located("2026-11-01"),
+    summary: "Browse products.",
+  },
+  flows: [
+    {
+      id: "new-arrivals",
+      status: "shipped",
+      since: "2.0",
+      heading: "New arrivals",
+      steps: 3,
+      cases: 2,
+      criteria: 2,
+      tested: 1,
+      findings: 1,
+    },
+    {
+      id: "search",
+      status: "building",
+      since: "3.0",
+      heading: null,
+      steps: 1,
+      cases: 0,
+      criteria: 0,
+      tested: 0,
+      findings: 0,
+    },
+  ],
+  bookmap: {
+    own: ["src/app/catalog/a.ts", "src/app/catalog/b.ts", "src/app/cart/c.ts"],
+    borrowed: [{ file: "src/shared/x.ts", owner: null, by: ["src/app/catalog/a.ts"] }],
+    routes: [{ method: "GET", path: "/api/products", file: "src/app/catalog/routes.ts" }],
+    pages: { "web-client": [{ route: "/", file: "src/pages/home.page.tsx", type: "page" }] },
+    unreached: ["src/app/cart/c.ts"],
+  },
+  map: {
+    columns: [
+      { id: "app:web-client", title: "Storefront", type: "site" },
+      { id: "app:mobile", title: "Shop app", type: "mobile" },
+      { id: "api", title: "API", type: "api" },
+      { id: "background", title: "Background", type: "background" },
+    ],
+    rows: [
+      {
+        flow: "new-arrivals",
+        heading: "New arrivals",
+        status: "shipped",
+        cells: {
+          "app:web-client": [chip(1, "page", "/", { app: "web-client", page: "home" })],
+          api: [
+            chip(2, "route", "GET /api/products/new-arrivals", {
+              method: "GET",
+              path: "/api/products/new-arrivals",
+            }),
+          ],
+          background: [
+            chip(3, "mail", "arrivals-digest", { file: "src/mail/digest.ts" }),
+            chip(4, "job", "ghost-job", { found: false }),
+          ],
+        },
+      },
+      { flow: "search", heading: null, status: "building", cells: {} },
+    ],
+  },
+  fileGroups: [
+    { module: "cart", files: ["src/app/cart/c.ts"] },
+    { module: "catalog", files: ["src/app/catalog/a.ts", "src/app/catalog/b.ts"] },
+  ],
+  proofs: [
+    {
+      flow: "new-arrivals",
+      heading: "New arrivals",
+      criteria: [
+        {
+          id: "AC-1",
+          app: null,
+          text: "newest first",
+          status: "pass",
+          tests: [
+            { file: "e2e/new.spec.ts", line: 3, name: "orders", result: "pass", stale: false },
+          ],
+        },
+        { id: "AC-2", app: null, text: "global list", status: "no-test", tests: [] },
+      ],
+    },
+    { flow: "search", heading: null, criteria: [] },
+  ],
+  changes: [],
+  tasks: [],
+  findings: [
+    {
+      code: "GR4008",
+      severity: "warning",
+      message: "AC-1 did not run",
+      at: null,
+      expected: false,
+      subject: {
+        feature: "catalog",
+        flow: "catalog/new-arrivals",
+        app: null,
+        task: null,
+        file: null,
+      },
+      hint: null,
+    },
+    {
+      code: "GR4008",
+      severity: "warning",
+      message: "AC-2 did not run",
+      at: null,
+      expected: false,
+      subject: {
+        feature: "catalog",
+        flow: "catalog/new-arrivals",
+        app: null,
+        task: null,
+        file: null,
+      },
+      hint: null,
+    },
+    {
+      code: "GR3006",
+      severity: "warning",
+      message: "file not reached",
+      at: null,
+      expected: true,
+      subject: { feature: "catalog", flow: null, app: null, task: null, file: null },
+      hint: null,
+    },
+  ],
+};
+
+describe("grimoire view: feature page", () => {
+  const answers = { "features/catalog": featurePageAnswer };
+
+  it("opens on the Overview with the feature map, flow cards and counts on the tabs", async () => {
+    const { view } = await renderView(answers, "feature/catalog");
+    const tabs = view.findAll((node) => node.attributes.role === "tab");
+
+    expect(tabs.map((tab) => tab.text.replace(/\s+/g, " ").trim())).toEqual([
+      "Overview",
+      "Flows 2",
+      "Files 3",
+      "Findings 2",
+      "Tests 2",
+    ]);
+    expect(tabs[0]?.attributes["aria-selected"]).toBe("true");
+    expect(view.text).toContain("Browse products.");
+    expect(view.find("h3").map((node) => node.text)).toEqual([
+      "Feature map",
+      "Flows",
+      "Recent changes",
+    ]);
+  });
+
+  it("draws flows as rows and places as columns, with a dash for an empty cell and links on the chips", async () => {
+    const { view } = await renderView(answers, "feature/catalog");
+    const headers = view
+      .findAll((node) => node.tag === "th" && node.attributes.scope === "col")
+      .map((node) => node.text);
+
+    expect(headers[0]).toBe("Flow");
+    expect(headers.join("|")).toContain("Storefront");
+    expect(headers.join("|")).toContain("Shop app");
+    expect(headers.join("|")).toContain("Background");
+    expect(view.links).toEqual(
+      expect.arrayContaining([
+        "#grimoire/page/web-client/home",
+        "#grimoire/route/GET/%2Fapi%2Fproducts%2Fnew-arrivals",
+        "#grimoire/file/src%2Fmail%2Fdigest.ts",
+        "#grimoire/flow/catalog/new-arrivals",
+      ]),
+    );
+
+    const rows = view.find("tbody")[0]?.find("tr") ?? [];
+
+    expect(rows).toHaveLength(2);
+    // The search flow touches nothing: every cell is a dash.
+    expect(
+      rows[1]?.findAll((node) => node.tag === "td").every((cell) => cell.text.trim() === "–"),
+    ).toBe(true);
+
+    const missing = view.findAll(
+      (node) =>
+        (node.attributes.class ?? "").includes("grimoire-mapchip") &&
+        (node.attributes.class ?? "").includes("is-missing"),
+    );
+
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.text).toContain("ghost-job");
+  });
+
+  it("builds a tab only when it opens, and puts it in the hash route", async () => {
+    const { view } = await renderView(answers, "feature/catalog");
+
+    expect(view.text).not.toContain("src/app/cart/c.ts");
+    expect(view.text).not.toContain("GR4008");
+
+    const files = view.findAll((node) => node.attributes.role === "tab")[2] as FakeNode;
+
+    files.fire("click");
+    expect(files.attributes["aria-selected"]).toBe("true");
+    expect(view.text).toContain("3 files in 2 modules");
+  });
+
+  it("lists files by module, every group closed until opened, and filters them", async () => {
+    const { view } = await renderView(answers, "feature/catalog/files");
+    const heads = view.findAll((node) => node.attributes.class === "grimoire-group-head");
+    const titles = heads.map((node) => node.text.replace(/\s+/g, " ").trim());
+
+    expect(titles).toEqual(
+      expect.arrayContaining([
+        "▸ Routes 1",
+        "▸ Not reached by a flow 1",
+        "▸ cart 1",
+        "▸ catalog 2",
+      ]),
+    );
+    expect(heads.every((node) => node.attributes["aria-expanded"] === "false")).toBe(true);
+    // Closed groups hold no files yet.
+    expect(view.links).not.toContain("#grimoire/file/src%2Fapp%2Fcatalog%2Fa.ts");
+
+    heads.find((node) => node.text.includes("catalog 2"))?.fire("click");
+    expect(view.links).toContain("#grimoire/file/src%2Fapp%2Fcatalog%2Fa.ts");
+
+    const input = view.findAll(
+      (node) => node.attributes.class === "grimoire-filterbox",
+    )[0] as FakeNode;
+
+    input.fire("input", { target: { value: "cart" } });
+    expect(view.text).toContain("1 of 3 files match");
+    expect(view.text).not.toContain("catalog 2");
+  });
+
+  it("groups findings by code, closed, with counts and the expected ones left out of the tab count", async () => {
+    const { view } = await renderView(
+      { ...answers, "check/groups": { groups: [{ code: "GR4008", title: "A test did not run" }] } },
+      "feature/catalog/findings",
+    );
+    const heads = view.findAll((node) => node.attributes.class === "grimoire-group-head");
+
+    expect(heads.map((node) => node.text.replace(/\s+/g, " ").trim())).toEqual([
+      "▸ warning GR4008 2",
+      "▸ warning GR3006 1",
+    ]);
+    expect(view.text).not.toContain("AC-1 did not run");
+
+    heads[0]?.fire("click");
+    expect(view.text).toContain("AC-1 did not run");
+    expect(view.text).toContain("AC-2 did not run");
+  });
+
+  it("shows the criteria of each flow with their tests on the Tests tab", async () => {
+    const { view } = await renderView(answers, "feature/catalog/tests");
+    const heads = view.findAll((node) => node.attributes.class === "grimoire-group-head");
+
+    // The flow with no criteria has no group.
+    expect(heads).toHaveLength(1);
+    expect(heads[0]?.text).toContain("1/2 proven");
+    heads[0]?.fire("click");
+    expect(view.text).toContain("newest first");
+    expect(view.links).toContain("#grimoire/file/e2e%2Fnew.spec.ts");
+  });
+
+  it("still opens an older answer that has no map, file groups or proofs", async () => {
+    const { map: _map, fileGroups: _groups, proofs: _proofs, ...older } = featurePageAnswer;
+    const { view } = await renderView({ "features/catalog": older }, "feature/catalog");
+
+    expect(view.text).toContain("Browse products.");
+    expect(view.text).toContain("This answer has no feature map");
   });
 });
 
@@ -995,7 +1466,13 @@ describe("grimoire view: apps", () => {
 });
 
 describe("grimoire view: check", () => {
-  const group = (code: string, severity: string, count: number, expected: number, features: [string, number][]) => ({
+  const group = (
+    code: string,
+    severity: string,
+    count: number,
+    expected: number,
+    features: [string, number][],
+  ) => ({
     code,
     severity,
     area: "written",
@@ -1050,13 +1527,20 @@ describe("grimoire view: check", () => {
   it("renders code spans in a group title as code, not as literal backticks", async () => {
     const titled = {
       ...groups,
-      groups: [{ ...group("GR6007", "error", 1, 0, [["cart", 1]]), title: "A flow's `since` is newer than its feature's version" }],
+      groups: [
+        {
+          ...group("GR6007", "error", 1, 0, [["cart", 1]]),
+          title: "A flow's `since` is newer than its feature's version",
+        },
+      ],
     };
     const { view } = await renderView({ "check/groups": titled }, "check");
     const heading = view.find("h3").find((node) => node.text.includes("is newer than"));
 
     // The fake DOM joins child texts with spaces.
-    expect(heading?.text.replace(/\s+/g, " ")).toBe("A flow's since is newer than its feature's version");
+    expect(heading?.text.replace(/\s+/g, " ")).toBe(
+      "A flow's since is newer than its feature's version",
+    );
     expect(heading?.find("code").map((node) => node.text)).toEqual(["since"]);
     expect(view.text).not.toContain("`since`");
   });
@@ -1072,7 +1556,11 @@ describe("grimoire view: check", () => {
       },
       "check",
     );
-    const card = view.findAll((node) => node.attributes.class === "grimoire-card grimoire-check-group" && node.text.includes("Title of GR3006"))[0] as FakeNode;
+    const card = view.findAll(
+      (node) =>
+        node.attributes.class === "grimoire-card grimoire-check-group" &&
+        node.text.includes("Title of GR3006"),
+    )[0] as FakeNode;
 
     expect(card.text).toContain("1 file");
     expect(card.text).not.toContain("Show all");
@@ -1089,12 +1577,23 @@ describe("grimoire view: check", () => {
     const { view } = await renderView(
       {
         "check/groups": groups,
-        "check?code=GR2002&state=unexpected&offset=0&limit=20": page([finding("GR2002", "a.ts")], 2),
-        "check?code=GR2002&state=unexpected&offset=1&limit=20": page([finding("GR2002", "b.ts")], 2, 1),
+        "check?code=GR2002&state=unexpected&offset=0&limit=20": page(
+          [finding("GR2002", "a.ts")],
+          2,
+        ),
+        "check?code=GR2002&state=unexpected&offset=1&limit=20": page(
+          [finding("GR2002", "b.ts")],
+          2,
+          1,
+        ),
       },
       "check",
     );
-    const card = view.findAll((node) => node.attributes.class === "grimoire-card grimoire-check-group" && node.text.includes("Title of GR2002"))[0] as FakeNode;
+    const card = view.findAll(
+      (node) =>
+        node.attributes.class === "grimoire-card grimoire-check-group" &&
+        node.text.includes("Title of GR2002"),
+    )[0] as FakeNode;
 
     button(card, "Show all 2").fire("click");
     await vi.waitFor(() => expect(card.text).toContain("Showing 1 of 2"));
@@ -1104,7 +1603,10 @@ describe("grimoire view: check", () => {
   });
 
   it("keeps filters in the hash: links carry them and the route opens the filtered view", async () => {
-    const { view } = await renderView({ "check/groups": groups }, "check?code=GR2002&severity=warning");
+    const { view } = await renderView(
+      { "check/groups": groups },
+      "check?code=GR2002&severity=warning",
+    );
 
     expect(view.links).toEqual(
       expect.arrayContaining([
@@ -1113,7 +1615,10 @@ describe("grimoire view: check", () => {
         "#grimoire/check?code=GR2002&severity=warning&state=expected",
       ]),
     );
-    expect(view.find("h3").map((node) => node.text)).toEqual(["To fix (1 kind)", "Title of GR2002"]);
+    expect(view.find("h3").map((node) => node.text)).toEqual([
+      "To fix (1 kind)",
+      "Title of GR2002",
+    ]);
     expect(view.text).toContain("code: GR2002 ×");
   });
 
@@ -1149,7 +1654,9 @@ describe("grimoire view: product map", () => {
   it("loads the product map module from a page-relative asset URL", async () => {
     // A host may return `panels/grimoire/product-map.js`; import() refuses that bare
     // specifier, so the view resolves it against the page first.
-    const dashboard = pathToFileURL(path.join(path.dirname(viewPath), "..", "dashboard") + path.sep).href;
+    const dashboard = pathToFileURL(
+      path.join(path.dirname(viewPath), "..", "dashboard") + path.sep,
+    ).href;
 
     vi.stubGlobal("document", { baseURI: dashboard });
 
@@ -1189,11 +1696,7 @@ describe("grimoire view: product map", () => {
       Reflect.deleteProperty(globalThis, "grimoireProductMap");
     }
 
-    expect(calls).toEqual([
-      [],
-      ["feature", "cart"],
-      ["flow", "catalog", "new-arrivals"],
-    ]);
+    expect(calls).toEqual([[], ["feature", "cart"], ["flow", "catalog", "new-arrivals"]]);
   });
 
   it("says what failed when the product map module cannot load", async () => {
@@ -1230,6 +1733,71 @@ describe("grimoire view: loading and errors", () => {
 
     expect(view.text).not.toContain("Opening the book…");
     expect(view.text).toContain("3 of 3 features");
+  });
+
+  it("shows a skeleton with progress, an elapsed counter and a hint that grows with time", async () => {
+    vi.useFakeTimers();
+    try {
+      const panel = fakePanelContext({}, "");
+      let release: (answer: unknown) => void = () => undefined;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      const { default: render } = await import(/* @vite-ignore */ pathToFileURL(viewPath).href);
+      const pending = render({
+        ...panel.context,
+        api: async () => gate,
+      }) as Promise<FakeNode>;
+
+      await vi.advanceTimersByTimeAsync(200);
+
+      const view = await pending;
+      const disabled = () => (view.find("input")[0] as unknown as { disabled?: boolean }).disabled;
+
+      // Rendered even without grimoire.css: the layout is inline.
+      const grid = view.findAll((node) => node.attributes.class === "grimoire-skeleton-grid")[0];
+
+      expect(grid?.attributes.style).toContain("grid");
+      expect(
+        view.findAll((node) => node.attributes.class === "grimoire-skeleton-row"),
+      ).toHaveLength(5);
+      expect(disabled()).toBe(true);
+      expect(view.text).toMatch(/Elapsed\s+[0-1] s/);
+      expect(view.text).not.toContain("Large books take 5–15 s");
+
+      await vi.advanceTimersByTimeAsync(5200);
+      expect(view.text).toMatch(/Elapsed\s+5 s/);
+      expect(view.text).toContain(
+        "Large books take 5–15 s the first time; later opens are instant.",
+      );
+
+      await vi.advanceTimersByTimeAsync(11_000);
+      expect(view.text).toContain("taking longer than usual");
+
+      release({});
+      await vi.advanceTimersByTimeAsync(50);
+      expect(view.text).not.toContain("Elapsed");
+      expect(disabled()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows the HTTP status and a retry button inside the loading area when the book fails", async () => {
+    const panel = fakePanelContext({}, "features");
+    const { default: render } = await import(/* @vite-ignore */ pathToFileURL(viewPath).href);
+    const view = (await render({
+      ...panel.context,
+      api: async () => {
+        throw Object.assign(new Error("The server answered badly"), { status: 502 });
+      },
+    })) as FakeNode;
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(view.text).toContain("The server answered badly (HTTP 502)");
+    expect(button(view, "Try again")).toBeDefined();
+    expect(view.text).not.toContain("Elapsed");
   });
 
   it("names what failed, why, and what to do next", async () => {
@@ -1269,10 +1837,46 @@ describe("grimoire view: overview", () => {
         ok: false,
         counts,
         groups: [
-          { code: "GR2002", severity: "warning", area: "w", title: "Many warnings", fix: "x", count: 9, expected: 0, features: [] },
-          { code: "GR1001", severity: "error", area: "w", title: "A broken link", fix: "Fix it", count: 1, expected: 0, features: [] },
-          { code: "GR3003", severity: "warning", area: "w", title: "Few warnings", fix: "x", count: 2, expected: 0, features: [] },
-          { code: "GR9999", severity: "error", area: "w", title: "Only expected", fix: "x", count: 0, expected: 4, features: [] },
+          {
+            code: "GR2002",
+            severity: "warning",
+            area: "w",
+            title: "Many warnings",
+            fix: "x",
+            count: 9,
+            expected: 0,
+            features: [],
+          },
+          {
+            code: "GR1001",
+            severity: "error",
+            area: "w",
+            title: "A broken link",
+            fix: "Fix it",
+            count: 1,
+            expected: 0,
+            features: [],
+          },
+          {
+            code: "GR3003",
+            severity: "warning",
+            area: "w",
+            title: "Few warnings",
+            fix: "x",
+            count: 2,
+            expected: 0,
+            features: [],
+          },
+          {
+            code: "GR9999",
+            severity: "error",
+            area: "w",
+            title: "Only expected",
+            fix: "x",
+            count: 0,
+            expected: 4,
+            features: [],
+          },
         ],
       },
       releases: {
@@ -1288,7 +1892,10 @@ describe("grimoire view: overview", () => {
     expect(view.text).toContain("A broken link");
     expect(view.text).not.toContain("Only expected");
     // Errors first, then the biggest group; each leads to the filtered Check tab.
-    const problems = view.findAll((node) => node.tag === "a" && node.attributes.href?.startsWith("#grimoire/check?code=") === true);
+    const problems = view.findAll(
+      (node) =>
+        node.tag === "a" && node.attributes.href?.startsWith("#grimoire/check?code=") === true,
+    );
 
     expect(problems.map((node) => node.attributes.href)).toEqual([
       "#grimoire/check?code=GR1001",
@@ -1302,5 +1909,83 @@ describe("grimoire view: overview", () => {
         "#grimoire/features",
       ]),
     );
+  });
+});
+
+describe("grimoire view: host and flow cards", () => {
+  const host = {
+    name: "Warlock.js",
+    version: "5.59.0",
+    logo: "data:image/png;base64,AAAA",
+    app: { name: "shop", version: "1.4.0" },
+  };
+  const featureWith = (flows: unknown[]) => ({
+    type: "feature",
+    readme: {
+      id: located("catalog"),
+      title: located("Catalog"),
+      status: located("shipped"),
+      version: located("3.0"),
+      updated: located("2026-11-01"),
+      summary: "Browse products.",
+    },
+    flows,
+    bookmap: { own: [], borrowed: [], routes: [], pages: {}, unreached: [] },
+    changes: [],
+    tasks: [],
+    findings: [],
+  });
+
+  it("shows the framework in the header and the app at the bottom when the summary has a host", async () => {
+    const { view } = await renderView({ summary: { ...emptySummary, host } });
+    const brand = view.findAll((node) => node.attributes.class === "grimoire-brand")[0];
+    const footer = view.find("footer")[0];
+
+    expect(brand?.text).toContain("Warlock.js");
+    expect(brand?.text).toContain("v5.59.0");
+    expect(brand?.find("img")[0]?.attributes.src).toBe(host.logo);
+    expect(footer?.text).toContain("shop 1.4.0");
+  });
+
+  it("shows nothing when the adapter reports no host", async () => {
+    const { view } = await renderView({ summary: { ...emptySummary, host: null } });
+
+    expect(view.findAll((node) => node.attributes.class === "grimoire-brand")).toHaveLength(0);
+    expect(view.find("footer")[0]?.text ?? "").toBe("");
+  });
+
+  it("lists the flows as linked cards with the heading, id, status, counts and findings", async () => {
+    const { view } = await renderView(
+      {
+        "features/catalog": featureWith([
+          {
+            id: "new-arrivals",
+            status: "shipped",
+            since: "2.0",
+            heading: "New arrivals",
+            steps: 4,
+            cases: 1,
+            criteria: 3,
+            tested: 2,
+            findings: 2,
+          },
+          { id: "search", status: "proposed", since: "3.0", heading: null },
+        ]),
+      },
+      "feature/catalog",
+    );
+    const cards = view.findAll((node) => node.attributes.class === "grimoire-flowcard");
+
+    expect(cards).toHaveLength(2);
+    expect(cards[0]?.text).toContain("New arrivals");
+    expect(cards[0]?.text).toContain("new-arrivals");
+    expect(cards[0]?.text).toContain("since 2.0");
+    expect(cards[0]?.text).toContain("4 steps");
+    expect(cards[0]?.text).toContain("2/3 criteria tested");
+    expect(cards[0]?.text).toContain("2 findings");
+    expect(cards[0]?.links).toEqual(["#grimoire/flow/catalog/new-arrivals"]);
+    // A flow without counts (an older answer) still renders, with its id as the title.
+    expect(cards[1]?.text).toContain("search");
+    expect(cards[1]?.text).not.toContain("finding");
   });
 });

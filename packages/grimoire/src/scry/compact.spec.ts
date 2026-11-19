@@ -44,7 +44,9 @@ describe("the compact flow helpers", () => {
     const health = flowHealth(result);
 
     expect(health.criteria.total).toBe(result.bookmap.criteria.length);
-    expect(Object.values(health.criteria.byStatus).reduce((a, b) => a + b, 0)).toBe(health.criteria.total);
+    expect(Object.values(health.criteria.byStatus).reduce((a, b) => a + b, 0)).toBe(
+      health.criteria.total,
+    );
     expect(health.steps.resolved).toBeLessThanOrEqual(health.steps.total);
   });
 
@@ -53,7 +55,8 @@ describe("the compact flow helpers", () => {
     const bookmap = snapshot.collected.flows["catalog/new-arrivals"];
     const step = bookmap?.steps[1];
 
-    if (bookmap === undefined || step === undefined) throw new Error("fixture flow has no second step");
+    if (bookmap === undefined || step === undefined)
+      throw new Error("fixture flow has no second step");
 
     const sorted = stepFileSet(snapshot, "catalog", step, "reachable");
 

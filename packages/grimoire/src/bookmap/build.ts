@@ -23,6 +23,7 @@ import type {
   WrittenTask,
 } from "../contracts/written";
 import { fileGraph } from "../graph";
+import { isExemptFromReach, specOnlyFiles } from "../ownership";
 import { toPosixPath } from "../paths";
 import { criterionStatus } from "../test-results";
 import { resolveStep, type StepContext } from "./steps";
@@ -187,6 +188,7 @@ function featureBookmap(
   flows: readonly FlowBookmap[],
   input: CollectedInput,
   byPath: ReadonlyMap<string, BookFile>,
+  specOnly: ReadonlySet<string>,
 ): FeatureBookmap {
   const { ownership, facts } = input;
   const own = ownership.features[feature.id]?.own ?? [];
@@ -286,7 +288,12 @@ function featureBookmap(
     borrowed,
     routes,
     pages: sortedPages,
-    unreached: own.filter((file) => !reached.has(file)),
+    unreached: own.filter(
+      (file) =>
+        !reached.has(file) &&
+        !specOnly.has(file) &&
+        !isExemptFromReach(byPath.get(file) ?? { type: "source" }),
+    ),
   };
 }
 
@@ -397,6 +404,7 @@ export function buildCollectedFiles(input: CollectedInput): CollectedFiles {
     graph: fileGraph(input.facts.files),
   };
   const byPath = new Map(input.facts.files.map((file) => [file.file, file]));
+  const specOnly = specOnlyFiles(input.facts.files);
   const features: CollectedFiles["features"] = {};
   const flows: CollectedFiles["flows"] = {};
 
@@ -407,7 +415,7 @@ export function buildCollectedFiles(input: CollectedInput): CollectedFiles {
 
     for (const map of maps) flows[map.ref] = map;
 
-    features[feature.id] = featureBookmap(feature, maps, input, byPath);
+    features[feature.id] = featureBookmap(feature, maps, input, byPath, specOnly);
   }
 
   return {

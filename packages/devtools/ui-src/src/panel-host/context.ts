@@ -1,4 +1,5 @@
 import { NOT_FOUND_EVENT, getCsrfToken } from "@/api/client";
+import { isConnectionFailure, reportFailure, reportSuccess } from "@/api/connection";
 import { el, empty, panelApiUrl, panelHref, svg } from "./dom";
 import type { LegacyPanelContext } from "./types";
 
@@ -18,8 +19,18 @@ export async function panelFetch(url: string, init: RequestInit = {}): Promise<u
   try {
     response = await fetch(url, { ...init, headers, credentials: "same-origin" });
   } catch {
-    throw new Error("Could not reach the server. Check your connection and try again.");
+    reportFailure();
+
+    throw Object.assign(
+      new Error("Could not reach the server. Check your connection and try again."),
+      {
+        status: 0,
+      },
+    );
   }
+
+  if (isConnectionFailure(response.status)) reportFailure();
+  else reportSuccess();
 
   if (!response.ok && response.status !== 204) {
     let message = response.statusText || `Request failed (${response.status})`;
@@ -38,7 +49,7 @@ export async function panelFetch(url: string, init: RequestInit = {}): Promise<u
       window.dispatchEvent(new CustomEvent(NOT_FOUND_EVENT, { detail: { path: url } }));
     }
 
-    throw new Error(message);
+    throw Object.assign(new Error(message), { status: response.status });
   }
 
   return response.status === 204 ? undefined : response.json();

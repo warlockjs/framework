@@ -86,6 +86,8 @@ npx warlock grimoire check
 | A README `updated` older than its newest changelog entry            | Reshape the README                                    |
 | A changelog version that does not fit the word (`added` with `2.1`) | Fix the version                                       |
 
+Migrations, seeds, commands, the main file, layouts, roots and test helpers only specs import are never reported (`GR3006`); a route step reaches the middleware its route names. Do not try to describe those in a flow.
+
 **Recording results.** The check and the devtools tab read test results from
 `grimoire/book/test-results.json`, written by the Grimoire Vitest reporter when the tests run. That
 folder is not committed, so run the tests with the reporter in CI and ship the results file with the

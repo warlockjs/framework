@@ -26,6 +26,11 @@ import {
   type TestAuthenticableUser,
   actingAs,
 } from "./authenticated-test-client";
+import {
+  APP_MODULES_LOADED_KEY,
+  APP_MODULES_ROOT_KEY,
+  type LoadedHolder,
+} from "./app-modules-state";
 import { forgetOpenTestServer, trackOpenTestServer } from "./open-test-servers";
 import { type TestRequestClient, createTestRequestClient } from "./test-helpers";
 
@@ -38,7 +43,9 @@ export type CreateTestHttpServerOptions = {
   /**
    * Load the application's modules (`routes.ts`, `main.ts`, events, ...) first,
    * so the server answers every app route. Needs `setupTest()` to have run in
-   * this worker. Modules load once per process; later servers reuse them.
+   * this worker. Modules load once per process; later servers reuse them. With
+   * `tests.lifetime: "worker-isolated"` they load once per FILE, through that file's
+   * fresh module graph, so the file's `vi.mock` calls reach the route handlers.
    */
   loadAppModules?: boolean;
   /**
@@ -62,15 +69,6 @@ export type TestHttpServer = TestRequestClient & {
   actingAs(user: TestAuthenticableUser): Promise<AuthenticatedTestClient>;
   /** Stop listening and remove the routes `routes` registered. */
   close(): Promise<void>;
-};
-
-const APP_MODULES_LOADED_KEY = Symbol.for("warlock.core.testAppModulesLoaded");
-
-const APP_MODULES_ROOT_KEY = Symbol.for("warlock.core.testAppModulesRoot");
-
-type LoadedHolder = {
-  [APP_MODULES_LOADED_KEY]?: Promise<void>;
-  [APP_MODULES_ROOT_KEY]?: string;
 };
 
 let serverCounter = 0;

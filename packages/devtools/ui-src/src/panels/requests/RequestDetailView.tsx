@@ -23,7 +23,7 @@ import type { DetailQuery, RequestDetail } from "./types";
 import { Waterfall } from "./Waterfall";
 
 type AiRunRow = { traceId: string; name: string; status: string; duration: number };
-type AiAnswer = { available: boolean; message?: string; runs: AiRunRow[] };
+type AiAnswer = { available: boolean; title?: string; message?: string; runs: AiRunRow[] };
 
 function CopyCurl({ id }: { id: string }) {
   const [status, setStatus] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
@@ -130,7 +130,9 @@ function AiSection({ requestId }: { requestId: string }) {
   if (error) return <ErrorMessage error={error} title="Could not load the AI runs" />;
   if (!data && loading) return <LoadingRows rows={1} />;
   if (!data?.available)
-    return <EmptyState title={data?.message ?? "AI observation is not available."} />;
+    return (
+      <EmptyState title={data?.title ?? data?.message ?? "AI observation is not available."} />
+    );
   if (!data.runs.length) return <EmptyState title="No AI runs collected for this request yet." />;
 
   return (

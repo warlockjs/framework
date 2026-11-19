@@ -31,7 +31,16 @@ export type AiRun = {
 
 export type AiAnswer = {
   available: boolean;
+  reason?:
+    | "ai-missing"
+    | "panoptic-missing"
+    | "panoptic-failed"
+    | "observation-off"
+    | "not-collected";
+  title?: string;
   message?: string;
+  command?: string;
+  detail?: string;
   runs: AiRun[];
   aggregate?: { traces: number; usage: AiUsage };
 };

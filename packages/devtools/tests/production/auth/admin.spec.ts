@@ -436,6 +436,17 @@ describe("password change", () => {
 });
 
 describe("helpers", () => {
+  it("checkPasswordPolicy honours minLength and rejectCommon", () => {
+    expect(checkPasswordPolicy("abcdefghijk", null, { minLength: 12 })).toBe(
+      "auth.password-too-short",
+    );
+    expect(checkPasswordPolicy("abcdefghijkl", null, { minLength: 12 })).toBeNull();
+    expect(checkPasswordPolicy("PassWord123", null, { rejectCommon: false })).toBeNull();
+    expect(checkPasswordPolicy("PassWord123", null, { rejectCommon: true })).toBe(
+      "auth.password-common",
+    );
+  });
+
   it("checkPasswordPolicy orders its rules", () => {
     expect(checkPasswordPolicy("short", null)).toBe("auth.password-too-short");
     expect(checkPasswordPolicy("1234567", null)).toBe("auth.password-too-short");

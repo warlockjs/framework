@@ -46,6 +46,7 @@ export function productionOptions(
     origin: null,
     session: { ...defaults.session },
     twoFactor: "admins",
+    passwords: { minLength: 8, rejectCommon: true },
     rateLimits: { ...defaults.rateLimits },
     explain: { executing: false },
     panels: {},

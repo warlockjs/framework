@@ -104,7 +104,7 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
   const grimoire: CLICommand = command({
     name: "grimoire <action> [release]",
     description:
-      "Grimoire (experimental): build the book (build [--force] [--site [--out <dir>]]), check the written files (check [--all]), collect a release (release <version>); --json for JSON",
+      "Grimoire (experimental): build the book (build [--force] [--site [--product] [--out <dir>]]), check the written files (check [--all]), collect a release (release <version>); --json for JSON",
     preAction: async ({ args, options: flags }) => {
       grimoire.commandPreload = undefined;
 
@@ -156,12 +156,19 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
       },
       {
         text: "--force, -f",
-        description: "build: rebuild every book entry and read the routes again",
+        description:
+          "build: rebuild every book entry and read the routes again, and write the site even when it is up to date",
         type: "boolean",
       },
       {
         text: "--site",
         description: "build: also write the static Grimoire site (default grimoire/book/site)",
+        type: "boolean",
+      },
+      {
+        text: "--product",
+        description:
+          "build --site: export the share-safe Product map only (no file paths, test names or per-file answers; opens on the map)",
         type: "boolean",
       },
       {

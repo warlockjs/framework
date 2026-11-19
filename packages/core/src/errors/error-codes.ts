@@ -643,7 +643,7 @@ export const ERROR_CODES = {
     area: "environment",
     category: "environment",
     title: "A tool crashed, timed out or ran out of memory",
-    fix: "Re-run the step; if it repeats, raise the memory limit (NODE_OPTIONS=--max-old-space-size) or use --changed.",
+    fix: "Re-run the step; if it repeats, raise the memory limit (NODE_OPTIONS=--max-old-space-size) or use --changed. For a timeout, the message says how long the run took: raise --test-timeout above that.",
     skill: "warlock-check",
   },
   WL8008: {

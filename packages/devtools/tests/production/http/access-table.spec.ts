@@ -327,9 +327,9 @@ describe("the share rules", () => {
 
   it("exist only when sharing is on", () => {
     expect(productionRouteAccess([]).some((rule) => rule.url.includes("share"))).toBe(false);
-    expect(productionRouteAccess([], { share: false }).some((rule) => rule.url.includes("share"))).toBe(
-      false,
-    );
+    expect(
+      productionRouteAccess([], { share: false }).some((rule) => rule.url.includes("share")),
+    ).toBe(false);
   });
 
   it("keeps the grant exchange public, the shared view behind the grant, and the management admin only", () => {

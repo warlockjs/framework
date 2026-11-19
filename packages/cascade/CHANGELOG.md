@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.59.0 - 2026-11-19
+
+### Changed
+
+- Registering a model under a name that is already registered no longer warns while a test file runs under the experimental `tests.lifetime: "worker-isolated"`: each file imports its models again by design, so the duplicates are counted instead (one debug line per file with `WARLOCK_TEST_PROFILE=1`). Every other context warns as before.
+
 ## 5.54.0 - 2026-11-16
 
 ### Upgrading

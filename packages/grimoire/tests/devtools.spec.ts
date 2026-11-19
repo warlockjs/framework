@@ -131,7 +131,10 @@ describe("the panel", () => {
     const flow = panel.routes?.find((item) => item.path === "/product/flows/:feature/:flow");
     const params = { feature: "catalog", flow: "new-arrivals" };
     const request = { params, query: {}, body: undefined };
-    const signedIn = (await flow?.handler(request)) as { developer: unknown; health: { errors: unknown } };
+    const signedIn = (await flow?.handler(request)) as {
+      developer: unknown;
+      health: { errors: unknown };
+    };
     const shared = (await flow?.handler({ ...request, shared: true })) as { developer: unknown };
 
     expect(signedIn.developer).not.toBeNull();
@@ -140,7 +143,9 @@ describe("the panel", () => {
 
     const map = panel.routes?.find((item) => item.path === "/product");
 
-    expect(((await map?.handler({ ...request, shared: true })) as { developer: boolean }).developer).toBe(false);
+    const answer = (await map!.handler({ ...request, shared: true })) as { developer: boolean };
+
+    expect(answer.developer).toBe(false);
   });
 
   it("answers the summary, lists and reports from the snapshot without booting the app", async () => {
@@ -438,6 +443,8 @@ describe("exportGrimoireSite", () => {
 
     await page.goTo("#grimoire/flow/catalog/new-arrivals");
     expect(page.root.text).toContain("Proof");
+    // The criteria belong to the Proof tab.
+    await page.goTo("#grimoire/flow/catalog/new-arrivals/proof");
     expect(page.root.text).toContain("AC-1");
 
     await page.goTo("#grimoire/tasks");

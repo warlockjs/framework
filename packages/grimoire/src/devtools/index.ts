@@ -20,8 +20,8 @@ import * as data from "./data";
 import { productFeature, productFlow, productMap, type ProductErrorSummary } from "./product-map";
 import { createSnapshotSource } from "./snapshot-source";
 
-export { exportGrimoireSite } from "./site";
-export type { ExportGrimoireSiteOptions } from "./site";
+export { buildProductSiteData, exportGrimoireSite, exportGrimoireSiteDetailed } from "./site";
+export type { ExportGrimoireSiteOptions, GrimoireSiteExport } from "./site";
 
 /** The parts of devtools' `DevtoolsPanelRequest` the routes read. */
 export type GrimoirePanelRequest = {
@@ -104,6 +104,9 @@ export async function grimoireDevtoolsPanel(
   const source = createSnapshotSource(context.root, {
     write: context.mode !== "production",
     mode: context.mode ?? "development",
+    // The panel runs inside the app's own process. Collecting route facts there boots every connector and
+    // re-imports the route and event modules, which would register them twice in the live app. So the tab
+    // reads the cached facts and says "missing" or "stale" until `warlock grimoire build` runs elsewhere.
     ...(context.adapter === undefined ? {} : { adapter: context.adapter }),
     ...(context.ttlMs === undefined ? {} : { ttlMs: context.ttlMs }),
     ...(context.testResultsFile === undefined ? {} : { testResultsFile: context.testResultsFile }),
@@ -158,13 +161,34 @@ export async function grimoireDevtoolsPanel(
     const limit = number(one(query, "limit"));
     let any = false;
 
-    if (code) (filter.code = code), (any = true);
-    if (feature) (filter.feature = feature), (any = true);
-    if (flow) (filter.flow = flow), (any = true);
-    if (severity === "error" || severity === "warning") (filter.severity = severity), (any = true);
-    if (state === "expected" || state === "unexpected") (filter.state = state), (any = true);
-    if (offset !== undefined) (filter.offset = offset), (any = true);
-    if (limit !== undefined) (filter.limit = limit), (any = true);
+    if (code) {
+      filter.code = code;
+      any = true;
+    }
+    if (feature) {
+      filter.feature = feature;
+      any = true;
+    }
+    if (flow) {
+      filter.flow = flow;
+      any = true;
+    }
+    if (severity === "error" || severity === "warning") {
+      filter.severity = severity;
+      any = true;
+    }
+    if (state === "expected" || state === "unexpected") {
+      filter.state = state;
+      any = true;
+    }
+    if (offset !== undefined) {
+      filter.offset = offset;
+      any = true;
+    }
+    if (limit !== undefined) {
+      filter.limit = limit;
+      any = true;
+    }
 
     return any ? filter : null;
   };
@@ -235,7 +259,10 @@ export async function grimoireDevtoolsPanel(
           }),
         ),
       },
-      { path: "/product", handler: product((snapshot, _request, options) => productMap(snapshot, options)) },
+      {
+        path: "/product",
+        handler: product((snapshot, _request, options) => productMap(snapshot, options)),
+      },
       {
         path: "/product/features/:feature",
         handler: product((snapshot, { params }, options) =>

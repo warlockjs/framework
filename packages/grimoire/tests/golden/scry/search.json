@@ -3,12 +3,20 @@
   "routes": "fresh",
   "notes": [],
   "text": "new arrivals",
+  "counts": {
+    "flow": 1,
+    "block": 2,
+    "route": 1,
+    "file": 6,
+    "export": 3,
+    "task": 1
+  },
   "hits": [
     {
       "type": "flow",
       "id": "catalog/new-arrivals",
       "detail": "New arrivals",
-      "score": 7
+      "score": 9
     },
     {
       "type": "block",
@@ -47,18 +55,6 @@
       "score": 6
     },
     {
-      "type": "export",
-      "id": "src/app/catalog/controllers/new-arrivals.controller.ts#NewArrivalsController",
-      "detail": "Returns the new arrivals for the customer's country.",
-      "score": 6
-    },
-    {
-      "type": "export",
-      "id": "src/app/catalog/services/new-arrivals.service.ts#listNewArrivals",
-      "detail": "Returns up to 20 products, newest first.",
-      "score": 5
-    },
-    {
       "type": "file",
       "id": "mobile/app/index.tsx",
       "detail": "The home screen with new arrivals.",
@@ -75,6 +71,18 @@
       "id": "src/web/$sites/client/home.setup.ts",
       "detail": "Loads featured products and new arrivals for the home page.",
       "score": 3
+    },
+    {
+      "type": "export",
+      "id": "src/app/catalog/controllers/new-arrivals.controller.ts#NewArrivalsController",
+      "detail": "Returns the new arrivals for the customer's country.",
+      "score": 6
+    },
+    {
+      "type": "export",
+      "id": "src/app/catalog/services/new-arrivals.service.ts#listNewArrivals",
+      "detail": "Returns up to 20 products, newest first.",
+      "score": 5
     },
     {
       "type": "export",

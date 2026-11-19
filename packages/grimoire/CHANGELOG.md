@@ -2,6 +2,30 @@
 
 `@warlock.js/grimoire` is new in 5.55.0 and experimental: its file layout, `GR` codes and API may change in any release until it is marked stable.
 
+## 5.59.0 - 2026-11-19
+
+### Added
+
+- The adapter has an optional `host()` that reports the framework name, version and logo and the app's name and version (its `package.json`). The devtools tab shows them in the header and footer, and the static export does too. The Warlock adapter implements it.
+- The flow list shows flow cards with the counts that matter (steps, cases, criteria, proven criteria, unexpected findings), and `scry --feature` answers carry the same counts per flow.
+- A "What changed" timeline lists releases, tasks and changes with reference chips that jump to the feature or flow they name.
+- Feature and flow pages are tabbed. A feature map shows flows against apps, and the flow page's journey and health strip sit in their own tabs. A loading skeleton shows while the book opens.
+- The Product map sorts its features and shows what changed since a release you pick.
+- `warlock grimoire build --site --product` exports the share-safe Product map only: no file paths, test names or per-file answers, and the page opens on the map.
+- Search indexes the written text of flows (summary, who, story, cases and criteria such as AC-5), and written content ranks above files and exports; hits are grouped by type.
+- `openGrimoire`'s snapshot source takes an opt-in `collectRoutes` option that collects route, event and job facts once when the book has none. It boots the app for inspection, so it is meant for tooling processes only, never for a process that serves the app; the devtools panel does not use it.
+
+### Changed
+
+- The MCP server (and any long-running process that queries the book) keeps the opened book in memory between calls and opens it again only when a file or folder it lists changed; a one-off `warlock scry` call still opens the book once. `build --site` leaves the page alone when it was built from the same book; `--force` writes it again.
+- Steps that could not be checked (no route facts yet) are counted as unchecked, apart from the missing ones, and never count against a flow's health.
+- The shared Product map shows a grey "not measured" instead of a problem when no test results were recorded.
+
+### Fixed
+
+- GR3006 no longer reports files that are reached: route middleware is followed, files with a role that runs by being present (migration, seed, command, main, layout, root) are exempt, and test helpers (files under `tests/`, `__tests__/`, `fixtures/`, `support/` or named `*.test-utils.*`) that only specs import count as reached. A source file that only its own spec imports still warns.
+- GR5008 is skipped for mail and notification entries when the book has no route facts, instead of reporting an entry the booted app would have confirmed.
+
 ## 5.58.0 - 2026-11-18
 
 ### Added

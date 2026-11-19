@@ -204,7 +204,12 @@ describe("the panel's snapshot source", () => {
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(
       file,
-      JSON.stringify({ schemaVersion: 1, updatedAt: "2026-11-18T00:00:00.000Z", runner: "vitest", results: [] }),
+      JSON.stringify({
+        schemaVersion: 1,
+        updatedAt: "2026-11-18T00:00:00.000Z",
+        runner: "vitest",
+        results: [],
+      }),
     );
     const later = new Date(Date.now() + 60_000);
 
@@ -233,11 +238,41 @@ describe("the panel's snapshot source", () => {
     mkdirSync(path.join(copy.root, "deploy"), { recursive: true });
     writeFileSync(
       path.join(copy.root, "deploy", "results.json"),
-      JSON.stringify({ schemaVersion: 1, updatedAt: "2026-11-18T01:00:00.000Z", runner: "vitest", results: [] }),
+      JSON.stringify({
+        schemaVersion: 1,
+        updatedAt: "2026-11-18T01:00:00.000Z",
+        runner: "vitest",
+        results: [],
+      }),
     );
 
     const second = await source.get();
 
     expect(second.results?.updatedAt).toBe("2026-11-18T01:00:00.000Z");
+  });
+});
+
+describe("collecting route facts in development", () => {
+  it("reads the route facts once on first open when none exist, and only when asked to", async () => {
+    copy = copyFixture();
+    const adapter = createShopAdapter();
+    const routes = vi.spyOn(adapter, "routes");
+    const quiet = await createSnapshotSource(copy.root, { adapter, write: true }).get();
+
+    expect(quiet.routes).toBe("missing");
+    expect(routes).not.toHaveBeenCalled();
+
+    const source = createSnapshotSource(copy.root, { adapter, write: true, collectRoutes: true });
+    const first = await source.get();
+
+    expect(first.routes).not.toBe("missing");
+    expect(routes).toHaveBeenCalled();
+
+    const calls = routes.mock.calls.length;
+
+    source.invalidate();
+    await source.get();
+    // The facts now live in the book: the next open does not collect again.
+    expect(routes.mock.calls.length).toBe(calls);
   });
 });

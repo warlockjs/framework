@@ -132,6 +132,19 @@ describe("invites", () => {
     await expect(world.auth.inspectInvite(created.token)).resolves.toBeDefined();
   });
 
+  it("names the configured minimum length when the password is too short", async () => {
+    const world = createWorld({ options: { passwords: { minLength: 12, rejectCommon: true } } });
+    const admin = await signedIn(world, "boss@example.com", "admin");
+    const created = await invite(world, admin);
+
+    await expect(
+      world.auth.acceptInvite({ token: created.token, password: "elevenchars" }, meta()),
+    ).rejects.toMatchObject({
+      code: "auth.password-too-short",
+      message: "Use a password of at least 12 characters.",
+    });
+  });
+
   it("cannot be used twice", async () => {
     const { world, admin } = await adminWorld();
     const created = await invite(world, admin);

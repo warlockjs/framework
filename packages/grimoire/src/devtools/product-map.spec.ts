@@ -4,7 +4,13 @@ import { checkGrimoire } from "../check";
 import { copyFixture, type FixtureCopy } from "../../tests/support/copy-fixture";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import { openGrimoire } from "../workspace";
-import { productFeature, productFlow, productMap, type ProductMapOptions } from "./product-map";
+import {
+  compareReleases,
+  productFeature,
+  productFlow,
+  productMap,
+  type ProductMapOptions,
+} from "./product-map";
 
 // The real check, counted: the answers must run it once per snapshot.
 vi.mock("../check", async (importOriginal) => {
@@ -42,6 +48,25 @@ describe("the product map answers", () => {
     expect(["good", "attention", "problem", "unknown"]).toContain(catalog?.health.level);
     expect(catalog?.health.reason).not.toBe("");
     expect(productMap(snapshot, shared).developer).toBe(false);
+  });
+
+  it("gives each card the numbers of its health strip: flows, criteria, screenshots and findings", async () => {
+    const snapshot = await open();
+    const catalog = productMap(snapshot, shared).features.find(
+      (feature) => feature.id === "catalog",
+    );
+    const strip = catalog?.strip;
+
+    expect(strip?.flows.total).toBe(catalog?.flows);
+    expect(strip?.flows.shipped).toBeLessThanOrEqual(strip?.flows.total ?? 0);
+    expect(strip?.criteria.total).toBe(catalog?.health.criteria.total);
+    expect(strip?.criteria.proven).toBe(catalog?.health.criteria.pass);
+    expect(typeof strip?.criteria.measured).toBe("boolean");
+    // A criterion with a result (pass, fail or stale) makes the strip measured.
+    if ((catalog?.health.criteria.pass ?? 0) > 0) expect(strip?.criteria.measured).toBe(true);
+    expect(strip?.screenshots.present).toBeLessThanOrEqual(strip?.screenshots.places ?? 0);
+    expect(strip?.findings.errors).toBeGreaterThanOrEqual(0);
+    expect(strip?.findings.warnings).toBeGreaterThanOrEqual(0);
   });
 
   it("answers a feature with flows, appearances, releases and planned work", async () => {
@@ -120,6 +145,51 @@ describe("the product map answers", () => {
     expect(productFeature(snapshot, "catalog", shared).developer).toBeNull();
   });
 
+  it("shows missing test results as neutral not-measured in the shared view and as attention for developers", async () => {
+    const snapshot = await open();
+    const unmeasured = {
+      ...snapshot,
+      results: null,
+      proofs: snapshot.proofs.length > 0 ? snapshot.proofs : ([{}] as never),
+      collected: {
+        ...snapshot.collected,
+        flows: Object.fromEntries(
+          Object.entries(snapshot.collected.flows).map(([ref, bookmap]) => [
+            ref,
+            {
+              ...bookmap,
+              criteria: bookmap.criteria.map((item) => ({ ...item, status: "pass" as const })),
+            },
+          ]),
+        ),
+      },
+    } as GrimoireSnapshot;
+    const business = productFeature(unmeasured, "catalog", shared).health;
+    const developer = productFeature(unmeasured, "catalog", signedIn).health;
+
+    if (business.criteria.total > 0) {
+      expect(business.level).toBe("unknown");
+      expect(business.reason).toBe("Test results are not measured");
+      expect(developer.level).toBe("attention");
+      expect(developer.reason).toBe("No test results recorded");
+    }
+  });
+
+  it("gives each card the day it last changed and the releases that name it, and lists the releases", async () => {
+    const snapshot = await open();
+    const map = productMap(snapshot, shared);
+
+    for (const feature of map.features) {
+      expect(feature.changedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(Array.isArray(feature.changedIn)).toBe(true);
+      expect(typeof feature.unreleased).toBe("boolean");
+    }
+
+    const dates = map.releases.map((item) => item.date);
+
+    expect(dates).toEqual([...dates].sort());
+  });
+
   it("says no results are recorded when proofs exist and no store was read", async () => {
     const snapshot = await open();
     const hasProofs = snapshot.proofs.length > 0;
@@ -136,7 +206,10 @@ describe("the product map answers", () => {
         flows: Object.fromEntries(
           Object.entries(snapshot.collected.flows).map(([ref, bookmap]) => [
             ref,
-            { ...bookmap, criteria: bookmap.criteria.map((item) => ({ ...item, status: "fail" as const })) },
+            {
+              ...bookmap,
+              criteria: bookmap.criteria.map((item) => ({ ...item, status: "fail" as const })),
+            },
           ]),
         ),
       },
@@ -154,7 +227,10 @@ describe("the product map answers", () => {
         flows: Object.fromEntries(
           Object.entries(snapshot.collected.flows).map(([ref, bookmap]) => [
             ref,
-            { ...bookmap, criteria: bookmap.criteria.map((item) => ({ ...item, status: "pass" as const })) },
+            {
+              ...bookmap,
+              criteria: bookmap.criteria.map((item) => ({ ...item, status: "pass" as const })),
+            },
           ]),
         ),
       },
@@ -166,22 +242,70 @@ describe("the product map answers", () => {
 
   it("maps captured errors of the last hour to the features and flows that use the route", async () => {
     const snapshot = await open();
-    const route = (snapshot.book.facts.routes ?? []).find(
-      (item) => item.path.includes("new-arrivals"),
+    const route = (snapshot.book.facts.routes ?? []).find((item) =>
+      item.path.includes("new-arrivals"),
     );
 
     expect(route).toBeDefined();
 
     const now = Date.now();
     const errors = [
-      { route: route?.path ?? "", status: 500, name: "Error", source: "request" as const, count: 3, firstSeen: now - 1000, lastSeen: now - 500 },
-      { route: route?.path ?? "", status: 500, name: "Old", source: "request" as const, count: 9, firstSeen: now - 9_000_000, lastSeen: now - 8_000_000 },
-      { route: null, status: null, name: "NoRoute", source: "log" as const, count: 5, firstSeen: now, lastSeen: now },
+      {
+        route: route?.path ?? "",
+        status: 500,
+        name: "Error",
+        source: "request" as const,
+        count: 3,
+        firstSeen: now - 1000,
+        lastSeen: now - 500,
+      },
+      {
+        route: route?.path ?? "",
+        status: 500,
+        name: "Old",
+        source: "request" as const,
+        count: 9,
+        firstSeen: now - 9_000_000,
+        lastSeen: now - 8_000_000,
+      },
+      {
+        route: null,
+        status: null,
+        name: "NoRoute",
+        source: "log" as const,
+        count: 5,
+        firstSeen: now,
+        lastSeen: now,
+      },
     ];
     const answer = productFlow(snapshot, "catalog", "new-arrivals", { shared: false, errors });
 
     expect(answer.health.errors).toEqual({ count: 3, lastSeen: now - 500 });
     expect(productFlow(snapshot, "catalog", "new-arrivals", signedIn).health.errors).toBeNull();
-    expect(productFeature(snapshot, "catalog", { shared: false, errors }).health.errors?.count).toBe(3);
+    expect(
+      productFeature(snapshot, "catalog", { shared: false, errors }).health.errors?.count,
+    ).toBe(3);
+  });
+});
+
+describe("product map dates and release order", () => {
+  it("ignores an updated value that is not a day, so every card keeps a valid changedAt", async () => {
+    const snapshot = await open();
+    const feature = snapshot.written.features.find((item) => item.readme !== null);
+
+    if (feature?.readme === undefined || feature.readme === null) throw new Error("no readme");
+
+    feature.readme.updated = { ...feature.readme.updated, value: "soon" };
+    feature.changelog = null;
+
+    const card = productMap(snapshot, shared).features.find((item) => item.id === feature.id);
+
+    expect(card?.changedAt).toBe("");
+  });
+
+  it("compares releases by their numbers, so 5.9.0 comes before 5.10.0", () => {
+    const names = ["5.10.0", "5.9.0", "5.2.1", "5.2.0"];
+
+    expect([...names].sort(compareReleases)).toEqual(["5.2.0", "5.2.1", "5.9.0", "5.10.0"]);
   });
 });

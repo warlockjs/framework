@@ -185,10 +185,19 @@ export type DevtoolsProductionOptions = {
   };
   /**
    * Who must use a second factor (an authenticator app or a passkey).
+   * `"off"` requires nobody: users may still add a factor, and an account
+   * that has one is always asked for it. Boot logs a warning when it is off.
    *
    * @default "admins"
    */
-  twoFactor?: "admins" | "everyone";
+  twoFactor?: "off" | "admins" | "everyone";
+  /** Password rules for accounts, invites and the first admin. */
+  passwords?: {
+    /** Shortest password, in characters; 8 or more. @default 8 */
+    minLength?: number;
+    /** Refuse passwords from the built-in common list. @default true */
+    rejectCommon?: boolean;
+  };
   /** Failed sign-in limits, counted over the audit log in a sliding window. */
   rateLimits?: {
     /** @default 15 */

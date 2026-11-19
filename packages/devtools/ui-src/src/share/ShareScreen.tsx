@@ -1,3 +1,4 @@
+import { BrandMark } from "@/components/common/BrandMark";
 import { useCallback, useEffect, useState } from "react";
 import type { DevtoolsShareOpenAnswer } from "@contracts";
 import { ApiError, apiFetch } from "@/api/client";
@@ -15,7 +16,8 @@ type State =
   | { type: "closed" }
   | { type: "failed"; error: unknown };
 
-const CLOSED_TEXT = "This link has expired or was revoked. Ask the person who shared it for a new one.";
+const CLOSED_TEXT =
+  "This link has expired or was revoked. Ask the person who shared it for a new one.";
 
 /**
  * A read-only share link. `#/share/<token>` is exchanged once for a scoped
@@ -110,14 +112,15 @@ export function ShareScreen() {
 
   return (
     <div className="min-h-screen">
-      <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b bg-card px-4 py-3 sm:px-6">
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b bg-card px-4 py-3.5 sm:px-6">
+        <BrandMark />
         <h1 className="text-base font-semibold">{info.title}</h1>
         <span className="text-sm text-muted-foreground">{info.label}</span>
         <span className="ml-auto text-xs text-muted-foreground" data-testid="share-expiry">
           Read-only link · expires {new Date(info.expiresAt).toLocaleDateString()}
         </span>
       </header>
-      <main className="mx-auto w-full max-w-[110rem] px-3 py-5 sm:px-6">
+      <main className="mx-auto w-full max-w-[110rem] px-4 py-6 sm:px-8">
         <PanelHost id={info.panel} title={info.title} route={route} shared />
       </main>
     </div>

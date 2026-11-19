@@ -70,10 +70,28 @@ export type ScryRouteResult = ScryNotes & {
   page: BookPage | null;
 };
 
+/** One flow of a feature answer, with the counts the flow cards show. */
+export type ScryFeatureFlow = {
+  id: string;
+  status: string;
+  since: string;
+  heading: string | null;
+  /** Technical steps written in the flow file. */
+  steps: number;
+  /** Edge cases written in the flow (`## Cases`). */
+  cases: number;
+  /** Acceptance criteria written in the flow. */
+  criteria: number;
+  /** Criteria with at least one `@proves` test. */
+  tested: number;
+  /** Findings about the flow that are not expected (a `proposed` flow's findings are). */
+  findings: number;
+};
+
 export type ScryFeatureResult = ScryNotes & {
   type: "feature";
   readme: WrittenFeatureReadme;
-  flows: { id: string; status: string; since: string; heading: string | null }[];
+  flows: ScryFeatureFlow[];
   bookmap: FeatureBookmap;
   /** Newest first, at most 10. */
   changes: WrittenChangelogEntry[];
@@ -118,11 +136,19 @@ export type ScryHit = {
   detail: string | null;
   /** Higher is better. Only the order is meaningful. */
   score: number;
+  /**
+   * For a feature or flow found by its written text: the part that matched
+   * (`AC-5: …`, `case duplicate: …`, `story 2: …`, `summary: …`). Absent when the name matched.
+   */
+  matched?: string;
 };
 
 export type ScrySearchResult = ScryNotes & {
   type: "search";
   text: string;
+  /** How many candidates matched, per type, before the limit cut the list. */
+  counts: Partial<Record<ScryHitType, number>>;
+  /** Grouped by type (features and flows first), best first inside a group. */
   hits: ScryHit[];
 };
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DevtoolsPanelInfo } from "@contracts";
 import { useApi } from "@/api/hooks";
+import { useConnection } from "@/api/connection";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { LoadingRows } from "@/components/common/LoadingRows";
@@ -27,6 +28,7 @@ export function Shell() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const menuButton = useRef<HTMLElement | null>(null);
+  const { generation } = useConnection();
   const panels = useApi<DevtoolsPanelInfo[]>("api/panels");
   const list = useMemo(() => panels.data ?? [], [panels.data]);
   const tabId =
@@ -41,12 +43,13 @@ export function Shell() {
   };
 
   let content;
-  const viewKey =
+  const viewKey = `${generation}:${
     route.type === "admin"
       ? `admin:${route.page}`
       : route.type === "tab"
         ? `tab:${tabId ?? ""}`
-        : route.type;
+        : route.type
+  }`;
   const viewName =
     route.type === "account"
       ? "Account"
@@ -181,9 +184,7 @@ export function Shell() {
           id={info.id}
           title={info.title}
           route={tabRoute}
-          share={
-            canShare ? { enabled: true, manageHref: `#/admin/shares?panel=${info.id}` } : null
-          }
+          share={canShare ? { enabled: true, manageHref: `#/admin/shares?panel=${info.id}` } : null}
         />
       );
     }
@@ -213,7 +214,7 @@ export function Shell() {
           }}
           onOpenPalette={() => setPaletteOpen(true)}
         />
-        <main className="mx-auto w-full max-w-[110rem] flex-1 px-3 py-5 sm:px-6">
+        <main className="mx-auto w-full max-w-[110rem] flex-1 px-4 py-6 sm:px-8">
           <ViewBoundary key={viewKey} name={viewName}>
             {content}
           </ViewBoundary>

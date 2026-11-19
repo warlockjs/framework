@@ -99,17 +99,24 @@ function productDate(value) {
 }
 
 function productStatusChip(kit, status) {
-  return kit.el("span", { class: `pm-chip pm-status pm-status--${status}`, text: PRODUCT_STATUS[status] ?? status });
+  return kit.el("span", {
+    class: `pm-chip pm-status pm-status--${status}`,
+    text: PRODUCT_STATUS[status] ?? status,
+  });
 }
 
 /** A traffic light: a shape and words as well as a colour. */
 function productLight(kit, level, label) {
   const light = PRODUCT_LIGHT[level] ?? PRODUCT_LIGHT.unknown;
 
-  return kit.el("span", { class: `pm-light pm-light--${PRODUCT_LIGHT[level] ? level : "unknown"}` }, [
-    kit.el("span", { class: "pm-light-glyph", "aria-hidden": "true", text: light.glyph }),
-    kit.el("span", { text: label ?? light.label }),
-  ]);
+  return kit.el(
+    "span",
+    { class: `pm-light pm-light--${PRODUCT_LIGHT[level] ? level : "unknown"}` },
+    [
+      kit.el("span", { class: "pm-light-glyph", "aria-hidden": "true", text: light.glyph }),
+      kit.el("span", { text: label ?? light.label }),
+    ],
+  );
 }
 
 function productHealth(kit, health) {
@@ -119,12 +126,100 @@ function productHealth(kit, health) {
   ]);
 }
 
+/**
+ * The health strip of a feature card: four thin segments (flows written,
+ * criteria proven by tests, screenshots present, open findings) and a legend
+ * that says each number in words. Criteria with no recorded results are grey and
+ * read "not measured": that is a missing measurement, not a problem.
+ */
+function productStrip(kit, strip) {
+  if (!strip) return null;
+
+  const share = (part, whole) =>
+    whole > 0 ? Math.max(0, Math.min(100, Math.round((part / whole) * 100))) : 0;
+  const findings = strip.findings.errors + strip.findings.warnings;
+  const criteria = strip.criteria;
+  const parts = [
+    {
+      key: "flows",
+      fill: share(strip.flows.shipped, strip.flows.total),
+      tone: strip.flows.total ? "info" : "none",
+      text: `${productPlural(strip.flows.total, "flow")} written, ${strip.flows.shipped} shipped`,
+    },
+    {
+      key: "proof",
+      fill: criteria.measured ? share(criteria.proven, criteria.total) : 0,
+      tone:
+        !criteria.total || !criteria.measured
+          ? "none"
+          : criteria.failing
+            ? "bad"
+            : criteria.proven === criteria.total
+              ? "good"
+              : "warn",
+      text: !criteria.total
+        ? "No criteria written"
+        : criteria.measured
+          ? `${criteria.proven} of ${criteria.total} criteria proven by tests`
+          : `${criteria.total} criteria, test results not measured`,
+    },
+    {
+      key: "shots",
+      fill: share(strip.screenshots.present, strip.screenshots.places),
+      tone: !strip.screenshots.places
+        ? "none"
+        : strip.screenshots.present === strip.screenshots.places
+          ? "good"
+          : "warn",
+      text: strip.screenshots.places
+        ? `${strip.screenshots.present} of ${productPlural(strip.screenshots.places, "place")} with a screenshot`
+        : "No pages show it yet",
+    },
+    {
+      key: "findings",
+      fill: 100,
+      tone: strip.findings.errors ? "bad" : findings ? "warn" : "good",
+      text: findings ? `${productPlural(findings, "open finding")}` : "No open findings",
+    },
+  ];
+  const summary = parts.map((part) => part.text).join("; ");
+
+  return kit.el(
+    "div",
+    { class: "pm-strip", role: "group", "aria-label": "Health", title: summary },
+    [
+      kit.el(
+        "div",
+        { class: "pm-strip-bar", "aria-hidden": "true" },
+        parts.map((part) =>
+          kit.el("span", { class: `pm-strip-seg is-${part.tone}` }, [
+            kit.el("span", { class: "pm-strip-fill", style: `width: ${part.fill}%` }),
+          ]),
+        ),
+      ),
+      kit.el(
+        "ul",
+        { class: "pm-strip-legend" },
+        parts.map((part) =>
+          kit.el("li", { class: `pm-strip-item is-${part.tone}` }, [
+            kit.el("span", { class: "pm-strip-dot", "aria-hidden": "true" }),
+            part.text,
+          ]),
+        ),
+      ),
+    ],
+  );
+}
+
 function productChips(kit, items, kind) {
   if (!items || items.length === 0) return null;
 
   return kit.el(
     "ul",
-    { class: `pm-chips pm-chips--${kind}`, "aria-label": kind === "audience" ? "Who it is for" : "Where it lives" },
+    {
+      class: `pm-chips pm-chips--${kind}`,
+      "aria-label": kind === "audience" ? "Who it is for" : "Where it lives",
+    },
     items.map((item) => kit.el("li", { class: `pm-chip pm-chip--${kind}`, text: item })),
   );
 }
@@ -202,11 +297,15 @@ const PRODUCT_SHOT_EXTENSION = /\.(png|jpe?g|webp|gif)$/i;
  * `ctx.file()` can never point an image outside the folder.
  */
 function productShotPath(src) {
-  if (typeof src !== "string" || src === "" || src.startsWith("/") || /[\\:\0?#]/.test(src)) return false;
+  if (typeof src !== "string" || src === "" || src.startsWith("/") || /[\\:\0?#]/.test(src))
+    return false;
 
   const segments = src.split("/");
 
-  return segments.every((segment) => segment !== "" && segment !== "." && segment !== "..") && PRODUCT_SHOT_EXTENSION.test(src);
+  return (
+    segments.every((segment) => segment !== "" && segment !== "." && segment !== "..") &&
+    PRODUCT_SHOT_EXTENSION.test(src)
+  );
 }
 
 function productShots(ctx, kit, list, lightbox) {
@@ -262,7 +361,11 @@ function productAppearances(ctx, kit, appearances, lightbox, withFlowLinks) {
                   kit.el("strong", { text: item.title ?? item.id }),
                   item.route ? kit.el("span", { class: "pm-place-route", text: item.route }) : null,
                   withFlowLinks && item.flow
-                    ? kit.link(`product/flow/${item.flow.split("/").map(productEncode).join("/")}`, "See the story", { class: "pm-place-flow" })
+                    ? kit.link(
+                        `product/flow/${item.flow.split("/").map(productEncode).join("/")}`,
+                        "See the story",
+                        { class: "pm-place-flow" },
+                      )
                     : null,
                 ]),
                 productShots(ctx, kit, item.screenshots, lightbox),
@@ -292,7 +395,11 @@ function productDeveloperToggle(kit, body) {
     "aria-pressed": String(on),
     text: "For developers",
   });
-  const panel = kit.el("section", { class: "pm-developer", "aria-label": "For developers" }, on ? body() : []);
+  const panel = kit.el(
+    "section",
+    { class: "pm-developer", "aria-label": "For developers" },
+    on ? body() : [],
+  );
 
   if (!on) panel.setAttribute("hidden", "");
 
@@ -342,6 +449,106 @@ function productLoadError(ctx, kit, what, error) {
   ]);
 }
 
+/** The sorts of the feature cards. `id` is the written order and the default. */
+const PRODUCT_SORTS = [
+  { value: "id", label: "Feature id" },
+  { value: "name", label: "Name" },
+  { value: "changed", label: "Recently changed" },
+  { value: "health", label: "Health (worst first)" },
+];
+
+const PRODUCT_HEALTH_ORDER = { problem: 0, attention: 1, unknown: 2, good: 3 };
+
+const productCompareText = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
+
+/** The cards in the order `sort` names; the sort is stable, so equal cards keep their written order. */
+export function productSortFeatures(features, sort) {
+  const list = features.map((feature, index) => ({ feature, index }));
+  const by = {
+    id: (a, b) => productCompareText(a.feature.id, b.feature.id),
+    name: (a, b) => a.feature.title.localeCompare(b.feature.title),
+    changed: (a, b) => productCompareText(b.feature.changedAt ?? "", a.feature.changedAt ?? ""),
+    health: (a, b) =>
+      (PRODUCT_HEALTH_ORDER[a.feature.health.level] ?? 2) -
+      (PRODUCT_HEALTH_ORDER[b.feature.health.level] ?? 2),
+  }[sort];
+
+  if (!by) return features;
+
+  return list.sort((a, b) => by(a, b) || a.index - b.index).map((item) => item.feature);
+}
+
+/** The flow cards in the order `sort` names (`written`, `name`, `health`); the sort is stable. */
+export function productSortFlows(flows, sort) {
+  const list = flows.map((flow, index) => ({ flow, index }));
+  const by = {
+    name: (a, b) => (a.flow.title ?? "").localeCompare(b.flow.title ?? ""),
+    health: (a, b) =>
+      (PRODUCT_HEALTH_ORDER[a.flow.health?.level] ?? 2) -
+      (PRODUCT_HEALTH_ORDER[b.flow.health?.level] ?? 2),
+  }[sort];
+
+  if (!by) return flows;
+
+  return list.sort((a, b) => by(a, b) || a.index - b.index).map((item) => item.flow);
+}
+
+/**
+ * The features that changed since a day (`yyyy-mm-dd`) or since a release (the release's own
+ * changes included, and anything not yet released). An empty `since` keeps every feature.
+ */
+export function productChangedSince(features, since, releases = []) {
+  if (!since) return features;
+
+  if (since.startsWith("release:")) {
+    const name = since.slice("release:".length);
+    const position = releases.findIndex((item) => item.release === name);
+
+    if (position < 0) return features;
+
+    const later = new Set(releases.slice(position).map((item) => item.release));
+
+    return features.filter(
+      (feature) =>
+        feature.unreleased === true ||
+        (feature.changedIn ?? []).some((release) => later.has(release)),
+    );
+  }
+
+  return features.filter((feature) => (feature.changedAt ?? "") >= since);
+}
+
+/** The "changed since" choices: the last week and month before the newest change, and each written release. */
+function productSinceChoices(features, releases) {
+  const validDay = (value) =>
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime());
+  const newest = features.reduce(
+    (max, feature) =>
+      validDay(feature.changedAt) && feature.changedAt > max ? feature.changedAt : max,
+    "",
+  );
+  const choices = [];
+
+  if (newest !== "") {
+    for (const [days, label] of [
+      [7, "Last 7 days"],
+      [30, "Last 30 days"],
+    ]) {
+      const day = new Date(`${newest}T00:00:00Z`);
+
+      day.setUTCDate(day.getUTCDate() - days);
+      choices.push({ value: day.toISOString().slice(0, 10), label: `${label} of activity` });
+    }
+  }
+
+  for (const item of [...releases].reverse())
+    choices.push({ value: `release:${item.release}`, label: `Release ${item.release} and later` });
+
+  return choices;
+}
+
 function productMapPage(ctx, kit, answer) {
   const features = answer.features ?? [];
   const live = features.filter((feature) => feature.status === "shipped").length;
@@ -359,7 +566,11 @@ function productMapPage(ctx, kit, answer) {
       }),
     ]),
     share
-      ? kit.el("a", { class: "pm-button pm-button--primary", href: share.manageHref, text: "Share this map" })
+      ? kit.el("a", {
+          class: "pm-button pm-button--primary",
+          href: share.manageHref,
+          text: "Share this map",
+        })
       : null,
   ]);
 
@@ -377,10 +588,14 @@ function productMapPage(ctx, kit, answer) {
 
   const apps = [...new Set(features.flatMap((feature) => feature.apps))].sort();
   const audiences = [...new Set(features.flatMap((feature) => feature.audience))].sort();
-  const state = { text: "", app: "", audience: "" };
+  const releases = answer.releases ?? [];
+  const state = { text: "", app: "", audience: "", sort: "id", since: "" };
   const grid = kit.el("ul", { class: "pm-grid" });
   const count = kit.el("p", { class: "pm-count", role: "status", "aria-live": "polite" });
-  const none = kit.el("p", { class: "pm-empty pm-empty--inline", text: "No feature matches. Clear the search or a filter." });
+  const none = kit.el("p", {
+    class: "pm-empty pm-empty--inline",
+    text: "No feature matches. Clear the search or a filter.",
+  });
 
   const card = (feature) =>
     kit.el("li", { class: "pm-card" }, [
@@ -389,7 +604,9 @@ function productMapPage(ctx, kit, answer) {
         kit.el("span", { class: "pm-muted", text: productPlural(feature.flows, "flow") }),
       ]),
       kit.el("h3", { class: "pm-card-title" }, [
-        kit.link(`product/feature/${productEncode(feature.id)}`, feature.title, { class: "pm-card-link" }),
+        kit.link(`product/feature/${productEncode(feature.id)}`, feature.title, {
+          class: "pm-card-link",
+        }),
       ]),
       kit.el("p", {
         class: "pm-card-summary",
@@ -397,12 +614,16 @@ function productMapPage(ctx, kit, answer) {
       }),
       productChips(kit, feature.audience, "audience"),
       productChips(kit, feature.apps, "app"),
+      productStrip(kit, feature.strip),
       productHealth(kit, feature.health),
     ]);
 
   const show = () => {
     const needle = state.text.trim().toLowerCase();
-    const matches = features.filter(
+    const matches = productSortFeatures(
+      productChangedSince(features, state.since, releases),
+      state.sort,
+    ).filter(
       (feature) =>
         (state.app === "" || feature.apps.includes(state.app)) &&
         (state.audience === "" || feature.audience.includes(state.audience)) &&
@@ -448,6 +669,39 @@ function productMapPage(ctx, kit, answer) {
     ]),
     apps.length > 1 ? select("App", apps, "app") : null,
     audiences.length > 0 ? select("Audience", audiences, "audience") : null,
+    kit.el("label", { class: "pm-field" }, [
+      kit.el("span", { text: "Sort by" }),
+      kit.el(
+        "select",
+        {
+          "data-pm": "sort",
+          onchange: (event) => {
+            state.sort = event?.target?.value ?? "id";
+            show();
+          },
+        },
+        PRODUCT_SORTS.map((item) => kit.el("option", { value: item.value, text: item.label })),
+      ),
+    ]),
+    kit.el("label", { class: "pm-field" }, [
+      kit.el("span", { text: "Changed since" }),
+      kit.el(
+        "select",
+        {
+          "data-pm": "since",
+          onchange: (event) => {
+            state.since = event?.target?.value ?? "";
+            show();
+          },
+        },
+        [
+          kit.el("option", { value: "", text: "Any time" }),
+          ...productSinceChoices(features, releases).map((item) =>
+            kit.el("option", { value: item.value, text: item.label }),
+          ),
+        ],
+      ),
+    ]),
   ]);
 
   show();
@@ -455,8 +709,14 @@ function productMapPage(ctx, kit, answer) {
   return kit.el("div", { class: "pm-page" }, [
     header,
     kit.el("ul", { class: "pm-stats", "aria-label": "At a glance" }, [
-      kit.el("li", {}, [kit.el("strong", { text: String(features.length) }), kit.el("span", { text: "features" })]),
-      kit.el("li", {}, [kit.el("strong", { text: String(live) }), kit.el("span", { text: "live" })]),
+      kit.el("li", {}, [
+        kit.el("strong", { text: String(features.length) }),
+        kit.el("span", { text: "features" }),
+      ]),
+      kit.el("li", {}, [
+        kit.el("strong", { text: String(live) }),
+        kit.el("span", { text: "live" }),
+      ]),
       kit.el("li", {}, [
         kit.el("strong", { text: String(attention) }),
         kit.el("span", { text: attention === 1 ? "needs attention" : "need attention" }),
@@ -475,12 +735,49 @@ function productFlowCard(kit, flow) {
       kit.el("span", { class: "pm-muted", text: flow.who }),
     ]),
     kit.el("h4", { class: "pm-card-title" }, [
-      kit.link(`product/flow/${flow.ref.split("/").map(productEncode).join("/")}`, flow.title, { class: "pm-card-link" }),
+      kit.link(`product/flow/${flow.ref.split("/").map(productEncode).join("/")}`, flow.title, {
+        class: "pm-card-link",
+      }),
     ]),
     kit.el("p", { class: "pm-card-summary", text: flow.summary ?? "No summary yet." }),
     productHealth(kit, flow.health),
   ]);
 }
+
+/** A reference id: `AC-6`, `T-089`, `QA 1.5.6`. */
+const PRODUCT_REF = /^(?:[A-Z]{1,5}-\d+|QA\s+\d[\w.-]*)$/;
+/** A trailing parenthesised group (optionally followed by one end mark) at the end of a sentence. */
+const PRODUCT_TRAILING_GROUP = /\s*\(([^()]*)\)\s*([.!?]?)\s*$/;
+
+/**
+ * Split the reference ids off the end of a change sentence: `"Fixed the total (AC-6, T-089)."` gives
+ * `{ text: "Fixed the total.", refs: ["AC-6", "T-089"] }`. Only a trailing parenthesised group whose items are
+ * all reference ids is taken, so ordinary parentheses in the text stay.
+ */
+export function productSplitRefs(sentence) {
+  let text = String(sentence ?? "");
+  const refs = [];
+
+  for (;;) {
+    const match = PRODUCT_TRAILING_GROUP.exec(text);
+
+    if (!match) break;
+
+    const parts = match[1]
+      .split(/[,;]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    if (parts.length === 0 || !parts.every((part) => PRODUCT_REF.test(part))) break;
+
+    refs.unshift(...parts);
+    text = `${text.slice(0, match.index)}${match[2]}`;
+  }
+
+  return { text: text.trim(), refs };
+}
+
+const PRODUCT_CHANGE_ORDER = ["added", "changed", "fixed", "removed"];
 
 function productTimeline(kit, releases) {
   const ordered = [...releases].sort(
@@ -491,29 +788,86 @@ function productTimeline(kit, releases) {
     "ol",
     { class: "pm-timeline" },
     ordered.map((item) => {
-      const when = [
-        item.release === null ? "Not released yet" : `Release ${item.release}`,
-        productDate(item.date),
-      ].filter(Boolean);
+      const groups = new Map();
 
-      return kit.el("li", { class: "pm-release" }, [
+      for (const change of item.changes)
+        groups.set(change.word, [...(groups.get(change.word) ?? []), change]);
+
+      const words = [
+        ...PRODUCT_CHANGE_ORDER.filter((word) => groups.has(word)),
+        ...[...groups.keys()].filter((word) => !PRODUCT_CHANGE_ORDER.includes(word)),
+      ];
+      const date = productDate(item.date);
+
+      return kit.el("li", { class: `pm-release${item.release === null ? " is-unreleased" : ""}` }, [
         kit.el("div", { class: "pm-release-head" }, [
-          kit.el("strong", { text: `Version ${item.version}` }),
-          kit.el("span", { class: "pm-muted", text: when.join(" · ") }),
+          kit.el("strong", { class: "pm-release-version", text: `Version ${item.version}` }),
+          item.release === null
+            ? kit.el("span", {
+                class: "pm-chip pm-chip--soft pm-release-state",
+                text: "Unreleased",
+              })
+            : kit.el("span", {
+                class: "pm-muted pm-release-state",
+                text: [`Release ${item.release}`, date].filter(Boolean).join(" · "),
+              }),
         ]),
-        kit.el(
-          "ul",
-          { class: "pm-changes" },
-          item.changes.map((change) =>
-            kit.el("li", {}, [
-              kit.el("span", { class: `pm-chip pm-change pm-change--${change.word}`, text: PRODUCT_CHANGE[change.word] ?? change.word }),
-              kit.el("span", { text: change.text }),
-            ]),
-          ),
-        ),
+        words.length === 0
+          ? kit.el("p", { class: "pm-muted", text: "No changes are listed for this version." })
+          : kit.el(
+              "div",
+              { class: "pm-change-groups" },
+              words.map((word) =>
+                kit.el("section", { class: "pm-change-group" }, [
+                  kit.el("h4", {
+                    class: `pm-change-type pm-change--${word}`,
+                    text: PRODUCT_CHANGE[word] ?? word,
+                  }),
+                  kit.el(
+                    "ul",
+                    { class: "pm-changes" },
+                    groups.get(word).map((change) => {
+                      const { text, refs } = productSplitRefs(change.text);
+
+                      return kit.el("li", {}, [
+                        kit.el("span", { class: "pm-change-text", text }),
+                        !kit.shared && refs.length > 0
+                          ? kit.el(
+                              "span",
+                              { class: "pm-refs" },
+                              refs.map((ref) => kit.el("code", { class: "pm-ref", text: ref })),
+                            )
+                          : null,
+                      ]);
+                    }),
+                  ),
+                ]),
+              ),
+            ),
       ]);
     }),
   );
+}
+
+/** The host the adapter reported, or `null` when there is none. */
+function productHost(host) {
+  return host && typeof host === "object" ? host : null;
+}
+
+/** "Warlock.js v5.58.0" with the logo, for the footer of the shared page. */
+function productBrandLine(kit, host) {
+  return kit.el("span", { class: "pm-brand" }, [
+    host.logo
+      ? kit.el("img", {
+          class: "pm-brand-logo",
+          src: host.logo,
+          alt: "",
+          width: "16",
+          height: "16",
+        })
+      : null,
+    kit.el("span", { text: host.version ? `${host.name} v${host.version}` : host.name }),
+  ]);
 }
 
 function productPlanned(kit, planned) {
@@ -522,7 +876,17 @@ function productPlanned(kit, planned) {
     { class: "pm-list" },
     planned.map((item) =>
       kit.el("li", {}, [
-        kit.el("span", { class: "pm-chip", text: item.type === "bug" ? "Fix" : item.type === "feature" ? "New" : item.type === "decision" ? "Decision" : "Upkeep" }),
+        kit.el("span", {
+          class: "pm-chip",
+          text:
+            item.type === "bug"
+              ? "Fix"
+              : item.type === "feature"
+                ? "New"
+                : item.type === "decision"
+                  ? "Decision"
+                  : "Upkeep",
+        }),
         kit.el("span", { text: item.title }),
         kit.el("span", { class: "pm-muted", text: item.status }),
       ]),
@@ -560,16 +924,42 @@ function productFeaturePage(ctx, kit, answer, lightbox) {
     ]),
   );
 
-  if (feature.why) sections.push(productSection(kit, "Why it exists", kit.el("p", { class: "pm-prose", text: feature.why })));
-
-  if (answer.flows.length > 0)
+  if (feature.why)
     sections.push(
-      productSection(
-        kit,
-        "What people can do",
-        kit.el("ul", { class: "pm-grid pm-grid--flows" }, answer.flows.map((flow) => productFlowCard(kit, flow))),
-      ),
+      productSection(kit, "Why it exists", kit.el("p", { class: "pm-prose", text: feature.why })),
     );
+
+  if (answer.flows.length > 0) {
+    const list = kit.el("ul", { class: "pm-grid pm-grid--flows" });
+    const showFlows = (sort) =>
+      list.replaceChildren(
+        ...productSortFlows(answer.flows, sort).map((flow) => productFlowCard(kit, flow)),
+      );
+
+    showFlows("written");
+    sections.push(
+      productSection(kit, "What people can do", [
+        answer.flows.length > 1
+          ? kit.el("label", { class: "pm-field" }, [
+              kit.el("span", { text: "Sort by" }),
+              kit.el(
+                "select",
+                {
+                  "data-pm": "flow-sort",
+                  onchange: (event) => showFlows(event?.target?.value ?? "written"),
+                },
+                [
+                  kit.el("option", { value: "written", text: "As written" }),
+                  kit.el("option", { value: "name", text: "Name" }),
+                  kit.el("option", { value: "health", text: "Health (worst first)" }),
+                ],
+              ),
+            ])
+          : null,
+        list,
+      ]),
+    );
+  }
 
   sections.push(productAppearances(ctx, kit, answer.appearances, lightbox, true));
 
@@ -610,7 +1000,9 @@ function productFeatureDeveloper(kit, developer) {
           : kit.el(
               "ul",
               { class: "pm-mono pm-plain-list" },
-              developer.routes.map((route) => kit.el("li", { text: `${route.method} ${route.path}` })),
+              developer.routes.map((route) =>
+                kit.el("li", { text: `${route.method} ${route.path}` }),
+              ),
             ),
       ),
     ]),
@@ -627,7 +1019,9 @@ function productStory(ctx, kit, story, lightbox) {
     story.map((step) =>
       kit.el("li", { class: "pm-step" }, [
         kit.el("p", { text: step.text }),
-        step.derived ? kit.el("span", { class: "pm-chip pm-chip--soft", text: "from the technical steps" }) : null,
+        step.derived
+          ? kit.el("span", { class: "pm-chip pm-chip--soft", text: "from the technical steps" })
+          : null,
         productShots(ctx, kit, step.screenshots, lightbox),
       ]),
     ),
@@ -640,9 +1034,14 @@ function productCases(kit, cases) {
   const item = (entry) =>
     kit.el("li", {}, [
       kit.el("strong", { text: entry.question }),
-      kit.el("p", { text: entry.handled ? entry.answer : entry.answer.replace(/^does not apply\b[:\s—-]*/i, "") }),
+      kit.el("p", {
+        text: entry.handled ? entry.answer : entry.answer.replace(/^does not apply\b[:\s—-]*/i, ""),
+      }),
       entry.criteria.length > 0
-        ? kit.el("span", { class: "pm-chip pm-chip--soft", text: `Checked by ${entry.criteria.join(", ")}` })
+        ? kit.el("span", {
+            class: "pm-chip pm-chip--soft",
+            text: `Checked by ${entry.criteria.join(", ")}`,
+          })
         : null,
     ]);
 
@@ -679,9 +1078,13 @@ function productFlowPage(ctx, kit, answer, lightbox) {
   const neighbour = (item, label) =>
     item === null
       ? null
-      : kit.link(`product/flow/${productEncode(flow.feature)}/${productEncode(item.id)}`, `${label}: ${item.heading ?? item.id}`, {
-          class: "pm-button",
-        });
+      : kit.link(
+          `product/flow/${productEncode(flow.feature)}/${productEncode(item.id)}`,
+          `${label}: ${item.heading ?? item.id}`,
+          {
+            class: "pm-button",
+          },
+        );
   const sections = [
     productBreadcrumb(kit, [
       { text: "Product map", to: "product" },
@@ -689,11 +1092,16 @@ function productFlowPage(ctx, kit, answer, lightbox) {
       { text: flow.title },
     ]),
     kit.el("header", { class: "pm-title" }, [
-      kit.el("div", { class: "pm-title-row" }, [kit.el("h2", { text: flow.title }), productStatusChip(kit, flow.status)]),
+      kit.el("div", { class: "pm-title-row" }, [
+        kit.el("h2", { text: flow.title }),
+        productStatusChip(kit, flow.status),
+      ]),
       kit.el("p", { class: "pm-lead", text: flow.summary ?? "No summary yet." }),
       kit.el("p", { class: "pm-muted", text: `For ${flow.who} · since version ${flow.since}` }),
     ]),
-    kit.el("section", { class: "pm-section pm-callout", "aria-label": "Health" }, [productHealth(kit, answer.health)]),
+    kit.el("section", { class: "pm-section pm-callout", "aria-label": "Health" }, [
+      productHealth(kit, answer.health),
+    ]),
     productSection(kit, "How it goes", productStory(ctx, kit, answer.story, lightbox)),
     productSection(
       kit,
@@ -715,7 +1123,11 @@ function productFlowPage(ctx, kit, answer, lightbox) {
 
 /** A step's file counts, like the technical flow page: the type-only count only when there is one. */
 function productStepCounts(counts) {
-  const parts = [`${counts.direct} direct`, `${counts.feature} in this feature`, `${counts.reachable} reachable`];
+  const parts = [
+    `${counts.direct} direct`,
+    `${counts.feature} in this feature`,
+    `${counts.reachable} reachable`,
+  ];
 
   if (counts.typeOnly > 0) parts.push(`${counts.typeOnly} type-only`);
 
@@ -759,13 +1171,20 @@ export async function productMapView(ctx, parts = []) {
   const main = el("main", { class: "pm-main", "aria-busy": "true" });
   const [kind, first, second] = parts.map(productDecode);
 
+  let answerHost = null;
+
   root.append(main);
 
   try {
     if (kind === "feature" && first) {
       const answer = await ctx.api(`product/features/${productEncode(first)}`);
+
+      answerHost = answer.host;
       const body = [
-        productBreadcrumb(kit, [{ text: "Product map", to: "product" }, { text: answer.feature.title }]),
+        productBreadcrumb(kit, [
+          { text: "Product map", to: "product" },
+          { text: answer.feature.title },
+        ]),
         ...productFeaturePage(ctx, kit, answer, lightbox),
       ];
 
@@ -778,7 +1197,11 @@ export async function productMapView(ctx, parts = []) {
 
       main.append(el("div", { class: "pm-page" }, body));
     } else if (kind === "flow" && first && second) {
-      const answer = await ctx.api(`product/flows/${productEncode(first)}/${productEncode(second)}`);
+      const answer = await ctx.api(
+        `product/flows/${productEncode(first)}/${productEncode(second)}`,
+      );
+
+      answerHost = answer.host;
       const body = productFlowPage(ctx, kit, answer, lightbox);
 
       if (!kit.shared && answer.developer) {
@@ -790,16 +1213,40 @@ export async function productMapView(ctx, parts = []) {
 
       main.append(el("div", { class: "pm-page" }, body));
     } else {
-      main.append(productMapPage(ctx, kit, await ctx.api("product")));
+      const answer = await ctx.api("product");
+
+      answerHost = answer.host;
+      main.append(productMapPage(ctx, kit, answer));
     }
   } catch (error) {
-    main.append(productLoadError(ctx, kit, kind === "feature" ? "this feature" : kind === "flow" ? "this flow" : "the product map", error));
+    main.append(
+      productLoadError(
+        ctx,
+        kit,
+        kind === "feature" ? "this feature" : kind === "flow" ? "this flow" : "the product map",
+        error,
+      ),
+    );
   }
 
   main.setAttribute("aria-busy", "false");
   root.append(lightbox.dialog);
 
-  if (kit.shared) root.append(el("footer", { class: "pm-footer", text: "Read-only view" }));
+  if (kit.shared) {
+    const host = productHost(answerHost);
+    const app =
+      host && host.app && host.app.name
+        ? `${host.app.name}${host.app.version ? ` ${host.app.version}` : ""}`
+        : null;
+
+    root.append(
+      el("footer", { class: "pm-footer" }, [
+        el("span", { text: "Read-only view" }),
+        app ? el("span", { class: "pm-mono", text: app }) : null,
+        host && host.name ? productBrandLine(kit, host) : null,
+      ]),
+    );
+  }
 
   return root;
 }
@@ -808,7 +1255,8 @@ export async function productMapView(ctx, parts = []) {
 async function renderProductMap(context) {
   const parts = (context.route ?? "").split("/").filter(Boolean);
 
-  if (parts[0] === "share" && (parts.length === 1 || parts[1] === "feature" || parts[1] === "flow")) parts.shift();
+  if (parts[0] === "share" && (parts.length === 1 || parts[1] === "feature" || parts[1] === "flow"))
+    parts.shift();
   if (parts[0] === "product") parts.shift();
 
   return productMapView({ ...context, shared: true }, parts);

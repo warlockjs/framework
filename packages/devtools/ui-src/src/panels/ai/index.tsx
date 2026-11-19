@@ -19,10 +19,8 @@ import {
   TextField,
 } from "@/components/ui/panel-kit";
 import type { DevtoolsPanelProps } from "@/panels/types";
+import { AiUnavailable } from "./AiUnavailable";
 import type { AiAnswer, AiRun, AiSpanNode, AiTrace, AiUsage } from "./types";
-
-const AI_GUIDANCE =
-  "Install @warlock.js/ai and @warlock.js/ai-panoptic, restart warlock dev, and enable Panoptic observation.";
 
 export function runTone(status: string): PillTone {
   if (status === "completed" || status === "ok") return "success";
@@ -168,12 +166,7 @@ export function AiPanel({ route, navigate }: DevtoolsPanelProps) {
         <ErrorMessage error={error} title="Could not load the AI runs" onRetry={reload} />
       ) : null}
       {!data && loading ? <LoadingRows /> : null}
-      {data && !data.available ? (
-        <EmptyState
-          title={data.message || AI_GUIDANCE}
-          hint="AI observation needs the Panoptic package; nothing else to configure."
-        />
-      ) : null}
+      {data && !data.available ? <AiUnavailable answer={data} /> : null}
       {data?.available && !data.runs.length ? (
         <EmptyState
           title="No AI runs yet. Enable Panoptic observation and execute a flow; runs appear when collection completes."

@@ -6,6 +6,100 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 - T-148: keep request paths as served in production samples, or store only the route pattern.
 - T-158: product map usage analytics and member feedback: leave out, add a project extension point, or build first-party sources.
+- T-170: business fields in features and flows: a fixed set of fields, one `extra:` key, or leave out (strictness stays).
+
+## 5.59.0: Warlock branding in devtools and Grimoire, flow and change-log views
+
+### T-177 [feature] AI section in devtools: every Panoptic view plus reports and charts (5.60.0)
+
+- Source: owner, 2026-11-19, in session. Decision: all Panoptic views move into devtools; AI stays split into separate
+  sidebar pages (no merge), and gains reports and charts: cost, token usage and error rates by model, agent and date range.
+- Today: Panoptic serves its own dashboard (`packages/ai-panoptic/src/dashboard/serve.ts`, port 4319: traces, aggregate,
+  evaluate). Devtools has an AI tab (`packages/devtools/src/server/ai-routes.ts`: run list and span tree only) and an
+  Agents tab (agent traces from `@warlock.js/ai`). Traces live in an in-memory store (capacity 1000) unless Panoptic's
+  `cache` option is set, so date-range reports have no durable data today.
+- Pages under "AI" in the sidebar: Reports (KPIs: estimated cost, tokens in/out/cached, runs, error rate, p95 latency;
+  date range 24h/7d/30d/custom with the previous period for comparison; cost over time by model, tokens over time,
+  error rate over time, top agents and top models tables), Runs (Panoptic traces, span tree), Agents, Models (usage
+  per model, pricing set or missing, fallback rate), Errors (failed runs grouped by provider error, rate limit,
+  timeout, refusal), Evaluate.
+- Data: durable rollups per hour (agent, model, provider, status: runs, tokens, estimated cost, error types, latency
+  buckets) stored through the devtools store in the app database, so reports survive restarts and work in the
+  production monitor; raw traces keep their current retention. Worker processes contribute through the same store.
+  Cost is labelled "estimated from model pricing"; unpriced models are flagged, not counted as zero.
+- Panoptic's standalone dashboard stays for processes outside a Warlock app (supported use:
+  `docs/src/content/docs/v/latest/ai/getting-started/02-installation.mdx:3,72`); inside a Warlock app
+  `panoptic.dashboard` stays off and enabling it logs a notice pointing at `/__warlock`. Removal only in a major release.
+- Plan: its own release (5.60.0) after 5.59.0 ships, started in a fresh session with an architect pass (storage schema,
+  rollup writer, report API, chart components; follow the `dataviz` skill for charts).
+- Status: decided, not started.
+
+## From the 2026-11-19 app reviews
+
+### T-178 [feature] Dev Grimoire tab: collect route facts without booting the app a second time
+
+- Source: 5.59.0 review (2026-11-19). T-161 first collected route facts in the dev panel by calling the Warlock
+  adapter's inspect boot inside the running dev server. That runs `bootForDiagnostics`
+  (`packages/core/src/cli/commands/doctor/boot-for-diagnostics.ts`): every connector's `boot()` (a second Fastify) and
+  `moduleLoader.loadAll()` (routes and event listeners registered again), and swaps `console.log`. 5.59.0 removed it
+  from the panel; `collectRoutes` stays an opt-in option of the snapshot source for tooling processes only
+  (`packages/grimoire/src/devtools/snapshot-source.ts`).
+- What: give the dev tab real route/named facts without a manual `warlock grimoire build`: either read them from the
+  running app (core/devtools passes its live router, events and named registries to the panel context), or run the
+  inspect in a child process and store the result in the book.
+- Acceptance: a fresh checkout's dev tab shows `routes: fresh` after the first open; no second boot in the serving
+  process (spec asserting connectors boot once); docs and skill; CHANGELOG.
+- Status: open (after 5.59.0).
+
+### T-168 [feature] Stamp releases from the app's release flow and add a "What's new" view to the Product map
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0): the app shipped two releases but its Grimoire had none, so every changelog line read "Not released yet".
+- What and why: `warlock release` (or the package version and git tags) should stamp the changelogs and write the release file; the Product map gets a "What's new" view per release.
+- Evidence: the release and changelog reading code is under `packages/grimoire/src/` (find `release` and `changelog`); the Product map "What changed" list is `packages/grimoire/ui/product-map.js:579` (T-159 redesigns it first).
+- Acceptance: after a release, the changelog lines carry the version and the Product map shows a "What's new" view; specs; docs and CHANGELOG entry.
+- Status: open; do after T-159 settles the "What changed" layout.
+
+### T-169 [feature] Faster first open of the Grimoire tab on a large app
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0, 11,223-file book): first tab open with no book on disk 17.1 s (3 API calls of 16.2 s each); cold open after a restart with the book on disk 5.4 s; warm answers 2-80 ms.
+- What and why: the first open is the first impression. The three first calls each rebuild the same data. Overlaps T-161 (collect route facts in dev) and T-141 (keep the opened book in memory).
+- Acceptance: the first open runs the build once and shares it across the three calls; the book is warmed at dev start; partial answers stream where possible; the measured first-open time is recorded in the CHANGELOG entry; a spec counts builds per first open.
+- Status: open.
+
+### T-170 [decision] Open content model for business fields in features and flows
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0). The app wants owner, success measures (KPIs), support notes (FAQ), risks, links (designs, docs, tickets) and a glossary shown on the Product map.
+- What and why: an unknown front-matter key is GR1005 and an unknown heading is GR1007 (`packages/grimoire/src/written/markdown.ts`, find the two codes), which keeps the written format strict and checkable. The review's "accept anything" ask would lose that.
+- Options: (a) keep strictness and add a fixed set of business fields (owner, success measures, support notes, risks, links); (b) keep strictness and allow one `extra:` front-matter key that holds free-form fields and is shown as-is on the Product map; (c) leave it out.
+- Needs owner decision: which option. Keep GR1005/GR1007 for everything else.
+- Recommendation (2026-11-19): (c) with one exception. Grimoire's job is product behaviour checked against code and
+  tests; KPIs, FAQ, risks and roadmap cannot be checked and go stale, so they belong in the app's own docs or tools.
+  Allow only `owner` and a `## Links` section (pointers to those docs), because they help readers find the rest.
+- Status: waiting for the owner's answer on the recommendation.
+
+### T-171 [feature] Parked: requests only one app has made
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0, one app). Vetting rule: build only requests with a verified need; wait for a second app to ask.
+- Items:
+  1. Link flows to analytics events and funnels (an `analytics <name>` step or a pluggable fact source). The `event` step resolves only app event listeners (`packages/grimoire/src/warlock/adapter.ts`, named facts). See T-158.
+  2. Product health from the app's own errors and feedback, and a configurable error window (today one hour: `packages/grimoire/src/devtools/product-map.ts:57`, matched by route and fed only by the monitor's error groups). See T-158.
+  3. Plan gating and locales as structured data: `who` is free text and audience has many free-text values; ask is a declared audience and plan vocabulary and per-flow locale coverage.
+  4. A screenshot workflow (`warlock grimoire shoot`: capture per page and story step plus a staleness check).
+  5. A plain-words journey diagram of how flows connect, per feature and across features.
+- Status: parked, one app asked. Revisit when a second app asks for the same item.
+
+### T-172 [bug] Product map and developer UI issues seen in screenshots, no runnable repro yet
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0, 1440 px and 390 px, light and dark). Each item was observed through screenshots only; none has a runnable repro, so each needs reproducing before a fix.
+- Items:
+  1. Repeated rows in "Where you see it" on a feature page (the same page listed several times, one row per block). Partly checked: the row key includes the block (`packages/grimoire/src/devtools/product-map.ts:319`); whether the UI renders the block name is unverified (`packages/grimoire/ui/product-map.js`, the appearances list). Likely fix: show the block name or group by page.
+  2. Developer feature page shows one card per finding in a very tall, ungrouped list with the neighbour graph underneath (`packages/grimoire/ui/grimoire-view.js`); the Check tab already groups the same findings. Likely fix: group by code and collapse, graph above.
+  3. Raw ids and code terms on business screens: app group headings show ids instead of titles, "For free" in the flow meta line, raw case keys in "What if...", AC/T references in "What changed" (`packages/grimoire/ui/product-map.js`, near `:255` and `:694`; T-159 touches the "What changed" part).
+  4. Overview task count ("0 open, 1 waiting") disagrees with the tab badge ("Tasks 1") when a task has the status "waiting for approval".
+  5. Modules graph unreadable on a large app (labels cut from the left and overlapping, one 2,548-file node). Design opinion: cut labels from the right, split sites from modules, offer a top-N matrix.
+  6. Phone width (390 px): the tab bar hides 5 of 8 tabs behind a fade with no hint, and the Apps page is very tall. Likely fix: a visible "more" control or a select; collapsed groups on Apps.
+- Acceptance: for each item, a repro (a spec on the view data or a screenshot test) before the fix; items 5 and 6 need an owner design call first.
+- Status: needs repro.
 
 ## 5.58.0: Grimoire flow pages, type-only reach and product map
 
@@ -126,16 +220,6 @@ Design: `findings/5.58/ARCHITECTURE.md` (decisions D1–D28); work-package brief
   `packages/core/src/tooling/inspect/collect-files.ts`.
 - Acceptance: a mobile app fixture with `App.tsx` and `index.ts` at its root lists both in the book; a spec covers the
   new file entries (or the skip list).
-- Status: open.
-
-### T-141 [feature] `warlock scry` takes about 2.7 s per call on a large app
-
-- Source: 5.55.0 build and pilot, 2026-11-16.
-- What and why: each `warlock scry` call reopens the whole grimoire. On the pilot application (11,087 book files) a call
-  takes about 2.7 s. Cache the parsed snapshot between calls, keyed by the manifest and the hash of the written files.
-- Evidence: pilot timings of 2026-11-16 (see T-136); `packages/grimoire/src/workspace/index.ts`.
-- Acceptance: a second call on an unchanged book does not reopen the grimoire (a spec counts the reads); a change to a
-  written file or to the manifest reopens it.
 - Status: open.
 
 ### T-142 [decision] Read-only flows must answer all eight case questions

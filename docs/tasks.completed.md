@@ -2,6 +2,193 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+## 5.59.0 (2026-11-19)
+
+### T-141 [feature] `warlock scry` takes about 2.7 s per call on a large app
+
+- Source: 5.55.0 build and pilot, 2026-11-16.
+- What and why: each `warlock scry` call reopens the whole grimoire. On the pilot application (11,087 book files) a call
+  takes about 2.7 s. Cache the parsed snapshot between calls, keyed by the manifest and the hash of the written files.
+- Evidence: pilot timings of 2026-11-16 (see T-136); `packages/grimoire/src/workspace/index.ts`.
+- Acceptance: a second call on an unchanged book does not reopen the grimoire (a spec counts the reads); a change to a
+  written file or to the manifest reopens it.
+- Update 2026-11-19 (app gate-speed write-up https://claude.ai/artifact/J1f3aS1k6PKvy4gM8AEY7w, same ask): on an 11,223-file
+  book each `scry` took about 7 s, `grimoire check` 4.9 s, `grimoire build` 35.6 s, and `build --site` 70.6 s even with a
+  fresh book. Checked: `warlock mcp` does not keep the book loaded; each tool call runs `openGrimoire(...)` again
+  (`packages/grimoire/src/warlock/mcp-tools.ts:167`, `:239`), so the MCP server, `scry` and `check` all pay the open per call. Extend the
+  acceptance: the MCP tools and the dev server reuse one opened book until the manifest or a written file changes, and
+  `build --site` skips the rebuild when the book is fresh. First-open time of the tab is T-169.
+- Status: in progress for 5.59.0 (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
+### T-159 [feature] Warlock logo, versions and logo colours in devtools and Grimoire; new flows and "What changed" views
+
+- Source: owner, 2026-11-19, in session (two screenshots: the Product map "What changed" list and the developer feature
+  page's Flows table).
+- What and why: (1) when Grimoire runs inside a Warlock.js app, show the Warlock logo and the installed Warlock
+  version, and show the app's own name and version at the bottom; (2) recolour the devtools dashboard from the logo
+  (gold on near-black, `docs/public/logo.png`) and tidy spacing; (3) replace the plain Flows table on the developer
+  feature page (`packages/grimoire/ui/grimoire-view.js:1082`) with a more visual layout; (4) redesign the Product map
+  "What changed" list (`packages/grimoire/ui/product-map.js:579`): versions as a timeline, entries grouped by
+  type, AC/T references as quiet chips.
+- Files: `packages/devtools/ui-src/src/styles.css` (`--brand` is indigo today), `packages/devtools/ui-src/src/app/`
+  (Header, Sidebar, Shell: no logo or version today), `packages/grimoire/ui/*`, `packages/grimoire/src/warlock/adapter.ts`
+  (already reads installed package versions).
+- Acceptance: logo + Warlock version in the devtools header and the Grimoire tab; app name + version at the bottom;
+  text tokens keep 4.5:1 contrast in both themes; Grimoire stays framework-neutral (logo only through the Warlock
+  adapter); specs, docs, skills and CHANGELOG entries; owner reviews a preview on a large real app before the final
+  verify and the release.
+- Status: in progress (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
+### T-160 [bug] GR3006 "owned file no flow reaches" fires on route middleware, migrations, seeds, commands, layouts and spec-only helpers
+
+- Source: app write-up https://claude.ai/artifact/RHPjc4m77HEC3gCQf1Vdon (measured on `@warlock.js/grimoire` 5.58.0; 429 of 430 warnings left in a large app were GR3006: 161 migrations, 10 seeds, 12 command files, route middleware, `main.ts` boot work, layout/root components, spec-only helpers). Confirmed against the source 2026-11-19.
+- What and why: GR3002 makes every file under `src/app/<module>` belong to a feature, and GR3006 then warns when no flow step reaches it. Files that no step type can reach, yet are real used code, can never be cleared honestly, so the warning stops being a signal for real dead code.
+- Evidence: `packages/grimoire/src/bookmap/steps.ts:70-100` (`reach()` follows imports from the entry files only; `extra` files are added without their imports); `:102-120` (`routeStep`: the routes file is `extra`, and the comment says its imports are deliberately not part of the step); `packages/grimoire/src/bookmap/build.ts:289` (`unreached: own.filter(file => !reached.has(file))`); `packages/grimoire/src/check/rules/source-files.ts:14` (`NO_FEATURE_TYPES`) and `:153` (`checkUnreached`); `packages/grimoire/src/ownership/index.ts:47` (`countsForFeature` only leaves out specs).
+- Repro: the write-up's `run.mjs` feeds a hand-written adapter (one feature, one flow `route GET /api/orders`, a routes file importing a controller and a middleware, a migration, a seed, a command, a component) to `openGrimoire` + `checkGrimoire`; observed output on 5.58.0 is five GR3006 warnings (middleware, migration, seed, command, component). Turn it into the regression spec in `packages/grimoire/src/`.
+- Suggested fix (verified; two of the write-up's suggestions are changed):
+  1. Route middleware: resolve the matched route's `middleware` names (the route fact carries them) to files and reach those in `routeStep`. Do NOT follow the routes file's imports: a routes file imports every controller of the module, so one route step would reach all handlers and hide real gaps.
+  2. Exempt by role, as `countsForFeature` does for specs: migration, seed, command, main, layout/root. The book must classify commands and layouts first (command files are `type: "source"` today), so the classification is part of this task.
+  3. Helpers imported only by specs count as reached (specs are already excluded from ownership).
+  4. Reject the free-form `plumbing: [globs]` opt-out: it lets any file hide from the check.
+- Unconfirmed: the layout/root component case was simulated with an unimported file; a fixture with a real layout mounting the component is the missing step. The 429 total came from the real CLI in the app, not from the script.
+- Acceptance: the regression spec passes (middleware reached; migration, seed, command, main, layout exempt by role; spec-only helper reached); a file of no such role still warns; docs, `use-the-grimoire` / `describe-an-app` skill text and CHANGELOG entry updated.
+- Status: in progress for 5.59.0 (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
+### T-161 [bug] Grimoire tab in dev reports false GR5008 errors and a red health light because route facts are missing; Overview and Check word the route-facts state differently
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0, `warlock dev`, no book on disk): `/__warlock/api/grimoire/summary` answered `routes: "missing"` with 2 GR5008 errors; the feature card read "Has problems" and a flow read "Steps resolved 3/4" next to "Findings 0". After `warlock grimoire build` the same app showed `fresh`, 0 errors, all steps resolved. Separately, Overview said route facts were "fresh / up to date" while Check said "routes cached" at the same moment. Both share one root: the panel's idea of the route facts state.
+- What and why: the dev panel never collects route facts when none are cached, yet still checks mail and notification entries against them. A false red health light on first open misleads every user of the tab.
+- Evidence: `packages/grimoire/src/apps/check-apps.ts:226-275` (`checkReached`; `:240` checks mail/notification against `facts.named` with no routes-missing guard); the guard the step rules already have: `packages/grimoire/src/check/rules/links.ts:38` (`skipBootTypes = snapshot.routes === "missing"`). The wording of the route-facts state comes from the Overview and Check views in `packages/grimoire/ui/` (find where each prints `routes` and make them share one label).
+- Repro: git worktree with no `grimoire/book`, `warlock dev`, `curl <dev>/__warlock/api/grimoire/summary` shows `routes: "missing"` and 2 errors; `npx warlock grimoire build`, curl again shows `fresh` and 0 errors. Turn it into a spec: a snapshot with `routes: "missing"` and a page whose `Also reached from` names a mail gives no GR5008, and the unchecked step is not counted as resolved or failed.
+- Suggested fix: skip GR5008 when `routes === "missing"`, count only steps really checked, keep unchecked facts out of the health light; collect route facts from the live app in dev (or once on first open) so the state is `fresh` without a manual build; one shared wording for the state in Overview and Check.
+- Acceptance: the spec passes; Overview and Check never disagree on the state in a spec over the same snapshot; docs and CHANGELOG entry.
+- Status: in progress for 5.59.0 (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review. Dev self-collection of route facts was removed for safety; follow-up T-178.
+
+### T-162 [bug] Grimoire search indexes only a flow's ref and heading, so flows by title, summary, case or criterion words never show
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0): "trial" ranks the two trial flows 26th and 27th, past the default limit of 20; "cancel" (limit 50) misses a flow titled "Cancel, resume or switch"; "payment failed", "double charge" and "AC-5" find no flow or criterion.
+- What and why: written content (flows, criteria) is not searchable by its own text and loses on score to files whose paths contain the word. Business readers cannot find flows.
+- Evidence: `packages/grimoire/src/scry/query.ts:524` (`candidates()`; flow candidates carry only ref and heading text); scoring and the 20-result cut are in the same file (find `limit`/score weights near the candidate scoring).
+- Repro: `npx warlock scry --search "trial" --json` in an app with a flow titled with "trial" and many files containing the word. Spec: a snapshot with one flow titled "Start a trial" and 30 files with "trial" in their path ranks the flow within the limit.
+- Suggested fix: index summary, story, case text and criteria; rank written content above file paths; group results by type so one type cannot crowd out the rest; a business mode on the Product map that hides files and exports.
+- Acceptance: the spec passes; criteria ids (AC-n) are findable; docs and CHANGELOG entry.
+- Status: in progress for 5.59.0 (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
+### T-163 [bug] CLI progress lines print the command signature ("grimoire <action> [release] completed", "Running scry [file]...")
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0). Core bug, not Grimoire: it affects every command that declares arguments in its `name`.
+- What and why: the progress helpers print the command's `name`, which for argument-taking commands includes the signature, so users see placeholders.
+- Evidence: `packages/core/src/cli/cli-commands.utils.ts:138` ("Running ...") and `:197` ("completed successfully"); the names come from `packages/grimoire/src/warlock/commands.ts:105` (`"grimoire <action> [release]"`) and `:176` (`"scry [file]"`).
+- Repro: `warlock grimoire build` and `warlock scry --search x` show the signature in the progress lines. Spec: `displayExecutingCommand("scry [file]")` output contains `scry` and not `[file]`.
+- Suggested fix: strip `<...>` and `[...]` argument tokens from the name in the display helpers (not from the registered name).
+- Acceptance: the spec passes for `<x>` and `[x]` forms; CHANGELOG entry.
+- Status: in progress for 5.59.0 (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
+### T-164 [feature] Business-only static export of the Product map (small and share-safe), plus PDF or Docs export
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0): `build --site` took 70.6 s with a fresh book and produced one 25 MB `index.html`, with file paths and test names included and per-file answers kept for only 3,000 of 11,223 files.
+- What and why: the export always carries developer detail, so it cannot be handed to business readers, and it opens on the developer Overview.
+- Evidence: `packages/grimoire/src/devtools/site.ts:47` (`productOptions = { shared: false, errors: null }`); `:28` (`SITE_FILE_LIMIT = 3000`); `:144` (the per-file cut).
+- Acceptance: a `--product` option exports the share-safe product view only (no file paths or test names, opens on the Product map, no per-file answers) and is much smaller than the full export; a spec checks the output carries no file path; PDF or Docs export is a follow-up decision. Docs, skill and CHANGELOG entry.
+- Status: in progress for 5.59.0 (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
+### T-165 [feature] Product map: show a missing test-results file as neutral grey "not measured", not "Needs attention"
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0): all 20 features read "Needs attention: No test results recorded" because no results file existed.
+- What and why: missing proof hygiene is not a product problem; business readers see a wall of yellow.
+- Evidence: `packages/grimoire/src/devtools/product-map.ts:171` (`healthOf`) and `:205` (the "No test results recorded" reason); `packages/grimoire/src/devtools/view.spec.ts:412` pins the text.
+- Acceptance: with no results file the product view shows a grey "not measured" state; the developer view keeps the yellow warning; specs for both; docs and CHANGELOG entry.
+- Status: in progress for 5.59.0 (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
+### T-166 [feature] Product map: sort features and flows, and filter "changed since"
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0): cards sort by id (admin first); "recently updated" is useless after a backfill (all 20 dated the same day).
+- What and why: business readers want the important features first and a way to see what changed since a date or release.
+- Evidence: the feature list and its order are built in `packages/grimoire/src/devtools/product-map.ts` and rendered in `packages/grimoire/ui/product-map.js`.
+- Acceptance: sort by id, name, last updated and health (default stays stable); a "changed since" filter (date or release) in the product view; specs for the ordering and the filter; docs and CHANGELOG entry. Ranking by traffic needs a source the framework lacks (see T-158); not part of this task.
+- Status: in progress for 5.59.0 (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
+### T-167 [feature] Devtools production auth: optional two-factor and a configurable common-password check
+
+- Source: owner, 2026-11-19, in session.
+- What and why: two-factor is mandatory today (`"admins"` or `"everyone"`), and the common-password list check cannot be turned off or tuned. Add `twoFactor: "off" | "admins" | "everyone"` and `passwords: { minLength, rejectCommon }`. Passkeys stay one of the two optional second factors. When `twoFactor` is `"off"`, boot logs a warning that the monitor has no second factor.
+- Evidence: `packages/devtools/src/production/options.ts:34` (type), `:66` (default `"admins"`), `:188-191` (validation); `packages/devtools/src/production/auth/service.ts:177-178` (`twoFactorRequired`), `:1595` (admin without a factor); `packages/devtools/src/production/auth/helpers.ts:31` (the hard-coded `COMMON_PASSWORDS` check; list in `auth/common-passwords.ts`).
+- Acceptance: `"off"` skips enrolment and the second step for every role, with the boot warning; `passwords.rejectCommon: false` accepts a common password, `minLength` is enforced; specs for each, docs (`devtools/security.mdx`, options reference), `packages/devtools/skills/SKILL.md` and CHANGELOG entry.
+- Status: in progress for 5.59.0, alongside T-159.
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
+### T-173 [feature] `warlock check` reuses a fresh Vitest result for the same tree and sizes its test timeout
+
+- Source: gate speed write-up https://claude.ai/artifact/J1f3aS1k6PKvy4gM8AEY7w (5.58.0; a 2,616-file, 15,335-test suite ran 1,403 s; the first `warlock check` stopped at the 600 s limit with WL8007, and the rerun with a raised timeout added about 23 minutes for a result already known).
+- What and why: without `--changed`/`--base`, the tests step runs the whole suite again even when the same commit just passed `vitest run`. The 600 s default is too small for large apps and the error does not say how long the run took.
+- Evidence: `packages/core/src/cli/commands/check.command.ts:51` (`--test-timeout`, default 600, `WARLOCK_CHECK_TEST_TIMEOUT`); the tests step is `packages/core/src/tooling/check/` (see `tests-step.spec.ts`); WL8007 is in `packages/core/src/errors/error-codes.ts`.
+- Acceptance: accept a recorded result for the same tree (a Vitest JSON report or the Grimoire reporter's results file, with a content hash of the tree) and skip the run when it matches; derive the default timeout from the last run's duration or print the measured duration in the WL8007 message; specs; docs, `warlock-check` skill and CHANGELOG entry. Estimated size: M.
+- Workaround in the app: run `warlock check --skip tests` right after `vitest run`.
+- Status: in progress for 5.59.0 (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
+### T-174 [feature] Shorter per-file app boot in integration tests
+
+- Source: gate speed write-up https://claude.ai/artifact/J1f3aS1k6PKvy4gM8AEY7w. App boot is 54-55% of every full-suite run (about 10 minutes per run, 20-30 minutes per gate on the measured app). Worker lifetime needs `isolate: false` (`packages/core/skills/test-service/SKILL.md:500-504`), which shares module state between files; the app judged that unsafe (595 non-unit specs use `vi.mock`, many on app modules; process-wide caches in app modules).
+- What and why: a way to boot less per file without sharing module state. Large (L).
+- Options: (a) worker lifetime that boots connectors once per worker but gives each file a fresh module graph (cached database, cache and config connections handed to each file's import of the app), with a reset hook for app caches; (b) a lighter boot profile for HTTP specs that skips work they do not use (web/Vite setup, sitemap, route registration of other sites), with per-phase costs reported by the existing setup recommendation.
+- Owner decision (2026-11-19, in session): build (a).
+- Plan: spike first on a framework-owned app (the create-warlock template or the release gate's blog app). Measure the
+  boot phases, then prove that connectors kept on the worker survive a per-file module reset and that `vi.mock`,
+  `vi.spyOn`, stubbed env and fake timers do not leak between files (a spec per leak type). If the spike shows Vitest
+  cannot give each file a fresh module graph without leaks, stop and report to the owner before falling back to (b).
+- Acceptance: integration specs keep per-file module isolation; connectors (database, cache) open once per worker;
+  a documented reset hook for app caches; measured boot share before/after on the spike app; specs, docs,
+  `test-service` skill and CHANGELOG entry.
+- Status: in progress for 5.59.0 (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review. Shipped as experimental `tests.lifetime: "worker-isolated"`; real-app check 148.8 s to 129.7 s, setup 27% to 3%.
+
+### T-175 [feature] Grimoire feature and flow pages: architecture-first layout with three new visual views
+
+- Source: owner, 2026-11-19, in session, after reviewing the T-159 preview at wjs-devtools.mentoor.io. Agents get
+  file-level answers from scry/CLI/MCP JSON, so the pages should explain the feature to humans and show files only on demand.
+- What: (1) feature map grid: flows (rows) × places they run (columns: each site, each mobile app, API, background
+  jobs/mail/notifications), cells hold chips for the pages, screens, routes and named steps the flow touches;
+  (2) flow journey: written steps drawn left to right as typed nodes (page, route, service, mail, job, event,
+  notification, affects), click a node to see its files; "What if…" cases as their own lane (not attached to a step
+  unless the data ties them); (3) health strip on Product map feature cards (written, proven by tests, screenshots,
+  open findings). Feature page becomes tabs (Overview default: summary, feature map, flow cards, neighbours; Flows;
+  Files grouped by module and collapsed; Findings grouped by code and collapsed; Tests). Flow page becomes tabs
+  (Journey default; Proof; Files per step, collapsed; Findings). Each tab has its own hash route.
+- Files: `packages/grimoire/ui/grimoire-view.js`, `ui/product-map.js`, `ui/*.css`, feature/flow answers in
+  `packages/grimoire/src/devtools/` and `src/scry/query.ts`.
+- Acceptance: hand-drawn SVG/plain JS only (no new libraries), works in the static export and at 390 px, both themes,
+  dashboard tokens only; old hash links still open the right page; specs for the new answer fields and views; docs and
+  skill updates. Covers T-172 item 2 (findings wall).
+- Status: in progress on the preview (2026-11-19).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
+### T-176 [bug] Devtools AI tab: one generic install paragraph for every reason the tab is empty
+
+- Source: owner, 2026-11-19, in session (screenshot of the AI tab on the preview app). The app uses `@warlock.js/ai`
+  (46 source files) but never installed `@warlock.js/ai-panoptic` (its `src/config/ai.ts` has the `panoptic` line
+  commented out), so the empty tab is correct, but the message does not say which of the reasons applies.
+- Evidence: `packages/devtools/src/sources/ai-source.ts:5-6` (`AI_INSTALL_GUIDANCE`, one fixed string covering "not
+  installed", "installed but cannot load" and "observation off"), shown as a long bold paragraph by the AI page in
+  `packages/devtools/ui-src`.
+- Fix: detect the case and say it: (1) `@warlock.js/ai` missing; (2) ai present, Panoptic missing → "Your app uses
+  @warlock.js/ai. Add Panoptic to see its runs: `warlock add ai-panoptic`"; (3) Panoptic present but failed to load →
+  show the load error and the two versions; (4) loaded but `observeAll` off and nothing registered → how to turn it
+  on. Render as a short title, one line of explanation and a copyable command, not a bold paragraph.
+- Acceptance: a spec per case for the source's message; the UI empty state uses title + body + code; docs line on the
+  AI tab; CHANGELOG entry.
+- Status: open, after T-175 (shares the preview rebuild).
+- Shipped: 5.59.0 (commit release commit), verified by the 5.59.0 verify pass + Forma preview review.
+
 ## 5.58.0 (2026-11-18)
 
 ### T-152 [bug] Flows have no summary
@@ -97,7 +284,6 @@ Newest first. Each entry records the release that shipped it and how it was veri
   checklist; docs pages (grimoire product map, devtools panels/production/security), skills, changelogs.
 - Status: shipped in 5.58.0, commit 33c436691.
 - Verified by: one typecheck + full tests + release gates, single review, real-browser screenshots at 1440/390 px light/dark; share-link store run on Postgres 16 and MongoDB 7.
-
 
 ## 5.57.0 (2026-11-18)
 

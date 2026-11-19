@@ -143,7 +143,10 @@ as reached, so [`GR3006`](../04-check/#gr3006) does not change because of type-o
 - `pages`: by app, the pages and screens whose page, setup or screen file the feature owns. The key is the app id
   under `grimoire/apps/`; when no app folder matches a site, the site id is used.
 - `unreached`: own files that no step of any of the feature's flows reaches. Each one is either behaviour no flow
-  describes yet, or dead code ([`GR3006`](../04-check/#gr3006)).
+  describes yet, or dead code ([`GR3006`](../04-check/#gr3006)). Files with a role that runs by being present
+  (migration, seed, command, main, layout, root) and test helpers only specs import (in `tests`, `fixtures`, `support`, `test-utils`) are left out. A route step reaches the
+  middleware files its matched route names, resolved by the name a file exports or, for a `*.middleware.*` file, its stem (`auth-only.middleware.ts`
+  is `authOnly`).
 
 ## Flow book map
 
@@ -162,7 +165,10 @@ as reached, so [`GR3006`](../04-check/#gr3006) does not change because of type-o
       "target": "GET /api/products/new-arrivals",
       "found": true,
       "entry": "src/app/catalog/controllers/new-arrivals.controller.ts",
-      "entries": ["src/app/catalog/controllers/new-arrivals.controller.ts", "src/app/catalog/routes.ts"],
+      "entries": [
+        "src/app/catalog/controllers/new-arrivals.controller.ts",
+        "src/app/catalog/routes.ts"
+      ],
       "direct": ["src/app/catalog/repositories/products.repository.ts"],
       "files": ["src/app/catalog/controllers/new-arrivals.controller.ts", "..."],
       "typeOnlyFiles": []

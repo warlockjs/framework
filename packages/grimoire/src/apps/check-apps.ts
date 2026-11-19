@@ -152,7 +152,18 @@ export function checkApps(snapshot: GrimoireSnapshot): GrimoireFinding[] {
         );
       }
 
-      if (match) checkReached(page, label, subject, appId, facts, match, app.screens, findings);
+      if (match)
+        checkReached(
+          page,
+          label,
+          subject,
+          appId,
+          facts,
+          match,
+          app.screens,
+          findings,
+          snapshot.routes,
+        );
     }
 
     // An app folder with no README is reported as GR1021 by the parser.
@@ -222,7 +233,11 @@ export function checkApps(snapshot: GrimoireSnapshot): GrimoireFinding[] {
   return findings;
 }
 
-/** GR5008: an `Also reached from` entry that names nothing the code has. */
+/**
+ * GR5008: an `Also reached from` entry that names nothing the code has. A mail
+ * or notification entry is not checked without route facts (`routes: missing`):
+ * the booted app is what reports them, so their absence proves nothing.
+ */
 function checkReached(
   page: WrittenPage,
   label: string,
@@ -232,11 +247,14 @@ function checkReached(
   match: NonNullable<GrimoireSnapshot["apps"][string]>,
   declaredScreens: readonly WrittenPage[],
   findings: GrimoireFinding[],
+  routes: GrimoireSnapshot["routes"],
 ): void {
   for (const entry of page.alsoReachedFrom) {
     let found = true;
 
     if (entry.type === "mail" || entry.type === "notification") {
+      if (routes === "missing") continue;
+
       found = facts.named.some((item) => item.type === entry.type && item.name === entry.name);
     } else if (entry.type === "page") {
       const site = match.site;

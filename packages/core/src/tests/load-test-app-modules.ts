@@ -4,6 +4,7 @@ import { setAppModuleImporter } from "../loader/app-module-importer";
 import type { AppModuleImporter } from "../loader/app-module-importer";
 import { router } from "../router/router";
 import { rootPath, srcPath } from "../utils/paths";
+import { usesFreshModuleGraph } from "./fresh-module-graph";
 import { timeTestStep } from "./test-runtime-scope";
 
 /** `src/app/<module>/routes.ts(x)` and `src/app/**\/main.ts(x)` found on disk. */
@@ -25,12 +26,45 @@ async function appModuleEntriesOnDisk(): Promise<string[]> {
  * in a project that has them on disk throws, naming what it saw, instead of
  * serving an empty application.
  */
+/**
+ * Undo a previous load so the next one runs against the current module graph:
+ * every module's cleanup runs (use cases and models unregister, listeners
+ * unsubscribe) and the routes of route files are removed.
+ *
+ * @returns how many modules were disposed
+ */
+export async function disposeLoadedAppModules(): Promise<number> {
+  const files = [...filesOrchestrator.files.values()];
+
+  await filesOrchestrator.moduleLoader.dispose(files);
+
+  return files.length;
+}
+
 export async function loadTestAppModules(
   importModule: AppModuleImporter | undefined,
 ): Promise<void> {
   setAppModuleImporter(importModule);
 
   try {
+    if (usesFreshModuleGraph()) {
+      await loadFiles();
+      // Not captured: the next file removes these routes and imports the
+      // modules again through its own module graph.
+      return;
+    }
+
+    await loadFiles();
+    // The application's own routes are now part of the state a worker-scoped
+    // runtime returns to between files.
+    router.captureBootSnapshot();
+  } finally {
+    setAppModuleImporter(undefined);
+  }
+}
+
+async function loadFiles(): Promise<void> {
+  {
     await filesOrchestrator.init();
     await filesOrchestrator.initializeAll();
     filesOrchestrator.specialFilesCollector.collect(filesOrchestrator.files);
@@ -50,10 +84,5 @@ export async function loadTestAppModules(
     }
 
     await timeTestStep("appModules", () => filesOrchestrator.moduleLoader.loadAll());
-    // The application's own routes are now part of the state a worker-scoped
-    // runtime returns to between files.
-    router.captureBootSnapshot();
-  } finally {
-    setAppModuleImporter(undefined);
   }
 }

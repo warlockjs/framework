@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { readVersions } from "../app-versions";
 import { listPanelInfos, type MountedDevtoolsPanel } from "../panels";
 import type { DevtoolsPanelInfo, DevtoolsSessionView } from "../production/contracts";
 import type { MountDevtoolsRoutesDeps } from "./types";
@@ -18,6 +19,7 @@ export function developmentSessionView(deps: MountDevtoolsRoutesDeps): DevtoolsS
     instance: deps.instance ?? null,
     methods: null,
     share: null,
+    ...readVersions(),
   };
 }
 

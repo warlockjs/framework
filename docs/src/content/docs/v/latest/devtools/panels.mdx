@@ -122,7 +122,9 @@ The client then gets `404` with `{ "error": "No flow named \"checkout\"." }`.
 `files` serves a folder of images, such as screenshots, at `/__warlock/panels/<id>/files/<path inside the folder>`.
 
 ```ts
-files: { dir: new URL("./screenshots/", import.meta.url) }
+files: {
+  dir: new URL("./screenshots/", import.meta.url);
+}
 ```
 
 - `dir` is an absolute path or a `file:` URL. A folder that does not exist serves nothing.
@@ -150,12 +152,12 @@ share: {
 }
 ```
 
-| Field    | What it is                                                                                                                  |
-| -------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `view`   | The browser module the link opens. It is called like `view`, with `context.shared === true`. It must exist.                  |
-| `routes` | The paths of the panel's GET routes, as written in `routes`, that the shared page may call. Any other path answers `404`.   |
-| `assets` | Served names from `assets` the shared page may load. Default: none.                                                         |
-| `files`  | `true` lets the shared page load images from `files`. The panel must declare `files`. Default: `false`.                     |
+| Field    | What it is                                                                                                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `view`   | The browser module the link opens. It is called like `view`, with `context.shared === true`. It must exist.               |
+| `routes` | The paths of the panel's GET routes, as written in `routes`, that the shared page may call. Any other path answers `404`. |
+| `assets` | Served names from `assets` the shared page may load. Default: none.                                                       |
+| `files`  | `true` lets the shared page load images from `files`. The panel must declare `files`. Default: `false`.                   |
 
 The panel fails to load, with a message naming the panel and the field, when `view` is missing, a `routes` entry is not
 the path of one of its GET routes, an `assets` entry is not a name in `assets`, or `files` is set without a folder.
@@ -204,9 +206,9 @@ export default async function renderQueue({ api, el, empty, href, route, root })
 | `navigate(route)`           | Goes to that view, as following `href(route)` would.                                                                                                                                                                                                                          |
 | `refresh()`                 | Renders the panel again.                                                                                                                                                                                                                                                      |
 | `asset(name)`               | The absolute URL of one of the panel's `assets`, for a `<link rel="stylesheet">`, an image or `import()` of another module.                                                                                                                                                   |
-| `file(path)`                | The URL of an image in the panel's `files` folder: `file("login/step-1.png")`. Behind a share link it points at the shared image route. |
-| `shared`                    | `true` when the view runs behind a read-only share link. Show the shared view only: no file paths, code or developer detail. |
-| `share`                     | For an admin in the production monitor, when sharing is on and the panel declares `share`: `{ enabled: true, manageHref }`, where `manageHref` opens the link manager for this panel. Otherwise `null`. Behind a link it is always `null`. |
+| `file(path)`                | The URL of an image in the panel's `files` folder: `file("login/step-1.png")`. Behind a share link it points at the shared image route.                                                                                                                                       |
+| `shared`                    | `true` when the view runs behind a read-only share link. Show the shared view only: no file paths, code or developer detail.                                                                                                                                                  |
+| `share`                     | For an admin in the production monitor, when sharing is on and the panel declares `share`: `{ enabled: true, manageHref }`, where `manageHref` opens the link manager for this panel. Otherwise `null`. Behind a link it is always `null`.                                    |
 | `el(tag, attrs, children)`  | Builds an element. `text` sets the text, `class` the class name, `on<event>` adds a listener, anything else is an attribute.                                                                                                                                                  |
 | `svg(tag, attrs, children)` | The same for SVG elements, for small graphs drawn without a chart library.                                                                                                                                                                                                    |
 | `empty(message)`            | The dashboard's empty-state paragraph.                                                                                                                                                                                                                                        |
@@ -290,7 +292,7 @@ In the production monitor, a panel's GET routes need a signed-in user. Every oth
 origin check and the CSRF header `X-Devtools-Csrf`, and is written to the audit log as `panel.action`. The view
 context's `api()` adds the header for you. If your view calls `fetch` directly for a write, it must send
 `X-Devtools-Csrf` itself and a JSON body with `Content-Type: application/json`. Read the token from the `csrf` field of
-`GET api/auth/session`. A write without the header is refused with `csrf.invalid`.
+`GET api/auth/session`. The same answer carries `warlockVersion` and `app` (`{ name, version }`), both `null` when signed out or unknown. A write without the header is refused with `csrf.invalid`.
 
 Turn a panel off in production with `production.panels[<id>]: false`; see
 [Devtools in production](/v/latest/devtools/production/#tabs-in-production).
@@ -322,7 +324,8 @@ dashboard's CSS variables so it follows the theme and stays readable in both. A 
 }
 ```
 
-`--foreground`, `--muted-foreground`, `--brand`, `--success`, `--warning`, `--info` and `--destructive` are at least
+In the light theme `--primary` is the gold fill (put `--primary-foreground` on it) and `--brand` is a deep amber that is
+safe to use as text; in the dark theme both are gold. `--foreground`, `--muted-foreground`, `--brand`, `--success`, `--warning`, `--info` and `--destructive` are at least
 4.5:1 against `--background` and `--card` in both themes, so text in these colours is readable. A variable that is
 not in the list (or defined by the panel itself) is not set by the dashboard and falls back to the browser default,
 which can make text unreadable. The list is exported as `DEVTOOLS_PANEL_TOKENS` from `@warlock.js/devtools`, so a

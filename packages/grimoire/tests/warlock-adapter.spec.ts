@@ -385,9 +385,7 @@ describe("createWarlockAdapter over the shop fixture", () => {
       (file) => file.file === "src/app/catalog/controllers/products.controller.ts",
     );
 
-    expect(
-      controller?.imports.map((entry) => [entry.specifier, entry.typeOnly === true]),
-    ).toEqual([
+    expect(controller?.imports.map((entry) => [entry.specifier, entry.typeOnly === true])).toEqual([
       ["../repositories/products.repository", false],
       ["app/shared/utils/money", true],
     ]);

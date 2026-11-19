@@ -35,6 +35,8 @@ function session(overrides: Partial<DevtoolsSessionView>): DevtoolsSessionView {
     instance: instanceA,
     methods: null,
     share: null,
+    warlockVersion: null,
+    app: null,
     ...overrides,
   };
 }

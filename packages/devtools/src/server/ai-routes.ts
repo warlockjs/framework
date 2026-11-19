@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { AGENT_TRACE_INSTALL_GUIDANCE } from "../sources/agent-trace-source";
-import { AI_INSTALL_GUIDANCE } from "../sources/ai-source";
+import { describeAiUnavailable } from "../sources/ai-source";
 import type { MountDevtoolsRoutesDeps } from "./types";
 
 /** Read-only AI metadata, inside the same development/loopback guard as every panel. */
@@ -9,13 +9,24 @@ export function registerAiRoutes(server: FastifyInstance, deps: MountDevtoolsRou
     reply.header("Cache-Control", "no-store");
     const source = deps.ai;
     if (!source?.available) {
-      return { available: false, message: source?.message ?? AI_INSTALL_GUIDANCE, runs: [] };
+      if (!source) {
+        // Production never attaches the feed: say so instead of claiming AI is missing.
+        const reason = deps.mode === "production" ? "not-collected" : "ai-missing";
+        return { ...describeAiUnavailable(reason), runs: [] };
+      }
+      const { dispose: _dispose, ...unavailable } = source;
+      return { ...unavailable, runs: [] };
     }
     const filter =
       request.query.requestId === undefined ? undefined : { requestId: request.query.requestId };
+    const runs = source.store.query(filter).map(source.summarize);
+    // Nothing collected and nothing that would collect: say how to turn it on.
+    if (!runs.length && filter === undefined && source.observationOff?.()) {
+      return { ...describeAiUnavailable("observation-off"), runs: [] };
+    }
     return {
       available: true,
-      runs: source.store.query(filter).map(source.summarize),
+      runs,
       aggregate: source.store.aggregate(filter),
     };
   });

@@ -277,7 +277,11 @@ async function writeStoredBook(
   facts: BookFacts | null,
 ): Promise<void> {
   if (facts !== null) {
-    const cache: StoredFactsCache = { schemaVersion: BOOK_SCHEMA_VERSION, typeOnlyEdges: true, facts };
+    const cache: StoredFactsCache = {
+      schemaVersion: BOOK_SCHEMA_VERSION,
+      typeOnlyEdges: true,
+      facts,
+    };
     await writeBookFile(root, GRIMOIRE_PATHS.bookFactsCache, toJson(cache));
   }
 

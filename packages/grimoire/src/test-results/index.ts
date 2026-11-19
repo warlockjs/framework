@@ -42,7 +42,8 @@ export function resultsFileLabel(root: string, file?: string): string {
   const absolute = resolveResultsFile(root, file);
   const relative = path.relative(root, absolute);
 
-  if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) return toPosixPath(absolute);
+  if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative))
+    return toPosixPath(absolute);
 
   return toPosixPath(relative);
 }
@@ -53,7 +54,10 @@ export function resultsFileLabel(root: string, file?: string): string {
  *
  * @param file Project-relative or absolute path of another results file.
  */
-export async function readTestResults(root: string, file?: string): Promise<TestResultsStore | null> {
+export async function readTestResults(
+  root: string,
+  file?: string,
+): Promise<TestResultsStore | null> {
   try {
     const parsed: unknown = JSON.parse(await readFile(resolveResultsFile(root, file), "utf8"));
 

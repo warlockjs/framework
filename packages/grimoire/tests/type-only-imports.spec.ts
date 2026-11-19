@@ -45,7 +45,8 @@ const FILES: Record<string, string> = {
     'export type Settings = typeof import("./about-settings");',
     "export default function AboutPage() { return null; }",
   ].join("\n"),
-  "src/app/web/pages/about-types.ts": 'import { db } from "../../db/connection"; export type Page = typeof db;',
+  "src/app/web/pages/about-types.ts":
+    'import { db } from "../../db/connection"; export type Page = typeof db;',
   "src/app/web/pages/about-settings.ts": "export const settings = {};",
 };
 
@@ -122,10 +123,9 @@ describe("page step files and type-only imports", () => {
   it("marks `export type *` and type queries of `import()` as type-only", () => {
     const about = "src/app/web/pages/about.page.tsx";
 
-    expect(scanned.find((file) => file.file === about)?.imports.map((entry) => entry.typeOnly)).toEqual([
-      true,
-      true,
-    ]);
+    expect(
+      scanned.find((file) => file.file === about)?.imports.map((entry) => entry.typeOnly),
+    ).toEqual([true, true]);
     expect(importClosure(graph, [about], { skipTypeOnly: true })).toEqual([about]);
     expect(importClosure(graph, [about])).toContain("src/app/db/connection.ts");
   });

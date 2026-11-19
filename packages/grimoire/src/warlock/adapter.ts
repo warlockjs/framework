@@ -21,6 +21,7 @@ import type {
 import type {
   BookAdapter,
   BookFile,
+  BookHost,
   BookMobileApp,
   BookNamedThing,
   BookPage,
@@ -28,6 +29,7 @@ import type {
   BookSite,
 } from "../contracts/adapter";
 import { isCodeFile, isInsideFolder, toPosixPath } from "../paths";
+import { WARLOCK_LOGO_DATA_URI } from "./logo";
 import { collectMobileFacts, type MobileAppOption } from "./mobile-facts";
 
 /**
@@ -130,6 +132,35 @@ function coreVersion(): string {
   );
 }
 
+/** The app's own `name` and `version` from `<root>/package.json`, or `null` when it has no name. */
+export function appIdentity(root: string): { name: string; version: string | null } | null {
+  try {
+    const manifest = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")) as {
+      name?: unknown;
+      version?: unknown;
+    };
+
+    return typeof manifest.name === "string" && manifest.name !== ""
+      ? {
+          name: manifest.name,
+          version: typeof manifest.version === "string" ? manifest.version : null,
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The Warlock.js brand (logo and installed version) and the app at `root`, for the view's header and footer. */
+export function warlockHost(root: string, frameworkVersion: string): BookHost {
+  return {
+    name: "Warlock.js",
+    version: frameworkVersion === "unknown" ? null : frameworkVersion,
+    logo: WARLOCK_LOGO_DATA_URI,
+    app: appIdentity(root),
+  };
+}
+
 /** Run `work` with `console.log`/`info`/`debug` on stderr, so a boot never mixes with `--json` output. */
 async function withConsoleOnStderr<T>(work: () => Promise<T>): Promise<T> {
   const { log, info, debug } = console;
@@ -184,6 +215,22 @@ function stemOf(file: string, ...suffixes: string[]): string {
   return base;
 }
 
+/**
+ * The book's role of a file: the framework's role, with CLI command files
+ * (`*.command.ts`, or a file directly in `<module>/commands/`) told apart from
+ * plain source.
+ */
+export function bookRole(file: Pick<InspectFile, "file" | "role">): string {
+  if (file.role !== "source") return file.role;
+
+  const stem = path.posix.basename(file.file).replace(/\.(?:d\.ts|[cm]?[jt]sx?)$/, "");
+  const folders = file.file.split("/").slice(0, -1);
+
+  return stem.endsWith(".command") || (folders.length === 4 && folders[3] === "commands")
+    ? "command"
+    : file.role;
+}
+
 function toBookFile(file: InspectFile, mobile: readonly BookMobileApp[]): BookFile {
   const docs = file.exportDocs ?? {};
   const app = mobile.find((item) => isInsideFolder(file.file, item.root));
@@ -191,7 +238,7 @@ function toBookFile(file: InspectFile, mobile: readonly BookMobileApp[]): BookFi
   return {
     file: file.file,
     module: file.module,
-    type: file.role,
+    type: bookRole(file),
     lines: file.lines ?? 0,
     about: file.about ?? null,
     tags: file.tags ?? {},
@@ -418,6 +465,7 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
   return {
     name: "warlock",
     version: coreVersion(),
+    host: (root) => warlockHost(root, coreVersion()),
     async sourceRoots(root) {
       return sourceFolders(root, await mobileApps(root));
     },

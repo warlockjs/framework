@@ -53,6 +53,14 @@ export type SnapshotSourceOptions = {
    * without a restart.
    */
   testResultsFile?: string;
+  /**
+   * Read the route facts once when the first open finds none (`routes: "missing"`), so the development tab is
+   * never "missing" without a manual `warlock grimoire build`. The adapter's booted inspect runs at most once per
+   * process; a boot that fails keeps the cached answer. Default `false`. Never set it in a process that serves the app: the boot
+   * pass boots every connector and re-imports the route and event modules, which registers them twice. The devtools panel
+   * does not set it; use it from a separate tool process.
+   */
+  collectRoutes?: boolean;
 };
 
 /** A cached, shared snapshot of one project. */
@@ -111,6 +119,7 @@ export function createSnapshotSource(
   let cached: { snapshot: GrimoireSnapshot; at: number; stamp: string; took: number } | null = null;
   let opening: Promise<GrimoireSnapshot> | null = null;
 
+  let collected = options.collectRoutes !== true || options.mode === "production";
   const resultsFile = resolveResultsFile(root, options.testResultsFile);
 
   const keepUntilChanged = options.mode === "production" && options.ttlMs === undefined;
@@ -119,11 +128,24 @@ export function createSnapshotSource(
   async function open(): Promise<GrimoireSnapshot> {
     const started = Date.now();
     const adapter = await loadAdapter(options.adapter);
-    const snapshot = await openGrimoire(root, adapter, {
-      routes: "cached",
+    const openOptions = {
       write: options.write ?? false,
-      ...(options.testResultsFile === undefined ? {} : { testResultsFile: options.testResultsFile }),
-    });
+      ...(options.testResultsFile === undefined
+        ? {}
+        : { testResultsFile: options.testResultsFile }),
+    };
+    let snapshot = await openGrimoire(root, adapter, { routes: "cached", ...openOptions });
+
+    if (!collected && snapshot.routes === "missing") {
+      // Once per source: the route, event and job facts come from one boot pass, then live in the book.
+      collected = true;
+
+      try {
+        snapshot = await openGrimoire(root, adapter, { routes: "fresh", ...openOptions });
+      } catch {
+        // The app did not boot (GR8002): keep the cached answer; the tab says the facts are missing.
+      }
+    }
 
     const at = Date.now();
 

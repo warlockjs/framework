@@ -5,7 +5,7 @@
  */
 import { explainGrimoireCode, isGrimoireCode } from "../codes";
 import { checkGrimoire } from "../check";
-import type { BookPage, BookScreen } from "../contracts/adapter";
+import type { BookHost, BookPage, BookScreen } from "../contracts/adapter";
 import type { TasksIndex, FeaturesIndex } from "../contracts/bookmap";
 import type { GrimoireCheckReport, GrimoireFinding, RouteFreshness } from "../contracts/findings";
 import type {
@@ -21,9 +21,11 @@ import type { WrittenApp, WrittenLayout, WrittenPage, WrittenRelease } from "../
 import { scry } from "../scry";
 import { compactFlow, STEP_FILE_SETS, stepFilePage } from "../scry/compact";
 import { testResultsInfo } from "../test-results";
+import { featureFileGroups, featureMap, featureProofs } from "./feature-map";
 import { featureGraph, fileGraph, moduleGraph, pageGraph, type GrimoireGraph } from "./graphs";
 import {
   STEP_FILES_PAGE_LIMIT,
+  type GrimoireFeatureAnswer,
   type GrimoireCheckFilter,
   type GrimoireCheckGroup,
   type GrimoireCheckGroups,
@@ -46,6 +48,11 @@ export class GrimoirePanelError extends Error {
 }
 
 export type GrimoireSummary = {
+  /**
+   * Flow steps by what was checked: `resolved` (`found === true`) and `missing` (`found === false`) were looked up
+   * in the code; `unchecked` (`found === null`, no route facts yet) were not, and never count against the health.
+   */
+  steps: { checked: number; resolved: number; missing: number; unchecked: number };
   routes: RouteFreshness;
   features: FeaturesIndex;
   tasks: TasksIndex;
@@ -58,6 +65,8 @@ export type GrimoireSummary = {
   releases: number;
   /** Whether test results were read, from where, and how many proofs have one. */
   results: TestResultsInfo;
+  /** Framework brand and the app's name and version from the adapter; `null` when the adapter reports none. */
+  host: BookHost | null;
 };
 
 /** One feature of the listing: the index entry plus what the cards show. */
@@ -131,7 +140,17 @@ export function summary(snapshot: GrimoireSnapshot): GrimoireSummary {
   const files = snapshot.book.facts.files;
   const written = snapshot.written;
 
+  const steps = Object.values(snapshot.collected.flows).flatMap((flow) => flow.steps);
+  const resolved = steps.filter((step) => step.found === true).length;
+  const missing = steps.filter((step) => step.found === false).length;
+
   return {
+    steps: {
+      checked: resolved + missing,
+      resolved,
+      missing,
+      unchecked: steps.length - resolved - missing,
+    },
     routes: snapshot.routes,
     features: snapshot.collected.featuresIndex,
     tasks: snapshot.collected.tasksIndex,
@@ -151,6 +170,7 @@ export function summary(snapshot: GrimoireSnapshot): GrimoireSummary {
     },
     releases: written.releases.length,
     results: testResultsInfo(snapshot),
+    host: snapshot.host ?? null,
   };
 }
 
@@ -204,8 +224,20 @@ export function route(
   });
 }
 
-export function feature(snapshot: GrimoireSnapshot, id: string | undefined): ScryFeatureResult {
-  return ask(snapshot, { type: "feature", feature: required(id, "feature") });
+export function feature(snapshot: GrimoireSnapshot, id: string | undefined): GrimoireFeatureAnswer {
+  const wanted = required(id, "feature");
+  const result = ask<ScryFeatureResult>(snapshot, { type: "feature", feature: wanted });
+  const written = snapshot.written.features.find((item) => item.id === wanted);
+
+  if (written === undefined)
+    throw new GrimoirePanelError(404, `No feature "${wanted}" is written.`);
+
+  return {
+    ...result,
+    map: featureMap(snapshot, written),
+    fileGroups: featureFileGroups(snapshot, result.bookmap.own),
+    proofs: featureProofs(snapshot, written),
+  };
 }
 
 export function flow(
@@ -399,7 +431,10 @@ export function stepFiles(
 
   const stepIndex = whole(required(index, "index"), "index", 0, 0);
   const offset = whole(query.offset, "offset", 0, 0);
-  const limit = Math.min(whole(query.limit, "limit", STEP_FILES_PAGE_LIMIT, 1), STEP_FILES_PAGE_LIMIT);
+  const limit = Math.min(
+    whole(query.limit, "limit", STEP_FILES_PAGE_LIMIT, 1),
+    STEP_FILES_PAGE_LIMIT,
+  );
   const written = snapshot.written.features
     .find((item) => item.id === feature)
     ?.flows.find((item) => item.id.value === id);
@@ -419,7 +454,10 @@ export function stepFiles(
 }
 
 /** `GET /check?code=&feature=&flow=&severity=&state=&offset=&limit=`: matching findings, paged. */
-export function checkPage(snapshot: GrimoireSnapshot, filter: GrimoireCheckFilter): GrimoireCheckPage {
+export function checkPage(
+  snapshot: GrimoireSnapshot,
+  filter: GrimoireCheckFilter,
+): GrimoireCheckPage {
   const report = checkGrimoire(snapshot);
   const limit = Math.min(Math.max(1, Math.floor(filter.limit ?? 100)), 500);
   const offset = Math.max(0, Math.floor(filter.offset ?? 0));
@@ -427,7 +465,8 @@ export function checkPage(snapshot: GrimoireSnapshot, filter: GrimoireCheckFilte
   const matching = report.findings.filter((finding) => {
     if (code !== undefined && code !== "" && finding.code !== code) return false;
     if (filter.severity !== undefined && finding.severity !== filter.severity) return false;
-    if (filter.state !== undefined && finding.expected !== (filter.state === "expected")) return false;
+    if (filter.state !== undefined && finding.expected !== (filter.state === "expected"))
+      return false;
     if (filter.flow !== undefined && filter.flow !== "" && finding.subject.flow !== filter.flow) {
       return false;
     }

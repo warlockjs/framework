@@ -20,6 +20,8 @@ npx warlock migrate --fresh
 npx warlock generate.module products
 ```
 
+The progress lines show the command name and the arguments you passed, never the declared signature: `warlock grimoire build` prints `› Running grimoire build...` and `✔ grimoire build completed successfully`, even though the command is registered as `grimoire <action> [release]`.
+
 Equivalent shortcuts your project may have configured:
 
 ```bash

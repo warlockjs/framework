@@ -1,4 +1,5 @@
 import type { DevtoolsApiErrorBody, DevtoolsErrorCode } from "@contracts";
+import { isConnectionFailure, reportFailure, reportSuccess } from "./connection";
 
 /**
  * The dashboard's only way to call its API. Paths are relative to the
@@ -77,8 +78,13 @@ export async function apiFetch<T>(path: string, request: ApiRequest = {}): Promi
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
 
+    reportFailure();
+
     throw new ApiError(UNREACHABLE, 0);
   }
+
+  if (isConnectionFailure(response.status)) reportFailure();
+  else reportSuccess();
 
   if (response.status === 204) return undefined as T;
 

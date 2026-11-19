@@ -150,7 +150,8 @@ const CASES: Case[] = [
   {
     code: "GR1012",
     name: "a case question answered nowhere",
-    breakIt: (copy) => copy.replace(BROWSE, "- limits                 50 products per page (AC-1)\n", ""),
+    breakIt: (copy) =>
+      copy.replace(BROWSE, "- limits                 50 products per page (AC-1)\n", ""),
     file: BROWSE,
     line: "## Cases",
     subject: { feature: "catalog", flow: "catalog/browse-products" },
@@ -310,7 +311,11 @@ const CASES: Case[] = [
     code: "GR1029",
     name: "an image outside grimoire/screenshots",
     breakIt: (copy) =>
-      copy.replace(BROWSE, "../../../screenshots/web/product-page.png", "../../../images/product-page.png"),
+      copy.replace(
+        BROWSE,
+        "../../../screenshots/web/product-page.png",
+        "../../../images/product-page.png",
+      ),
     file: BROWSE,
     line: "![The product page]",
     subject: { feature: "catalog", flow: "catalog/browse-products" },

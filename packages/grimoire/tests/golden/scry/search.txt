@@ -5,10 +5,10 @@ route    GET /api/products/new-arrivals    catalog.new-arrivals
 file     src/app/catalog/controllers/new-arrivals.controller.ts  Answers the new arrivals request.
 file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
 file     src/app/catalog/tests/new-arrivals.test.ts  Proves the new arrivals rules.
-export   src/app/catalog/controllers/new-arrivals.controller.ts#NewArrivalsController  Returns the new arrivals for the customer's country.
-export   src/app/catalog/services/new-arrivals.service.ts#listNewArrivals  Returns up to 20 products, newest first.
 file     mobile/app/index.tsx              The home screen with new arrivals.
 file     src/web/$sites/client/home.page.tsx  The home page with featured products and new arrivals.
 file     src/web/$sites/client/home.setup.ts  Loads featured products and new arrivals for the home page.
+export   src/app/catalog/controllers/new-arrivals.controller.ts#NewArrivalsController  Returns the new arrivals for the customer's country.
+export   src/app/catalog/services/new-arrivals.service.ts#listNewArrivals  Returns up to 20 products, newest first.
 export   src/web/$sites/client/home.setup.ts#loader  Returns featured products and up to 20 new arrivals.
 task     T-010                             New arrivals were empty for customers with no country

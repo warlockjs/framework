@@ -7,16 +7,18 @@
  *
  * Absent values are `null`, never `undefined`.
  */
+import type { BookHost } from "../contracts/adapter";
 import type { BookRouteRef } from "../contracts/book";
 import type { FlowBookmap, FlowBookmapCriterion, FlowBookmapStep } from "../contracts/bookmap";
 import type { GrimoireCheckReport, GrimoireFinding } from "../contracts/findings";
-import type { ScryFlowResult } from "../contracts/scry";
+import type { ScryFeatureResult, ScryFlowResult } from "../contracts/scry";
 import type { CriterionStatus, TestResultsInfo } from "../contracts/test-results";
 import type {
   ChangeWord,
   CriterionId,
   FeatureVersion,
   FlowRef,
+  StepType,
   TaskStatus,
   TaskType,
   WrittenOrigin,
@@ -51,7 +53,8 @@ export type GrimoireFlowNeighbour = { id: string; heading: string | null };
 /** The health strip of a flow page. */
 export type GrimoireFlowHealth = {
   criteria: { total: number; proven: number; byStatus: Record<CriterionStatus, number> };
-  steps: { total: number; resolved: number };
+  /** `total` counts only the steps that were checked (`found !== null`); `unchecked` are the ones that could not be (no route facts). */
+  steps: { total: number; resolved: number; unchecked: number };
   findings: GrimoireCheckReport["counts"];
 };
 
@@ -90,6 +93,75 @@ export type GrimoireStepFilesAnswer = {
   files: { file: string; module: string; owner: string | null }[];
   /** Every module of the set with its file count, largest first. */
   modules: { module: string; count: number }[];
+};
+
+// ── Feature page ───────────────────────────────────────────────────────────
+
+/** One column of the feature map: a site, a mobile app, the API or the background work. */
+export type GrimoireFeatureMapColumn = {
+  /** `app:<id>` for a site or mobile app, else `api`, `background` or `other`. */
+  id: string;
+  /** The app's title (its id when none is written), `API`, `Background` or `Not placed`. */
+  title: string;
+  type: "site" | "mobile" | "api" | "background" | "other";
+};
+
+/** What one step of a flow resolved to, as a chip in a cell of the feature map. */
+export type GrimoireFeatureMapChip = {
+  /** The flow step this chip stands for. */
+  step: number;
+  type: StepType;
+  /** `/orders` for a page, `POST /orders` for a route, the name for a mail, job, event or notification. */
+  label: string;
+  /** What the step matched: `false` when nothing, `null` when the book cannot tell. */
+  found: boolean | null;
+  /** For a page chip: the app id. */
+  app: string | null;
+  /** For a page chip: the id of the written page or screen, when one is written. */
+  page: string | null;
+  /** For a route chip: method and path. */
+  method: string | null;
+  path: string | null;
+  /** The step's entry file, when it matched one. */
+  file: string | null;
+};
+
+/** One flow of the feature map: its cells by column id. Columns the flow does not touch are absent. */
+export type GrimoireFeatureMapRow = {
+  flow: string;
+  heading: string | null;
+  status: WrittenStatus;
+  cells: Record<string, GrimoireFeatureMapChip[]>;
+};
+
+/**
+ * The feature map: flows as rows, the places they run as columns (each site
+ * and mobile app, then the API, then the background work). Columns with no
+ * chip are left out.
+ */
+export type GrimoireFeatureMap = {
+  columns: GrimoireFeatureMapColumn[];
+  rows: GrimoireFeatureMapRow[];
+};
+
+/** The own files of a feature in one module. */
+export type GrimoireFeatureFileGroup = { module: string; files: string[] };
+
+/** The criteria of one flow with the tests behind them (the feature's Tests tab). */
+export type GrimoireFeatureProof = {
+  flow: string;
+  heading: string | null;
+  criteria: FlowBookmapCriterion[];
+};
+
+/**
+ * `GET /features/:feature`: the scry feature answer plus what the tabbed
+ * page draws: the feature map, the own files by module and the proof of each flow.
+ */
+export type GrimoireFeatureAnswer = ScryFeatureResult & {
+  map: GrimoireFeatureMap;
+  fileGroups: GrimoireFeatureFileGroup[];
+  proofs: GrimoireFeatureProof[];
 };
 
 // ── Check ──────────────────────────────────────────────────────────────────
@@ -152,13 +224,35 @@ export type ProductHealth = {
   level: ProductHealthLevel;
   /** One short sentence: "All 12 checks pass", "2 of 9 checks fail", "No checks yet". */
   reason: string;
-  criteria: { total: number; pass: number; fail: number; stale: number; notRun: number; noTest: number };
+  criteria: {
+    total: number;
+    pass: number;
+    fail: number;
+    stale: number;
+    notRun: number;
+    noTest: number;
+  };
   /** Captured errors of the last hour on routes this feature or flow uses; `null` when the monitor reports none (no source). */
   errors: { count: number; lastSeen: number | null } | null;
 };
 
 /** An image shown on the product map. `src` is relative to the panel's files URL. */
 export type ProductScreenshot = { src: string; alt: string };
+
+/**
+ * The numbers behind a feature card's health strip: flows written, criteria
+ * proven by tests, screenshots present and open findings. `measured` is
+ * `false` when tagged tests exist but no test results were recorded: the
+ * strip then shows the criteria as "not measured", not as a problem.
+ */
+export type ProductStrip = {
+  flows: { total: number; shipped: number };
+  criteria: { total: number; proven: number; failing: number; measured: boolean };
+  /** Places that show the feature's flows, and how many of them have a screenshot. */
+  screenshots: { places: number; present: number };
+  /** Unexpected check findings of the feature and its flows. */
+  findings: { errors: number; warnings: number };
+};
 
 /** One feature card of the map. */
 export type ProductFeatureCard = {
@@ -172,6 +266,16 @@ export type ProductFeatureCard = {
   version: FeatureVersion;
   flows: number;
   health: ProductHealth;
+  strip: ProductStrip;
+  /**
+   * The newest day the feature changed (`yyyy-mm-dd`): its README `updated`,
+   * or a later changelog entry. Drives "recently changed" sorting.
+   */
+  changedAt: string;
+  /** Releases whose changelog section names this feature. */
+  changedIn: string[];
+  /** Whether the feature has changes not yet in a release. */
+  unreleased: boolean;
 };
 
 /** `GET /product`: the feature map. */
@@ -180,8 +284,12 @@ export type ProductMapAnswer = {
   builtAt: string;
   features: ProductFeatureCard[];
   apps: { id: string; type: "site" | "mobile"; title: string | null }[];
+  /** The written releases, oldest first: the choices of the "changed since" filter. */
+  releases: { release: string; date: string }[];
   /** Whether the answers carry developer detail (never through a share link). */
   developer: boolean;
+  /** Framework brand and the app's name and version, or `null` when the adapter reports none. */
+  host: BookHost | null;
 };
 
 /** One flow as a short story on the feature page. */
@@ -256,6 +364,7 @@ export type ProductFeatureAnswer = {
   health: ProductHealth;
   /** `null` through a share link. */
   developer: ProductDeveloperDetail | null;
+  host: BookHost | null;
 };
 
 /** One step of a flow in the user's words (`## Story`), or derived from a technical step when no story is written. */
@@ -298,4 +407,5 @@ export type ProductFlowAnswer = {
   health: ProductHealth;
   /** Signed-in view only: technical steps with counts. `null` through a share link. */
   developer: { steps: GrimoireFlowStep[] } | null;
+  host: BookHost | null;
 };

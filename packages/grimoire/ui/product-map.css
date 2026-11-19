@@ -104,7 +104,11 @@
   border: 1px solid var(--border);
   border-radius: var(--pm-radius);
   background:
-    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--brand) 14%, transparent), transparent 60%),
+    radial-gradient(
+      120% 140% at 0% 0%,
+      color-mix(in srgb, var(--brand) 14%, transparent),
+      transparent 60%
+    ),
     var(--card);
   box-shadow: var(--pm-shadow);
 }
@@ -288,6 +292,71 @@
   color: var(--muted-foreground);
   font-size: 13.5px;
 }
+.pm-strip {
+  display: grid;
+  gap: 6px;
+  margin-top: auto;
+}
+.pm-strip-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+}
+.pm-strip-seg {
+  --pm-tone: var(--muted-foreground);
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--pm-tone) 22%, transparent);
+}
+.pm-strip-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--pm-tone);
+}
+.pm-strip-seg.is-none .pm-strip-fill {
+  background: transparent;
+}
+.pm-strip-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted-foreground);
+  font-size: 12.5px;
+}
+.pm-strip-item {
+  --pm-tone: var(--muted-foreground);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.pm-strip-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--pm-tone);
+}
+.pm-strip .is-info {
+  --pm-tone: var(--info, var(--brand));
+}
+.pm-strip .is-good {
+  --pm-tone: var(--pm-good);
+}
+.pm-strip .is-warn {
+  --pm-tone: var(--pm-attention);
+}
+.pm-strip .is-bad {
+  --pm-tone: var(--pm-problem);
+}
+.pm-strip .is-none {
+  --pm-tone: var(--muted-foreground);
+}
 .pm-light {
   display: inline-flex;
   align-items: center;
@@ -464,35 +533,100 @@
 .pm-changes li {
   display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
   gap: 4px 10px;
 }
+.pm-change-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pm-refs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.pm-ref {
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.7;
+}
 .pm-change--added {
-  color: var(--pm-good);
+  --pm-type: var(--pm-good);
 }
 .pm-change--fixed {
-  color: var(--info, var(--brand));
+  --pm-type: var(--info);
 }
 .pm-change--removed {
-  color: var(--pm-problem);
+  --pm-type: var(--pm-problem);
 }
 .pm-change--changed {
-  color: var(--pm-attention);
+  --pm-type: var(--pm-attention);
+}
+.pm-change-type {
+  --pm-type: var(--muted-foreground);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pm-type);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.pm-change-type::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--pm-type);
+  content: "";
+}
+.pm-change-groups {
+  display: grid;
+  gap: 12px;
+}
+.pm-change-group {
+  display: grid;
+  gap: 6px;
 }
 .pm-timeline {
   display: grid;
-  gap: 16px;
-  padding-left: 16px;
+  gap: 22px;
+  padding-left: 22px;
   border-left: 2px solid var(--border);
   list-style: none;
 }
 .pm-release {
+  position: relative;
   display: grid;
-  gap: 8px;
+  gap: 10px;
+}
+.pm-release::before {
+  position: absolute;
+  top: 6px;
+  left: -29px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--brand);
+  border-radius: 50%;
+  background: var(--brand);
+  content: "";
+}
+.pm-release.is-unreleased::before {
+  background: var(--background);
 }
 .pm-release-head {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 2px 12px;
+}
+.pm-release-version {
+  font-size: 16px;
 }
 
 /* Where you see it */
@@ -603,12 +737,27 @@
   background: var(--card);
 }
 .pm-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 16px;
   margin-top: 28px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
   color: var(--muted-foreground);
   font-size: 13px;
   text-align: center;
+}
+
+.pm-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pm-brand-logo {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
 }
 
 @media (max-width: 640px) {

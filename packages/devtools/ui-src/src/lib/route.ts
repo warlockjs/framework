@@ -25,7 +25,8 @@ export function parseHash(hash: string): HashRoute {
 
     if (first === "setup" && second) return { type: "setup", token: decodeURIComponent(second) };
     if (first === "invite" && second) return { type: "invite", token: decodeURIComponent(second) };
-    if (first === "share") return { type: "share", token: second ? decodeURIComponent(second) : null };
+    if (first === "share")
+      return { type: "share", token: second ? decodeURIComponent(second) : null };
     if (first === "account") return { type: "account" };
     if (first === "admin") {
       const page = second.split("?")[0];

@@ -78,6 +78,12 @@ export async function bootProductionDevtools(
   const warn = (message: string): void => {
     log.warn("devtools", "production", message);
   };
+  if (production.twoFactor === "off") {
+    warn(
+      'Two-factor sign-in is off for the dashboard (production.twoFactor is "off"): anyone with a password can sign in. Set it to "admins" or "everyone" to require an authenticator app or passkey.',
+    );
+  }
+
   const instance = insightsModule.createInstanceInfo();
   const [crypto, passkeys] = await Promise.all([
     authModule.defaultDevtoolsCrypto(),

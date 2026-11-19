@@ -410,7 +410,8 @@ export function createMemoryStore(options: { now?: () => number } = {}): Devtool
     shares: {
       async create(input) {
         for (const share of shares.values()) {
-          if (share.tokenHash === input.tokenHash) throw new DevtoolsStoreConflictError("tokenHash");
+          if (share.tokenHash === input.tokenHash)
+            throw new DevtoolsStoreConflictError("tokenHash");
         }
 
         const record: DevtoolsShareRecord = {

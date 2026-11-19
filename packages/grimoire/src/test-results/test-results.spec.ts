@@ -202,7 +202,13 @@ describe("checkTestResults", () => {
   });
 
   it("reports an unmatched proof as GR4010 while its @proves line is still there", () => {
-    const unmatched = { feature: "catalog", flow: "wishlist", criterion: "AC-1", testFile: "src/a.spec.ts", line: 1 };
+    const unmatched = {
+      feature: "catalog",
+      flow: "wishlist",
+      criterion: "AC-1",
+      testFile: "src/a.spec.ts",
+      line: 1,
+    };
     const gone = { ...unmatched, line: 9 };
     const findings = checkTestResults(
       snapshot({ ...store([result({ testFileHash: hash })]), unmatched: [unmatched, gone] }),

@@ -24,12 +24,21 @@ import {
 import { testResultsInfo } from "../test-results";
 
 /** The file sets a step can list, in the order a view shows them. */
-export const STEP_FILE_SETS: readonly StepFileSet[] = ["direct", "feature", "reachable", "type-only"];
+export const STEP_FILE_SETS: readonly StepFileSet[] = [
+  "direct",
+  "feature",
+  "reachable",
+  "type-only",
+];
 
 const byText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
 
 /** The files of a step the flow's feature owns. */
-function featureFiles(snapshot: GrimoireSnapshot, feature: string, step: FlowBookmapStep): string[] {
+function featureFiles(
+  snapshot: GrimoireSnapshot,
+  feature: string,
+  step: FlowBookmapStep,
+): string[] {
   return step.files.filter((file) => snapshot.ownership.files[file]?.owner === feature);
 }
 
@@ -99,7 +108,11 @@ export function flowHealth(result: ScryFlowResult): GrimoireFlowHealth {
 
   return {
     criteria: { total: result.bookmap.criteria.length, proven: byStatus.pass, byStatus },
-    steps: { total: checked.length, resolved: checked.filter((step) => step.found === true).length },
+    steps: {
+      total: checked.length,
+      resolved: checked.filter((step) => step.found === true).length,
+      unchecked: result.bookmap.steps.length - checked.length,
+    },
     findings: {
       errors,
       warnings: unexpected.length - errors,
@@ -140,7 +153,10 @@ export function compactStep(
 }
 
 /** The scry flow answer made compact, with the flow page header data. */
-export function compactFlow(snapshot: GrimoireSnapshot, result: ScryFlowResult): GrimoireFlowAnswer {
+export function compactFlow(
+  snapshot: GrimoireSnapshot,
+  result: ScryFlowResult,
+): GrimoireFlowAnswer {
   const feature = snapshot.written.features.find((item) => item.id === result.flow.feature);
 
   if (feature === undefined) {
@@ -187,7 +203,9 @@ export function stepFileSet(
   const modules = new Map(snapshot.book.facts.files.map((item) => [item.file, item.module]));
   const moduleOf = (file: string): string => modules.get(file) ?? "";
 
-  return [...files].sort((left, right) => byText(moduleOf(left), moduleOf(right)) || byText(left, right));
+  return [...files].sort(
+    (left, right) => byText(moduleOf(left), moduleOf(right)) || byText(left, right),
+  );
 }
 
 /**

@@ -81,11 +81,13 @@ export function Sidebar({ panels, activeTab, open, onClose }: SidebarProps) {
         "max-lg:data-[open=true]:animate-dt-drawer",
       )}
     >
-      <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
-        <BrandMark />
+      <div className="flex items-center gap-3 px-5 pt-5 pb-4">
+        <BrandMark className="size-9" />
         <div className="min-w-0 leading-tight">
-          <p className="text-sm font-semibold tracking-tight">Warlock</p>
-          <p className="text-xs text-muted-foreground">Devtools</p>
+          <p className="text-sm font-semibold tracking-tight">Warlock.js</p>
+          <p className="truncate text-xs text-muted-foreground" data-testid="warlock-version">
+            Devtools{session.warlockVersion ? ` · v${session.warlockVersion}` : ""}
+          </p>
         </div>
         <Button
           type="button"
@@ -98,7 +100,7 @@ export function Sidebar({ panels, activeTab, open, onClose }: SidebarProps) {
           <XIcon />
         </Button>
       </div>
-      <div className="px-4 pb-3">
+      <div className="px-5 pb-4">
         <Badge variant={production ? "brand" : "neutral"} className="max-w-full">
           <span
             aria-hidden="true"
@@ -110,10 +112,10 @@ export function Sidebar({ panels, activeTab, open, onClose }: SidebarProps) {
           <span className="truncate">{label}</span>
         </Badge>
       </div>
-      <nav aria-label="Dashboard tabs" className="flex-1 overflow-y-auto px-2.5 pb-4">
+      <nav aria-label="Dashboard tabs" className="flex-1 overflow-y-auto px-3 pb-4">
         {groupPanels(panels).map(({ group, items }) => (
-          <div key={group} className="mt-3 first:mt-0">
-            <p className="px-2.5 pb-1 text-xs font-semibold text-muted-foreground">{group}</p>
+          <div key={group} className="mt-4 first:mt-0">
+            <p className="px-2.5 pb-1.5 text-xs font-semibold text-muted-foreground">{group}</p>
             <ul className="grid gap-0.5">
               {items.map((panel) => {
                 const Icon = iconFor(panel.id);
@@ -148,6 +150,14 @@ export function Sidebar({ panels, activeTab, open, onClose }: SidebarProps) {
           </div>
         ))}
       </nav>
+      {session.app ? (
+        <div className="border-t px-5 py-3 text-xs" data-testid="app-version">
+          <p className="truncate font-medium" title={session.app.name}>
+            {session.app.name}
+          </p>
+          <p className="truncate text-muted-foreground">v{session.app.version}</p>
+        </div>
+      ) : null}
     </aside>
   );
 }

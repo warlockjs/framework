@@ -2,7 +2,8 @@ import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto
 import type { DevtoolsErrorCode } from "../contracts";
 import { COMMON_PASSWORDS } from "./common-passwords";
 
-const MIN_PASSWORD_LENGTH = 8;
+/** The lowest `passwords.minLength` the options accept, and its default. */
+export const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_BYTES = 72;
 
 /** The alphabet of recovery codes and references: no 0, 1, 8, 9, I, L, O. */
@@ -12,15 +13,19 @@ const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const TEMPORARY_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
 
 /**
- * The password rules: at least 8 characters, at most 72 bytes (UTF-8), not in
- * the built-in common list (compared lower-cased), not equal to the email
+ * The password rules: at least `rules.minLength` characters (default 8), at
+ * most 72 bytes (UTF-8), not in the built-in common list unless
+ * `rules.rejectCommon` is false (compared lower-cased), not equal to the email
  * (lower-cased). Returns the failing rule's error code, or `null`.
  */
 export function checkPasswordPolicy(
   password: string,
   email: string | null,
+  rules: { minLength?: number; rejectCommon?: boolean } = {},
 ): DevtoolsErrorCode | null {
-  if (typeof password !== "string" || [...password].length < MIN_PASSWORD_LENGTH) {
+  const minLength = rules.minLength ?? MIN_PASSWORD_LENGTH;
+
+  if (typeof password !== "string" || [...password].length < minLength) {
     return "auth.password-too-short";
   }
 
@@ -28,7 +33,7 @@ export function checkPasswordPolicy(
 
   const lower = password.toLowerCase();
 
-  if (COMMON_PASSWORDS.has(lower)) return "auth.password-common";
+  if (rules.rejectCommon !== false && COMMON_PASSWORDS.has(lower)) return "auth.password-common";
 
   if (email !== null && lower === email.trim().toLowerCase()) return "auth.password-same-as-email";
 

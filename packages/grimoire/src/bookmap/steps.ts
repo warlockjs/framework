@@ -99,6 +99,55 @@ function reach(
   };
 }
 
+/** `auth-only.middleware.ts` → `authOnly` (the camelCase stem without the role suffix). */
+function middlewareNameOf(file: string): string {
+  const base = (file.split("/").pop() ?? file).replace(/\.(?:d\.ts|[cm]?[jt]sx?)$/, "");
+  const stem = base.replace(/\.middleware$/, "");
+
+  return stem.replace(/[-_.]+([a-zA-Z0-9])/g, (_match, letter: string) => letter.toUpperCase());
+}
+
+/**
+ * The files of the middleware a route names. A name matches a file that exports
+ * it, or a `*.middleware.*` file whose stem is the name (`auth-only.middleware.ts` ↔ `authOnly`).
+ * When the routes file imports some of the matches, only those count (two
+ * modules may name a middleware the same). The routes file's other imports are
+ * not followed: it imports every controller of its module.
+ */
+function middlewareFiles(
+  names: readonly string[],
+  routesFile: string | null,
+  graph: FileGraph,
+): string[] {
+  const imported = new Set(
+    routesFile === null
+      ? []
+      : (graph.get(routesFile)?.imports ?? []).flatMap((edge) =>
+          edge.file === null ? [] : [edge.file],
+        ),
+  );
+  const found: string[] = [];
+
+  for (const name of names) {
+    const matches: string[] = [];
+
+    for (const [file, entry] of graph) {
+      const exports = (entry as { exports?: readonly { name: string }[] }).exports ?? [];
+
+      const byStem =
+        /\.middleware\.(?:[cm]?[jt]sx?)$/.test(file) && middlewareNameOf(file) === name;
+
+      if (exports.some((item) => item.name === name) || byStem) matches.push(file);
+    }
+
+    const near = matches.filter((file) => imported.has(file));
+
+    found.push(...(near.length > 0 ? near : matches.length === 1 ? matches : []));
+  }
+
+  return found;
+}
+
 function routeStep(step: WrittenStep, facts: BookFacts, graph: FileGraph): StepMatch {
   if (facts.routes === null || step.route === null) return UNKNOWN;
 
@@ -108,11 +157,16 @@ function routeStep(step: WrittenStep, facts: BookFacts, graph: FileGraph): StepM
 
   if (!first) return NOTHING;
 
-  const handlers = routes.flatMap((route) => (route.handlerFile === null ? [] : [route.handlerFile]));
+  const handlers = routes.flatMap((route) =>
+    route.handlerFile === null ? [] : [route.handlerFile],
+  );
   const sources = routes.flatMap((route) => (route.sourceFile === null ? [] : [route.sourceFile]));
-  const handlerReach = reach(graph, handlers, sources);
+  const middleware = routes.flatMap((route) =>
+    middlewareFiles(route.middleware, route.sourceFile, graph),
+  );
+  const handlerReach = reach(graph, [...handlers, ...middleware], sources);
   // The routes files are entries too, but their own imports are not part of the step.
-  const entries = sortedUnique([...handlers, ...sources]);
+  const entries = sortedUnique([...handlers, ...middleware, ...sources]);
 
   return {
     found: true,
@@ -178,7 +232,8 @@ function namedStep(step: WrittenStep, facts: BookFacts, graph: FileGraph): StepM
   );
   const first = named[0];
 
-  if (!first) return NOTHING;
+  // Mails, jobs, events and notifications come from the booted app: without route facts they were not checked.
+  if (!first) return facts.routes === null ? UNKNOWN : NOTHING;
 
   const entries = named.flatMap((thing) => (thing.file === null ? [] : [thing.file]));
 

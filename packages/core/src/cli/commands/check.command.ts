@@ -48,7 +48,18 @@ export const checkCommand = command({
     {
       text: "--test-timeout",
       description:
-        "Seconds one vitest run may take before the check stops it (default 600, 0 for no limit; also WARLOCK_CHECK_TEST_TIMEOUT)",
+        "Seconds one vitest run may take before the check stops it (default 600, or 1.5 times the last full run when longer; 0 for no limit; also WARLOCK_CHECK_TEST_TIMEOUT)",
+      type: "string",
+    },
+    {
+      text: "--rerun-tests",
+      description: "Run the whole suite even when a recorded passing result matches the same tree",
+      type: "boolean",
+    },
+    {
+      text: "--test-report",
+      description:
+        "Vitest JSON report to reuse for the same tree (default node_modules/.cache/warlock/vitest-report.json; also WARLOCK_CHECK_TEST_REPORT)",
       type: "string",
     },
     {

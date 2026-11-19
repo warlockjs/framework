@@ -16,7 +16,8 @@ import { loadBook } from "../book";
 import { projectPath } from "../paths";
 import { writeRelease } from "../releases";
 import { formatScryResult, parseScryQuery, scry } from "../scry";
-import { openGrimoire, runGrimoire, type GrimoireRun } from "../workspace";
+import { runGrimoire, type GrimoireRun } from "../workspace";
+import { openGrimoireCached } from "../workspace/cache";
 import { parseGrimoire } from "../written";
 
 /** Where a command writes: `out` for its answer, `err` for problems. */
@@ -210,7 +211,7 @@ function elapsedLine(started: number): string {
   return `time      ${((Date.now() - started) / 1000).toFixed(1)}s`;
 }
 
-/** `warlock grimoire build [--force] [--site [--out <dir>]] [--json]`. */
+/** `warlock grimoire build [--force] [--site [--product] [--out <dir>]] [--json]`. */
 export async function runBuild(context: CommandContext, options: Options = {}): Promise<number> {
   const { root, adapter, io } = context;
   const started = Date.now();
@@ -222,15 +223,21 @@ export async function runBuild(context: CommandContext, options: Options = {}): 
       runGrimoire(root, adapter, { routes, force }),
     );
     let site: string | null = null;
+    let siteUpToDate = false;
 
-    if (options.site === true || typeof options.out === "string") {
-      const { exportGrimoireSite } = await import("../devtools");
-
-      site = await exportGrimoireSite(root, {
+    if (options.site === true || options.product === true || typeof options.out === "string") {
+      const { exportGrimoireSiteDetailed } = await import("../devtools");
+      // A page built from the same book is kept; --force writes it again.
+      const exported = await exportGrimoireSiteDetailed(root, {
         adapter,
         snapshot: run.snapshot,
+        force,
+        ...(options.product === true ? { product: true } : {}),
         ...(outDir === undefined ? {} : { outDir }),
       });
+
+      site = exported.outDir;
+      siteUpToDate = exported.upToDate;
     }
 
     if (options.json === true) {
@@ -241,6 +248,8 @@ export async function runBuild(context: CommandContext, options: Options = {}): 
         removed: [...run.book.removed, ...run.collected.removed],
         routes: run.snapshot.routes,
         site,
+        siteUpToDate,
+        siteMode: site === null ? null : options.product === true ? "product" : "full",
         problems: bootProblem === null ? [] : [bootProblem],
       });
 
@@ -258,7 +267,11 @@ export async function runBuild(context: CommandContext, options: Options = {}): 
     io.out(summary.book);
     io.out(summary.collected);
 
-    if (site !== null) io.out(`site      ${site}/index.html`);
+    if (site !== null) {
+      io.out(
+        `site      ${site}/index.html${options.product === true ? " (product map only)" : ""}${siteUpToDate ? " (up to date, not rebuilt)" : ""}`,
+      );
+    }
 
     io.out(elapsedLine(started));
 
@@ -376,7 +389,7 @@ async function openForScry(
   const routes: "fresh" | "cached" =
     query.type === "route" && !(await hasRouteFacts(root)) ? "fresh" : "cached";
 
-  return openGrimoire(root, adapter, { routes });
+  return openGrimoireCached(root, adapter, { routes });
 }
 
 /** Answer a parsed query (shared by the CLI and the MCP tools). */

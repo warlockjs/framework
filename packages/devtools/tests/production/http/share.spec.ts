@@ -178,7 +178,9 @@ describe("share links: creating and listing", () => {
     expect(stored[0]?.tokenHash).toBe(createHash("sha256").update(token).digest("hex"));
     expect(JSON.stringify(stored)).not.toContain(token);
 
-    const list = (await t.send("GET", "/api/admin/shares", { session: admin })).json<DevtoolsShareList>();
+    const list = (
+      await t.send("GET", "/api/admin/shares", { session: admin })
+    ).json<DevtoolsShareList>();
 
     expect(list).toMatchObject({
       enabled: true,
@@ -201,7 +203,10 @@ describe("share links: creating and listing", () => {
         .statusCode,
     ).toBe(204);
 
-    const audit = await t.store.audit.list({ types: ["share.created", "share.revoked"], limit: 10 });
+    const audit = await t.store.audit.list({
+      types: ["share.created", "share.revoked"],
+      limit: 10,
+    });
 
     expect(audit.map((entry) => entry.type).sort()).toEqual(["share.created", "share.revoked"]);
     expect(JSON.stringify(audit)).not.toContain(token);
@@ -247,7 +252,9 @@ describe("share links: creating and listing", () => {
     const { t, admin } = await setup({ production: { share: { enabled: true, maxDays: 90 } } });
 
     await createLink(t, admin, { panel: "book", label: "Quarter", days: 90 });
-    expect((await t.store.shares.list())[0]?.expiresAt).toBeGreaterThan(Date.now() + 89 * 86_400_000);
+    expect((await t.store.shares.list())[0]?.expiresAt).toBeGreaterThan(
+      Date.now() + 89 * 86_400_000,
+    );
   });
 
   it("revokes one link, answers share.not-found for an unknown or repeated revoke, and revokes all", async () => {
@@ -264,8 +271,9 @@ describe("share links: creating and listing", () => {
     await t.send("DELETE", `/api/admin/shares/${first.created.share.id}`, { session: admin });
 
     expect(
-      (await t.send("DELETE", `/api/admin/shares/${first.created.share.id}`, { session: admin }))
-        .json<{ code: string }>().code,
+      (
+        await t.send("DELETE", `/api/admin/shares/${first.created.share.id}`, { session: admin })
+      ).json<{ code: string }>().code,
     ).toBe("share.not-found");
 
     const all = await t.send("POST", "/api/admin/shares/revoke-all", { session: admin, body: {} });
@@ -785,9 +793,9 @@ describe("share links: tabs", () => {
     expect((await t.send("GET", "/api/auth/session", { session: admin })).json()).toMatchObject({
       share: { enabled: true },
     });
-    expect((await off.send("GET", "/api/auth/session", { session: offAdmin })).json()).toMatchObject(
-      { share: { enabled: false } },
-    );
+    expect(
+      (await off.send("GET", "/api/auth/session", { session: offAdmin })).json(),
+    ).toMatchObject({ share: { enabled: false } });
     expect((await t.send("GET", "/api/auth/session")).json()).toMatchObject({ share: null });
     expect(HOST).toBeTruthy();
   });

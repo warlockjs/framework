@@ -98,6 +98,8 @@ export function sessionView(overrides: Partial<DevtoolsSessionView> = {}): Devto
     instance: instanceInfo,
     methods: { totp: true, passkeys: false },
     share: { enabled: false },
+    warlockVersion: null,
+    app: null,
     ...overrides,
   };
 }
@@ -112,6 +114,8 @@ export const signedOut: DevtoolsSessionView = {
   instance: null,
   methods: null,
   share: null,
+  warlockVersion: null,
+  app: null,
 };
 
 export const developmentSession = sessionView({
@@ -122,4 +126,6 @@ export const developmentSession = sessionView({
   expiresAt: null,
   methods: null,
   share: null,
+  warlockVersion: null,
+  app: null,
 });

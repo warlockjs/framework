@@ -4,6 +4,21 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.59.0 - 2026-11-19
+
+### Added
+
+- The dashboard uses the Warlock gold palette and logo, in the light and the dark theme, and shows the Warlock.js version in the sidebar header and the app's name and version in its footer. `DevtoolsSessionView` gains `warlockVersion` and `app`; both are `null` when signed out or not found, and only the app's own `package.json` name and version are read.
+- Production option `twoFactor: "off"` requires no second factor (an account that has one is still asked for it); boot logs a warning when it is off.
+- Production option `passwords: { minLength, rejectCommon }` sets the password rules for accounts, invites and the first admin (`minLength` is 8 or more, `rejectCommon` defaults to `true`).
+- The AI tab tells which of four reasons it is empty: `@warlock.js/ai` is missing, `@warlock.js/ai-panoptic` is missing, Panoptic failed to load (with the load error and both versions), or observation is off. Each shows a title, one line and the command to run.
+- A reconnect banner shows while the app is unreachable and panels refetch when it returns.
+
+### Changed
+
+- The `/ai` answer carries `reason`, `title`, `command` and `detail` when unavailable; `message` stays.
+- A too-short password answers with the configured minimum length.
+
 ## 5.58.0 - 2026-11-18
 
 ### Added

@@ -110,7 +110,7 @@ describe("source file inspection", () => {
         'export type Typed = typeof import("./t-query");',
         'export type Lazy = import("./t-lazy").Lazy;',
         'export const load = () => import("./lazy-value");',
-        'export const keep = [E, f];',
+        "export const keep = [E, f];",
         "export type All = [A, B, C, D, F, G, H, I, J];",
       ].join("\n"),
     );

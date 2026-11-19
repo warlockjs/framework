@@ -18,6 +18,8 @@ export type VitestRun = {
   stderr: string;
   /** The `--reporter=json` report, parsed; `undefined` when none was written. */
   report: unknown;
+  /** How long the run took, in milliseconds. */
+  elapsedMs?: number;
 };
 
 /** Runs the app's vitest with the given arguments. Injectable for tests. */
@@ -25,6 +27,8 @@ export type VitestRunner = (
   binary: string,
   args: readonly string[],
   cwd: string,
+  /** The limit for this run in milliseconds (`0` = none). Default: {@link testTimeoutMs}. */
+  timeoutMs?: number,
 ) => Promise<VitestRun>;
 
 /** Ten minutes: the default limit of one vitest run. */
@@ -33,16 +37,32 @@ const DEFAULT_TEST_TIMEOUT_MS = 10 * 60 * 1000;
 /** The environment variable that raises (or lowers) the limit, in seconds. `0` turns it off. */
 export const TEST_TIMEOUT_ENV = "WARLOCK_CHECK_TEST_TIMEOUT";
 
+/** Headroom over the last recorded run when the limit is derived from it. */
+const TIMEOUT_HEADROOM = 1.5;
+
 /**
  * The time limit of one vitest run in milliseconds (`0` means no limit): the
- * `WARLOCK_CHECK_TEST_TIMEOUT` variable in seconds, else ten minutes.
+ * `WARLOCK_CHECK_TEST_TIMEOUT` variable in seconds when set; else 1.5 times the
+ * last recorded full run when that is longer than ten minutes; else ten minutes.
  */
-export function testTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+export function testTimeoutMs(
+  env: NodeJS.ProcessEnv = process.env,
+  lastDurationMs?: number,
+): number {
   const seconds = Number(env[TEST_TIMEOUT_ENV]);
 
-  return Number.isFinite(seconds) && seconds >= 0 && env[TEST_TIMEOUT_ENV]?.trim()
-    ? seconds * 1000
-    : DEFAULT_TEST_TIMEOUT_MS;
+  if (Number.isFinite(seconds) && seconds >= 0 && env[TEST_TIMEOUT_ENV]?.trim()) {
+    return seconds * 1000;
+  }
+
+  if (lastDurationMs !== undefined && lastDurationMs > 0) {
+    return Math.max(
+      DEFAULT_TEST_TIMEOUT_MS,
+      Math.ceil((lastDurationMs * TIMEOUT_HEADROOM) / 1000) * 1000,
+    );
+  }
+
+  return DEFAULT_TEST_TIMEOUT_MS;
 }
 
 /**
@@ -78,11 +98,12 @@ export function findVitest(cwd: string): string | undefined {
  * --outputFile=<tmp>`, reading the report back from the file so test output on
  * stdout cannot corrupt it.
  */
-export const runVitest: VitestRunner = (binary, args, cwd) => {
+export const runVitest: VitestRunner = (binary, args, cwd, limitMs) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "warlock-check-vitest-"));
   const outputFile = path.join(directory, "report.json");
 
-  const timeoutMs = testTimeoutMs();
+  const timeoutMs = limitMs ?? testTimeoutMs();
+  const startedAt = Date.now();
 
   return new Promise((resolve) => {
     execFile(
@@ -117,6 +138,7 @@ export const runVitest: VitestRunner = (binary, args, cwd) => {
           stdout,
           stderr,
           report,
+          elapsedMs: Date.now() - startedAt,
         });
       },
     );
@@ -133,6 +155,11 @@ export function vitestArguments(files: readonly string[] | null): string[] {
   if (files === null) return ["run", "--passWithNoTests"];
 
   return ["related", ...files, "--run", "--passWithNoTests"];
+}
+
+/** `1403 s` style duration for messages. */
+function secondsText(ms: number): string {
+  return `${Math.round(ms / 1000)} s`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -255,7 +282,7 @@ export function vitestRunFailure(run: VitestRun): ToolingProblem[] {
         code: "WL8007",
         source: "environment",
         message:
-          `The tests timed out after ${seconds} s and were stopped. ` +
+          `The tests timed out after ${seconds} s and were stopped (ran ${secondsText(run.elapsedMs ?? run.timeoutMs ?? 0)}). ` +
           `Raise the limit with ${TEST_TIMEOUT_ENV}=<seconds> (0 turns it off) or \`warlock check --test-timeout <seconds>\`.`,
       }),
     ];
@@ -273,8 +300,8 @@ export function vitestRunFailure(run: VitestRun): ToolingProblem[] {
         source: "environment",
         message:
           run.code === 143 && run.signal === null
-            ? `vitest was stopped by SIGTERM (exit 143) by something other than the check, such as a memory-capped wrapper or the operating system: ${output}`
-            : `vitest ${run.signal ? `was killed (${run.signal})` : `exited with ${run.code ?? "no code"}`}: ${output}`,
+            ? `vitest was stopped by SIGTERM (exit 143) after ${secondsText(run.elapsedMs ?? 0)} by something other than the check, such as a memory-capped wrapper or the operating system: ${output}`
+            : `vitest ${run.signal ? `was killed (${run.signal})` : `exited with ${run.code ?? "no code"}`}${run.elapsedMs === undefined ? "" : ` after ${secondsText(run.elapsedMs)}`}: ${output}`,
       }),
     ];
   }
@@ -348,10 +375,11 @@ export async function runVitestBatches(
   binary: string,
   batches: readonly (readonly string[])[],
   cwd: string,
+  timeoutMs?: number,
 ): Promise<VitestRun> {
   const runs: VitestRun[] = [];
 
-  for (const args of batches) runs.push(await runner(binary, args, cwd));
+  for (const args of batches) runs.push(await runner(binary, args, cwd, timeoutMs));
 
   const [first] = runs;
 
@@ -388,6 +416,7 @@ export async function runVitestBatches(
     signal: runs.find((run) => run.signal !== null)?.signal ?? null,
     stdout: runs.map((run) => run.stdout).join(""),
     stderr: runs.map((run) => run.stderr).join(""),
+    elapsedMs: runs.reduce((sum, run) => sum + (run.elapsedMs ?? 0), 0),
     report,
   };
 }

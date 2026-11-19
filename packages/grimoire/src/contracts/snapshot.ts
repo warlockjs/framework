@@ -3,7 +3,7 @@
  * owners, the book maps, the proofs and the test results. `openGrimoire()`
  * builds it; `checkGrimoire()`, `scry()` and the devtools panel read it.
  */
-import type { BookMobileApp, BookSite } from "./adapter";
+import type { BookHost, BookMobileApp, BookSite } from "./adapter";
 import type { BookAnnotations, LoadedBook } from "./book";
 import type { CollectedFiles, Ownership } from "./bookmap";
 import type { GrimoireFinding, RouteFreshness } from "./findings";
@@ -33,6 +33,8 @@ export type GrimoireSnapshot = {
   collected: CollectedFiles;
   annotations: BookAnnotations;
   routes: RouteFreshness;
+  /** What the adapter's `host()` reported (framework brand, app name and version); `null` or absent when it reports none. */
+  host?: BookHost | null;
 };
 
 /** Options of `openGrimoire()`. */

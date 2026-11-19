@@ -101,25 +101,25 @@ Files of a mobile app go under `mobile/<app id>/`. Two cases keep the full file 
 }
 ```
 
-| Field           | Holds                                                                                                                                                                       |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `schemaVersion` | The version of the book's JSON shapes. It changes only for a breaking change.                                                                                               |
-| `file`          | The source file, project-relative, with `/`.                                                                                                                                |
-| `module`        | `src/app/<module>` for application code, otherwise the top folder (`src/config`, `src/web`, `mobile/app`).                                                                  |
-| `type`          | The file's role from its name: `controller`, `service`, `repository`, `model`, `mail`, `job`, `page`, `setup`, `layout`, `routes`, `spec` and so on.                        |
-| `lines`         | Line count.                                                                                                                                                                 |
-| `about`         | The first sentence of the comment at the top of the file, or `null`.                                                                                                        |
-| `feature`       | The feature that owns the file, or `null`. See [Features and book maps](/v/latest/grimoire/guides/03-features-and-book-maps/).                                              |
-| `borrowedBy`    | Features that import the file without owning it. Sorted.                                                                                                                    |
-| `flows`         | `<feature>/<flow>` of every flow whose steps reach the file. Sorted.                                                                                                        |
-| `exports`       | Each export with the first sentence of the comment above it (`about`, or `null`). `default` and `*` stand for default and star exports.                                     |
-| `packages`      | External packages the file imports, by package name (`@warlock.js/core`, `dayjs`). Node built-ins are left out. Sorted.                                                     |
-| `imports`       | Project files it imports. Sorted.                                                                                                                                           |
-| `typeOnlyImports` | The project files from `imports` that the file imports only as types (`import type`, `import { type A }`, `export type … from`). Erased at build time. Sorted.                |
-| `importedBy`    | Project files that import it. Sorted.                                                                                                                                       |
-| `routes`        | Routes the file registers (`"via": "registers"`, a routes file) or handles (`"via": "handles"`, the controller or page that answers). Each has `method`, `path` and `name`. |
-| `pages`         | Pages the file is the page, setup or layout file of: `site`, `route`, `via` (`page`, `setup`, `layout`).                                                                    |
-| `screens`       | Mobile screens the file is the screen or layout file of: `app`, `route`, `via` (`screen`, `layout`).                                                                        |
+| Field             | Holds                                                                                                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion`   | The version of the book's JSON shapes. It changes only for a breaking change.                                                                                               |
+| `file`            | The source file, project-relative, with `/`.                                                                                                                                |
+| `module`          | `src/app/<module>` for application code, otherwise the top folder (`src/config`, `src/web`, `mobile/app`).                                                                  |
+| `type`            | The file's role from its name: `controller`, `service`, `repository`, `model`, `mail`, `job`, `page`, `setup`, `layout`, `routes`, `spec` and so on.                        |
+| `lines`           | Line count.                                                                                                                                                                 |
+| `about`           | The first sentence of the comment at the top of the file, or `null`.                                                                                                        |
+| `feature`         | The feature that owns the file, or `null`. See [Features and book maps](/v/latest/grimoire/guides/03-features-and-book-maps/).                                              |
+| `borrowedBy`      | Features that import the file without owning it. Sorted.                                                                                                                    |
+| `flows`           | `<feature>/<flow>` of every flow whose steps reach the file. Sorted.                                                                                                        |
+| `exports`         | Each export with the first sentence of the comment above it (`about`, or `null`). `default` and `*` stand for default and star exports.                                     |
+| `packages`        | External packages the file imports, by package name (`@warlock.js/core`, `dayjs`). Node built-ins are left out. Sorted.                                                     |
+| `imports`         | Project files it imports. Sorted.                                                                                                                                           |
+| `typeOnlyImports` | The project files from `imports` that the file imports only as types (`import type`, `import { type A }`, `export type … from`). Erased at build time. Sorted.              |
+| `importedBy`      | Project files that import it. Sorted.                                                                                                                                       |
+| `routes`          | Routes the file registers (`"via": "registers"`, a routes file) or handles (`"via": "handles"`, the controller or page that answers). Each has `method`, `path` and `name`. |
+| `pages`           | Pages the file is the page, setup or layout file of: `site`, `route`, `via` (`page`, `setup`, `layout`).                                                                    |
+| `screens`         | Mobile screens the file is the screen or layout file of: `app`, `route`, `via` (`screen`, `layout`).                                                                        |
 
 Absent values are `null`, never left out. A route that only reaches the file through imports is not listed in
 `routes`; `warlock scry --impact <file>` answers that.

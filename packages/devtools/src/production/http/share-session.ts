@@ -25,11 +25,15 @@ export type DevtoolsShareSessions = {
   /** The cookie value for `share`: `<id>.<exp>.<hmac>`, and its life in seconds. */
   issue(share: DevtoolsShareRecord): { value: string; maxAgeSeconds: number };
   /** The grant a `Cookie` value carries, or the reason it was refused. */
-  verify(value: string | undefined): Promise<
+  verify(
+    value: string | undefined,
+  ): Promise<
     { grant: DevtoolsShareGrant } | { refused: DevtoolsShareRefusal; shareId: string | null }
   >;
   /** The record a token hash names, checked for life and panel; or the reason it is refused. */
-  open(tokenHash: string): Promise<
+  open(
+    tokenHash: string,
+  ): Promise<
     { grant: DevtoolsShareGrant } | { refused: DevtoolsShareRefusal; shareId: string | null }
   >;
   /** Counts one use of `share` (at most once a minute per link). */
@@ -81,9 +85,9 @@ export function createShareSessions(input: {
     return found;
   }
 
-  function grantFor(share: DevtoolsShareRecord):
-    | { grant: DevtoolsShareGrant }
-    | { refused: DevtoolsShareRefusal; shareId: string } {
+  function grantFor(
+    share: DevtoolsShareRecord,
+  ): { grant: DevtoolsShareGrant } | { refused: DevtoolsShareRefusal; shareId: string } {
     if (share.revokedAt !== null) return { refused: "revoked", shareId: share.id };
 
     if (share.expiresAt <= now()) return { refused: "expired", shareId: share.id };

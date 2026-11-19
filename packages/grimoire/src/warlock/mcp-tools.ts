@@ -148,23 +148,30 @@ export function createGrimoireMcpTools(
           files: {
             type: "string",
             enum: ["reachable", "type-only"],
-            description: "With step: list the step's files that run (reachable) or only type imports reach (type-only).",
+            description:
+              "With step: list the step's files that run (reachable) or only type imports reach (type-only).",
           },
           step: { type: "integer", description: "Step number, for files.", minimum: 0 },
-          offset: { type: "integer", description: "First file to list (default 0); a page holds 200.", minimum: 0 },
+          offset: {
+            type: "integer",
+            description: "First file to list (default 0); a page holds 200.",
+            minimum: 0,
+          },
         },
         ["flow"],
       ),
       writes: false,
       run: async (input) => {
         try {
-          const [{ parseFlowText, scry }, { openGrimoire }, compact] = await Promise.all([
+          const [{ parseFlowText, scry }, { openGrimoireCached }, compact] = await Promise.all([
             scryParts(),
-            import("../workspace"),
+            import("../workspace/cache"),
             import("../scry/compact"),
           ]);
           const query = { type: "flow" as const, ...parseFlowText(text(input, "flow")) };
-          const snapshot = await openGrimoire(root, await loadAdapter(), { routes: "cached" });
+          const snapshot = await openGrimoireCached(root, await loadAdapter(), {
+            routes: "cached",
+          });
           const result = scry(snapshot, query);
 
           if (result.type !== "flow") return result;
@@ -198,7 +205,7 @@ export function createGrimoireMcpTools(
     {
       name: "grimoire_search",
       description:
-        "Search the Grimoire by words: features, flows, blocks, pages, screens, routes, file paths, export names, header sentences and tasks, best match first. Read-only.",
+        "Search the Grimoire by words (the written text of flows too: summary, story, cases, criteria such as AC-5; written content ranks first and hits are grouped by type): features, flows, blocks, pages, screens, routes, file paths, export names, header sentences and tasks, best match first. Read-only.",
       input: inputSchema(
         {
           text: { type: "string", description: "Words to look for, in any order." },
@@ -231,12 +238,14 @@ export function createGrimoireMcpTools(
       writes: false,
       run: async () => {
         try {
-          const [{ openGrimoire }, { checkGrimoire }] = await Promise.all([
-            import("../workspace"),
+          const [{ openGrimoireCached }, { checkGrimoire }] = await Promise.all([
+            import("../workspace/cache"),
             import("../check"),
           ]);
 
-          return checkGrimoire(await openGrimoire(root, await loadAdapter(), { routes: "cached" }));
+          return checkGrimoire(
+            await openGrimoireCached(root, await loadAdapter(), { routes: "cached" }),
+          );
         } catch (error) {
           return toolError(error);
         }

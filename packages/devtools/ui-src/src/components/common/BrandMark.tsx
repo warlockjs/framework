@@ -1,26 +1,16 @@
 import { cn } from "@/lib/utils";
+import { WARLOCK_LOGO_DATA_URI } from "./warlock-logo";
 
-/** The product mark: a rounded tile with a stylised flame-W, drawn inline so it works offline. */
+/** The Warlock logo (an inlined PNG, so it works offline). Decorative: the name sits next to it. */
 export function BrandMark({ className }: { className?: string }) {
   return (
-    <span
+    <img
+      src={WARLOCK_LOGO_DATA_URI}
+      alt=""
       aria-hidden="true"
-      className={cn(
-        "grid size-8 shrink-0 place-items-center rounded-lg bg-brand text-brand-foreground shadow-sm",
-        className,
-      )}
-    >
-      <svg
-        viewBox="0 0 24 24"
-        className="size-[60%]"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M3 5l4 14 5-10 5 10 4-14" />
-      </svg>
-    </span>
+      width={32}
+      height={32}
+      className={cn("size-8 shrink-0 rounded-lg bg-black", className)}
+    />
   );
 }

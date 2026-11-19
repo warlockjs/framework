@@ -39,6 +39,7 @@ export type BookFileType =
   | "main"
   | "routes"
   | "worker"
+  | "command"
   | "page"
   | "setup"
   | "layout"
@@ -211,6 +212,23 @@ export type BookFacts = {
 };
 
 /**
+ * The framework the book was read from, and the app it describes. The
+ * Grimoire view shows it in its header (framework logo and version) and at
+ * the bottom (the app's own name and version); an adapter that supplies no
+ * host shows nothing.
+ */
+export type BookHost = {
+  /** Framework name (`Warlock.js`). */
+  name: string;
+  /** Installed framework version, or `null` when unknown. */
+  version: string | null;
+  /** Small logo as a `data:image/...` URI (kept inline so the static export stays one file), or `null`. */
+  logo: string | null;
+  /** The app's own name and version (its `package.json`), or `null`. */
+  app: { name: string; version: string | null } | null;
+};
+
+/**
  * What a framework adapter provides. Only `files` and `sourceRoots` are
  * required; a missing method means "this framework has none of those".
  *
@@ -250,4 +268,6 @@ export type BookAdapter = {
   named?(root: string): Promise<BookNamedThing[]>;
   /** Test files to scan for `@proves` lines. Static. */
   tests?(root: string): Promise<string[]>;
+  /** The framework brand and the app's own name and version, for the view's header and footer. Optional; never boots the app. */
+  host?(root: string): Promise<BookHost | null> | BookHost | null;
 };

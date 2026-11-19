@@ -3,7 +3,7 @@ import { createShopAdapter } from "../../tests/fixtures/shop-facts";
 import { copyFixture, type FixtureCopy } from "../../tests/support/copy-fixture";
 import type { GrimoireAppsAnswer, GrimoireFeaturesAnswer, GrimoireSummary } from "./data";
 import { openGrimoire } from "../workspace";
-import { checkGroups, checkPage, flowAnswer, stepFiles } from "./data";
+import { checkGroups, checkPage, feature, flowAnswer, stepFiles } from "./data";
 import { grimoireDevtoolsPanel } from "./index";
 
 let copy: FixtureCopy | null = null;
@@ -88,6 +88,49 @@ describe("the compact answers", () => {
     }
   });
 
+  it("answers a feature with its map, own files by module and the proof of each flow", async () => {
+    const taken = await snapshot();
+    const answer = feature(taken, "catalog");
+
+    expect(answer.map.rows.map((row) => row.flow)).toContain("new-arrivals");
+
+    const arrivals = answer.map.rows.find((row) => row.flow === "new-arrivals");
+    const chips = Object.values(arrivals?.cells ?? {}).flat();
+
+    // Step 2 is `route GET /api/products/new-arrivals`: it lands in the API column with its method and path.
+    const route = chips.find((chip) => chip.type === "route");
+
+    expect(route?.label).toBe("GET /api/products/new-arrivals");
+    expect(route?.method).toBe("GET");
+    expect(route?.path).toBe("/api/products/new-arrivals");
+    expect(arrivals?.cells.api).toContain(route);
+    expect(answer.map.columns.find((column) => column.id === "api")?.title).toBe("API");
+
+    // Step 1 is `page /`: it lands in a column of an app, titled with the app's heading or id.
+    const page = chips.find((chip) => chip.type === "page");
+
+    expect(page?.step).toBe(1);
+    expect(page?.app).toBeTruthy();
+    expect(arrivals?.cells[`app:${page?.app}`]).toContain(page);
+
+    // Columns come sorted: apps, then the API, then the background; none is empty.
+    const order = ["site", "mobile", "api", "background", "other"];
+    const ranks = answer.map.columns.map((column) => order.indexOf(column.type));
+
+    expect(ranks).toEqual([...ranks].sort((left, right) => left - right));
+
+    for (const column of answer.map.columns) {
+      expect(answer.map.rows.some((row) => (row.cells[column.id] ?? []).length > 0)).toBe(true);
+    }
+
+    expect(answer.fileGroups.flatMap((group) => group.files).sort()).toEqual(
+      [...answer.bookmap.own].sort(),
+    );
+    expect(answer.proofs.map((item) => item.flow).sort()).toEqual(
+      answer.flows.map((item) => item.id).sort(),
+    );
+  });
+
   it("caps direct imports at 50 and counts every one", async () => {
     const taken = await snapshot();
     const bookmap = taken.collected.flows["catalog/new-arrivals"];
@@ -141,9 +184,13 @@ describe("the compact answers", () => {
       return 0;
     };
 
-    expect(status(() => stepFiles(taken, "catalog", "new-arrivals", "1", { set: "all" }))).toBe(400);
+    expect(status(() => stepFiles(taken, "catalog", "new-arrivals", "1", { set: "all" }))).toBe(
+      400,
+    );
     expect(status(() => stepFiles(taken, "catalog", "new-arrivals", "x", {}))).toBe(400);
-    expect(status(() => stepFiles(taken, "catalog", "new-arrivals", "1", { limit: "0" }))).toBe(400);
+    expect(status(() => stepFiles(taken, "catalog", "new-arrivals", "1", { limit: "0" }))).toBe(
+      400,
+    );
     expect(status(() => stepFiles(taken, "catalog", "nope", "1", {}))).toBe(404);
     expect(status(() => stepFiles(taken, "catalog", "new-arrivals", "99", {}))).toBe(404);
   });
@@ -166,7 +213,51 @@ describe("the compact answers", () => {
 
     const severities = groups.groups.map((group) => group.severity);
 
-    expect(severities).toEqual([...severities].sort((a, b) => (a === b ? 0 : a === "error" ? -1 : 1)));
+    expect(severities).toEqual(
+      [...severities].sort((a, b) => (a === b ? 0 : a === "error" ? -1 : 1)),
+    );
     expect(groups.counts).toEqual(all.counts);
+  });
+});
+
+describe("steps without route facts", () => {
+  it("counts a step as resolved only when found is true and reports unchecked steps apart", async () => {
+    const { summary } = await import("./data");
+    const { flowHealth } = await import("../scry/compact");
+    copy = copyFixture();
+    const snapshot = await openGrimoire(copy.root, createShopAdapter(), {
+      routes: "fresh",
+      write: false,
+    });
+    const flows = Object.fromEntries(
+      Object.entries(snapshot.collected.flows).map(([ref, flow]) => [
+        ref,
+        {
+          ...flow,
+          steps: flow.steps.map((step, index) => ({
+            ...step,
+            found: index === 0 ? true : index === 1 ? false : null,
+          })),
+        },
+      ]),
+    );
+    const changed = { ...snapshot, collected: { ...snapshot.collected, flows } } as typeof snapshot;
+    const answer = summary(changed);
+    const total = Object.values(flows).reduce((sum, flow) => sum + flow.steps.length, 0);
+
+    expect(answer.steps.resolved + answer.steps.missing + answer.steps.unchecked).toBe(total);
+    expect(answer.steps.checked).toBe(answer.steps.resolved + answer.steps.missing);
+
+    const ref = Object.keys(flows)[0] ?? "";
+    const steps = flows[ref]?.steps ?? [];
+    const health = flowHealth({
+      type: "flow",
+      bookmap: flows[ref],
+      findings: [],
+    } as never);
+
+    expect(health.steps.total).toBe(steps.filter((step) => step.found !== null).length);
+    expect(health.steps.resolved).toBe(steps.filter((step) => step.found === true).length);
+    expect(health.steps.unchecked).toBe(steps.filter((step) => step.found === null).length);
   });
 });

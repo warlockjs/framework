@@ -151,6 +151,19 @@ function link(ctx, text, target, attrs = {}) {
   return ctx.el("a", { href: ctx.href(target), text, ...attrs });
 }
 
+/** The words for the state of the route facts, shared by Overview and Check. */
+function routeFactsState(state) {
+  const value = state ?? "cached";
+  const sub = {
+    fresh: "read from the running app",
+    cached: "from the last build",
+    stale: "older than the code. Run warlock grimoire build to refresh them",
+    missing: "none yet: route, mail and notification steps are not checked",
+  };
+
+  return { value, sub: sub[value] ?? "", stale: value === "stale" || value === "missing" };
+}
+
 /** The tone (`good`, `info`, `warn`, `bad`, or none) a status word is shown in. */
 function toneOf(status) {
   switch (status) {
@@ -197,6 +210,88 @@ function muted(ctx, text) {
   return ctx.el("span", { class: "grimoire-muted", text });
 }
 
+/** "Warlock.js v5.58.0" with the framework logo, from the adapter's host; nothing when the adapter reports none. */
+function grimoireBrand(ctx, host) {
+  if (!host || !host.name) return null;
+
+  return ctx.el("div", { class: "grimoire-brand" }, [
+    host.logo
+      ? ctx.el("img", {
+          class: "grimoire-brand-logo",
+          src: host.logo,
+          alt: "",
+          width: "24",
+          height: "24",
+        })
+      : "",
+    ctx.el("span", { class: "grimoire-brand-name", text: host.name }),
+    host.version
+      ? ctx.el("span", { class: "grimoire-brand-version", text: `v${host.version}` })
+      : "",
+  ]);
+}
+
+/** The app's own name and version ("shop 1.4.0") for the bottom of the view; `null` when unknown. */
+function grimoireAppLine(ctx, host) {
+  const app = host && host.app;
+
+  if (!app || !app.name) return null;
+
+  return ctx.el("p", { class: "grimoire-appline" }, [
+    ctx.el("span", { class: "grimoire-muted", text: "App " }),
+    ctx.el("span", {
+      class: "grimoire-mono",
+      text: app.version ? `${app.name} ${app.version}` : app.name,
+    }),
+  ]);
+}
+
+/** One flow card: the heading as the title, the id under it, the status, and the counts that are known. */
+function grimoireFlowCard(ctx, feature, flow) {
+  const { el } = ctx;
+  const count = (value, one, many = `${one}s`) =>
+    typeof value === "number" ? `${value} ${value === 1 ? one : many}` : null;
+  const metrics = [
+    count(flow.steps, "step"),
+    count(flow.cases, "case"),
+    typeof flow.criteria === "number"
+      ? typeof flow.tested === "number"
+        ? `${flow.tested}/${flow.criteria} criteria tested`
+        : count(flow.criteria, "criterion", "criteria")
+      : null,
+  ].filter(Boolean);
+  const findings = typeof flow.findings === "number" ? flow.findings : 0;
+
+  return el("li", { class: "grimoire-flowcard" }, [
+    el("div", { class: "grimoire-flowcard-top" }, [
+      pill(ctx, flow.status, toneOf(flow.status)),
+      el("span", { class: "grimoire-muted", text: `since ${flow.since}` }),
+    ]),
+    el("h4", { class: "grimoire-flowcard-title" }, [
+      link(
+        ctx,
+        flow.heading ?? flow.id,
+        `flow/${encodeURIComponent(feature)}/${encodeURIComponent(flow.id)}`,
+        { class: "grimoire-flowcard-link" },
+      ),
+    ]),
+    flow.heading ? el("span", { class: "grimoire-mono grimoire-muted", text: flow.id }) : "",
+    metrics.length
+      ? el(
+          "ul",
+          { class: "grimoire-flowcard-metrics" },
+          metrics.map((text) => el("li", { text })),
+        )
+      : "",
+    findings > 0
+      ? el("span", {
+          class: "grimoire-pill is-warn grimoire-flowcard-findings",
+          text: `${findings} ${findings === 1 ? "finding" : "findings"}`,
+        })
+      : "",
+  ]);
+}
+
 function list(ctx, items) {
   return ctx.el(
     "ul",
@@ -223,9 +318,7 @@ function table(ctx, headings, rows) {
           ctx.el(
             "tr",
             {},
-            row.map((cell, column) =>
-              ctx.el("td", { "data-label": headings[column] ?? "" }, cell),
-            ),
+            row.map((cell, column) => ctx.el("td", { "data-label": headings[column] ?? "" }, cell)),
           ),
         ),
       ),
@@ -421,20 +514,34 @@ function copyText(text, node, done) {
 }
 
 const STEP_ICONS = {
-  page: [["rect", { x: "3", y: "4", width: "18", height: "14", rx: "2" }], ["path", { d: "M3 9h18" }]],
+  page: [
+    ["rect", { x: "3", y: "4", width: "18", height: "14", rx: "2" }],
+    ["path", { d: "M3 9h18" }],
+  ],
   route: [["path", { d: "M5 12h14M13 6l6 6-6 6" }]],
-  mail: [["rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }], ["path", { d: "M3 7l9 6 9-6" }]],
+  mail: [
+    ["rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }],
+    ["path", { d: "M3 7l9 6 9-6" }],
+  ],
   notification: [["path", { d: "M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4" }]],
-  job: [["circle", { cx: "12", cy: "12", r: "9" }], ["path", { d: "M12 7v5l3 2" }]],
+  job: [
+    ["circle", { cx: "12", cy: "12", r: "9" }],
+    ["path", { d: "M12 7v5l3 2" }],
+  ],
   event: [["path", { d: "M13 2L4 14h7l-1 8 9-12h-7z" }]],
   "outside service": [["path", { d: "M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.2A4 4 0 0 1 17 18z" }]],
   affects: [
-    ["path", { d: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" }],
+    [
+      "path",
+      {
+        d: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
+      },
+    ],
   ],
 };
 
 /** A small icon for a flow step type. */
-function stepIcon(ctx, type) {
+function stepIcon(ctx, type, size = 18) {
   const { svg } = ctx;
   const shapes = STEP_ICONS[type] ?? STEP_ICONS.route;
 
@@ -442,8 +549,8 @@ function stepIcon(ctx, type) {
     "svg",
     {
       viewBox: "0 0 24 24",
-      width: "18",
-      height: "18",
+      width: String(size),
+      height: String(size),
       fill: "none",
       stroke: "currentColor",
       "stroke-width": "1.8",
@@ -657,15 +764,6 @@ function findingItem(ctx, finding, options = {}) {
   ]);
 }
 
-/** A list of findings: severity, code, message, what to do, and where. */
-function findingList(ctx, findings, options = {}) {
-  return ctx.el(
-    "ul",
-    { class: "grimoire-findings" },
-    findings.map((finding) => findingItem(ctx, finding, options)),
-  );
-}
-
 function changesView(ctx, changes) {
   if (!changes.length) return ctx.empty("No changelog entries.");
   return list(
@@ -767,9 +865,11 @@ function graphView(ctx, graph, title) {
     const group = svg(
       "g",
       {},
-      [svg("title", { text: node.label }), circle, labelled || node.type === "center" ? label : ""].filter(
-        (child) => child !== "",
-      ),
+      [
+        svg("title", { text: node.label }),
+        circle,
+        labelled || node.type === "center" ? label : "",
+      ].filter((child) => child !== ""),
     );
     canvas.append(target === null ? group : svg("a", { href: href(target) }, [group]));
   }
@@ -822,7 +922,8 @@ async function overviewView(ctx, summaryRequest) {
     .join(", ");
   const waiting = data.tasks.waiting.length;
   const open = data.tasks.open.length - waiting;
-  const stale = data.routes === "stale" || data.routes === "missing";
+  const routeFacts = routeFactsState(data.routes);
+  const stale = routeFacts.stale;
   const out = el("div", { class: "grimoire-view" });
 
   out.append(
@@ -863,8 +964,8 @@ async function overviewView(ctx, summaryRequest) {
       }),
       stat(ctx, {
         label: "Route facts",
-        value: data.routes,
-        sub: stale ? "need a refresh" : "up to date",
+        value: routeFacts.value,
+        sub: routeFacts.sub,
         target: "check",
         tone: toneOf(data.routes),
       }),
@@ -875,7 +976,7 @@ async function overviewView(ctx, summaryRequest) {
     out.append(
       el("p", {
         class: "grimoire-note",
-        text: "The route facts are old or missing. Run warlock grimoire build to refresh them.",
+        text: `Route facts: ${routeFacts.value}, ${routeFacts.sub}.`,
       }),
     );
   }
@@ -914,7 +1015,9 @@ async function overviewView(ctx, summaryRequest) {
                 problems.map((group) => [
                   pill(ctx, group.severity, toneOf(group.severity)),
                   " ",
-                  link(ctx, group.code, checkTarget({ code: group.code }), { class: "grimoire-mono" }),
+                  link(ctx, group.code, checkTarget({ code: group.code }), {
+                    class: "grimoire-mono",
+                  }),
                   " ",
                   ...[codeText(ctx, group.title)].flat(),
                   " ",
@@ -1053,7 +1156,580 @@ async function featuresView(ctx) {
   ]);
 }
 
-async function featureView(ctx, id) {
+// ── Tabs, groups and the feature map ────────────────────────────────────────
+
+/** Move the address bar to `route` without reloading the view (the tab is already shown). */
+function rememberRoute(ctx, route) {
+  try {
+    globalThis.history?.replaceState?.(null, "", ctx.href(route));
+  } catch {
+    // A host that keeps its own history leaves the address as it is.
+  }
+}
+
+/**
+ * Real tab buttons over lazily built panels. `tabs` is
+ * `[{ id, label, count?, make }]`; `make()` runs the first time a tab opens, so
+ * a long list in a closed tab costs nothing. `route(id)` is the hash route the
+ * tab owns; the first tab is the default.
+ */
+function tabbed(ctx, { tabs, active, label, prefix, route }) {
+  const { el } = ctx;
+  const strip = el("div", { class: "grimoire-pagetabs", role: "tablist", "aria-label": label });
+  const panel = el("div", { class: "grimoire-tabpanel", role: "tabpanel", tabindex: "0" });
+  const buttons = new Map();
+  const built = new Map();
+
+  function show(id, user) {
+    const tab = tabs.find((item) => item.id === id) ?? tabs[0];
+
+    for (const [key, button] of buttons) {
+      const on = key === tab.id;
+
+      button.setAttribute("aria-selected", String(on));
+      button.setAttribute("tabindex", on ? "0" : "-1");
+      button.setAttribute("class", on ? "grimoire-pagetab is-active" : "grimoire-pagetab");
+    }
+
+    if (!built.has(tab.id)) built.set(tab.id, tab.make());
+
+    panel.setAttribute("aria-labelledby", `${prefix}-tab-${tab.id}`);
+    panel.replaceChildren(built.get(tab.id));
+    if (user) rememberRoute(ctx, route(tab.id));
+  }
+
+  function move(from, step) {
+    const next = tabs[(from + step + tabs.length) % tabs.length];
+
+    show(next.id, true);
+    buttons.get(next.id)?.focus?.();
+  }
+
+  tabs.forEach((tab, index) => {
+    const button = el(
+      "button",
+      {
+        type: "button",
+        role: "tab",
+        id: `${prefix}-tab-${tab.id}`,
+        class: "grimoire-pagetab",
+        "aria-selected": "false",
+        "aria-controls": `${prefix}-panel`,
+        tabindex: "-1",
+        onclick: () => show(tab.id, true),
+        onkeydown: (event) => {
+          const keys = {
+            ArrowRight: () => move(index, 1),
+            ArrowLeft: () => move(index, -1),
+            Home: () => move(0, 0),
+            End: () => move(tabs.length - 1, 0),
+          };
+          const act = keys[event.key];
+
+          if (!act) return;
+          event.preventDefault?.();
+          act();
+        },
+      },
+      [
+        tab.label,
+        typeof tab.count === "number"
+          ? el("span", { class: "grimoire-tab-count", text: String(tab.count) })
+          : "",
+      ],
+    );
+
+    buttons.set(tab.id, button);
+    strip.append(button);
+  });
+
+  panel.setAttribute("id", `${prefix}-panel`);
+  show(active, false);
+
+  return el("div", { class: "grimoire-tabbed" }, [strip, panel]);
+}
+
+/**
+ * A group that is closed until opened. `make()` builds the body on the first
+ * open, so a closed group costs one row.
+ */
+function group(ctx, { title, count, tone = "", lead = [], make, open = false, className = "" }) {
+  const { el } = ctx;
+  const body = el("div", { class: "grimoire-group-body" });
+  let built = false;
+  let isOpen = false;
+  const button = el(
+    "button",
+    {
+      type: "button",
+      class: "grimoire-group-head",
+      "aria-expanded": "false",
+      onclick: () => toggle(!isOpen),
+    },
+    [
+      el("span", { class: "grimoire-group-caret", "aria-hidden": "true", text: "▸" }),
+      ...lead,
+      el("span", { class: "grimoire-group-title", text: title }),
+      typeof count === "number"
+        ? el("span", { class: "grimoire-tab-count", text: String(count) })
+        : "",
+    ],
+  );
+
+  function toggle(next) {
+    isOpen = next;
+
+    if (isOpen && !built) {
+      built = true;
+      body.append(make());
+    }
+
+    button.setAttribute("aria-expanded", String(isOpen));
+    body.setAttribute("class", isOpen ? "grimoire-group-body is-open" : "grimoire-group-body");
+  }
+
+  const node = el(
+    "div",
+    { class: `grimoire-group ${tone ? `is-${tone}` : ""} ${className}`.trim() },
+    [button, body],
+  );
+
+  node.toggle = toggle;
+  if (open) toggle(true);
+
+  return node;
+}
+
+/** A long list shown a slice at a time: `make(item)` builds one row; "Show more" adds the next slice. */
+function slicedList(ctx, items, make, options = {}) {
+  const { el } = ctx;
+  const size = options.size ?? 30;
+  const tag = options.tag ?? "ul";
+  const list = el(tag, { class: options.className ?? "grimoire-list" });
+  const more = el("button", { type: "button", class: "grimoire-more" });
+  const holder = el("div", {}, [list, more]);
+  let shown = 0;
+
+  function paint() {
+    const next = items.slice(shown, shown + size);
+
+    for (const item of next) list.append(make(item));
+    shown += next.length;
+    more.textContent = `Show ${Math.min(size, items.length - shown)} more (${items.length - shown} left)`;
+    more.setAttribute("class", shown >= items.length ? "grimoire-more is-hidden" : "grimoire-more");
+    more.setAttribute("aria-hidden", String(shown >= items.length));
+  }
+
+  more.addEventListener("click", paint);
+  paint();
+  return holder;
+}
+
+/** What a feature-map chip leads to: the written page, the route, or the entry file. */
+function mapChipTarget(chip) {
+  if (chip.type === "page" && chip.app && chip.page) {
+    return `page/${encodeURIComponent(chip.app)}/${encodeURIComponent(chip.page)}`;
+  }
+  if (chip.type === "route" && chip.method && chip.path) {
+    return `route/${encodeURIComponent(chip.method)}/${encodeURIComponent(chip.path)}`;
+  }
+  return chip.file ? `file/${encodeURIComponent(chip.file)}` : null;
+}
+
+/** One chip of the feature map: a glyph and the name; a dashed look when the step matched nothing. */
+function mapChip(ctx, chip) {
+  const target = mapChipTarget(chip);
+  const missing = chip.found === false;
+  const attrs = {
+    class: `grimoire-mapchip is-${chip.type.replace(/\s+/g, "-")}${missing ? " is-missing" : ""}`,
+    title: `${chip.type}, step ${chip.step}${missing ? ", not found in the book" : ""}: ${chip.label}`,
+  };
+  const inner = [
+    stepIcon(ctx, chip.type, 14),
+    ctx.el("span", { class: "grimoire-mapchip-label", text: chip.label }),
+  ];
+
+  return target
+    ? ctx.el("a", { ...attrs, href: ctx.href(target) }, inner)
+    : ctx.el("span", attrs, inner);
+}
+
+/** The feature map: flows as rows, the places they run as columns. */
+function featureMapView(ctx, feature, map) {
+  const { el } = ctx;
+
+  if (!map)
+    return ctx.empty("This answer has no feature map. Update the Grimoire package and reload.");
+  if (!map.rows.length) return ctx.empty("This feature has no flows yet.");
+  if (!map.columns.length) {
+    return ctx.empty(
+      "No step of any flow resolves to a page, screen, route or background job yet.",
+    );
+  }
+
+  return el("div", { class: "grimoire-scroll grimoire-featuremap" }, [
+    el("table", { class: "grimoire-table grimoire-mapgrid" }, [
+      el("caption", { class: "grimoire-sr", text: "Flows and the places they run" }),
+      el("thead", {}, [
+        el("tr", {}, [
+          el("th", { scope: "col", text: "Flow" }),
+          ...map.columns.map((column) =>
+            el("th", { scope: "col", class: `is-${column.type}` }, [
+              el("span", {
+                class: "grimoire-maptype",
+                text:
+                  column.type === "site" ? "site" : column.type === "mobile" ? "mobile app" : "",
+              }),
+              el("span", { text: column.title }),
+            ]),
+          ),
+        ]),
+      ]),
+      el(
+        "tbody",
+        {},
+        map.rows.map((row) =>
+          el("tr", {}, [
+            el("th", { scope: "row", class: "grimoire-maprow" }, [
+              link(
+                ctx,
+                row.heading ?? row.flow,
+                `flow/${encodeURIComponent(feature)}/${encodeURIComponent(row.flow)}`,
+              ),
+              row.heading
+                ? el("span", { class: "grimoire-mono grimoire-muted", text: row.flow })
+                : "",
+            ]),
+            ...map.columns.map((column) => {
+              const chips = row.cells[column.id] ?? [];
+
+              return el(
+                "td",
+                { "data-label": column.title, class: chips.length ? "" : "is-empty" },
+                chips.length
+                  ? el(
+                      "div",
+                      { class: "grimoire-mapcell" },
+                      chips.map((chip) => mapChip(ctx, chip)),
+                    )
+                  : el("span", { class: "grimoire-muted", "aria-label": "none", text: "–" }),
+              );
+            }),
+          ]),
+        ),
+      ),
+    ]),
+  ]);
+}
+
+/** The criteria of a feature, counted from its proofs. */
+function featureCriteria(data) {
+  const byStatus = {};
+  let total = 0;
+
+  for (const item of data.proofs ?? []) {
+    for (const criterion of item.criteria) {
+      total += 1;
+      byStatus[criterion.status] = (byStatus[criterion.status] ?? 0) + 1;
+    }
+  }
+
+  return {
+    total,
+    proven: byStatus.pass ?? 0,
+    failing: byStatus.fail ?? 0,
+    noTest: byStatus["no-test"] ?? 0,
+  };
+}
+
+/** The feature's health tiles. */
+function featureHealthStrip(ctx, id, data, unexpected) {
+  const criteria = featureCriteria(data);
+  const flows = data.flows;
+  const shipped = flows.filter((flow) => flow.status === "shipped").length;
+  const errors = unexpected.filter((finding) => finding.severity === "error").length;
+
+  return ctx.el("div", { class: "grimoire-stats grimoire-health" }, [
+    tile(ctx, { label: "Flows", value: flows.length, sub: `${shipped} shipped` }),
+    tile(ctx, {
+      label: "Criteria proven",
+      value: `${criteria.proven}/${criteria.total}`,
+      sub: criteria.failing
+        ? `${plural(criteria.failing, "criterion")} failing`
+        : criteria.noTest
+          ? `${criteria.noTest} without a test`
+          : criteria.total
+            ? "by passing tests"
+            : "none written",
+      tone: criteria.failing
+        ? "bad"
+        : criteria.total && criteria.proven === criteria.total
+          ? "good"
+          : criteria.total
+            ? "warn"
+            : "",
+    }),
+    stat(ctx, {
+      label: "Findings",
+      value: unexpected.length,
+      sub: `${plural(errors, "error")}, ${plural(unexpected.length - errors, "warning")}`,
+      target: checkTarget({ feature: id }),
+      tone: errors ? "bad" : unexpected.length ? "warn" : "good",
+    }),
+    tile(ctx, {
+      label: "Own files",
+      value: data.bookmap.own.length,
+      sub: `${data.bookmap.unreached.length} not reached by a flow`,
+    }),
+  ]);
+}
+
+/** Findings grouped by code, each group closed; the check's titles come with the first open. */
+function findingGroups(ctx, findings, options = {}) {
+  const { el } = ctx;
+
+  if (!findings.length) {
+    return el("p", {}, [pill(ctx, "clean", "good"), " No findings."]);
+  }
+
+  const byCode = new Map();
+
+  for (const finding of findings)
+    byCode.set(finding.code, [...(byCode.get(finding.code) ?? []), finding]);
+
+  const titles = ctx.api("check/groups").then(
+    (answer) => new Map((answer.groups ?? []).map((item) => [item.code, item.title])),
+    () => new Map(),
+  );
+  const groups = [...byCode.entries()]
+    .map(([code, items]) => ({
+      code,
+      items,
+      severity: items.some((item) => item.severity === "error") ? "error" : "warning",
+    }))
+    .sort(
+      (left, right) =>
+        (left.severity === "error" ? 0 : 1) - (right.severity === "error" ? 0 : 1) ||
+        right.items.length - left.items.length ||
+        left.code.localeCompare(right.code),
+    );
+
+  return el(
+    "div",
+    { class: "grimoire-groups" },
+    groups.map((item) => {
+      const title = el("span", { class: "grimoire-muted grimoire-group-note" });
+
+      titles.then((known) => {
+        const text = known.get(item.code);
+
+        if (text) title.textContent = text;
+      });
+
+      return group(ctx, {
+        title: item.code,
+        count: item.items.length,
+        tone: toneOf(item.severity),
+        lead: [pill(ctx, item.severity, toneOf(item.severity))],
+        make: () =>
+          el("div", {}, [
+            title,
+            slicedList(ctx, item.items, (finding) => findingItem(ctx, finding, options), {
+              className: "grimoire-findings",
+              size: 25,
+            }),
+          ]),
+      });
+    }),
+  );
+}
+
+/** Files grouped by module with a filter box; each group is closed and built when opened. */
+function fileGroupsView(ctx, groups, extras) {
+  const { el } = ctx;
+  const holder = el("div", { class: "grimoire-groups" });
+  const status = el("p", { class: "grimoire-muted", role: "status", "aria-live": "polite" });
+  const input = el("input", {
+    type: "search",
+    class: "grimoire-filterbox",
+    placeholder: "Filter files and modules",
+    "aria-label": "Filter files",
+    oninput: (event) => paint(String(event.target.value ?? "")),
+  });
+
+  function paint(text) {
+    const needle = text.trim().toLowerCase();
+    let files = 0;
+    let shown = 0;
+    const nodes = [];
+
+    for (const item of groups) {
+      const matches = needle
+        ? item.module.toLowerCase().includes(needle)
+          ? item.files
+          : item.files.filter((file) => file.toLowerCase().includes(needle))
+        : item.files;
+
+      files += item.files.length;
+      if (!matches.length) continue;
+
+      shown += matches.length;
+      nodes.push(
+        group(ctx, {
+          title: item.module || "(no module)",
+          count: matches.length,
+          open: needle !== "" && matches.length <= 40,
+          make: () =>
+            el(
+              "div",
+              { class: "grimoire-chips" },
+              matches.map((file) => fileLink(ctx, file)),
+            ),
+        }),
+      );
+    }
+
+    status.textContent = needle
+      ? `${shown} of ${files} files match`
+      : `${plural(files, "file")} in ${plural(groups.length, "module")}`;
+    holder.replaceChildren(...(needle ? [] : extras), ...nodes);
+  }
+
+  paint("");
+  return el("div", {}, [el("div", { class: "grimoire-toolbar" }, [input, status]), holder]);
+}
+
+/** The extra groups of the Files tab: routes, pages and screens, borrowed files, files no flow reaches. */
+function featureCodeGroups(ctx, map) {
+  const { el } = ctx;
+  const pages = Object.entries(map.pages).flatMap(([app, items]) =>
+    items.map((item) => ({ app, ...item })),
+  );
+
+  return [
+    map.routes.length
+      ? group(ctx, {
+          title: "Routes",
+          count: map.routes.length,
+          make: () =>
+            slicedList(ctx, map.routes, (item) =>
+              el("li", {}, [
+                routeLink(ctx, item.method, item.path),
+                " in ",
+                fileLink(ctx, item.file),
+              ]),
+            ),
+        })
+      : "",
+    pages.length
+      ? group(ctx, {
+          title: "Pages and screens",
+          count: pages.length,
+          make: () =>
+            slicedList(ctx, pages, (item) =>
+              el("li", {}, [
+                link(
+                  ctx,
+                  `${item.app} ${item.route}`,
+                  `page/${encodeURIComponent(item.app)}/${encodeURIComponent(item.route)}`,
+                ),
+              ]),
+            ),
+        })
+      : "",
+    map.borrowed.length
+      ? group(ctx, {
+          title: "Borrowed from other features",
+          count: map.borrowed.length,
+          make: () =>
+            el(
+              "div",
+              { class: "grimoire-chips" },
+              map.borrowed.map((item) => fileLink(ctx, item.file)),
+            ),
+        })
+      : "",
+    map.unreached.length
+      ? group(ctx, {
+          title: "Not reached by a flow",
+          count: map.unreached.length,
+          tone: "warn",
+          make: () =>
+            el(
+              "div",
+              { class: "grimoire-chips" },
+              map.unreached.map((file) => fileLink(ctx, file)),
+            ),
+        })
+      : "",
+  ];
+}
+
+/** The criteria of each flow with the tests behind them. */
+function testsView(ctx, feature, proofs) {
+  const { el } = ctx;
+  const filled = proofs.filter((item) => item.criteria.length);
+
+  if (!filled.length) return ctx.empty("No flow of this feature has acceptance criteria yet.");
+
+  return el(
+    "div",
+    { class: "grimoire-groups" },
+    filled.map((item) => {
+      const proven = item.criteria.filter((criterion) => criterion.status === "pass").length;
+      const failing = item.criteria.some((criterion) => criterion.status === "fail");
+
+      return group(ctx, {
+        title: item.heading ?? item.flow,
+        count: item.criteria.length,
+        tone: failing ? "bad" : proven === item.criteria.length ? "good" : "warn",
+        lead: [muted(ctx, `${proven}/${item.criteria.length} proven`)],
+        make: () =>
+          el("div", {}, [
+            el("p", {}, [
+              link(
+                ctx,
+                "Open the flow",
+                `flow/${encodeURIComponent(feature)}/${encodeURIComponent(item.flow)}/proof`,
+              ),
+            ]),
+            el(
+              "ul",
+              { class: "grimoire-proofs" },
+              item.criteria.map((criterion) => proofRow(ctx, criterion, false)),
+            ),
+          ]),
+      });
+    }),
+  );
+}
+
+/** The Flows tab: one row per flow with its counts. */
+function flowsTable(ctx, feature, flows) {
+  if (!flows.length) return ctx.empty("This feature has no flows yet.");
+
+  return table(
+    ctx,
+    ["Flow", "Status", "Steps", "Cases", "Criteria tested", "Findings"],
+    flows.map((flow) => [
+      [
+        link(
+          ctx,
+          flow.heading ?? flow.id,
+          `flow/${encodeURIComponent(feature)}/${encodeURIComponent(flow.id)}`,
+        ),
+        flow.heading ? [" ", mono(ctx, flow.id)] : "",
+      ],
+      [pill(ctx, flow.status, toneOf(flow.status))],
+      [String(flow.steps)],
+      [String(flow.cases)],
+      [`${flow.tested}/${flow.criteria}`],
+      [flow.findings ? pill(ctx, String(flow.findings), "warn") : muted(ctx, "0")],
+    ]),
+  );
+}
+
+async function featureView(ctx, id, tab = "") {
   const [data, graph] = await Promise.all([
     ctx.api(`features/${encodeURIComponent(id)}`),
     ctx.api(`graph/feature/${encodeURIComponent(id)}`).catch(() => null),
@@ -1061,10 +1737,15 @@ async function featureView(ctx, id) {
   const { el } = ctx;
   const readme = data.readme;
   const status = plain(readme.status);
+  const featureId = String(plain(readme.id));
+  const unexpected = data.findings.filter((finding) => !finding.expected);
+  const criteria = featureCriteria(data);
+  const base = `feature/${encodeURIComponent(id)}`;
+  const map = data.bookmap;
   const out = el("div", { class: "grimoire-view" }, [
-    crumbs(ctx, [["Features", "features"], [String(plain(readme.id))]]),
+    crumbs(ctx, [["Features", "features"], [featureId]]),
     heading(ctx, plain(readme.title), [
-      mono(ctx, plain(readme.id)),
+      mono(ctx, featureId),
       pill(ctx, status, toneOf(status)),
       pill(ctx, `version ${plain(readme.version)}`),
       readme.origin ? pill(ctx, plain(readme.origin), toneOf(plain(readme.origin))) : "",
@@ -1072,94 +1753,93 @@ async function featureView(ctx, id) {
     ]),
   ]);
 
-  if (readme.summary) out.append(el("p", { class: "grimoire-lede", text: readme.summary }));
+  const overview = () => {
+    const box = el("div", { class: "grimoire-tabstack" });
 
-  out.append(
-    section(ctx, "Flows", [
-      data.flows.length
-        ? table(
-            ctx,
-            ["Flow", "Status", "Since", "Heading"],
-            data.flows.map((flow) => [
-              [
-                link(
-                  ctx,
-                  flow.id,
-                  `flow/${encodeURIComponent(plain(readme.id))}/${encodeURIComponent(flow.id)}`,
-                ),
-              ],
-              [pill(ctx, flow.status, toneOf(flow.status))],
-              [flow.since],
-              [flow.heading ?? ""],
-            ]),
-          )
-        : ctx.empty("This feature has no flows yet."),
-    ]),
-  );
+    if (readme.summary) box.append(el("p", { class: "grimoire-lede", text: readme.summary }));
 
-  const map = data.bookmap;
-  out.append(
-    section(ctx, "Code", [
-      facts(ctx, [
-        ["Own files", String(map.own.length)],
-        ["Borrowed", String(map.borrowed.length)],
-        ["Routes", String(map.routes.length)],
-        ["Not reached by a flow", String(map.unreached.length)],
-      ]),
-      el("h4", { text: "Routes" }),
-      map.routes.length
-        ? list(
-            ctx,
-            map.routes.map((item) => [
-              routeLink(ctx, item.method, item.path),
-              " in ",
-              fileLink(ctx, item.file),
-            ]),
-          )
-        : muted(ctx, "none"),
-      el("h4", { text: "Pages and screens" }),
-      Object.keys(map.pages).length
-        ? list(
-            ctx,
-            Object.entries(map.pages).flatMap(([app, pages]) =>
-              pages.map((item) => [
-                link(
-                  ctx,
-                  `${app} ${item.route}`,
-                  `page/${encodeURIComponent(app)}/${encodeURIComponent(item.route)}`,
-                ),
-              ]),
-            ),
-          )
-        : muted(ctx, "none"),
-      el("h4", { text: "Own files" }),
-      fileChips(ctx, map.own, 12),
-      el("h4", { text: "Files no flow reaches" }),
-      fileChips(ctx, map.unreached, 12),
-    ]),
-  );
-
-  if (data.tasks.length) {
-    out.append(
-      section(ctx, "Open tasks", [
-        list(
-          ctx,
-          data.tasks.map((task) => [
-            link(ctx, task.id, `task/${encodeURIComponent(task.id)}`, { class: "grimoire-nowrap" }),
-            " ",
-            codeText(ctx, task.title),
-            " ",
-            pill(ctx, task.status, toneOf(task.status)),
-          ]),
-        ),
+    box.append(featureHealthStrip(ctx, featureId, data, unexpected));
+    box.append(section(ctx, "Feature map", [featureMapView(ctx, featureId, data.map)]));
+    box.append(
+      section(ctx, "Flows", [
+        data.flows.length
+          ? el(
+              "ul",
+              { class: "grimoire-flowcards" },
+              data.flows.map((flow) => grimoireFlowCard(ctx, featureId, flow)),
+            )
+          : ctx.empty("This feature has no flows yet."),
       ]),
     );
-  }
 
-  out.append(section(ctx, "Recent changes", [changesView(ctx, data.changes)]));
+    if (graph) box.append(graphView(ctx, graph, "The feature and its neighbours"));
 
-  if (data.findings.length) out.append(section(ctx, "Findings", [findingList(ctx, data.findings)]));
-  if (graph) out.append(graphView(ctx, graph, "The feature and its neighbours"));
+    if (data.tasks.length) {
+      box.append(
+        section(ctx, "Open tasks", [
+          list(
+            ctx,
+            data.tasks.map((task) => [
+              link(ctx, task.id, `task/${encodeURIComponent(task.id)}`, {
+                class: "grimoire-nowrap",
+              }),
+              " ",
+              codeText(ctx, task.title),
+              " ",
+              pill(ctx, task.status, toneOf(task.status)),
+            ]),
+          ),
+        ]),
+      );
+    }
+
+    box.append(section(ctx, "Recent changes", [changesView(ctx, data.changes)]));
+    return box;
+  };
+
+  out.append(
+    tabbed(ctx, {
+      label: "This feature",
+      prefix: "grimoire-feature",
+      active: tab,
+      route: (key) => (key === "overview" ? base : `${base}/${key}`),
+      tabs: [
+        { id: "overview", label: "Overview", make: overview },
+        {
+          id: "flows",
+          label: "Flows",
+          count: data.flows.length,
+          make: () => section(ctx, "Flows", [flowsTable(ctx, featureId, data.flows)]),
+        },
+        {
+          id: "files",
+          label: "Files",
+          count: map.own.length,
+          make: () =>
+            section(ctx, "Files", [
+              fileGroupsView(
+                ctx,
+                data.fileGroups ?? [{ module: "", files: map.own }],
+                featureCodeGroups(ctx, map),
+              ),
+            ]),
+        },
+        {
+          id: "findings",
+          label: "Findings",
+          count: unexpected.length,
+          make: () => section(ctx, "Findings", [findingGroups(ctx, data.findings)]),
+        },
+        {
+          id: "tests",
+          label: "Tests",
+          count: criteria.total,
+          make: () => section(ctx, "Tests", [testsView(ctx, featureId, data.proofs ?? [])]),
+        },
+      ],
+    }),
+  );
+
   return out;
 }
 
@@ -1183,7 +1863,8 @@ function stepFilesPanel(ctx, feature, flowId, step) {
   function paint(state) {
     const groups = new Map();
 
-    for (const item of state.files) groups.set(item.module, [...(groups.get(item.module) ?? []), item]);
+    for (const item of state.files)
+      groups.set(item.module, [...(groups.get(item.module) ?? []), item]);
 
     state.box.replaceChildren(
       ...[...groups.entries()].map(([name, items]) =>
@@ -1198,13 +1879,18 @@ function stepFilesPanel(ctx, feature, flowId, step) {
       ),
       state.files.length || state.error ? "" : muted(ctx, "No files in this set."),
       state.error
-        ? el("p", { class: "grimoire-error-title", text: `Could not load the files: ${state.error}. Try again.` })
+        ? el("p", {
+            class: "grimoire-error-title",
+            text: `Could not load the files: ${state.error}. Try again.`,
+          })
         : "",
       state.files.length < state.total || state.error
         ? el("button", {
             type: "button",
             class: "grimoire-filter",
-            text: state.error ? "Try again" : `Load ${Math.min(STEP_FILES_PAGE, state.total - state.files.length)} more`,
+            text: state.error
+              ? "Try again"
+              : `Load ${Math.min(STEP_FILES_PAGE, state.total - state.files.length)} more`,
             onclick: () => fetchPage(state),
           })
         : "",
@@ -1291,53 +1977,6 @@ function countsLine(counts) {
   return parts.join(" · ");
 }
 
-/** The journey: steps as a vertical stepper. */
-function journey(ctx, feature, flowId, flow, steps) {
-  const { el } = ctx;
-
-  if (!steps.length) return ctx.empty("This flow has no steps.");
-
-  return el(
-    "ol",
-    { class: "grimoire-stepper" },
-    steps.map((step) => {
-      const written = (flow.steps ?? []).find((item) => item.index === step.index);
-      const note = written && written.note ? written.note : null;
-      const counts = step.counts ?? { direct: 0, feature: 0, reachable: 0, typeOnly: 0 };
-      const shown = expander(ctx, "Show files", () => stepFilesPanel(ctx, feature, flowId, step));
-      const space = step.target.indexOf(" ");
-
-      return el("li", { class: "grimoire-step" }, [
-        el("span", { class: "grimoire-step-marker" }, [stepIcon(ctx, step.type)]),
-        el("div", { class: "grimoire-step-body" }, [
-          el("div", { class: "grimoire-step-head" }, [
-            mono(ctx, `${step.index}`),
-            pill(ctx, step.type),
-            step.type === "route" && space > 0
-              ? routeLink(ctx, step.target.slice(0, space), step.target.slice(space + 1))
-              : el("span", { class: "grimoire-step-target", text: step.target }),
-            step.found === false ? pill(ctx, "not found in the book", "bad") : "",
-          ]),
-          note ? el("p", { class: "grimoire-muted" }, codeText(ctx, note)) : "",
-          step.linked
-            ? el("p", { class: "grimoire-linked" }, [
-                "Affects ",
-                flowLink(ctx, step.linked.ref),
-                step.linked.heading ? ` (${step.linked.heading})` : "",
-                step.linked.summary ? el("span", { class: "grimoire-muted" }, [" ", step.linked.summary]) : "",
-              ])
-            : "",
-          step.entry ? el("p", {}, [muted(ctx, "Starts at "), fileLink(ctx, step.entry)]) : "",
-          counts.reachable || counts.direct
-            ? el("div", { class: "grimoire-step-counts" }, [muted(ctx, countsLine(counts)), shown.button])
-            : "",
-          shown.panel,
-        ]),
-      ]);
-    }),
-  );
-}
-
 /** The health numbers; older answers have none, so they are counted from the criteria. */
 function flowHealth(data) {
   if (data.health) return data.health;
@@ -1351,7 +1990,8 @@ function flowHealth(data) {
     criteria: { total: criteria.length, proven: byStatus.pass, byStatus },
     steps: {
       total: data.bookmap.steps.length,
-      resolved: data.bookmap.steps.filter((step) => step.found !== false).length,
+      resolved: data.bookmap.steps.filter((step) => step.found === true).length,
+      unchecked: data.bookmap.steps.filter((step) => step.found === null).length,
     },
     findings: { errors: 0, warnings: 0, expected: 0 },
   };
@@ -1416,7 +2056,10 @@ function fixNextBox(ctx, ref, criterion) {
     );
   }
 
-  return el("section", { class: "grimoire-card grimoire-fixnext" }, [el("h3", { text: "Fix next" }), ...body]);
+  return el("section", { class: "grimoire-card grimoire-fixnext" }, [
+    el("h3", { text: "Fix next" }),
+    ...body,
+  ]);
 }
 
 /** One criterion with one status pill and the tests behind it. */
@@ -1459,10 +2102,15 @@ function proofRow(ctx, criterion, untracked) {
 function neighbours(ctx, feature, data, className) {
   const make = (item, arrow) =>
     item
-      ? link(ctx, arrow === "prev" ? `‹ ${item.heading ?? item.id}` : `${item.heading ?? item.id} ›`, `flow/${encodeURIComponent(feature)}/${encodeURIComponent(item.id)}`, {
-          class: `grimoire-neighbour is-${arrow}`,
-          rel: arrow,
-        })
+      ? link(
+          ctx,
+          arrow === "prev" ? `‹ ${item.heading ?? item.id}` : `${item.heading ?? item.id} ›`,
+          `flow/${encodeURIComponent(feature)}/${encodeURIComponent(item.id)}`,
+          {
+            class: `grimoire-neighbour is-${arrow}`,
+            rel: arrow,
+          },
+        )
       : "";
 
   if (!data.previous && !data.next) return "";
@@ -1473,7 +2121,185 @@ function neighbours(ctx, feature, data, className) {
   ]);
 }
 
-async function flowView(ctx, feature, flowId) {
+/** The label a journey node shows for a step. */
+function nodeLabel(step) {
+  const tail = step.target.indexOf(" [");
+
+  return tail > 0 ? step.target.slice(0, tail) : step.target;
+}
+
+/** Why a node looks the way it does, in words. */
+function nodeState(step) {
+  if (step.found === false) return "not found in the book";
+  if (step.found === null) return "not checked by the book";
+  return "found in the book";
+}
+
+/** What a selected journey node shows: its note, link, entry file and the files it reaches. */
+function journeyDetail(ctx, feature, flowId, flow, step) {
+  const { el } = ctx;
+  const written = (flow.steps ?? []).find((item) => item.index === step.index);
+  const note = written && written.note ? written.note : null;
+  const counts = step.counts ?? { direct: 0, feature: 0, reachable: 0, typeOnly: 0 };
+  const shown = expander(ctx, "Show files", () => stepFilesPanel(ctx, feature, flowId, step));
+  const space = step.target.indexOf(" ");
+
+  return el("div", { class: "grimoire-jdetail" }, [
+    el("div", { class: "grimoire-step-head" }, [
+      mono(ctx, `${step.index}`),
+      pill(ctx, step.type),
+      step.type === "route" && space > 0
+        ? routeLink(ctx, step.target.slice(0, space), step.target.slice(space + 1))
+        : el("span", { class: "grimoire-step-target", text: step.target }),
+      step.found === false ? pill(ctx, "not found in the book", "bad") : "",
+    ]),
+    note ? el("p", { class: "grimoire-muted" }, codeText(ctx, note)) : "",
+    step.linked
+      ? el("p", { class: "grimoire-linked" }, [
+          "Affects ",
+          flowLink(ctx, step.linked.ref),
+          step.linked.heading ? ` (${step.linked.heading})` : "",
+          step.linked.summary
+            ? el("span", { class: "grimoire-muted" }, [" ", step.linked.summary])
+            : "",
+        ])
+      : "",
+    step.entry ? el("p", {}, [muted(ctx, "Starts at "), fileLink(ctx, step.entry)]) : "",
+    counts.reachable || counts.direct
+      ? el("div", { class: "grimoire-step-counts" }, [muted(ctx, countsLine(counts)), shown.button])
+      : "",
+    shown.panel,
+  ]);
+}
+
+/**
+ * The journey: the written steps drawn in order as connected nodes (a row
+ * that wraps; one column on a phone). Each node is a button; the one picked
+ * opens its panel under the drawing.
+ */
+function journeyView(ctx, feature, flowId, flow, steps) {
+  const { el } = ctx;
+
+  if (!steps.length) return ctx.empty("This flow has no steps.");
+
+  const detail = el("div", {
+    class: "grimoire-jpanel",
+    id: `grimoire-jpanel-${flowId}`,
+    role: "region",
+    "aria-label": "Step detail",
+  });
+  const nodes = new Map();
+  let current = null;
+
+  function pick(step) {
+    const same = current === step.index;
+
+    current = same ? null : step.index;
+
+    for (const [index, button] of nodes) {
+      const on = index === current;
+
+      button.setAttribute("aria-expanded", String(on));
+      button.setAttribute("class", `${button.baseClass}${on ? " is-selected" : ""}`);
+    }
+
+    detail.replaceChildren(...(same ? [] : [journeyDetail(ctx, feature, flowId, flow, step)]));
+  }
+
+  const list = el(
+    "ol",
+    { class: "grimoire-jny", "aria-label": "Steps in order" },
+    steps.map((step) => {
+      const state = step.found === false ? " is-missing" : step.found === null ? " is-unknown" : "";
+      const baseClass = `grimoire-jnode is-${step.type.replace(/\s+/g, "-")}${state}`;
+      const button = el(
+        "button",
+        {
+          type: "button",
+          class: baseClass,
+          "aria-expanded": "false",
+          "aria-controls": `grimoire-jpanel-${flowId}`,
+          title: `Step ${step.index}, ${step.type}: ${nodeLabel(step)} (${nodeState(step)})`,
+          onclick: () => pick(step),
+        },
+        [
+          el("span", { class: "grimoire-jnode-top" }, [
+            stepIcon(ctx, step.type, 16),
+            el("span", { class: "grimoire-jnode-type", text: step.type }),
+            el("span", { class: "grimoire-jnode-index", text: String(step.index) }),
+          ]),
+          el("span", { class: "grimoire-jnode-label", text: nodeLabel(step) }),
+          step.found === false
+            ? el("span", { class: "grimoire-jnode-flag", text: "not found" })
+            : "",
+        ],
+      );
+
+      button.baseClass = baseClass;
+      nodes.set(step.index, button);
+
+      return el("li", { class: "grimoire-jstep" }, [button]);
+    }),
+  );
+
+  return el("div", { class: "grimoire-journey" }, [list, detail]);
+}
+
+/** The "What if…" lane: each handled case as a small card; no card is tied to a step, the data does not say which. */
+function whatIfLane(ctx, feature, flowId, flow) {
+  const { el } = ctx;
+  const cases = flow.cases ?? [];
+  const handled = cases.filter((item) => !item.doesNotApply);
+  const skipped = cases.filter((item) => item.doesNotApply);
+
+  if (!cases.length) return "";
+
+  return section(ctx, "What if…", [
+    handled.length
+      ? el(
+          "ul",
+          { class: "grimoire-whatif" },
+          handled.map((item) =>
+            el("li", { class: "grimoire-whatif-card" }, [
+              el("strong", { class: "grimoire-whatif-q", text: `What if ${item.question}?` }),
+              el("p", {}, codeText(ctx, item.answer)),
+              (item.criteria ?? []).length
+                ? el("span", { class: "grimoire-chips" }, [
+                    muted(ctx, "proven by "),
+                    ...item.criteria.map((id) =>
+                      link(
+                        ctx,
+                        id,
+                        `flow/${encodeURIComponent(feature)}/${encodeURIComponent(flowId)}/proof`,
+                        {
+                          class: "grimoire-chip",
+                          title: `Open the Proof tab for ${id}`,
+                        },
+                      ),
+                    ),
+                  ])
+                : "",
+            ]),
+          ),
+        )
+      : muted(ctx, "No handled cases written."),
+    skipped.length
+      ? el("details", { class: "grimoire-details" }, [
+          el("summary", { text: `Does not apply (${skipped.length})` }),
+          list(
+            ctx,
+            skipped.map((item) => [
+              el("strong", { text: item.question }),
+              " ",
+              codeText(ctx, stripDoesNotApply(item.answer)),
+            ]),
+          ),
+        ])
+      : "",
+  ]);
+}
+
+async function flowView(ctx, feature, flowId, tab = "") {
   const data = await ctx.api(`flows/${encodeURIComponent(feature)}/${encodeURIComponent(flowId)}`);
   const { el } = ctx;
   const flow = data.flow;
@@ -1491,6 +2317,9 @@ async function flowView(ctx, feature, flowId) {
   const proven = health.criteria.proven;
   const total = health.criteria.total;
   const failing = health.criteria.byStatus.fail ?? 0;
+  const base = `flow/${encodeURIComponent(feature)}/${encodeURIComponent(flowId)}`;
+  // Missing tests are already shown per criterion in the Proof tab, so they are not listed twice.
+  const rest = data.findings.filter((finding) => finding.code !== "GR4001");
   const out = el("div", { class: "grimoire-view grimoire-flow" }, [
     el("div", { class: "grimoire-minihead" }, [
       el("strong", { text: title }),
@@ -1520,14 +2349,21 @@ async function flowView(ctx, feature, flowId) {
       tile(ctx, {
         label: "Criteria proven",
         value: `${proven}/${total}`,
-        sub: failing ? `${plural(failing, "criterion")} failing` : total ? "passing tests" : "none written",
+        sub: failing
+          ? `${plural(failing, "criterion")} failing`
+          : total
+            ? "passing tests"
+            : "none written",
         tone: failing ? "bad" : total && proven === total ? "good" : total ? "warn" : "",
       }),
       el("div", { class: "grimoire-stat" }, [
         el("span", { class: "grimoire-stat-label", text: "Last test run" }),
         el("span", {
           class: "grimoire-stat-value grimoire-stat-small",
-          text: results && results.recorded && results.updatedAt ? results.updatedAt.slice(0, 10) : "none",
+          text:
+            results && results.recorded && results.updatedAt
+              ? results.updatedAt.slice(0, 10)
+              : "none",
         }),
         el("span", {
           class: "grimoire-stat-sub",
@@ -1545,9 +2381,14 @@ async function flowView(ctx, feature, flowId) {
         el("span", { class: "grimoire-stat-label", text: "Steps resolved" }),
         el("span", {
           class: "grimoire-stat-value",
-          text: `${health.steps.resolved}/${health.steps.total}`,
+          text: `${health.steps.resolved}/${health.steps.total - (health.steps.unchecked ?? 0)}`,
         }),
-        el("span", { class: "grimoire-stat-sub", text: "found in the book" }),
+        el("span", {
+          class: "grimoire-stat-sub",
+          text: health.steps.unchecked
+            ? `found in the book; ${health.steps.unchecked} not checked`
+            : "found in the book",
+        }),
       ]),
     ]),
   ]);
@@ -1564,133 +2405,148 @@ async function flowView(ctx, feature, flowId) {
     );
   }
 
-  out.append(fixNextBox(ctx, ref, fixNextCriterion(map.criteria)));
-  out.append(section(ctx, "Journey", [journey(ctx, feature, flowId, flow, map.steps)]));
-  out.append(
-    section(ctx, "Proof", [
-      map.criteria.length
-        ? el(
-            "ul",
-            { class: "grimoire-proofs" },
-            map.criteria.map((criterion) => proofRow(ctx, criterion, untracked)),
-          )
-        : ctx.empty("No criteria written."),
-    ]),
-  );
+  const journeyTab = () => {
+    const box = el("div", { class: "grimoire-tabstack" });
 
-  if ((flow.differs ?? []).length) {
-    out.append(
-      section(ctx, "Differs by app", [
-        list(
-          ctx,
-          flow.differs.map((item) => [mono(ctx, item.name), " ", codeText(ctx, item.text)]),
-        ),
+    if ((flow.story ?? []).length) {
+      box.append(
+        section(ctx, "Story", [
+          el(
+            "ol",
+            { class: "grimoire-story" },
+            flow.story.map((item) => el("li", {}, codeText(ctx, item.text))),
+          ),
+        ]),
+      );
+    }
+
+    box.append(section(ctx, "Journey", [journeyView(ctx, feature, flowId, flow, map.steps)]));
+    box.append(whatIfLane(ctx, feature, flowId, flow));
+
+    if ((flow.differs ?? []).length) {
+      box.append(
+        section(ctx, "Differs by app", [
+          list(
+            ctx,
+            flow.differs.map((item) => [mono(ctx, item.name), " ", codeText(ctx, item.text)]),
+          ),
+        ]),
+      );
+    }
+
+    if ((flow.notHandled ?? []).length) {
+      box.append(
+        section(ctx, "Not handled", [
+          list(
+            ctx,
+            flow.notHandled.map((item) => [
+              el("strong", { text: item.name }),
+              " ",
+              codeText(ctx, item.text),
+            ]),
+          ),
+        ]),
+      );
+    }
+
+    if (flow.unknowns.length) {
+      box.append(
+        section(ctx, "Unknowns", [
+          list(
+            ctx,
+            flow.unknowns.map((item) => [codeText(ctx, item.text)]),
+          ),
+        ]),
+      );
+    }
+
+    box.append(
+      section(ctx, "Where users see it", [
+        map.shownBy.length
+          ? list(
+              ctx,
+              map.shownBy.map((shown) => [
+                shown.type === "layout"
+                  ? `${shown.app} layout ${shown.id}`
+                  : link(
+                      ctx,
+                      `${shown.app} ${shown.type} ${shown.id}`,
+                      `page/${encodeURIComponent(shown.app)}/${encodeURIComponent(shown.id)}`,
+                    ),
+                ` as block ${shown.block}`,
+              ]),
+            )
+          : ctx.empty("No app page shows this flow."),
       ]),
     );
-  }
+    box.append(section(ctx, "History", [changesView(ctx, data.history)]));
+    box.append(neighbours(ctx, feature, data, "grimoire-pager"));
+    return box;
+  };
 
-  if (flow.cases.length) {
-    const handled = flow.cases.filter((item) => !item.doesNotApply);
-    const skipped = flow.cases.filter((item) => item.doesNotApply);
-    const jump = (id) =>
-      el("button", {
-        type: "button",
-        class: "grimoire-chip",
-        title: `Go to ${id}`,
-        text: id,
-        onclick: () => {
-          const target = out.findAll
-            ? out.findAll((node) => node.attributes && node.attributes.id === `grimoire-ac-${id}`)[0]
-            : out.querySelector?.(`[id="grimoire-ac-${id}"]`);
-
-          target?.scrollIntoView?.({ block: "center" });
-        },
-      });
-
-    out.append(
-      section(ctx, "Cases", [
-        handled.length
+  const proofTab = () =>
+    el("div", { class: "grimoire-tabstack" }, [
+      fixNextBox(ctx, ref, fixNextCriterion(map.criteria)),
+      section(ctx, "Proof", [
+        map.criteria.length
           ? el(
               "ul",
-              { class: "grimoire-cases" },
-              handled.map((item) =>
-                el("li", {}, [
-                  el("strong", { text: item.question }),
-                  " ",
-                  codeText(ctx, item.answer),
-                  (item.criteria ?? []).length
-                    ? el("span", { class: "grimoire-chips" }, [" proven by ", ...item.criteria.map(jump)])
-                    : "",
-                ]),
-              ),
+              { class: "grimoire-proofs" },
+              map.criteria.map((criterion) => proofRow(ctx, criterion, untracked)),
             )
-          : muted(ctx, "No handled cases written."),
-        skipped.length
-          ? el("details", { class: "grimoire-details" }, [
-              el("summary", { text: `Does not apply (${skipped.length})` }),
-              list(
-                ctx,
-                skipped.map((item) => [
-                  el("strong", { text: item.question }),
-                  " ",
-                  codeText(ctx, stripDoesNotApply(item.answer)),
-                ]),
-              ),
-            ])
-          : "",
+          : ctx.empty("No criteria written."),
       ]),
-    );
-  }
+    ]);
 
-  if ((flow.notHandled ?? []).length) {
-    out.append(
-      section(ctx, "Not handled", [
-        list(
-          ctx,
-          flow.notHandled.map((item) => [el("strong", { text: item.name }), " ", codeText(ctx, item.text)]),
-        ),
-      ]),
-    );
-  }
+  const filesTab = () =>
+    section(ctx, "Files per step", [
+      map.steps.length
+        ? el(
+            "div",
+            { class: "grimoire-groups" },
+            map.steps.map((step) => {
+              const counts = step.counts ?? { direct: 0, feature: 0, reachable: 0, typeOnly: 0 };
 
-  if (flow.unknowns.length) {
-    out.append(
-      section(ctx, "Unknowns", [
-        list(
-          ctx,
-          flow.unknowns.map((item) => [codeText(ctx, item.text)]),
-        ),
-      ]),
-    );
-  }
+              return group(ctx, {
+                title: `${step.index}. ${nodeLabel(step)}`,
+                count: counts.reachable,
+                tone: step.found === false ? "warn" : "",
+                lead: [pill(ctx, step.type)],
+                make: () =>
+                  counts.reachable || counts.direct
+                    ? stepFilesPanel(ctx, feature, flowId, step)
+                    : muted(
+                        ctx,
+                        step.found === false
+                          ? "The step matched nothing in the book."
+                          : "This step reaches no files.",
+                      ),
+              });
+            }),
+          )
+        : ctx.empty("This flow has no steps."),
+    ]);
 
   out.append(
-    section(ctx, "Where users see it", [
-      map.shownBy.length
-        ? list(
-            ctx,
-            map.shownBy.map((shown) => [
-              shown.type === "layout"
-                ? `${shown.app} layout ${shown.id}`
-                : link(
-                    ctx,
-                    `${shown.app} ${shown.type} ${shown.id}`,
-                    `page/${encodeURIComponent(shown.app)}/${encodeURIComponent(shown.id)}`,
-                  ),
-              ` as block ${shown.block}`,
-            ]),
-          )
-        : ctx.empty("No app page shows this flow."),
-    ]),
+    tabbed(ctx, {
+      label: "This flow",
+      prefix: "grimoire-flowtab",
+      active: tab,
+      route: (key) => (key === "journey" ? base : `${base}/${key}`),
+      tabs: [
+        { id: "journey", label: "Journey", count: map.steps.length, make: journeyTab },
+        { id: "proof", label: "Proof", count: map.criteria.length, make: proofTab },
+        { id: "files", label: "Files", make: filesTab },
+        {
+          id: "findings",
+          label: "Findings",
+          count: rest.length,
+          make: () => section(ctx, "Findings", [findingGroups(ctx, rest)]),
+        },
+      ],
+    }),
   );
-  out.append(section(ctx, "History", [changesView(ctx, data.history)]));
 
-  // Missing tests are already shown per criterion above, so they are not listed twice.
-  const rest = data.findings.filter((finding) => finding.code !== "GR4001");
-
-  if (rest.length) out.append(section(ctx, "Findings", [findingList(ctx, rest)]));
-
-  out.append(neighbours(ctx, feature, data, "grimoire-pager"));
   return out;
 }
 
@@ -2155,7 +3011,11 @@ function checkGroupCard(ctx, group, mode, query) {
             const shown = expander(ctx, perFeature ? "Show files" : "Show", () =>
               pagedFindings(
                 ctx,
-                { ...filter, code: group.code, ...(item.feature === "(none)" ? {} : { feature: item.feature }) },
+                {
+                  ...filter,
+                  code: group.code,
+                  ...(item.feature === "(none)" ? {} : { feature: item.feature }),
+                },
                 { hints: false },
               ),
             );
@@ -2215,7 +3075,10 @@ async function checkView(ctx, query = {}) {
       pill(ctx, `${plural(counts.errors, "error")}`, counts.errors ? "bad" : "good"),
       pill(ctx, plural(counts.warnings, "warning"), counts.warnings ? "warn" : ""),
       pill(ctx, `${counts.expected} expected`),
-      muted(ctx, `routes ${report.routes ?? "cached"}`),
+      muted(
+        ctx,
+        `Route facts: ${routeFactsState(report.routes).value}, ${routeFactsState(report.routes).sub}`,
+      ),
     ]),
     el("p", {
       class: "grimoire-headline",
@@ -2224,14 +3087,30 @@ async function checkView(ctx, query = {}) {
     el("div", { class: "grimoire-toolbar grimoire-check-filters" }, [
       el("div", { class: "grimoire-filters", role: "group", "aria-label": "Severity" }, [
         filterLink(ctx, "all", checkTarget({ ...query, severity: "" }), !query.severity),
-        filterLink(ctx, "errors", checkTarget({ ...query, severity: "error" }), query.severity === "error"),
-        filterLink(ctx, "warnings", checkTarget({ ...query, severity: "warning" }), query.severity === "warning"),
+        filterLink(
+          ctx,
+          "errors",
+          checkTarget({ ...query, severity: "error" }),
+          query.severity === "error",
+        ),
+        filterLink(
+          ctx,
+          "warnings",
+          checkTarget({ ...query, severity: "warning" }),
+          query.severity === "warning",
+        ),
       ]),
       el("div", { class: "grimoire-filters", role: "group", "aria-label": "State" }, [
         filterLink(ctx, "to fix", checkTarget({ ...query, state: "" }), !query.state),
         filterLink(ctx, "expected", checkTarget({ ...query, state: "expected" }), expectedMode),
       ]),
-      filterSelect(ctx, "Code", "code", groups.map((group) => group.code), query),
+      filterSelect(
+        ctx,
+        "Code",
+        "code",
+        groups.map((group) => group.code),
+        query,
+      ),
       filterSelect(ctx, "Feature", "feature", names, query),
     ]),
     active.some((key) => key === "code" || key === "feature" || key === "flow")
@@ -2292,7 +3171,10 @@ async function checkView(ctx, query = {}) {
   if (expected.length) {
     out.append(
       el("div", { class: "grimoire-view-groups" }, [
-        el("h3", { class: "grimoire-subhead", text: `Expected: proposed work (${plural(expected.length, "kind")})` }),
+        el("h3", {
+          class: "grimoire-subhead",
+          text: `Expected: proposed work (${plural(expected.length, "kind")})`,
+        }),
         el("p", {
           class: "grimoire-muted",
           text: "These concern features or flows that are still proposed, so the code does not exist yet. They never fail the check.",
@@ -2466,16 +3348,18 @@ async function body(ctx, summaryRequest) {
 
   switch (type) {
     case "product": {
-      const map = globalThis.grimoireProductMap ?? (await import(/* @vite-ignore */ moduleUrl(ctx.asset("product-map.js"))));
+      const map =
+        globalThis.grimoireProductMap ??
+        (await import(/* @vite-ignore */ moduleUrl(ctx.asset("product-map.js"))));
 
       return map.productMapView(ctx, parts.slice(1));
     }
     case "features":
       return featuresView(ctx);
     case "feature":
-      return featureView(ctx, first);
+      return featureView(ctx, first, second);
     case "flow":
-      return flowView(ctx, first, second);
+      return flowView(ctx, first, second, parts[3] ?? "");
     case "page":
       return pageView(ctx, first, parts.slice(2).join("/"));
     case "apps":
@@ -2524,29 +3408,103 @@ function describe(route) {
   return map[type] ?? ["the overview", null];
 }
 
-/** The loading state: shown at once, so a large book never leaves a blank area. */
+/** The hint under the progress line: more specific the longer the book takes. */
+function loadingHint(seconds) {
+  if (seconds >= 40)
+    return "Still opening after 40 s. Check that the app is running and look at its server log; Retry appears if the request fails.";
+  if (seconds >= 15)
+    return "This is taking longer than usual. A very large book can need up to 30 s the first time; keep this tab open.";
+  if (seconds >= 5) return "Large books take 5–15 s the first time; later opens are instant.";
+
+  return "Reading the book. The first open of a large book can take a few seconds.";
+}
+
+// Inline, so the layout holds even when grimoire.css fails to load (tokens only).
+const SKEL_GRID =
+  "display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px;margin-top:6px";
+const SKEL_BLOCK = "height:76px;border-radius:var(--radius,10px);background-color:var(--muted)";
+const SKEL_ROW =
+  "height:34px;border-radius:calc(var(--radius,10px) - 4px);background-color:var(--muted)";
+const SKEL_TRACK =
+  "height:4px;border-radius:2px;background:var(--muted);overflow:hidden;position:relative;max-width:260px";
+const SKEL_BAR = "height:100%;width:40%;border-radius:2px;background:var(--brand,var(--primary))";
+
+/**
+ * The loading state: a skeleton of the Overview with a progress line, a live
+ * elapsed counter and a hint that grows more specific with time. `stop()` ends
+ * the counter; call it once the view is filled in or failed.
+ */
 function skeleton(ctx) {
   const { el } = ctx;
+  const started = Date.now();
+  const counter = el("span", { class: "grimoire-load-elapsed", text: "0 s" });
+  const hint = el("p", { class: "grimoire-muted grimoire-load-hint", text: loadingHint(0) });
+  const timer =
+    typeof setInterval === "function"
+      ? setInterval(() => {
+          const seconds = Math.floor((Date.now() - started) / 1000);
 
-  return el("div", { class: "grimoire-skeleton", role: "status" }, [
-    el("p", { class: "grimoire-skeleton-title", text: "Opening the book…" }),
-    el("p", {
-      class: "grimoire-muted",
-      text: "A large book can take a few seconds to open the first time.",
-    }),
-    el(
-      "div",
-      { class: "grimoire-skeleton-grid", "aria-hidden": "true" },
-      [1, 2, 3, 4, 5, 6].map(() => el("div", { class: "grimoire-skeleton-block" })),
-    ),
-  ]);
+          counter.textContent = `${seconds} s`;
+          hint.textContent = loadingHint(seconds);
+        }, 1000)
+      : null;
+
+  const node = el(
+    "div",
+    {
+      class: "grimoire-skeleton",
+      role: "status",
+      "aria-live": "polite",
+      style: "display:grid;gap:10px",
+    },
+    [
+      el("p", {
+        class: "grimoire-skeleton-title",
+        style: "margin:0;font-weight:600",
+        text: "Opening the book…",
+      }),
+      el("div", { class: "grimoire-load-progress", style: "display:grid;gap:6px" }, [
+        el("div", { class: "grimoire-load-track", style: SKEL_TRACK, "aria-hidden": "true" }, [
+          el("div", { class: "grimoire-load-bar", style: SKEL_BAR }),
+        ]),
+        el("p", { class: "grimoire-muted", style: "margin:0" }, ["Elapsed ", counter]),
+      ]),
+      hint,
+      el(
+        "div",
+        { class: "grimoire-skeleton-grid", style: SKEL_GRID, "aria-hidden": "true" },
+        [1, 2, 3, 4, 5, 6].map(() =>
+          el("div", { class: "grimoire-skeleton-block", style: SKEL_BLOCK }),
+        ),
+      ),
+      el(
+        "div",
+        {
+          class: "grimoire-skeleton-rows",
+          style: "display:grid;gap:8px;margin-top:6px",
+          "aria-hidden": "true",
+        },
+        [1, 2, 3, 4, 5].map(() => el("div", { class: "grimoire-skeleton-row", style: SKEL_ROW })),
+      ),
+    ],
+  );
+
+  return {
+    node,
+    stop: () => {
+      if (timer !== null) clearInterval(timer);
+    },
+  };
 }
 
 /** A failed view: what failed, why, what to do, and a way to try again. */
 function errorBox(ctx, route, error) {
   const { el } = ctx;
   const [what, back] = describe(route);
-  const message = error && error.message ? error.message : String(error);
+  const base = error && error.message ? error.message : String(error);
+  const status =
+    error && typeof error.status === "number" && error.status > 0 ? ` (HTTP ${error.status})` : "";
+  const message = base + status;
   const needsApp = message.includes("running app");
 
   return el("div", { class: "grimoire-error", role: "alert" }, [
@@ -2603,6 +3561,7 @@ function bindShortcut(input) {
 function header(ctx, route, summaryRequest) {
   const { el } = ctx;
   const results = el("div", { class: "grimoire-results" });
+  const brandSlot = el("div", { class: "grimoire-brand-slot" });
   const active = tabOf(route);
   const badges = new Map();
   let activeTab = null;
@@ -2788,12 +3747,17 @@ function header(ctx, route, summaryRequest) {
       set("tasks", data.tasks ? data.tasks.open.length : undefined);
       set("releases", data.releases);
       set("check", data.counts ? data.counts.errors + data.counts.warnings : undefined);
+
+      const brand = grimoireBrand(ctx, data.host);
+
+      if (brand) brandSlot.replaceChildren(brand);
     },
     () => undefined,
   );
 
   return {
     element: el("div", { class: "grimoire-header" }, [
+      brandSlot,
       nav,
       el("div", { class: "grimoire-searchbox" }, [input, results]),
     ]),
@@ -2837,8 +3801,21 @@ async function renderGrimoire(context) {
   const top = header(ctx, route, summaryRequest);
   const content = el("div", { class: "grimoire-body", "aria-busy": "true" });
 
-  content.append(skeleton(ctx));
-  root.append(el("div", { class: "grimoire-root" }, [top.element, content]));
+  const loading = skeleton(ctx);
+
+  content.append(loading.node);
+  top.input.disabled = true;
+  const footer = el("footer", { class: "grimoire-footer" });
+
+  summaryRequest.then(
+    (data) => {
+      const line = grimoireAppLine(ctx, data.host);
+
+      if (line) footer.replaceChildren(line);
+    },
+    () => undefined,
+  );
+  root.append(el("div", { class: "grimoire-root" }, [top.element, content, footer]));
   top.revealActive();
 
   const loaded = (async () => {
@@ -2847,6 +3824,8 @@ async function renderGrimoire(context) {
     } catch (error) {
       content.replaceChildren(errorBox(ctx, route, error));
     }
+    loading.stop();
+    top.input.disabled = false;
     content.setAttribute("aria-busy", "false");
   })();
 

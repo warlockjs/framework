@@ -108,7 +108,13 @@ The last admin cannot be removed or demoted, and nobody can remove or demote the
 ## Two-factor sign-in
 
 `twoFactor: "admins"` (the default) requires a second factor for admins and lets viewers add one. `"everyone"`
-requires it for all accounts.
+requires it for all accounts. `"off"` requires it for nobody: users can still add an authenticator app or a passkey
+themselves, and an account that has a factor is always asked for it at sign-in. With `"off"`, boot logs a warning,
+because anyone with a password can then sign in.
+
+Password rules are set with `passwords: { minLength, rejectCommon }`. `minLength` is the shortest password in characters
+(8 or more, default 8); `rejectCommon` (default `true`) refuses passwords from the built-in list of common passwords.
+A password is never accepted when it equals the account's email or exceeds 72 bytes, so `minLength` cannot be above 72: a larger value stops the boot with `DT007`.
 
 - **Authenticator app**: any TOTP app. A code cannot be used twice.
 - **Passkeys**: install `@simplewebauthn/server` (the same optional package `@warlock.js/auth` uses). Without it the
@@ -343,7 +349,9 @@ All of them are optional. Only `enabled` must be set; the path and first admin c
 | `origin`                    | `null`              | The public origin (`https://app.example.com`), for the CSRF check and passkeys.       |
 | `session.idleMinutes`       | `30`                | Signed out after this many idle minutes.                                              |
 | `session.maxHours`          | `8`                 | Signed out after this many hours.                                                     |
-| `twoFactor`                 | `"admins"`          | `"admins"` or `"everyone"`.                                                           |
+| `twoFactor`                 | `"admins"`          | `"off"`, `"admins"` or `"everyone"`.                                                  |
+| `passwords.minLength`       | `8`                 | Shortest password in characters; a whole number from 8 to 72.                         |
+| `passwords.rejectCommon`    | `true`              | Refuse passwords from the built-in common list.                                       |
 | `rateLimits.windowMinutes`  | `15`                | The sliding window for failed sign-ins.                                               |
 | `rateLimits.account`        | `5`                 | Failures per account before it is refused for the window.                             |
 | `rateLimits.ip`             | `20`                | Failures per IP before it is refused for the window.                                  |
@@ -365,18 +373,18 @@ An invalid value stops the boot with `DT007`, naming the option.
 When the monitor is enabled but cannot start safely, the app refuses to boot with a `DevtoolsProductionConfigError`.
 A deploy fails at once instead of exposing a half-protected dashboard. `DEVTOOLS_CONFIG_CODES` lists the messages.
 
-| Code    | Message and fix                                                                                                                                           |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DT001` | Needs a dashboard path. Set `DEVTOOLS_PATH` (for example `/ops-7f3k2q`) or `devtools.production.path`.                                                    |
-| `DT002` | The path must start with `/`, be at least 8 characters, use only letters, digits, `-`, `_`, `.`, `~` and `/`, and not be `/__warlock`.                    |
-| `DT003` | No admin yet. Set `DEVTOOLS_ADMIN_EMAIL` with `DEVTOOLS_ADMIN_PASSWORD` or `DEVTOOLS_SETUP_TOKEN`, or run `warlock devtools:reset-admin --email <email>`. |
-| `DT004` | `DEVTOOLS_ADMIN_PASSWORD` breaks the password rules (at least 8 characters, at most 72 bytes, not a common password, not the email). Choose another one.  |
-| `DT005` | The accounts are stored in the database. Install `@warlock.js/cascade` and configure a database connection.                                               |
-| `DT006` | Two-factor secrets are encrypted with the app key. Set `encryption.key` (64 hex characters) in `src/config/encryption.ts`.                                |
-| `DT007` | An option has an invalid value (`share.maxDays` must be a whole number from 1 to 365). The message names the option and the accepted values.             |
-| `DT008` | The devtools tables are missing (`devtools_shares` too, when `share.enabled`). Add `devtoolsMigrations` to `database.migrations` in `warlock.config.ts` and run `warlock migrate`. |
-| `DT009` | Set either `DEVTOOLS_ADMIN_PASSWORD` or `DEVTOOLS_SETUP_TOKEN`, not both.                                                                                 |
-| `DT010` | `DEVTOOLS_SETUP_TOKEN` must be at least 32 characters. Generate one with `openssl rand -base64 32`.                                                       |
+| Code    | Message and fix                                                                                                                                                                                                                       |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DT001` | Needs a dashboard path. Set `DEVTOOLS_PATH` (for example `/ops-7f3k2q`) or `devtools.production.path`.                                                                                                                                |
+| `DT002` | The path must start with `/`, be at least 8 characters, use only letters, digits, `-`, `_`, `.`, `~` and `/`, and not be `/__warlock`.                                                                                                |
+| `DT003` | No admin yet. Set `DEVTOOLS_ADMIN_EMAIL` with `DEVTOOLS_ADMIN_PASSWORD` or `DEVTOOLS_SETUP_TOKEN`, or run `warlock devtools:reset-admin --email <email>`.                                                                             |
+| `DT004` | `DEVTOOLS_ADMIN_PASSWORD` breaks the password rules (at least `passwords.minLength` characters, 8 by default; at most 72 bytes; not a common password unless `passwords.rejectCommon` is `false`; not the email). Choose another one. |
+| `DT005` | The accounts are stored in the database. Install `@warlock.js/cascade` and configure a database connection.                                                                                                                           |
+| `DT006` | Two-factor secrets are encrypted with the app key. Set `encryption.key` (64 hex characters) in `src/config/encryption.ts`.                                                                                                            |
+| `DT007` | An option has an invalid value (`share.maxDays` must be a whole number from 1 to 365). The message names the option and the accepted values.                                                                                          |
+| `DT008` | The devtools tables are missing (`devtools_shares` too, when `share.enabled`). Add `devtoolsMigrations` to `database.migrations` in `warlock.config.ts` and run `warlock migrate`.                                                    |
+| `DT009` | Set either `DEVTOOLS_ADMIN_PASSWORD` or `DEVTOOLS_SETUP_TOKEN`, not both.                                                                                                                                                             |
+| `DT010` | `DEVTOOLS_SETUP_TOKEN` must be at least 32 characters. Generate one with `openssl rand -base64 32`.                                                                                                                                   |
 
 ## Troubleshooting
 

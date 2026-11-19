@@ -59,6 +59,7 @@ export function baseOptions(
     origin: null,
     session: { idleMinutes: 30, maxHours: 8, pendingMinutes: 10 },
     twoFactor: "admins",
+    passwords: { minLength: 8, rejectCommon: true },
     rateLimits: { windowMinutes: 15, account: 5, ip: 20, global: 100, lockMinutes: 15 },
     explain: { executing: false },
     panels: {},

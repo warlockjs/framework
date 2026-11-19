@@ -6,8 +6,8 @@ description: A plain-language view of what the product does, who it is for and h
 import { Aside } from "@astrojs/starlight/components";
 
 <Aside type="caution" title="Experimental">
-  Grimoire is experimental. The structure of the written files and the commands may still change before
-  they are declared stable.
+  Grimoire is experimental. The structure of the written files and the commands may still change
+  before they are declared stable.
 </Aside>
 
 The product map is the first view in the Grimoire tab. It is written for people who do not read code: product owners,
@@ -19,24 +19,47 @@ Everything on it comes from the files your agent already writes in `grimoire/`. 
 ## What it shows
 
 - **The map.** One card per feature: its name, a short summary, who it is for, the apps it lives in, its status
-  (Live, Being built, Planned or Retired) and a health light. Search by name or summary, and filter by app or
-  audience. On a phone the cards stack in one column.
+  (Live, Being built, Planned or Retired), a health strip and a health light. Search by name or summary, and filter by
+  app or audience. Sort the cards by feature id (the default), name, recently changed or health (worst first), and
+  filter them by "Changed since" a date (the last 7 or 30 days of activity) or a release (the features whose changes are in
+  that release or later, plus anything unreleased). On a feature page the flows sort by the README order, name or
+  health. On a phone the cards stack in one column.
 - **A feature page.** What it is, why it exists, the things people can do with it (its flows, each a short story),
-  where you see it in each app with screenshots, what changed in each version (changes not released yet come first),
-  and what is coming next.
+  where you see it in each app with screenshots, what changed in each version, and what is coming next.
+- **What changed.** A timeline with one node per version, unreleased changes first (marked "Unreleased"), then
+  the newest release. Under each version the changes are grouped by type (Added, Changed, Fixed, Removed), each with
+  its sentence in plain text. Reference ids written at the end of a sentence in brackets, such as `(AC-6, T-089)` or
+  `(QA 1.5.6)`, are shown after it as small chips in the tab; the read-only share link leaves them out. Ordinary
+  brackets in the sentence stay where they are.
 - **A flow page.** The story step by step in the user's words, what proves it works, the "what if" cases (what is
   handled and what does not apply), where you see it, and links to the previous and next flow.
+
+## The health strip
+
+Under each card sits a thin bar of four segments with a legend that says every number in words (hover the bar for the
+same text as a tooltip). The first three segments fill by how much is in place; the findings segment is full and
+coloured by the worst open finding:
+
+| Segment     | What it counts                                                                                                                                                                                                                                                                |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Flows       | The flows written, and how many are shipped.                                                                                                                                                                                                                                  |
+| Criteria    | Acceptance criteria proven by a passing test out of the criteria written. When tests are tagged but no test results were recorded, or none of the criteria has a result yet, the segment is grey and reads "test results not measured": a missing measurement, not a problem. |
+| Screenshots | The places (pages, screens, layouts) that show the feature's flows, and how many have a screenshot.                                                                                                                                                                           |
+| Findings    | The open check findings of the feature and its flows (errors and warnings; expected ones are left out).                                                                                                                                                                       |
+
+The numbers come with each feature card as `strip` (`flows`, `criteria`, `screenshots`, `findings`); they hold no file
+paths or test names, so the read-only share link and the static export carry them too.
 
 ## Health lights
 
 Each light has a shape and words as well as a colour, so it reads without colour.
 
-| Light | Meaning |
-| --- | --- |
-| Working well | At least one check is written and every check passes. |
+| Light           | Meaning                                                                                                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Working well    | At least one check is written and every check passes.                                                                                                                                 |
 | Needs attention | A check has no test, has not run, or its tests changed since the last run. Also shown when recent errors were captured, or when proofs are written but no test results were recorded. |
-| Has problems | A check fails, or the check report has an error for this feature. |
-| Not checked yet | No acceptance criteria are written. |
+| Has problems    | A check fails, or the check report has an error for this feature.                                                                                                                     |
+| Not checked yet | No acceptance criteria are written.                                                                                                                                                   |
 
 The sentence next to the light says why, for example "All 12 checks pass" or "2 of 9 checks fail". The map shows only
 what the framework has real data for: release history, test results, open tasks and, in the production monitor, the
@@ -79,13 +102,20 @@ file paths, folders, code, test names or files, check findings, error messages, 
 Grimoire tab. The page says "Read-only view" at the bottom. Admins see a "Share this map" button on the map when
 sharing is on. In development the map is visible in the tab only; there are no share links.
 
+Under the Warlock.js adapter the footer of the shared page also names the app and the framework version.
+
 ## The static export
 
 `warlock grimoire build --site` (see [Devtools](/v/latest/grimoire/guides/09-devtools/)) includes the product map, its
 answers and every screenshot the written files use. Screenshots are copied to a `screenshots/` folder next to
 `index.html`. Only images inside `grimoire/screenshots/` with a supported extension are copied. Open `index.html` and
-choose "Product map". The exported page is the signed-in view, so it keeps the developer buttons; do not publish it
-where non-developers should not see code detail.
+choose "Product map". The full export is the signed-in view, so it keeps the developer buttons; do not publish it
+where non-developers should not see code detail. For readers who do not read code, use the business export,
+`warlock grimoire build --site --product`: it writes the share-safe map only (the page of a share link, with no file paths, test
+names, export names or check findings), opens on the Product map and carries no per-file answers, so it is much smaller.
+
+When no test results were recorded, the shared view and the business export show the health light as grey ("Test
+results are not measured") instead of "Needs attention"; the signed-in view keeps the yellow "No test results recorded".
 
 ## When something is empty
 

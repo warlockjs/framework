@@ -430,7 +430,9 @@ describe("Grimoire MCP tools", () => {
       await run("grimoire_flow", { flow: "catalog/new-arrivals", files: "reachable", step: 1 }),
     ).toMatchObject({ set: "reachable", index: 1 });
     await expect(
-      byName.get("grimoire_flow")?.run({ flow: "catalog/new-arrivals", files: "reachable", step: 99 }),
+      byName
+        .get("grimoire_flow")
+        ?.run({ flow: "catalog/new-arrivals", files: "reachable", step: 99 }),
     ).rejects.toThrow(/^GR9006: Pass step/);
     expect(await run("grimoire_search", { text: "order", limit: 2 })).toMatchObject({
       type: "search",

@@ -286,6 +286,20 @@ describe("checkApps", () => {
     expect(codes(findings)).toEqual(["GR5008", "GR5008", "GR5008"]);
   });
 
+  it("GR5008: mail and notification entries are not checked without route facts", () => {
+    const entries = [
+      { type: "mail", name: "missing", at: at(FILE, 13) },
+      { type: "notification", name: "ping", at: at(FILE, 14) },
+      { type: "page", name: "/nowhere", at: at(FILE, 16) },
+    ];
+    const target = build({ app: { pages: [page("home", { alsoReachedFrom: entries })] } });
+
+    target.routes = "missing";
+
+    // The page entry is still checked: only entries the booted app reports are skipped.
+    expect(checkApps(target).map((finding) => finding.at?.line)).toEqual([16]);
+  });
+
   it("GR5008: a screen entry checks the declared and the file-based screens", () => {
     const entries = [
       { type: "screen", name: "/products/[id]", at: at(FILE, 1) },

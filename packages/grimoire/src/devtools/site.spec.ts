@@ -2,7 +2,15 @@
  * The static export's product map: its answers, its inlined module and its
  * screenshots. The rest of the export is covered in `tests/devtools.spec.ts`.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -21,12 +29,16 @@ import {
 vi.mock("./product-map", () => ({
   productMap: () => ({ features: [], apps: [], builtAt: "now", developer: true }),
   productFeature: (_snapshot: unknown, id: string) => ({ feature: { id } }),
-  productFlow: (_snapshot: unknown, feature: string, flow: string) => ({ flow: { ref: `${feature}/${flow}` } }),
+  productFlow: (_snapshot: unknown, feature: string, flow: string) => ({
+    flow: { ref: `${feature}/${flow}` },
+  }),
 }));
 
 vi.mock("./data", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./data")>()),
-  flowAnswer: (_snapshot: unknown, feature: string, flow: string) => ({ compact: `${feature}/${flow}` }),
+  flowAnswer: (_snapshot: unknown, feature: string, flow: string) => ({
+    compact: `${feature}/${flow}`,
+  }),
   checkGroups: () => ({ groups: [] }),
 }));
 
@@ -57,7 +69,9 @@ const screenshot = (file: string | null) => ({
 describe("collectScreenshotPaths", () => {
   it("finds every screenshot path once, skipping paths that point elsewhere", () => {
     const found = collectScreenshotPaths({
-      features: [{ flows: [{ story: [{ screenshots: [screenshot("a.png"), screenshot("a.png")] }] }] }],
+      features: [
+        { flows: [{ story: [{ screenshots: [screenshot("a.png"), screenshot("a.png")] }] }] },
+      ],
       apps: [{ pages: [{ screenshots: [screenshot("web/b.png"), screenshot(null)] }] }],
     });
 
@@ -109,7 +123,9 @@ describe("the product map in the page", () => {
     expect(code).toContain("async function productMapView()");
     expect(code).not.toContain("export");
     expect(code).toContain("globalThis.grimoireProductMap = { productMapView };");
-    expect(() => inlineProductMap("export function x() {}")).toThrow("export default renderProductMap");
+    expect(() => inlineProductMap("export function x() {}")).toThrow(
+      "export default renderProductMap",
+    );
   });
 
   it("puts the module and its styles into the page before the view", () => {
@@ -125,7 +141,9 @@ describe("the product map in the page", () => {
     );
 
     expect(html).toContain(".pm-root{color:red}");
-    expect(html.indexOf("globalThis.grimoireProductMap")).toBeLessThan(html.indexOf("async function renderGrimoire"));
+    expect(html.indexOf("globalThis.grimoireProductMap")).toBeLessThan(
+      html.indexOf("async function renderGrimoire"),
+    );
   });
 });
 
@@ -154,15 +172,21 @@ describe("the export", () => {
 
     expect(site.routes.product).toBeDefined();
     expect(site.routes["check/groups"]).toEqual({ groups: [] });
-    expect(site.routes[`product/features/${feature?.id}`]).toEqual({ feature: { id: feature?.id } });
+    expect(site.routes[`product/features/${feature?.id}`]).toEqual({
+      feature: { id: feature?.id },
+    });
     expect(site.routes[`product/flows/${flow?.ref}`]).toBeDefined();
     expect(site.routes[`flows/${flow?.ref}`]).toEqual({ compact: flow?.ref });
 
     const out = await exportGrimoireSite(copy.root, { snapshot, outDir: "out/site" });
 
-    expect(readFileSync(path.join(copy.root, out, "screenshots", "web", "home.png"), "utf8")).toBe("png");
+    expect(readFileSync(path.join(copy.root, out, "screenshots", "web", "home.png"), "utf8")).toBe(
+      "png",
+    );
     expect(existsSync(path.join(copy.root, out, "outside.png"))).toBe(false);
     expect(existsSync(path.join(copy.root, out, "screenshots", "outside.png"))).toBe(false);
-    expect(readFileSync(path.join(copy.root, out, "index.html"), "utf8")).toContain("grimoireProductMap");
+    expect(readFileSync(path.join(copy.root, out, "index.html"), "utf8")).toContain(
+      "grimoireProductMap",
+    );
   });
 });

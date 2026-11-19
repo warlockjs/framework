@@ -6,6 +6,7 @@
  * under .grimoire-root so nothing leaks into, or depends on, the dashboard.
  */
 .grimoire-root {
+  container-type: inline-size;
   --gm-gap: 16px;
   --gm-radius: var(--radius, 10px);
   --gm-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -79,6 +80,49 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
+}
+.grimoire-brand-slot:empty {
+  display: none;
+}
+.grimoire-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.grimoire-brand-logo {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  object-fit: contain;
+}
+.grimoire-brand-name {
+  color: var(--foreground);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.grimoire-brand-version {
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-family: var(--gm-mono);
+  font-size: 12px;
+  line-height: 20px;
+}
+.grimoire-footer:empty {
+  display: none;
+}
+.grimoire-footer {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.grimoire-appline {
+  margin: 0;
+  text-align: center;
 }
 .grimoire-tabs {
   display: flex;
@@ -290,6 +334,81 @@
 }
 .grimoire-pill.is-bad {
   --gm-tone: var(--destructive);
+}
+
+/* Flow cards on the feature page */
+.grimoire-flowcards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.grimoire-flowcard {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--gm-radius);
+  background: var(--card);
+  color: var(--card-foreground);
+  transition: border-color 0.15s ease;
+}
+.grimoire-flowcard:hover,
+.grimoire-flowcard:focus-within {
+  border-color: var(--brand);
+}
+.grimoire-flowcard-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  font-size: 13px;
+}
+.grimoire-root .grimoire-flowcard-title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+/* The whole card is the link: its hit area covers the card. */
+.grimoire-root .grimoire-flowcard-link {
+  color: var(--foreground);
+  text-decoration: none;
+}
+.grimoire-root .grimoire-flowcard-link::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+.grimoire-root .grimoire-flowcard-link:focus-visible {
+  box-shadow: none;
+}
+.grimoire-flowcard:has(.grimoire-flowcard-link:focus-visible) {
+  box-shadow: var(--gm-focus);
+}
+.grimoire-flowcard-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  list-style: none;
+}
+.grimoire-flowcard-findings {
+  justify-self: start;
+}
+@media (prefers-reduced-motion: reduce) {
+  .grimoire-flowcard {
+    transition: none;
+  }
 }
 
 /* Cards and sections */
@@ -637,6 +756,31 @@
   background-size: 200% 100%;
   animation: grimoire-shimmer 1.4s ease-in-out infinite;
 }
+.grimoire-skeleton-row {
+  border-radius: calc(var(--gm-radius) - 4px);
+  background: linear-gradient(90deg, var(--muted) 0%, var(--accent) 50%, var(--muted) 100%);
+  background-size: 200% 100%;
+  animation: grimoire-shimmer 1.4s ease-in-out infinite;
+}
+.grimoire-load-bar {
+  animation: grimoire-slide 1.2s ease-in-out infinite;
+}
+.grimoire-load-elapsed {
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+}
+.grimoire-search:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+@keyframes grimoire-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
 @keyframes grimoire-shimmer {
   from {
     background-position: 100% 0;
@@ -659,7 +803,6 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-
 
 /* Inline code, ids that never wrap, headline */
 .grimoire-root .grimoire-code {
@@ -1070,10 +1213,448 @@ div.grimoire-stat {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .grimoire-skeleton-block {
+  .grimoire-skeleton-block,
+  .grimoire-skeleton-row,
+  .grimoire-load-bar {
     animation: none;
+  }
+  .grimoire-load-bar {
+    width: 100% !important;
+    opacity: 0.5;
   }
   .grimoire-tabs {
     scroll-behavior: auto;
+  }
+}
+
+/* Page tabs (feature and flow pages): real buttons over lazily built panels */
+.grimoire-tabbed {
+  display: grid;
+  gap: var(--gm-gap);
+  min-width: 0;
+}
+.grimoire-pagetabs {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: thin;
+}
+.grimoire-root .grimoire-pagetab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.grimoire-root .grimoire-pagetab:hover {
+  color: var(--foreground);
+}
+.grimoire-root .grimoire-pagetab.is-active {
+  border-bottom-color: var(--brand);
+  color: var(--foreground);
+}
+.grimoire-root .grimoire-pagetab:focus-visible,
+.grimoire-root .grimoire-group-head:focus-visible,
+.grimoire-root .grimoire-jnode:focus-visible,
+.grimoire-tabpanel:focus-visible {
+  outline: none;
+  box-shadow: var(--gm-focus);
+}
+.grimoire-tabpanel {
+  display: grid;
+  min-width: 0;
+}
+.grimoire-tabstack {
+  display: grid;
+  gap: var(--gm-gap);
+  min-width: 0;
+}
+.grimoire-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* Collapsible groups */
+.grimoire-groups {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.grimoire-group {
+  --gm-tone: var(--border);
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gm-tone);
+  border-radius: calc(var(--gm-radius) - 2px);
+  background: var(--background);
+}
+.grimoire-group.is-good {
+  --gm-tone: var(--success);
+}
+.grimoire-group.is-warn {
+  --gm-tone: var(--warning);
+}
+.grimoire-group.is-bad {
+  --gm-tone: var(--destructive);
+}
+.grimoire-root .grimoire-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.grimoire-group-caret {
+  display: inline-block;
+  width: 12px;
+  color: var(--muted-foreground);
+  transition: transform 0.12s;
+}
+.grimoire-group-head[aria-expanded="true"] .grimoire-group-caret {
+  transform: rotate(90deg);
+}
+.grimoire-group-title {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.grimoire-group-body {
+  display: none;
+  padding: 4px 12px 12px;
+}
+.grimoire-group-body.is-open {
+  display: grid;
+  gap: 8px;
+}
+.grimoire-group-note {
+  display: block;
+  margin-bottom: 6px;
+}
+.grimoire-root .grimoire-more.is-hidden {
+  display: none;
+}
+.grimoire-filterbox {
+  flex: 1 1 240px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--input);
+  border-radius: var(--gm-radius);
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+}
+
+/* Feature map: flows by the places they run */
+.grimoire-mapgrid th,
+.grimoire-mapgrid td {
+  vertical-align: top;
+}
+.grimoire-mapgrid thead th:not(:first-child),
+.grimoire-mapgrid td {
+  min-width: 150px;
+}
+.grimoire-mapgrid thead th {
+  white-space: normal;
+}
+.grimoire-mapgrid thead th > span {
+  display: block;
+}
+.grimoire-maptype {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.grimoire-mapgrid thead th:not(:first-child) span:last-child {
+  color: var(--foreground);
+  font-size: 13px;
+}
+.grimoire-maprow {
+  display: grid;
+  gap: 2px;
+  min-width: 150px;
+  text-align: left;
+  white-space: normal;
+}
+.grimoire-mapgrid td.is-empty {
+  text-align: center;
+}
+.grimoire-mapcell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.grimoire-root .grimoire-mapchip {
+  --gm-tone: var(--muted-foreground);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2px 8px 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--gm-tone) 40%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--gm-tone) 9%, transparent);
+  color: var(--foreground);
+  font-size: 12px;
+  text-decoration: none;
+}
+.grimoire-root a.grimoire-mapchip:hover {
+  border-color: var(--brand);
+  text-decoration: underline;
+}
+.grimoire-mapchip.is-page {
+  --gm-tone: var(--info);
+}
+.grimoire-mapchip.is-route {
+  --gm-tone: var(--brand);
+}
+.grimoire-mapchip.is-mail,
+.grimoire-mapchip.is-notification {
+  --gm-tone: var(--chart-3);
+}
+.grimoire-mapchip.is-job,
+.grimoire-mapchip.is-event {
+  --gm-tone: var(--chart-2);
+}
+.grimoire-mapchip.is-missing {
+  border-style: dashed;
+  border-color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+.grimoire-mapchip-label {
+  min-width: 0;
+  font-family: var(--gm-mono);
+  overflow-wrap: anywhere;
+}
+.grimoire-mapchip .grimoire-step-icon {
+  flex: none;
+  color: var(--gm-tone);
+}
+
+/* Journey: connected nodes in order */
+.grimoire-journey {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.grimoire-jny {
+  --gm-jny-cols: 5;
+  display: grid;
+  grid-template-columns: repeat(var(--gm-jny-cols), minmax(0, 1fr));
+  gap: 18px 26px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.grimoire-jstep {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+.grimoire-jstep::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: 26px;
+  height: 2px;
+  background: var(--border);
+}
+.grimoire-jstep:last-child::after,
+.grimoire-jstep:nth-child(5n)::after {
+  display: none;
+}
+.grimoire-root .grimoire-jnode {
+  --gm-tone: var(--muted-foreground);
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--gm-tone) 50%, var(--border));
+  border-radius: calc(var(--gm-radius) - 2px);
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.grimoire-jnode.is-page {
+  --gm-tone: var(--info);
+}
+.grimoire-jnode.is-route {
+  --gm-tone: var(--brand);
+}
+.grimoire-jnode.is-mail,
+.grimoire-jnode.is-notification {
+  --gm-tone: var(--chart-3);
+}
+.grimoire-jnode.is-job,
+.grimoire-jnode.is-event {
+  --gm-tone: var(--chart-2);
+}
+.grimoire-jnode.is-affects {
+  --gm-tone: var(--chart-4);
+}
+.grimoire-root .grimoire-jnode:hover,
+.grimoire-root .grimoire-jnode.is-selected {
+  border-color: var(--gm-tone);
+  background: color-mix(in srgb, var(--gm-tone) 10%, var(--card));
+}
+.grimoire-root .grimoire-jnode.is-missing {
+  border-style: dashed;
+  border-color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 10%, var(--card));
+}
+.grimoire-jnode-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gm-tone);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.grimoire-jnode-index {
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-family: var(--gm-mono);
+}
+.grimoire-jnode-label {
+  font-family: var(--gm-mono);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.grimoire-jnode-flag {
+  color: var(--warning);
+  font-size: 11px;
+  font-weight: 700;
+}
+.grimoire-jpanel:empty {
+  display: none;
+}
+.grimoire-jdetail {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--gm-radius) - 2px);
+  background: var(--card);
+}
+.grimoire-story {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 22px;
+}
+.grimoire-whatif {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.grimoire-whatif-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--info);
+  border-radius: calc(var(--gm-radius) - 2px);
+  background: var(--background);
+  overflow-wrap: anywhere;
+}
+.grimoire-whatif-card p {
+  margin: 0;
+}
+
+@container (max-width: 1000px) {
+  .grimoire-jny {
+    --gm-jny-cols: 4;
+  }
+  .grimoire-jstep:nth-child(5n)::after {
+    display: block;
+  }
+  .grimoire-jstep:nth-child(4n)::after {
+    display: none;
+  }
+}
+@container (max-width: 760px) {
+  .grimoire-jny {
+    --gm-jny-cols: 3;
+  }
+  .grimoire-jstep:nth-child(4n)::after {
+    display: block;
+  }
+  .grimoire-jstep:nth-child(3n)::after {
+    display: none;
+  }
+}
+@container (max-width: 520px) {
+  .grimoire-jny {
+    --gm-jny-cols: 1;
+    gap: 26px;
+  }
+  .grimoire-jstep::after,
+  .grimoire-jstep:nth-child(3n)::after {
+    top: 100%;
+    left: 24px;
+    display: block;
+    width: 2px;
+    height: 26px;
+  }
+  .grimoire-jstep:last-child::after {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .grimoire-mapgrid tr {
+    display: flex;
+    flex-direction: column;
+  }
+  .grimoire-mapgrid th.grimoire-maprow {
+    order: -1;
+    display: grid;
+    padding: 2px 0 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .grimoire-mapgrid td.is-empty {
+    display: none;
+  }
+  .grimoire-mapgrid td {
+    min-width: 0;
+    text-align: left;
   }
 }

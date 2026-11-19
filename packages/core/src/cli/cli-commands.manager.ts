@@ -606,7 +606,7 @@ export class CLICommandsManager {
     // (restarts are already announced as restarts), and it is the process the
     // user actually started.
     if (!isRespawnedWorker()) {
-      displayExecutingCommand(command.name);
+      displayExecutingCommand(command.name, data.args);
     }
 
     if (command.commandPreAction) {
@@ -667,7 +667,7 @@ export class CLICommandsManager {
       // to 0 — re-erasing the very failure this whole path exists to surface.
       if (this.fatalAsyncErrorReported) return "failed";
 
-      displayCommandSuccess(command.name, Date.now() - startTime);
+      displayCommandSuccess(command.name, Date.now() - startTime, data.args);
 
       return "succeeded";
     } catch (error) {

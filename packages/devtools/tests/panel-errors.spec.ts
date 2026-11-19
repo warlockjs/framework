@@ -4,7 +4,9 @@ import type { DevtoolsErrorGroup } from "../src/production/contracts";
 
 const NOW = 10_000_000;
 
-function group(overrides: Partial<DevtoolsErrorGroup>): DevtoolsErrorGroup & { instances: string[] } {
+function group(
+  overrides: Partial<DevtoolsErrorGroup>,
+): DevtoolsErrorGroup & { instances: string[] } {
   return {
     id: "g",
     message: "secret message",

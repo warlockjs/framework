@@ -157,19 +157,34 @@
       "id": "browse-products",
       "status": "shipped",
       "since": "1.0",
-      "heading": "Browse products"
+      "heading": "Browse products",
+      "steps": 3,
+      "cases": 8,
+      "criteria": 3,
+      "tested": 0,
+      "findings": 3
     },
     {
       "id": "new-arrivals",
       "status": "shipped",
       "since": "2.0",
-      "heading": "New arrivals"
+      "heading": "New arrivals",
+      "steps": 2,
+      "cases": 8,
+      "criteria": 3,
+      "tested": 2,
+      "findings": 1
     },
     {
       "id": "wishlist",
       "status": "proposed",
       "since": "3.0",
-      "heading": "Save a product to the wishlist"
+      "heading": "Save a product to the wishlist",
+      "steps": 4,
+      "cases": 8,
+      "criteria": 4,
+      "tested": 0,
+      "findings": 0
     }
   ],
   "bookmap": {

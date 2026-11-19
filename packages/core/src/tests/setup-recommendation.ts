@@ -39,6 +39,8 @@ export function recommendWorkerLifetime(share: SetupShare): string | undefined {
     `[warlock:test] setup took ${Math.round(ratio * 100)}% of the time spent in ${share.files} files ` +
     `(${share.bootstraps} full boots). Consider tests.lifetime: "worker" in src/config/tests.ts with ` +
     `isolate: false on the integration project, and tests.resetDatabase: true; ` +
-    `see the "Opt into one runtime per fork" section of the testing guide.`
+    `see the "Opt into one runtime per fork" section of the testing guide. ` +
+    `Specs that need a fresh module graph per file (vi.mock of app modules) can try the ` +
+    `experimental tests.lifetime: "worker-isolated" instead.`
   );
 }

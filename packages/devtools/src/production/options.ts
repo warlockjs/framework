@@ -31,7 +31,8 @@ export type ResolvedDevtoolsProductionOptions = {
   allowedIps: readonly string[];
   origin: string | null;
   session: { idleMinutes: number; maxHours: number; pendingMinutes: number };
-  twoFactor: "admins" | "everyone";
+  twoFactor: "off" | "admins" | "everyone";
+  passwords: { minLength: number; rejectCommon: boolean };
   rateLimits: {
     windowMinutes: number;
     account: number;
@@ -64,6 +65,7 @@ export const DEVTOOLS_PRODUCTION_DEFAULTS = {
   requireHttps: true,
   session: { idleMinutes: 30, maxHours: 8, pendingMinutes: 10 },
   twoFactor: "admins",
+  passwords: { minLength: 8, rejectCommon: true },
   rateLimits: { windowMinutes: 15, account: 5, ip: 20, global: 100, lockMinutes: 15 },
   explain: { executing: false },
   logLevels: ["warn", "error"],
@@ -187,9 +189,22 @@ export function resolveProductionOptions(
 
   const twoFactor = given.twoFactor ?? defaults.twoFactor;
 
-  if (twoFactor !== "admins" && twoFactor !== "everyone") {
-    invalid("twoFactor", 'use "admins" or "everyone"');
+  if (twoFactor !== "off" && twoFactor !== "admins" && twoFactor !== "everyone") {
+    invalid("twoFactor", 'use "off", "admins" or "everyone"');
   }
+
+  const minLength: number = given.passwords?.minLength ?? defaults.passwords.minLength;
+
+  if (!Number.isInteger(minLength) || minLength < 8 || minLength > 72) {
+    invalid(
+      "passwords.minLength",
+      "use a whole number from 8 to 72 (passwords are limited to 72 bytes, so a longer minimum would refuse every password)",
+    );
+  }
+
+  const rejectCommon: boolean = given.passwords?.rejectCommon ?? defaults.passwords.rejectCommon;
+
+  if (typeof rejectCommon !== "boolean") invalid("passwords.rejectCommon", "use true or false");
 
   const origin = given.origin ?? null;
 
@@ -293,6 +308,7 @@ export function resolveProductionOptions(
       pendingMinutes: defaults.session.pendingMinutes,
     },
     twoFactor,
+    passwords: { minLength, rejectCommon },
     rateLimits: {
       windowMinutes: integerAtLeastOne(
         "rateLimits.windowMinutes",

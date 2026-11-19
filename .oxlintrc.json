@@ -47,6 +47,8 @@
     "tools/release/builds/**",
     "tools/release/sources/**",
     "packages/create-warlock/templates/**",
+    // Grimoire fixtures are sample apps read as data; their unused imports are part of the fixture.
+    "packages/grimoire/tests/fixtures/**",
     "packages/devtools/ui/dashboard/**"
   ]
 }

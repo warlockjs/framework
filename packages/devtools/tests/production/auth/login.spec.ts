@@ -112,6 +112,27 @@ describe("login", () => {
     ).toBe("mfa-enrol");
   });
 
+  it("skips enrolment for every role when twoFactor is off", async () => {
+    const world = createWorld({ options: { twoFactor: "off" } });
+
+    await world.addAccount("boss@example.com", { role: "admin" });
+    await world.addAccount("viewer@example.com");
+
+    for (const email of ["boss@example.com", "viewer@example.com"]) {
+      expect((await world.auth.login({ email, password: PASSWORD }, meta())).stage).toBe("active");
+    }
+  });
+
+  it("still asks for a factor an account has when twoFactor is off", async () => {
+    const world = createWorld({ options: { twoFactor: "off" } });
+
+    await world.addAccount("boss@example.com", { role: "admin", totpSecret: `enc:${FAKE_SECRET}` });
+
+    expect(
+      (await world.auth.login({ email: "boss@example.com", password: PASSWORD }, meta())).stage,
+    ).toBe("mfa-verify");
+  });
+
   it("asks an account with a factor to verify", async () => {
     const world = createWorld();
 

@@ -134,9 +134,7 @@ function CreateDialog({
 }
 
 function statusBadge(share: DevtoolsShareView) {
-  return (
-    <Badge variant={share.status === "active" ? "default" : "outline"}>{share.status}</Badge>
-  );
+  return <Badge variant={share.status === "active" ? "default" : "outline"}>{share.status}</Badge>;
 }
 
 /** Share links: the list with status, a create dialog, the one-time URL, revoke and revoke all. */
@@ -156,8 +154,8 @@ export function SharesPage() {
         <CardHeader>
           <CardTitle>Share links</CardTitle>
           <CardDescription>
-            A read-only link opens one panel&apos;s shared view without an account. The link is shown
-            once, expires on its own and can be revoked at any time.
+            A read-only link opens one panel&apos;s shared view without an account. The link is
+            shown once, expires on its own and can be revoked at any time.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">

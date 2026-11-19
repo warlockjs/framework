@@ -29,7 +29,7 @@ export function Header({
   const email = session.account?.email ?? "Account";
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/85 px-3 backdrop-blur sm:px-5">
+    <header className="sticky top-0 z-20 flex h-14 items-center gap-2.5 border-b bg-background/85 px-4 backdrop-blur sm:px-6">
       <Button
         type="button"
         variant="ghost"

@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.59.0 - 2026-11-19
+
+### Added
+
+- `warlock check` reuses a passing test result for the same tree: when the working tree matches the last passing full run (or a vitest JSON report from `--test-report`, default `node_modules/.cache/warlock/vitest-report.json`, also `WARLOCK_CHECK_TEST_REPORT`), the tests step reports that result instead of running the suite. The tree hash covers tracked and untracked files, the root `.env*` files and linked packages; a report counts only when it passed, lists every spec file and is newer than every file and folder, and a failure recorded for the same tree always runs the tests again. `--rerun-tests` runs it anyway.
+- Experimental `tests.lifetime: "worker-isolated"`: connectors boot once per worker like `"worker"`, and every test file also gets a fresh module graph and clean Vitest state (`vi.mock`, spies, stubbed env and globals, fake timers, module-level caches of application modules). The new `tests.resetAppCaches` hook clears caches the app keeps outside its own modules. It needs the same Vitest setup as `"worker"`.
+
+### Changed
+
+- The test step's time limit is sized from the last full run (1.5 times its duration when that is longer than the 600 s default). `--test-timeout` and `WARLOCK_CHECK_TEST_TIMEOUT` still win.
+- WL8007 messages say how long the test run took before it timed out, was killed or stopped.
+- The setup recommendation mentions `tests.lifetime: "worker-isolated"` for specs that need a fresh module graph per file.
+
+### Fixed
+
+- The "Running ..." and "completed successfully" lines of a CLI command show the arguments you passed instead of the registered placeholders: `Running grimoire build`, not `Running grimoire <action> [release]`.
+
 ## 5.58.0 - 2026-11-18
 
 ### Changed

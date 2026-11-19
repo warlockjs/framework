@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, apiFetch } from "./client";
+import {
+  isConnectionFailure,
+  isDown,
+  reportFailure,
+  reportSuccess,
+  useConnection,
+} from "./connection";
 
 /**
  * Data hooks shared by every tab.
@@ -27,7 +34,8 @@ export function useApi<T>(path: string | null, options: { refreshMs?: number } =
     error: ApiError | undefined;
   }>({ key: null, data: undefined, error: undefined });
   const reload = useCallback(() => setTick((value) => value + 1), []);
-  const key = path === null ? null : `${path}#${tick}`;
+  const { generation } = useConnection();
+  const key = path === null ? null : `${path}#${tick}#${generation}`;
 
   useEffect(() => {
     if (key === null || path === null) return;
@@ -42,6 +50,9 @@ export function useApi<T>(path: string | null, options: { refreshMs?: number } =
         if (controller.signal.aborted) return;
 
         const error = reason instanceof ApiError ? reason : new ApiError(String(reason), 0);
+
+        // While the app is unreachable the banner speaks; panels keep what they show and refetch on return.
+        if (isConnectionFailure(error.status) && isDown()) return;
 
         setResult((previous) => ({ key, data: previous.data, error }));
       },
@@ -108,9 +119,11 @@ export function useStream(types: readonly string[], onEvent: (event: StreamEvent
       source = current;
       current.addEventListener("open", () => {
         delay = 1000;
+        reportSuccess();
       });
       current.addEventListener("error", () => {
         current.close();
+        reportFailure();
 
         if (closed) return;
 

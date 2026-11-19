@@ -276,6 +276,8 @@ describe("sessions", () => {
         account: null,
         csrf: null,
         methods: null,
+        warlockVersion: null,
+        app: null,
       });
     });
 
@@ -290,7 +292,26 @@ describe("sessions", () => {
         methods: { totp: true, passkeys: true },
         expiresAt: auth.session.expiresAt,
       });
+      expect(view).toHaveProperty("warlockVersion");
+      expect(Object.keys(view.app ?? { name: 1, version: 1 }).sort()).toEqual(["name", "version"]);
       expect(JSON.stringify(view)).not.toMatch(/passwordHash|totpSecret|recoveryCodes"|csrfSecret/);
+    });
+
+    it("sends no versions to a session that is not active yet", async () => {
+      const world = createWorld();
+
+      await world.addAccount("viewer@example.com", {
+        mustChangePassword: true,
+        passwordSource: "env",
+      });
+
+      const pending = await authOf(
+        world,
+        await world.auth.login({ email: "viewer@example.com", password: PASSWORD }, meta()),
+      );
+
+      expect(pending.stage).toBe("password-change");
+      expect(world.auth.sessionView(pending)).toMatchObject({ warlockVersion: null, app: null });
     });
 
     it("reports passkeys off when the library is missing", async () => {

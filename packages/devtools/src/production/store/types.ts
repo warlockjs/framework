@@ -323,7 +323,10 @@ export type DevtoolsShareRecord = {
   uses: number;
 };
 
-export type NewDevtoolsShare = Omit<DevtoolsShareRecord, "id" | "revokedAt" | "lastUsedAt" | "uses">;
+export type NewDevtoolsShare = Omit<
+  DevtoolsShareRecord,
+  "id" | "revokedAt" | "lastUsedAt" | "uses"
+>;
 
 export interface DevtoolsShareStore {
   create(input: NewDevtoolsShare): Promise<DevtoolsShareRecord>;

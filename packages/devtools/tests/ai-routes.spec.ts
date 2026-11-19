@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createCollector } from "../src/collector";
 import { resolveDevtoolsOptions } from "../src/options";
 import { mountDevtoolsRoutes } from "../src/server";
+import { registerAiRoutes } from "../src/server/ai-routes";
 import type { DevtoolsAiEvent } from "../src/sources/ai-source";
 import { summarizeAiTrace } from "../src/sources/ai-source";
 
@@ -59,6 +60,27 @@ function fixture(development = true, path = "/__warlock") {
   return { server, store, listeners };
 }
 
+describe("AI route in production", () => {
+  it("says AI runs are not collected there instead of claiming AI is not installed", async () => {
+    const server = Fastify();
+    servers.push(server);
+    const options = resolveDevtoolsOptions();
+    registerAiRoutes(server, {
+      collector: createCollector(options),
+      options,
+      isDevelopment: () => false,
+      mode: "production",
+    });
+    const response = await server.inject({ url: "/api/ai" });
+
+    expect(response.json()).toMatchObject({
+      available: false,
+      reason: "not-collected",
+      runs: [],
+    });
+  });
+});
+
 describe("AI metadata API", () => {
   it("returns per-request runs and root usage aggregates, plus complete span trees by run", async () => {
     const { server } = fixture(true, "/dev");
@@ -87,6 +109,31 @@ describe("AI metadata API", () => {
     expect(missing.statusCode).toBe(404);
   });
 
+  it("says how to turn observation on when nothing is observed", async () => {
+    const server = Fastify();
+    servers.push(server);
+    const options = resolveDevtoolsOptions();
+    mountDevtoolsRoutes(server, {
+      collector: createCollector(options),
+      options,
+      isDevelopment: () => true,
+      ai: {
+        available: true,
+        observationOff: () => true,
+        store: createInMemoryTraceStore(),
+        summarize: (item) => summarizeAiTrace(item),
+        subscribe: () => () => {},
+        dispose() {},
+      },
+    });
+    const response = await server.inject({ url: "/__warlock/api/ai", remoteAddress: "127.0.0.1" });
+    expect(response.json()).toMatchObject({
+      available: false,
+      reason: "observation-off",
+      command: "ai.config({ panoptic: { observeAll: true } })",
+    });
+  });
+
   it("provides install guidance without Panoptic", async () => {
     const server = Fastify();
     servers.push(server);
@@ -99,7 +146,10 @@ describe("AI metadata API", () => {
     const response = await server.inject({ url: "/__warlock/api/ai", remoteAddress: "127.0.0.1" });
     expect(response.json()).toEqual({
       available: false,
-      message: expect.stringContaining("Install"),
+      reason: "ai-missing",
+      title: "AI isn't installed",
+      message: expect.any(String),
+      command: "warlock add ai",
       runs: [],
     });
   });

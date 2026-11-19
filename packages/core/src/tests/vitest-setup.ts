@@ -26,6 +26,14 @@ import { loadTestLocales } from "./test-locales";
 import { performance } from "node:perf_hooks";
 import { config } from "../config";
 import { loadUnitConfig } from "./load-unit-config";
+import {
+  CONNECTORS_MANAGER_LOST_MESSAGE,
+  connectorsManagerSurvived,
+  prepareFreshFile,
+  rememberConnectorsManager,
+  resetFileModuleGraph,
+  usesFreshModuleGraph,
+} from "./fresh-module-graph";
 import { resetTestDatabase, type ResetTestDatabaseOptions } from "./reset-test-database";
 import { closeOpenTestHttpServers } from "./open-test-servers";
 import { captureTestRouterSnapshot, resetTestRuntimeState } from "./reset-test-state";
@@ -68,10 +76,25 @@ import type { TestTimeoutHandle } from "./test-setup-timeout";
 export type { TestConnectorsSelection } from "./test-connectors-selection";
 
 export type TestRuntimeConfiguration = {
-  lifetime?: "file" | "worker";
+  /**
+   * `"file"` boots the app per test file. `"worker"` boots once per worker and
+   * shares modules between files (`isolate: false`). `"worker-isolated"` (experimental) boots
+   * connectors once per worker like `"worker"` and also gives every file a fresh
+   * module graph and clean Vitest state: `vi.mock`, spies, stubbed env, stubbed
+   * globals, fake timers and the module-level caches of application modules do
+   * not carry over. Same Vitest requirements as `"worker"`.
+   */
+  lifetime?: "file" | "worker" | "worker-isolated";
   profileSetup?: boolean;
   /** Runs before fixtures in every worker-lifetime file, including the first. Use a worker-specific database. */
   resetBetweenFiles?: () => void | Promise<void>;
+  /**
+   * `"worker-isolated"` only. Runs after the fresh module graph is in place and
+   * before fixtures, in every file including the first. Clear caches the app
+   * keeps OUTSIDE its own modules (a shared Redis namespace, a process-wide
+   * registry on `globalThis`); module-level state of app modules is already new.
+   */
+  resetAppCaches?: () => void | Promise<void>;
   /**
    * Worker lifetime only. Truncates every table or collection of the default
    * data source before each file (the migrations ledger is kept), then runs
@@ -261,9 +284,11 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
         beginFileProfile(options?.file);
         try {
           await timeTestStep("reset", async () => {
+            await resetFreshModules();
             await restoreTestFakes();
             await installTestFakes(options?.fakes, { isolatedStorage: true });
             await resetBetweenFiles();
+            await runResetAppCaches();
           });
           scope.fileOpen = true;
           markTestFileOpen();
@@ -328,6 +353,9 @@ export async function teardownTest(): Promise<void> {
   if (scope.lifetime === "worker") {
     if (scope.boundary) await settled(scope.boundary);
     scope.fileOpen = false;
+    // A fake clock left by this file must not outlive it: the next file's setup
+    // waits on real timers.
+    if (usesFreshModuleGraph()) await resetFileModuleGraph();
     // The runner owns actual shutdown; afterAll marks the file boundary.
     await timeTestStep("teardown", () => Promise.resolve());
     finishTestProfile();
@@ -651,7 +679,12 @@ async function runTestRuntimeStartup(
     if (scope.lifetime === "worker") {
       // The booted application is the state every later file returns to.
       await captureTestRouterSnapshot();
-      await timeTestStep("reset", () => resetBetweenFiles());
+      rememberConnectorsManager(connectorsManager);
+      await timeTestStep("reset", async () => {
+        await resetFreshModules();
+        await resetBetweenFiles();
+        await runResetAppCaches();
+      });
     }
 
     if (!bound.hasExpired()) {
@@ -856,6 +889,27 @@ function beginFileProfile(file?: string): void {
   if (profileEnabled()) testRuntimeScope().profile = { file: file ?? "unknown", steps: {} };
 }
 
+/**
+ * `"worker-isolated"`: new module graph and clean Vitest state for the file that
+ * is about to open. Fails before anything else runs when the framework itself
+ * was re-evaluated, because then the worker's connectors are out of reach.
+ */
+async function resetFreshModules(): Promise<void> {
+  if (!usesFreshModuleGraph()) return;
+  if (!connectorsManagerSurvived(connectorsManager))
+    throw new TestLifecycleError(CONNECTORS_MANAGER_LOST_MESSAGE);
+  await prepareFreshFile();
+}
+
+async function runResetAppCaches(): Promise<void> {
+  if (!usesFreshModuleGraph()) return;
+  const reset = readRuntimeConfiguration().resetAppCaches;
+  if (reset === undefined || reset === null) return;
+  if (typeof reset !== "function")
+    throw new TestLifecycleError("tests.resetAppCaches must be a function.");
+  await reset();
+}
+
 async function resetBetweenFiles(): Promise<void> {
   // Servers a previous file forgot to close still hold routes and a port.
   await closeOpenTestHttpServers();
@@ -879,6 +933,7 @@ function readRuntimeConfiguration(): {
   lifetime?: unknown;
   profileSetup?: unknown;
   resetBetweenFiles?: unknown;
+  resetAppCaches?: unknown;
   resetDatabase?: unknown;
 } {
   return (
@@ -886,6 +941,7 @@ function readRuntimeConfiguration(): {
       lifetime?: unknown;
       profileSetup?: unknown;
       resetBetweenFiles?: unknown;
+      resetAppCaches?: unknown;
       resetDatabase?: unknown;
     }>("tests", {}) ?? {}
   );

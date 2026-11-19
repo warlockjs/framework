@@ -135,7 +135,12 @@ describe("runCheck", () => {
       nodeVersion: "22.15.0",
     });
 
-    expect(vitest).toHaveBeenCalledWith("/fake/vitest.mjs", ["run", "--passWithNoTests"], root);
+    expect(vitest).toHaveBeenCalledWith(
+      "/fake/vitest.mjs",
+      ["run", "--passWithNoTests"],
+      root,
+      600_000,
+    );
     expect(report.steps.find((step) => step.name === "tests")).toMatchObject({
       status: "blocked",
       detail: "1 test(s) ran",
@@ -194,6 +199,7 @@ describe("runCheck", () => {
       "/fake/vitest.mjs",
       ["related", "src/app/posts/b.ts", "src/app/posts/new.ts", "--run", "--passWithNoTests"],
       root,
+      600_000,
     );
     // Only b.ts imports an auto-loaded file; a.ts was not changed and is not read.
     expect(report.problems.map((problem) => [problem.code, problem.file])).toEqual([

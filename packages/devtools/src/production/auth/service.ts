@@ -9,6 +9,7 @@ import type {
   DevtoolsSessionStage,
   DevtoolsSessionView,
 } from "../contracts";
+import { readVersions } from "../../app-versions";
 import { DEVTOOLS_FAILURE_AUDIT_TYPES } from "../contracts";
 import {
   createErrorRef,
@@ -130,7 +131,13 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     typeof value === "string" ? value.slice(0, MAX_PASSWORD_INPUT) : "";
 
   function requirePolicy(password: string, email: string): void {
-    const problem = checkPasswordPolicy(password, email);
+    const problem = checkPasswordPolicy(password, email, options.passwords);
+
+    if (problem === "auth.password-too-short") {
+      throw new DevtoolsApiError(problem, {
+        message: `Use a password of at least ${options.passwords.minLength} characters.`,
+      });
+    }
 
     if (problem !== null) fail(problem);
   }
@@ -174,7 +181,8 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
   }
 
   const twoFactorRequired = (account: DevtoolsAccountRecord): boolean =>
-    options.twoFactor === "everyone" || account.role === "admin";
+    options.twoFactor === "everyone" ||
+    (options.twoFactor === "admins" && account.role === "admin");
 
   /** Where an account goes after its password is accepted. */
   function nextStage(account: DevtoolsAccountRecord): Stage {
@@ -594,7 +602,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
         );
 
         if (!same) {
-          if (checkPasswordPolicy(admin.password, email) !== null) {
+          if (checkPasswordPolicy(admin.password, email, options.passwords) !== null) {
             throw new DevtoolsProductionConfigError("DT004");
           }
 
@@ -624,7 +632,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
     let record: Parameters<typeof store.accounts.create>[0];
 
     if (admin.password !== null) {
-      if (checkPasswordPolicy(admin.password, email) !== null) {
+      if (checkPasswordPolicy(admin.password, email, options.passwords) !== null) {
         throw new DevtoolsProductionConfigError("DT004");
       }
 
@@ -908,6 +916,8 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
         instance: null,
         methods: null,
         share: null,
+        warlockVersion: null,
+        app: null,
       };
     }
 
@@ -921,6 +931,7 @@ export function createDevtoolsAuth(deps: DevtoolsAuthDeps): DevtoolsAuthService 
       instance,
       methods: { totp: true, passkeys: passkeys !== null },
       share: { enabled: options.share.enabled },
+      ...(auth.stage === "active" ? readVersions() : { warlockVersion: null, app: null }),
     };
   }
 

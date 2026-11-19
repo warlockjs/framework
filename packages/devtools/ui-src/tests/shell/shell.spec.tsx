@@ -27,12 +27,40 @@ describe("shell", () => {
     expect(await screen.findByText("tab:requests route: instance:all")).toBeInTheDocument();
   });
 
+  it("shows the Warlock version at the top and the app name and version at the bottom", async () => {
+    mockApi({
+      "api/auth/session": {
+        body: sessionView({ warlockVersion: "5.58.0", app: { name: "shop", version: "1.4.0" } }),
+      },
+      "api/panels": { body: panels },
+    });
+    render(<App />);
+
+    expect(await screen.findByTestId("warlock-version")).toHaveTextContent("v5.58.0");
+    expect(screen.getByTestId("app-version")).toHaveTextContent("shop");
+    expect(screen.getByTestId("app-version")).toHaveTextContent("v1.4.0");
+  });
+
+  it("omits the version lines when the server does not know them", async () => {
+    mockApi({
+      "api/auth/session": { body: sessionView() },
+      "api/panels": { body: panels },
+    });
+    render(<App />);
+
+    await screen.findByRole("link", { name: "Requests" });
+    expect(screen.queryByTestId("app-version")).not.toBeInTheDocument();
+    expect(screen.getByTestId("warlock-version")).not.toHaveTextContent(/v\d/);
+  });
+
   it("keeps the header and the other tabs when one tab fails to draw", async () => {
     window.location.hash = "#broken";
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     mockApi({
       "api/auth/session": { body: sessionView() },
-      "api/panels": { body: [...panels, { id: "broken", title: "Broken", type: "built-in", shareable: false }] },
+      "api/panels": {
+        body: [...panels, { id: "broken", title: "Broken", type: "built-in", shareable: false }],
+      },
     });
     render(<App />);
 
@@ -64,7 +92,9 @@ describe("shell", () => {
     window.location.hash = "#book";
     mockApi({
       "api/auth/session": { body: sessionView() },
-      "api/panels": { body: [...panels, { id: "book", title: "Book", type: "package", shareable: false }] },
+      "api/panels": {
+        body: [...panels, { id: "book", title: "Book", type: "package", shareable: false }],
+      },
     });
     render(<App />);
 

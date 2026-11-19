@@ -13,7 +13,7 @@ export const DEVTOOLS_CONFIG_CODES = {
   DT003:
     "Devtools production mode has no admin yet. Set DEVTOOLS_ADMIN_EMAIL with DEVTOOLS_ADMIN_PASSWORD or DEVTOOLS_SETUP_TOKEN, or run `warlock devtools:reset-admin --email <email>`.",
   DT004:
-    "DEVTOOLS_ADMIN_PASSWORD does not meet the password rules (at least 8 characters, at most 72 bytes, not a common password, not the email). Choose another one.",
+    "DEVTOOLS_ADMIN_PASSWORD does not meet the password rules (the minimum length, at most 72 bytes, not a common password unless `passwords.rejectCommon` is false, not the email). Choose another one.",
   DT005:
     "Devtools production mode stores its accounts in the database. Install @warlock.js/cascade and configure a database connection.",
   DT006:
@@ -54,7 +54,8 @@ export const DEVTOOLS_ERROR_MESSAGES: Record<DevtoolsErrorCode, string> = {
     "The code is not correct or has expired. Enter the current 6-digit code from your authenticator app, or a recovery code.",
   "auth.invalid-setup-token":
     "This setup link is not valid. Use the link built from DEVTOOLS_SETUP_TOKEN, or run `warlock devtools:reset-admin`.",
-  "auth.password-too-short": "Use a password of at least 8 characters.",
+  "auth.password-too-short":
+    "Use a longer password. The minimum length is set by passwords.minLength (8 characters by default).",
   "auth.password-too-long": "Use a password of at most 72 bytes (about 72 letters).",
   "auth.password-common": "This password is too common. Choose one that is harder to guess.",
   "auth.password-same-as-email": "The password must not be your email address. Choose another one.",
@@ -149,10 +150,10 @@ export class DevtoolsApiError extends Error {
 
   public constructor(
     code: DevtoolsErrorCode,
-    options: { ref?: string; instance?: string; cause?: unknown } = {},
+    options: { ref?: string; instance?: string; cause?: unknown; message?: string } = {},
   ) {
     super(
-      DEVTOOLS_ERROR_MESSAGES[code],
+      options.message ?? DEVTOOLS_ERROR_MESSAGES[code],
       options.cause === undefined ? {} : { cause: options.cause },
     );
     this.name = "DevtoolsApiError";

@@ -68,6 +68,7 @@ npx warlock grimoire build            # bring the book up to date
 npx warlock grimoire build --force    # rebuild every entry and read the routes again
 npx warlock grimoire build --site     # also write the static site to grimoire/book/site
 npx warlock grimoire build --site --out public/grimoire
+npx warlock grimoire build --site --product   # the business export: the Product map only
 npx warlock grimoire build --json
 ```
 
@@ -80,7 +81,17 @@ time      0.4s
 The summary is always the last lines, after any output the app prints while it boots. A run with nothing to do prints `book      up to date`. A task waiting for the owner is counted under `waiting`
 only, not under `open`. `--site` writes the same view as the devtools tab as one
 static `index.html` (see [Devtools](/v/latest/grimoire/guides/09-devtools/)); `--out` takes a folder inside the
-project; a folder outside it, or the project folder itself, stops the command with `GR9006`. `--json` prints `{ rebuilt, changed, written, removed, routes, site, problems }`.
+project; a folder outside it, or the project folder itself, stops the command with `GR9006`. `--json` prints `{ rebuilt, changed, written, removed, routes, site, siteUpToDate, siteMode, problems }`.
+
+`--site --product` writes the business export: the Product map as a read-only page, opening on the map, with no
+file paths, test names, export names, check findings or per-file answers (the same detail a share link hides). It is
+much smaller than the full export, because it carries no per-file answers and no code search; the screenshots the
+written files use are copied next to it. Hand this one to people who do not read code. The full export stays the
+developer view.
+
+A site export carries a stamp of the book it was built from (the code and test files, the written folders, the test
+results). When the folder already holds a page with the same stamp and mode, `build --site` does not write it again
+and prints `(up to date, not rebuilt)`; `--force` writes it anyway.
 
 ## `warlock grimoire check`
 
@@ -276,11 +287,18 @@ file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest prod
 …
 ```
 
+Search reads the written content of features and flows too: a flow is found by the words of its title, summary,
+story, cases and criteria (`AC-5` finds the flow that holds that criterion, and the hit shows the part that matched,
+like `[AC-5: A receipt is emailed]`). Written content ranks above files and exports of the same match, and the answer is grouped by
+type (features and flows first). Files and exports never push matching features and flows out of the list: up to
+three quarters of the limit is kept for them first. When the limit cuts the list, a last line counts the matches per
+type (`showing 20 of 41 (2 flow, 39 file); raise --limit for more`), and `--json` carries the same `counts`.
+
 Search looks at features, flows, blocks, pages, screens, API routes, mail and job names, file paths, export names, header sentences and
 tasks. Case does not matter, and every word must appear, in any order. Hits are ranked: an exact name or
 path first, then a name or path that starts with the text, then one that holds the words as whole words, then a
-substring, then a match found only in the header sentence, and last a fuzzy match (the letters in order, for texts of
-four letters or more). Within a rank the type decides: feature, flow, block, page, screen, route, mail, job, file, export, task.
+substring, then a match found only in the header sentence or in a flow's written text, and last a fuzzy match (the letters in order, for texts of
+four letters or more). A feature or flow adds two ranks to its match. Within a rank the type decides: feature, flow, block, page, screen, route, mail, job, file, export, task.
 `--limit` defaults to 20.
 
 ### Errors
@@ -306,24 +324,31 @@ GR9003  No feature has the id "billing". Features: auth, catalog, orders.
 `--json` prints. The read tools never boot the app; they use the cached route facts (only the first `grimoire_route` of a project with
 no route facts reads them once, as `warlock scry --route` does).
 
-| Tool               | Input                           | Answer                                            | Writes |
-| ------------------ | ------------------------------- | ------------------------------------------------- | ------ |
-| `grimoire_file`    | `{ file }`                      | the file answer                                   | no     |
-| `grimoire_impact`  | `{ file }`                      | the impact answer                                 | no     |
-| `grimoire_route`   | `{ method, path }`              | the route answer                                  | no     |
-| `grimoire_feature` | `{ feature }`                   | the feature answer                                | no     |
+| Tool               | Input                              | Answer                                                 | Writes |
+| ------------------ | ---------------------------------- | ------------------------------------------------------ | ------ |
+| `grimoire_file`    | `{ file }`                         | the file answer                                        | no     |
+| `grimoire_impact`  | `{ file }`                         | the impact answer                                      | no     |
+| `grimoire_route`   | `{ method, path }`                 | the route answer                                       | no     |
+| `grimoire_feature` | `{ feature }`                      | the feature answer                                     | no     |
 | `grimoire_flow`    | `{ flow, files?, step?, offset? }` | the compact flow answer, or one page of a step's files | no     |
-| `grimoire_search`  | `{ text, limit? }`              | the search answer                                 | no     |
-| `grimoire_check`   | `{}`                            | the check report                                  | no     |
-| `grimoire_build`   | `{ force? }`                    | `{ rebuilt, written, removed, routes }`           | no     |
-| `grimoire_release` | `{ release }`                   | the release file, its list and whether it changed | yes    |
-| `grimoire_explain` | `{ code }`                      | the code's title, fix, skill and docs link        | no     |
+| `grimoire_search`  | `{ text, limit? }`                 | the search answer                                      | no     |
+| `grimoire_check`   | `{}`                               | the check report                                       | no     |
+| `grimoire_build`   | `{ force? }`                       | `{ rebuilt, written, removed, routes }`                | no     |
+| `grimoire_release` | `{ release }`                      | the release file, its list and whether it changed      | yes    |
+| `grimoire_explain` | `{ code }`                         | the code's title, fix, skill and docs link             | no     |
 
 `grimoire_flow` answers with counts instead of file lists: each step has `counts` (`direct`, `feature`, `reachable`,
 `typeOnly`) and its first 50 direct imports, so the answer stays small on a large app. To see the files behind one
 step, call it again with `files` (`reachable` or `type-only`) and `step` (the step number); a page holds 200 files
 sorted by module, and `offset` moves to the next page. `warlock scry --flow --json` and the `scry()` function keep the
 full lists.
+
+The MCP server keeps the opened book in memory between calls. Each read tool checks that nothing changed with a stamp
+of `stat` results (the size and modified time of the code and test files, the folders that hold them, every written
+file, the manifest and the test results file; no file is read) and answers from the kept book when the stamp is the
+same. A change to a code file, a written file or the manifest opens the book again on the next call, so answers never
+go stale. On a large app this turns a call that reopened the book (seconds) into a stat pass over the files (a fraction of a
+second). `warlock scry` as a one-off command opens the book once per process; the kept book helps long-running processes.
 
 The read tools and `grimoire_build` may refresh the book, which is a git-ignored cache, so they do not count as
 writes. `grimoire_build` reads the routes again when they changed (under `warlock mcp` this boots the app once, the

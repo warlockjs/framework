@@ -41,13 +41,46 @@ const answer = (runs: AiRun[]) => ({
 beforeEach(() => FakeEventSource.install());
 
 describe("AI panel", () => {
-  it("renders install guidance", async () => {
+  it("renders the unavailable state as title, one line and a copyable command", async () => {
     mockApi([
-      ["api/ai", { available: false, message: "Install @warlock.js/ai-panoptic", runs: [] }],
+      [
+        "api/ai",
+        {
+          available: false,
+          reason: "panoptic-missing",
+          title: "Panoptic isn't installed",
+          message: "Your app uses @warlock.js/ai. Add Panoptic to see its runs.",
+          command: "warlock add ai-panoptic",
+          runs: [],
+        },
+      ],
     ]);
     renderPanel(AiPanel);
 
-    expect(await screen.findByText("Install @warlock.js/ai-panoptic")).toBeInTheDocument();
+    expect(await screen.findByText("Panoptic isn't installed")).toBeInTheDocument();
+    expect(screen.getByText(/Add Panoptic to see its runs/)).toBeInTheDocument();
+    expect(screen.getByText("warlock add ai-panoptic")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
+  });
+
+  it("renders the load error and versions without a command", async () => {
+    mockApi([
+      [
+        "api/ai",
+        {
+          available: false,
+          reason: "panoptic-failed",
+          title: "Panoptic could not be loaded",
+          message: "Panoptic is installed but failed to load.",
+          detail: "boom (@warlock.js/ai 5.58.0, @warlock.js/ai-panoptic 5.57.0)",
+          runs: [],
+        },
+      ],
+    ]);
+    renderPanel(AiPanel);
+
+    expect(await screen.findByText(/boom \(@warlock.js\/ai 5.58.0/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /copy/i })).toBeNull();
   });
 
   it("renders an observed-but-empty state", async () => {

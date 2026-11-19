@@ -365,6 +365,19 @@ function formatFlow(result: ScryFlowResult): string[] {
   ];
 }
 
+/** One line telling what the limit cut, per type, or nothing when every match is listed. */
+function truncatedLine(result: ScrySearchResult): string[] {
+  const total = Object.values(result.counts).reduce((sum, count) => sum + (count ?? 0), 0);
+
+  if (total <= result.hits.length) return [];
+
+  const parts = Object.entries(result.counts).map(([type, count]) => `${count} ${type}`);
+
+  return [
+    `showing ${result.hits.length} of ${total} (${parts.join(", ")}); raise --limit for more`,
+  ];
+}
+
 function formatSearch(result: ScrySearchResult): string[] {
   if (result.hits.length === 0)
     return [`no match for ${JSON.stringify(result.text)}`, ...notes(result)];
@@ -372,12 +385,14 @@ function formatSearch(result: ScrySearchResult): string[] {
   const idWidth = Math.min(32, Math.max(0, ...result.hits.map((hit) => hit.id.length)));
 
   return [
-    ...result.hits.map((hit) =>
-      (hit.detail === null
-        ? `${hit.type.padEnd(9)}${hit.id}`
-        : `${hit.type.padEnd(9)}${hit.id.padEnd(idWidth)}  ${hit.detail}`
-      ).trimEnd(),
+    ...result.hits.map(
+      (hit) =>
+        (hit.detail === null
+          ? `${hit.type.padEnd(9)}${hit.id}`
+          : `${hit.type.padEnd(9)}${hit.id.padEnd(idWidth)}  ${hit.detail}`
+        ).trimEnd() + (hit.matched === undefined ? "" : `   [${hit.matched}]`),
     ),
+    ...truncatedLine(result),
     ...notes(result),
   ];
 }

@@ -105,8 +105,11 @@ An older core without the request log leaves the panel in-memory only.
 ## AI runs alongside HTTP requests
 
 The **AI** tab and each request's **AI runs** section display completed traces
-from optional `@warlock.js/ai-panoptic`. If it cannot be imported, the tab shows
-install/restart guidance and the other panels keep working.
+from optional `@warlock.js/ai-panoptic`. If the tab is empty it says why
+(`/api/ai` answers `reason`: `ai-missing`, `panoptic-missing`, `panoptic-failed` with the load
+error (absolute paths replaced) and versions, `observation-off`, or `not-collected` in the
+production dashboard, which never collects AI runs) with a title, one line and a copyable command; the
+other panels keep working.
 
 ```bash
 warlock add devtools
@@ -282,7 +285,7 @@ Environment variables:
 
 The accounts live in the app's database through Cascade. Roles are `viewer`
 and `admin`. Admins invite users with a 24-hour single-use link. Two-factor is
-required for admins by default (`twoFactor: "admins"`; or `"everyone"`): an
+required for admins by default (`twoFactor: "admins"`; or `"everyone"`, or `"off"` for nobody, which logs a boot warning; an account that has a factor is always asked for it): an
 authenticator app, or passkeys when `@simplewebauthn/server` is installed, plus
 10 recovery codes. Every closed case answers the app's own 404.
 
@@ -292,7 +295,7 @@ Options under `production` (all optional, defaults in brackets):
 `requestRetentionHours` [24], `maxStoredSamplesPerMinute` [120],
 `reportIntervalMs` [10000], `trustedProxies` [[]], `requireHttps` [true],
 `allowedIps` [[]], `origin`, `session.idleMinutes` [30], `session.maxHours` [8],
-`twoFactor` ["admins"], `rateLimits.windowMinutes` [15], `rateLimits.account`
+`twoFactor` ["admins"], `passwords.minLength` [8, from 8 to 72], `passwords.rejectCommon` [true], `rateLimits.windowMinutes` [15], `rateLimits.account`
 [5], `rateLimits.ip` [20], `rateLimits.global` [100], `rateLimits.lockMinutes`
 [15], `explain.executing` [false], `panels` [{}], `logLevels` [warn, error],
 `auditRetentionDays` [90], `passkeys.rpName`, `passkeys.rpId`.
@@ -355,18 +358,18 @@ Options under `production` (all optional, defaults in brackets):
 The app refuses to boot with a `DevtoolsProductionConfigError`
 (`DEVTOOLS_CONFIG_CODES` holds the messages):
 
-| Code    | Fix                                                                                                                         |
-| ------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `DT001` | Set `DEVTOOLS_PATH` or `production.path`.                                                                                   |
-| `DT002` | Use a path of 8+ characters starting with `/`, with letters, digits and `- _ . ~ /` only; not `/__warlock`.                 |
-| `DT003` | No admin: set `DEVTOOLS_ADMIN_EMAIL` plus a password or setup token, or run `warlock devtools:reset-admin --email <email>`. |
-| `DT004` | The env password breaks the rules (8+ characters, at most 72 bytes, not common, not the email).                             |
-| `DT005` | Install `@warlock.js/cascade` and configure a database.                                                                     |
-| `DT006` | Set `encryption.key` (64 hex characters).                                                                                   |
-| `DT007` | An option is invalid (`share.maxDays` must be 1 to 365); the message names it.                                              |
-| `DT008` | Add `devtoolsMigrations` to `database.migrations` and run `warlock migrate` (`devtools_shares` when sharing is on).         |
-| `DT009` | Set the password or the setup token, not both.                                                                              |
-| `DT010` | The setup token needs 32+ characters (`openssl rand -base64 32`).                                                           |
+| Code    | Fix                                                                                                                                                |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DT001` | Set `DEVTOOLS_PATH` or `production.path`.                                                                                                          |
+| `DT002` | Use a path of 8+ characters starting with `/`, with letters, digits and `- _ . ~ /` only; not `/__warlock`.                                        |
+| `DT003` | No admin: set `DEVTOOLS_ADMIN_EMAIL` plus a password or setup token, or run `warlock devtools:reset-admin --email <email>`.                        |
+| `DT004` | The env password breaks the rules (`passwords.minLength`+ characters, at most 72 bytes, not common unless `rejectCommon` is false, not the email). |
+| `DT005` | Install `@warlock.js/cascade` and configure a database.                                                                                            |
+| `DT006` | Set `encryption.key` (64 hex characters).                                                                                                          |
+| `DT007` | An option is invalid (`share.maxDays` must be 1 to 365); the message names it.                                                                     |
+| `DT008` | Add `devtoolsMigrations` to `database.migrations` and run `warlock migrate` (`devtools_shares` when sharing is on).                                |
+| `DT009` | Set the password or the setup token, not both.                                                                                                     |
+| `DT010` | The setup token needs 32+ characters (`openssl rand -base64 32`).                                                                                  |
 
 Every dashboard URL gives a 404: check that `production.enabled` is true, the
 dashboard is not disabled or locked (`warlock devtools:enable`), the request is
@@ -457,6 +460,11 @@ Panel styling: a package panel's CSS may use only the dashboard's variables (`DE
 `@warlock.js/devtools`: `--background --foreground --card --muted --muted-foreground --accent --border --brand
 --success --warning --info --destructive --chart-1..5` and the other shadcn names) plus variables it defines itself.
 Never use another name (such as `--text` or `--surface`): the dashboard does not define it, and text can become
-unreadable. The text tokens meet 4.5:1 contrast on `--background` and `--card` in both themes.
+unreadable. The text tokens meet 4.5:1 contrast on `--background` and `--card` in both themes. In the light theme `--primary` is the
+gold fill (dark `--primary-foreground` on it) and `--brand` is the deep amber for text; in the dark theme both are gold.
+
+The dashboard shows the Warlock logo and installed core version at the top of the sidebar and the app's own
+`package.json` name and version at the bottom. They come from `GET api/auth/session` (`warlockVersion`, `app`), read once
+on the server, signed-in only, `null` when unknown.
 
 

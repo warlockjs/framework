@@ -38,6 +38,13 @@ Installing Panoptic alone does not enable observation. Use `observeAll: true`,
 cannot be loaded or does not provide the trace-subscription API, the AI tab shows
 install/restart guidance; the other panels continue to work.
 
+When the tab is empty it says which case applies: `@warlock.js/ai` is not installed
+(`warlock add ai`), Panoptic is not installed (`warlock add ai-panoptic`), Panoptic is
+installed but failed to load (the load error, with file paths replaced, and both versions are shown), or
+observation is off (add `ai.config({ panoptic: { observeAll: true } })` to
+`src/config/ai.ts`). In the production dashboard the tab says that AI runs are not collected
+there; open it in development to see them.
+
 ## What appears
 
 | Field      | Meaning                                                                                                                                                                                                                                              |

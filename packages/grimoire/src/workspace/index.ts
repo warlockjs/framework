@@ -118,6 +118,8 @@ export async function runGrimoire(
     collectedWrite = await writeCollectedFiles(root, collected);
   }
 
+  const host = (await adapter.host?.(root)) ?? null;
+
   return {
     snapshot: {
       root,
@@ -133,6 +135,7 @@ export async function runGrimoire(
       collected,
       annotations,
       routes: book.routes,
+      host,
     },
     rebuilt,
     changed,

@@ -61,7 +61,7 @@ npx warlock scry --flow catalog/new-arrivals                        # one flow, 
 
 Add `--json` for machine-readable output. `--impact` lists API routes, pages, flows and features,
 including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`
-prints every line. `--search` ranks exact matches first. Read the flows it names and run their tests after
+prints every line. `--search` also reads a flow's summary, story, cases and criteria (`AC-5` works), ranks features and flows above files, and groups hits by type; a hit found by written text shows the part that matched in brackets. Read the flows it names and run their tests after
 your change.
 
 A file's entry is also at a fixed path: `src/app/auth/controllers/login.controller.ts` is described
@@ -69,13 +69,14 @@ in `grimoire/book/app/auth/controllers/login.controller.json`.
 
 ## Commands
 
-| Command                                     | Does                                                                                                          |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `warlock grimoire build`                    | Builds or refreshes the book. `scry` and `check` do it when it is stale                                       |
-| `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`)                                          |
-| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error; `--all` lists every warning |
-| `warlock grimoire release <release>`        | Writes the collected list into `grimoire/releases/<release>.md`                                               |
-| `warlock explain GR2001`                    | Explains a finding code                                                                                       |
+| Command                                     | Does                                                                                                                                   |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `warlock grimoire build`                    | Builds or refreshes the book. `scry` and `check` do it when it is stale                                                                |
+| `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`); skipped when the folder is already current (`--force` writes it) |
+| `warlock grimoire build --site --product`   | Writes the business export: the Product map only, no file paths, test names or per-file answers                                        |
+| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error; `--all` lists every warning                          |
+| `warlock grimoire release <release>`        | Writes the collected list into `grimoire/releases/<release>.md`                                                                        |
+| `warlock explain GR2001`                    | Explains a finding code                                                                                                                |
 
 Every finding has a code (`GR2001`) and a fix hint. A finding marked `(expected)` belongs to work
 that is still `proposed`; it does not fail the check.
@@ -83,6 +84,8 @@ that is still `proposed`; it does not fail the check.
 ## What to trust
 
 - **Exports, imports, importers, routes, middleware, pages:** read from the code. Trust them.
+- **Route middleware:** a route step also reaches the middleware files the matched route names (not the routes file's other imports). Roles that run by being present (migration, seed, command, main, layout, root) and spec-only helpers are not listed as unreached.
+- **Without route facts** (`routes: missing`): route, mail, notification, job and event steps are `found: null` (not checked), not resolved and not failed; `GR5008` skips mail and notification entries.
 - **Files behind a route:** every file the handler can reach through imports. It is not the exact
   call path; open the handler to see which ones it really uses.
 - **Reached from:** only links and redirects written as plain values. `unknown` means look.
@@ -131,8 +134,26 @@ From `@warlock.js/grimoire` (no dependency on core or web):
 
 From `@warlock.js/grimoire/warlock` (needs `@warlock.js/core`): `registerGrimoireCommands` returns
 the `grimoire` and `scry` commands for `cli.commands` in `warlock.config.ts`;
-`createWarlockAdapter` builds the adapter that feeds the book from the inspect report;
+`createWarlockAdapter` builds the adapter that feeds the book from the inspect report (it also supplies the
+optional `host()` described below);
 `collectMobileFacts` lists mobile screens from Expo Router file names.
+
+A custom `BookAdapter` may add `host(root)`, returning `{ name, version, logo, app }` (the framework's name,
+installed version and a small `data:` logo, and the app's own `{ name, version }`), or `null`. The tab shows the
+framework logo and version in its header and the app name and version at the bottom, in the static export and
+in the shared Product map too; an adapter without `host()` shows nothing. The summary and product answers carry it
+as `host` (`null` when absent); the feature answer's `flows` also carry `steps`, `cases`, `criteria`, `tested` and
+`findings` counts.
+
+The devtools feature route (`/features/:feature`) adds three fields for the tabbed page: `map` (the feature map:
+`columns` are each site and mobile app the flows touch, titled by the app's heading, then `api`, then `background`;
+`rows` has one entry per flow with `cells` keyed by column id, each cell a list of chips `{ step, type, label, found,
+app, page, method, path, file }` taken from the steps the book already resolved), `fileGroups` (the own files by module)
+and `proofs` (each flow's criteria with their tests). Each product map feature card carries `strip`: `flows`
+`{ total, shipped }`, `criteria` `{ total, proven, failing, measured }` (`measured` is `false` when tagged tests have no
+recorded results), `screenshots` `{ places, present }` and `findings` `{ errors, warnings }`. The feature and flow pages
+have tabs with their own hash routes: `feature/<id>[/flows|files|findings|tests]` and
+`flow/<feature>/<flow>[/proof|files|findings]`.
 
 From `@warlock.js/grimoire/vitest`: `grimoireReporter` records the last result of every test marked
 `// @proves` into `grimoire/book/test-results.json`. Add it to the Vitest `reporters` list.

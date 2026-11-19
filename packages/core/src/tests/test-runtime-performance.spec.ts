@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clockFake } from "./fakes/clock-fake";
 import { idsFake } from "./fakes/ids-fake";
 import { ids } from "../utils/ids";
+import { rememberConnectorsManager } from "./fresh-module-graph";
 import { getTestLifecycleRegistry } from "./test-lifecycle-state";
 import { configureTestWorker, getTestRuntimeStats, testRuntimeScope } from "./test-runtime-scope";
 import { trackOpenTestServer } from "./open-test-servers";
@@ -19,6 +20,12 @@ const mocks = vi.hoisted(() => ({
   resetDatabase: vi.fn(async () => [] as string[]),
   captureSnapshot: vi.fn(async () => undefined),
   resetState: vi.fn(async () => ({ routesRestored: true, cacheFlushed: false })),
+  resetGraph: vi.fn(async () => ({ modulesReset: true })),
+}));
+vi.mock("./fresh-module-graph", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./fresh-module-graph")>()),
+  resetFileModuleGraph: mocks.resetGraph,
+  prepareFreshFile: mocks.resetGraph,
 }));
 vi.mock("./reset-test-database", () => ({ resetTestDatabase: mocks.resetDatabase }));
 vi.mock("./reset-test-state", () => ({
@@ -122,6 +129,51 @@ describe("test runtime performance modes", () => {
     await cleanup();
     await cleanup();
     expect(mocks.shutdown).toHaveBeenCalledTimes(1);
+  });
+
+  it("worker-isolated boots once, gives each file a fresh module graph, then runs resetBetweenFiles and resetAppCaches", async () => {
+    const order: string[] = [];
+    mocks.resetGraph.mockImplementation(async () => {
+      order.push("modules");
+      return { modulesReset: true };
+    });
+    mocks.settings = {
+      lifetime: "worker-isolated",
+      resetBetweenFiles: () => void order.push("between"),
+      resetAppCaches: () => void order.push("caches"),
+    };
+    for (let file = 0; file < 3; file += 1) {
+      order.length = 0;
+      await setupTest({ ...options, file: `iso-${file}.test.ts` });
+      expect(order).toEqual(["modules", "between", "caches"]);
+      await setupTest(options); // repeated calls within a file reset nothing
+      expect(order).toEqual(["modules", "between", "caches"]);
+      order.length = 0;
+      await teardownTest(); // a fake clock must not outlive its file
+      expect(order).toEqual(["modules"]);
+    }
+    expect(getTestRuntimeStats()).toEqual({ bootstraps: 1, files: 3 });
+    expect(mocks.shutdown).not.toHaveBeenCalled();
+  });
+
+  it("plain worker lifetime never resets modules and ignores resetAppCaches", async () => {
+    const caches = vi.fn();
+    mocks.settings = { lifetime: "worker", resetAppCaches: caches };
+    for (let file = 0; file < 2; file += 1) {
+      await setupTest(options);
+      await teardownTest();
+    }
+    expect(mocks.resetGraph).not.toHaveBeenCalled();
+    expect(caches).not.toHaveBeenCalled();
+  });
+
+  it("worker-isolated refuses a file when the framework was re-evaluated", async () => {
+    mocks.settings = { lifetime: "worker-isolated" };
+    await setupTest(options);
+    await teardownTest();
+    rememberConnectorsManager({}); // the booted manager is no longer the one this file imports
+    await expect(setupTest(options)).rejects.toThrow(/stay externalized/);
+    getTestLifecycleRegistry().state = "idle";
   });
 
   it("truncates the database and closes leaked test servers before each worker-lifetime file", async () => {

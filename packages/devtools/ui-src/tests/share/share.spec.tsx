@@ -65,7 +65,9 @@ describe("the share screen", () => {
     expect(context.asset("product-map.css")).toBe(
       new URL("api/share/assets/product-map.css", document.baseURI).href,
     );
-    expect(context.file("a b/c.png")).toBe(new URL("api/share/files/a%20b/c.png", document.baseURI).href);
+    expect(context.file("a b/c.png")).toBe(
+      new URL("api/share/files/a%20b/c.png", document.baseURI).href,
+    );
     expect(context.href("product/feature/x")).toBe("#share/product/feature/x");
   });
 
@@ -154,7 +156,9 @@ describe("the share screen", () => {
       "api/share/info": () => {
         attempts += 1;
 
-        return attempts === 1 ? { status: 503, body: { error: "The server is busy." } } : { body: info };
+        return attempts === 1
+          ? { status: 503, body: { error: "The server is busy." } }
+          : { body: info };
       },
     });
 

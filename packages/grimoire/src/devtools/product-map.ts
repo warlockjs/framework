@@ -29,6 +29,7 @@ import type {
   ProductPlannedItem,
   ProductRelease,
   ProductScreenshot,
+  ProductStrip,
   ProductStoryStep,
 } from "./answers";
 import { GrimoirePanelError } from "./data";
@@ -65,6 +66,8 @@ type Context = {
   report: GrimoireCheckReport;
   featureErrors: Map<string, number>;
   flowErrors: Map<string, number>;
+  /** Unexpected findings by feature id. */
+  featureFindings: Map<string, { errors: number; warnings: number }>;
   captured: { features: Map<string, ErrorCount>; flows: Map<string, ErrorCount> } | null;
   resultsMissing: boolean;
 };
@@ -142,9 +145,23 @@ function contextOf(snapshot: GrimoireSnapshot, options: ProductMapOptions): Cont
   const report = reportOf(snapshot);
   const featureErrors = new Map<string, number>();
   const flowErrors = new Map<string, number>();
+  const featureFindings = new Map<string, { errors: number; warnings: number }>();
 
   for (const finding of report.findings) {
-    if (finding.expected || finding.severity !== "error") continue;
+    if (finding.expected) continue;
+
+    const owner = finding.subject.feature ?? finding.subject.flow?.split("/")[0] ?? null;
+
+    if (owner !== null) {
+      const known = featureFindings.get(owner) ?? { errors: 0, warnings: 0 };
+
+      if (finding.severity === "error") known.errors += 1;
+      else known.warnings += 1;
+
+      featureFindings.set(owner, known);
+    }
+
+    if (finding.severity !== "error") continue;
 
     const flow = finding.subject.flow;
     const feature = finding.subject.feature ?? flow?.split("/")[0] ?? null;
@@ -159,8 +176,8 @@ function contextOf(snapshot: GrimoireSnapshot, options: ProductMapOptions): Cont
     report,
     featureErrors,
     flowErrors,
-    captured:
-      options.errors === null ? null : captureErrors(snapshot, options.errors, Date.now()),
+    featureFindings,
+    captured: options.errors === null ? null : captureErrors(snapshot, options.errors, Date.now()),
     resultsMissing: snapshot.results === null && snapshot.proofs.length > 0,
   };
 }
@@ -185,7 +202,9 @@ function healthOf(
   }
 
   const errors =
-    context.captured === null ? null : { count: captured?.count ?? 0, lastSeen: captured?.lastSeen ?? null };
+    context.captured === null
+      ? null
+      : { count: captured?.count ?? 0, lastSeen: captured?.lastSeen ?? null };
   const recent = errors?.count ?? 0;
   const total = counts.total;
   let level: ProductHealth["level"];
@@ -201,8 +220,14 @@ function healthOf(
     level = "attention";
     reason = `${counts.noTest} of ${total} checks have no test`;
   } else if (context.resultsMissing && total > 0) {
-    level = "attention";
-    reason = "No test results recorded";
+    // A missing results file is a missing measurement, not a product problem: a shared (business) view shows it neutral.
+    if (context.options.shared) {
+      level = "unknown";
+      reason = "Test results are not measured";
+    } else {
+      level = "attention";
+      reason = "No test results recorded";
+    }
   } else if (counts.stale > 0 || counts.notRun > 0) {
     level = "attention";
     reason = "Tests have not run since they changed";
@@ -262,12 +287,81 @@ function audienceOf(feature: WrittenFeature): string[] {
   return [...new Set(feature.flows.map((flow) => flow.who.value))];
 }
 
+/** The health strip numbers of a feature card. */
+function stripOf(context: Context, feature: WrittenFeature, health: ProductHealth): ProductStrip {
+  const bookmaps = feature.flows.flatMap((flow) => {
+    const found = context.snapshot.collected.flows[flow.ref];
+
+    return found === undefined ? [] : [found];
+  });
+  const places = appearancesOf(context.snapshot, bookmaps);
+
+  return {
+    flows: {
+      total: feature.flows.length,
+      shipped: feature.flows.filter((flow) => flow.status.value === "shipped").length,
+    },
+    criteria: {
+      total: health.criteria.total,
+      proven: health.criteria.pass,
+      failing: health.criteria.fail,
+      // Nothing is measured when no result was recorded, or none of the criteria has a result yet.
+      measured:
+        !context.resultsMissing &&
+        (health.criteria.total === 0 ||
+          health.criteria.pass + health.criteria.fail + health.criteria.stale > 0 ||
+          health.criteria.notRun === 0),
+    },
+    screenshots: {
+      places: places.length,
+      present: places.filter((place) => place.screenshots.length > 0).length,
+    },
+    findings: context.featureFindings.get(feature.id) ?? { errors: 0, warnings: 0 },
+  };
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Only a real `YYYY-MM-DD` day counts as a change date; a bad `updated:` value is ignored here (check reports it). */
+const isDay = (value: string): boolean =>
+  DAY.test(value) && !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime());
+
+/** Compares release names by their numeric parts, so `5.9.0` comes before `5.10.0`. */
+export function compareReleases(left: string, right: string): number {
+  const parts = (value: string) => value.split(/[.\-+]/).map((part) => part);
+  const a = parts(left);
+  const b = parts(right);
+
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const x = a[index] ?? "0";
+    const y = b[index] ?? "0";
+    const numeric = /^\d+$/.test(x) && /^\d+$/.test(y);
+    const diff = numeric ? Number(x) - Number(y) : x < y ? -1 : x > y ? 1 : 0;
+
+    if (diff !== 0) return diff;
+  }
+
+  return 0;
+}
+
 function card(context: Context, feature: WrittenFeature): ProductFeatureCard {
   const readme = feature.readme;
 
   if (readme === null) throw new Error("A feature card needs a README.");
 
+  const health = featureHealth(context, feature);
+  const entries = feature.changelog?.entries ?? [];
+  const dates = [
+    readme.updated.value,
+    ...entries.flatMap((entry) => (entry.date === null ? [] : [entry.date])),
+  ].filter(isDay);
+
   return {
+    changedAt: dates.reduce((newest, date) => (date > newest ? date : newest), ""),
+    changedIn: [
+      ...new Set(entries.flatMap((entry) => (entry.release === null ? [] : [entry.release]))),
+    ],
+    unreleased: entries.some((entry) => entry.release === null),
     id: feature.id,
     title: readme.title.value,
     summary: readme.summary,
@@ -276,12 +370,16 @@ function card(context: Context, feature: WrittenFeature): ProductFeatureCard {
     status: readme.status.value,
     version: readme.version.value,
     flows: feature.flows.length,
-    health: featureHealth(context, feature),
+    health,
+    strip: stripOf(context, feature, health),
   };
 }
 
 /** `GET /product`: the feature map. */
-export function productMap(snapshot: GrimoireSnapshot, options: ProductMapOptions): ProductMapAnswer {
+export function productMap(
+  snapshot: GrimoireSnapshot,
+  options: ProductMapOptions,
+): ProductMapAnswer {
   const context = contextOf(snapshot, options);
 
   return {
@@ -294,7 +392,14 @@ export function productMap(snapshot: GrimoireSnapshot, options: ProductMapOption
       type: app.type.value,
       title: app.heading?.value ?? null,
     })),
+    releases: snapshot.written.releases
+      .map((item) => ({ release: item.release.value, date: item.date.value }))
+      .sort(
+        (left, right) =>
+          left.date.localeCompare(right.date) || compareReleases(left.release, right.release),
+      ),
     developer: !options.shared,
+    host: snapshot.host ?? null,
   };
 }
 
@@ -309,7 +414,10 @@ function screenshotsOf(items: readonly WrittenScreenshot[]): ProductScreenshot[]
 }
 
 /** Where the flows are shown, with the screenshots of the block (else of the page). */
-function appearancesOf(snapshot: GrimoireSnapshot, bookmaps: readonly FlowBookmap[]): ProductAppearance[] {
+function appearancesOf(
+  snapshot: GrimoireSnapshot,
+  bookmaps: readonly FlowBookmap[],
+): ProductAppearance[] {
   const seen = new Set<string>();
   const list: ProductAppearance[] = [];
   const apps = new Map<string, WrittenApp>(snapshot.written.apps.map((app) => [app.id.value, app]));
@@ -363,7 +471,9 @@ function appearancesOf(snapshot: GrimoireSnapshot, bookmaps: readonly FlowBookma
 }
 
 function releasesOf(snapshot: GrimoireSnapshot, feature: WrittenFeature): ProductRelease[] {
-  const dates = new Map(snapshot.written.releases.map((item) => [item.release.value, item.date.value]));
+  const dates = new Map(
+    snapshot.written.releases.map((item) => [item.release.value, item.date.value]),
+  );
   const entries = feature.changelog?.entries ?? [];
   // Unreleased entries first, then the stamped ones in file order (newest first).
   const ordered = [
@@ -435,8 +545,7 @@ export function productFeature(
   });
   const own = snapshot.collected.features[feature.id];
   const unexpected = context.report.findings.filter(
-    (finding) =>
-      (finding.subject.feature ?? finding.subject.flow?.split("/")[0]) === feature.id,
+    (finding) => (finding.subject.feature ?? finding.subject.flow?.split("/")[0]) === feature.id,
   );
   const unexpectedNow = unexpected.filter((finding) => !finding.expected);
   const errors = unexpectedNow.filter((finding) => finding.severity === "error").length;
@@ -459,6 +568,7 @@ export function productFeature(
     releases: releasesOf(snapshot, feature),
     planned: plannedOf(snapshot, feature.id),
     health: featureHealth(context, feature),
+    host: snapshot.host ?? null,
     developer: options.shared
       ? null
       : {
@@ -542,7 +652,9 @@ export function productFlow(
       tests: options.shared ? null : criterion.tests,
     })),
     cases: flow.cases.map((item) => {
-      const answer = item.doesNotApply ? item.answer.replace(DOES_NOT_APPLY, "").trim() : item.answer;
+      const answer = item.doesNotApply
+        ? item.answer.replace(DOES_NOT_APPLY, "").trim()
+        : item.answer;
 
       return {
         question: item.question,
@@ -560,5 +672,6 @@ export function productFlow(
       : {
           steps: (bookmap?.steps ?? []).map((step) => compactStep(snapshot, feature, step, flow)),
         },
+    host: snapshot.host ?? null,
   };
 }

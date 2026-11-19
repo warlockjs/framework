@@ -62,8 +62,7 @@ export function startReportWriter(input: {
       [
         "remove old share links",
         // Links that expired or were revoked more than 30 days ago; the table exists only when sharing is on.
-        async () =>
-          production.share.enabled ? store.shares.removeOld(now - 30 * 86_400_000) : 0,
+        async () => (production.share.enabled ? store.shares.removeOld(now - 30 * 86_400_000) : 0),
       ],
       [
         "remove old audit entries",

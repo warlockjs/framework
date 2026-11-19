@@ -47,6 +47,80 @@ export function countsForFeature(file: Pick<BookFile, "type">): boolean {
   return file.type !== "spec";
 }
 
+/**
+ * File roles no flow step can reach, yet which are real, used code: they run
+ * by being present (a migration, a seed, a command, the boot file, a layout or
+ * root component). The check does not ask a flow to reach them (`GR3006`).
+ */
+export const UNREACHED_ROLES: ReadonlySet<string> = new Set([
+  "migration",
+  "seed",
+  "command",
+  "main",
+  "layout",
+  "root",
+]);
+
+/** Whether a file's role exempts it from needing a flow to reach it. */
+export function isExemptFromReach(file: Pick<BookFile, "type">): boolean {
+  return UNREACHED_ROLES.has(file.type);
+}
+
+const HELPER_FOLDERS = new Set(["tests", "__tests__", "fixtures", "support", "test-utils"]);
+
+/** Whether a path is where test helpers live: a tests/fixtures/support folder or a `*.test-utils.*` file. */
+export function isTestHelperPath(file: string): boolean {
+  const parts = file.split("/");
+  const name = parts[parts.length - 1] ?? "";
+
+  return (
+    parts.slice(0, -1).some((part) => HELPER_FOLDERS.has(part)) ||
+    /^(?:test-utils|.+\.test-utils)\.[a-z]+$/.test(name)
+  );
+}
+
+/**
+ * Files only specs import, directly or through other such files, and that sit in a helper location
+ * (`tests/`, `__tests__/`, `fixtures/`, `support/`, `test-utils`): test helpers.
+ * Specs are not own files, so a helper they alone use counts as reached. A source file only its
+ * spec imports is not a helper: it is dead code and stays reported.
+ */
+export function specOnlyFiles(
+  files: readonly Pick<BookFile, "file" | "type" | "imports">[],
+): Set<string> {
+  const importers = new Map<string, Set<string>>();
+
+  for (const file of files) {
+    for (const entry of file.imports) {
+      if (entry.file === null || entry.file === file.file) continue;
+
+      const list = importers.get(entry.file) ?? new Set<string>();
+
+      list.add(file.file);
+      importers.set(entry.file, list);
+    }
+  }
+
+  const specs = new Set(files.filter((file) => file.type === "spec").map((file) => file.file));
+  const result = new Set<string>();
+  let changed = true;
+
+  while (changed) {
+    changed = false;
+
+    for (const [file, list] of importers) {
+      if (specs.has(file) || result.has(file) || !isTestHelperPath(file)) continue;
+
+      if ([...list].every((importer) => specs.has(importer) || result.has(importer))) {
+        result.add(file);
+        changed = true;
+      }
+    }
+  }
+
+  return result;
+}
+
 function decide(
   file: BookFile,
   features: Set<string>,

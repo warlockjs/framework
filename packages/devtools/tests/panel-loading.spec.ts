@@ -230,4 +230,3 @@ describe("loadDevtoolsPanels errors", () => {
     expect(Object.hasOwn(seen[0] ?? {}, "errors")).toBe(false);
   });
 });
-

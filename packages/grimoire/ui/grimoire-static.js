@@ -28,26 +28,75 @@ function grimoireStaticApi(data) {
       const text = (params.get("q") ?? "").trim().toLowerCase();
       const limit = Number(params.get("limit")) || 20;
       const hits = [];
+      const wordsOf = (value) =>
+        value
+          .toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter(Boolean);
+      const tokens = wordsOf(text);
       for (const item of data.search) {
         const id = item.id.toLowerCase();
         const detail = (item.detail ?? "").toLowerCase();
-        const score =
+        const written = item.type === "feature" || item.type === "flow";
+        const body = written && item.text ? wordsOf(item.text) : [];
+        // Written text matches whole words (a short token must equal a word), so "5" finds AC-5 and not AC-15.
+        const inBody =
+          tokens.length > 0 &&
+          body.length > 0 &&
+          tokens.every((token) =>
+            body.some((word) => (token.length >= 3 ? word.startsWith(token) : word === token)),
+          );
+        let score =
           id === text
             ? 4
             : id.startsWith(text)
               ? 3
               : id.includes(text)
                 ? 2
-                : detail.includes(text)
+                : detail.includes(text) || inBody
                   ? 1
                   : 0;
-        if (text && score) hits.push({ ...item, score });
+        // Written content ranks above files and exports of the same match.
+        if (text && score && written) score += 2;
+        if (text && score) hits.push({ ...item, text: undefined, score });
       }
       hits.sort((left, right) => right.score - left.score || left.id.localeCompare(right.id));
+      // Features and flows keep a share of the limit, so files never push them out; the list is grouped by type.
+      const order = [
+        "feature",
+        "flow",
+        "block",
+        "page",
+        "screen",
+        "route",
+        "mail",
+        "job",
+        "file",
+        "export",
+        "task",
+      ];
+      const writtenHits = hits
+        .filter((hit) => hit.type === "feature" || hit.type === "flow")
+        .slice(0, Math.max(1, Math.ceil(limit * 0.75)));
+      const chosen = new Set(writtenHits);
+      for (const hit of hits) {
+        if (chosen.size >= limit) break;
+        chosen.add(hit);
+      }
+      const counts = {};
+      for (const hit of hits) counts[hit.type] = (counts[hit.type] ?? 0) + 1;
       return {
         type: "search",
         text,
-        hits: hits.slice(0, limit),
+        counts,
+        hits: [...chosen]
+          .sort(
+            (left, right) =>
+              order.indexOf(left.type) - order.indexOf(right.type) ||
+              right.score - left.score ||
+              left.id.localeCompare(right.id),
+          )
+          .map(({ text: _text, ...hit }) => hit),
         routes: data.routes.summary?.routes ?? "cached",
         notes: [],
       };
@@ -80,8 +129,10 @@ function grimoireStaticContext(data, root, rerender) {
       if (value == null) continue;
       if (key === "class") node.setAttribute("class", value);
       else if (key === "text") node.textContent = value;
-      else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
-      else node.setAttribute(key, value);
+      else if (/^on[a-z]+$/i.test(key)) {
+        // Only a real function becomes a listener; a string `on*` attribute is never set (it would be script).
+        if (typeof value === "function") node.addEventListener(key.slice(2).toLowerCase(), value);
+      } else node.setAttribute(key, value);
     }
   };
   const build = (node, attrs, children) => {

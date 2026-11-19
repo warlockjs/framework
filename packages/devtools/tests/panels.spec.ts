@@ -332,9 +332,9 @@ describe("panel files and share declarations", () => {
     ["htm", { dir, extensions: [".htm"] }, 'entry ".htm"'],
     ["js", { dir, extensions: [".js"] }, 'entry ".js"'],
   ])("rejects files with %s, naming the panel and the field", (_name, files, message) => {
-    expect(() =>
-      checkDevtoolsPanels([testPanel({ files: files as never })]),
-    ).toThrow(new RegExp(`Devtools panel "test-panel".*${message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    expect(() => checkDevtoolsPanels([testPanel({ files: files as never })])).toThrow(
+      new RegExp(`Devtools panel "test-panel".*${message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+    );
   });
 
   const share = (overrides: Record<string, unknown> = {}) => ({
@@ -356,14 +356,19 @@ describe("panel files and share declarations", () => {
       files: true,
     });
     expect(
-      checkDevtoolsPanels([testPanel({ share: share({ routes: [], assets: undefined }) as never })])[0]
-        ?.share,
+      checkDevtoolsPanels([
+        testPanel({ share: share({ routes: [], assets: undefined }) as never }),
+      ])[0]?.share,
     ).toEqual({ view: path.join(fixtures, "view.js"), routes: [], assets: [], files: false });
   });
 
   it.each([
     ["a relative view", { view: "view.js" }, "needs share.view"],
-    ["a missing view", { view: path.join(fixtures, "absent.js") }, "share.view module of devtools panel"],
+    [
+      "a missing view",
+      { view: path.join(fixtures, "absent.js") },
+      "share.view module of devtools panel",
+    ],
     ["routes that are not a list", { routes: "/search" }, "needs share.routes"],
     ["a route the panel does not have", { routes: ["/nope"] }, 'share.routes entry "/nope"'],
     ["a POST route", { routes: ["/items"] }, 'share.routes entry "/items"'],
@@ -371,9 +376,11 @@ describe("panel files and share declarations", () => {
     ["files without a folder", { files: true }, "share.files, but the panel has no files folder"],
     ["files that are not a boolean", { files: "yes" }, "share.files to be true or false"],
   ])("rejects a share with %s, naming the panel and the field", (_name, overrides, message) => {
-    expect(() =>
-      checkDevtoolsPanels([testPanel({ share: share(overrides) as never })]),
-    ).toThrow(new RegExp(`Devtools panel "test-panel".*${message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}|${message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+    expect(() => checkDevtoolsPanels([testPanel({ share: share(overrides) as never })])).toThrow(
+      new RegExp(
+        `Devtools panel "test-panel".*${message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}|${message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+      ),
+    );
   });
 
   it("reserves the id share", () => {

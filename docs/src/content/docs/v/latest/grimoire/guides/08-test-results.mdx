@@ -47,9 +47,9 @@ The reporter works with Vitest 5. It turns on Vitest's `includeTaskLocation` opt
 its `@proves` line by position. If you run Vitest in a way that ignores that option, the reporter falls back to the
 test name.
 
-| Option | Default                                  | Meaning                              |
-| ------ | ---------------------------------------- | ------------------------------------ |
-| `root` | Vitest's `root`, else the current folder | Project root that holds `grimoire/`. |
+| Option | Default                                  | Meaning                                                    |
+| ------ | ---------------------------------------- | ---------------------------------------------------------- |
+| `root` | Vitest's `root`, else the current folder | Project root that holds `grimoire/`.                       |
 | `file` | `grimoire/book/test-results.json`        | Where to write the results (project-relative or absolute). |
 
 At the end of each run the reporter writes `grimoire/book/test-results.json` (or `file`) once, atomically. It never fails the
@@ -103,12 +103,12 @@ Book maps, `warlock scry --flow` and the devtools tab show these statuses.
 
 `warlock grimoire check` reads the results.
 
-| Code     | Severity | Meaning                                                                |
-| -------- | -------- | ---------------------------------------------------------------------- |
-| `GR4006` | error    | A test proving a criterion failed in its last run.                     |
-| `GR4007` | warning  | A criterion's result is older than its test file. Run the tests again. |
-| `GR4008` | warning  | A criterion's test did not run (or was skipped) in the last run.       |
-| `GR4009` | warning  | `@proves` lines exist, but no results file was found. Add the reporter and run the tests, or ship the file with the deploy. One finding for the project, at the first proof. |
+| Code     | Severity | Meaning                                                                                                                                                                         |
+| -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GR4006` | error    | A test proving a criterion failed in its last run.                                                                                                                              |
+| `GR4007` | warning  | A criterion's result is older than its test file. Run the tests again.                                                                                                          |
+| `GR4008` | warning  | A criterion's test did not run (or was skipped) in the last run.                                                                                                                |
+| `GR4009` | warning  | `@proves` lines exist, but no results file was found. Add the reporter and run the tests, or ship the file with the deploy. One finding for the project, at the first proof.    |
 | `GR4010` | warning  | The reporter saw a proving test it could not match to a result. Keep the `it(...)` or `test(...)` call on the line right under the `@proves` comment, with a plain string name. |
 
 Findings of a flow whose status is `proposed` are shown as expected and never fail the check.

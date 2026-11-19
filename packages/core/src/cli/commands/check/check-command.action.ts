@@ -77,6 +77,8 @@ export async function checkCommandAction({ options }: CommandActionData): Promis
     base,
     skip,
     project,
+    rerunTests: options.rerunTests === true,
+    testReport: stringOption(options.testReport),
     // Progress goes to stderr in both modes, so `--json` keeps stdout a single JSON document.
     onProgress: (message) => process.stderr.write(`${message}\n`),
     ...(cliEntry ? { typecheck: childTypecheckRunner(cliEntry, flags) } : {}),

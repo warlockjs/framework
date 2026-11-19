@@ -108,7 +108,11 @@ describe("admin share links", () => {
       ...base([]),
       "POST api/admin/shares": {
         status: 422,
-        body: { error: "Some fields are missing or not valid.", code: "input.invalid", ref: "AB12CD34" },
+        body: {
+          error: "Some fields are missing or not valid.",
+          code: "input.invalid",
+          ref: "AB12CD34",
+        },
       },
     });
 
@@ -120,7 +124,9 @@ describe("admin share links", () => {
     await userEvent.type(within(dialog).getByLabelText("Label"), "x");
     await userEvent.click(within(dialog).getByRole("button", { name: "Create link" }));
 
-    expect(await within(dialog).findByText(/Some fields are missing or not valid/)).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText(/Some fields are missing or not valid/),
+    ).toBeInTheDocument();
     expect(within(dialog).getByText(/AB12CD34/)).toBeInTheDocument();
   });
 
@@ -161,9 +167,9 @@ describe("admin share links", () => {
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Revoke" }));
     await waitFor(() =>
-      expect(api.calls.some((call) => call.method === "DELETE" && call.path === "api/admin/shares/s1")).toBe(
-        true,
-      ),
+      expect(
+        api.calls.some((call) => call.method === "DELETE" && call.path === "api/admin/shares/s1"),
+      ).toBe(true),
     );
   });
 
@@ -232,7 +238,9 @@ describe("admin share links", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("button", { name: "Disable the dashboard" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Disable the dashboard" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Share links" })).not.toBeInTheDocument();
   });
 });

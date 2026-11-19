@@ -40,6 +40,8 @@ export type RegisterModelOptions = {
  */
 const modelsRegistry = new Map<string, ChildModel<Model>>();
 
+type ModelSilencer = { count: number; current?: Set<string>; previous?: Set<string> };
+
 /**
  * Class decorator that registers a model in the global registry.
  *
@@ -84,12 +86,26 @@ export function RegisterModel(options?: RegisterModelOptions) {
       );
     }
 
+    const silencer = (globalThis as { [key: symbol]: ModelSilencer | undefined })[
+      Symbol.for("@warlock.js/test:silence-re-registration")
+    ];
+    const silenceKey = `model:${modelName}`;
+
     if (modelsRegistry.has(modelName)) {
-      console.warn(
-        `⚠️  Model "${modelName}" is already registered. ` +
-          `This will overwrite the previous registration.`,
-      );
+      // A worker-scoped test runtime that gives every file a fresh module graph
+      // registers the same names again by design; it counts a name an earlier file
+      // registered. The same name twice inside one file still warns.
+      if (silencer && !silencer.current?.has(silenceKey) && silencer.previous?.has(silenceKey)) {
+        silencer.count += 1;
+      } else {
+        console.warn(
+          `⚠️  Model "${modelName}" is already registered. ` +
+            `This will overwrite the previous registration.`,
+        );
+      }
     }
+
+    silencer?.current?.add(silenceKey);
 
     // Hoist relation definitions stashed by `@BelongsTo` / `@HasMany` /
     // etc. on this class's decorator-metadata bag onto the class's static

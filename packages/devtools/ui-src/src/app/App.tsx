@@ -13,6 +13,7 @@ import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { LoadingRows } from "@/components/common/LoadingRows";
 import { clearHash, isShareHash, parseHash, type HashRoute } from "@/lib/route";
 import { ShareScreen } from "@/share/ShareScreen";
+import { ConnectionBanner } from "./ConnectionBanner";
 import { Shell } from "./Shell";
 import { SessionContext, type SessionContextValue } from "./session";
 import { useColorScheme } from "./useColorScheme";
@@ -37,7 +38,12 @@ export function App() {
   // A read-only share link needs no sign-in: it never reads the session.
   const [sharing] = useState(() => isShareHash(location.hash));
 
-  return sharing ? <ShareScreen /> : <Dashboard />;
+  return (
+    <>
+      <ConnectionBanner />
+      {sharing ? <ShareScreen /> : <Dashboard />}
+    </>
+  );
 }
 
 function Dashboard() {

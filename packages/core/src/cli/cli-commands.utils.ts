@@ -128,14 +128,36 @@ export function displayMissingReadinessNotice(waitedMs: number) {
 }
 
 /**
+ * The name to show for a command: its registered name without `<action>` /
+ * `[file]` argument placeholders, followed by the values the user passed.
+ * `commandDisplayName("grimoire <action> [release]", ["build"])` is `grimoire build`.
+ */
+export function commandDisplayName(
+  commandName: string,
+  argumentValues: readonly string[] = [],
+): string {
+  const name = commandName
+    .replace(/\s*[/:]?\s*[<[][^>\]]*[>\]]\s*[/:]?/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return [name, ...argumentValues].join(" ");
+}
+
+/**
  * Display command execution header.
  *
  * On stderr for the same reason as {@link displayCommandSuccess}: it prints
  * before every command, so on stdout it prefixed `warlock routes --json` with
  * `› Running routes...` and the payload no longer parsed.
  */
-export function displayExecutingCommand(commandName: string) {
-  console.error(`  ${colors.cyan("›")} Running ${colors.bold(colors.white(commandName))}...`);
+export function displayExecutingCommand(
+  commandName: string,
+  argumentValues: readonly string[] = [],
+) {
+  console.error(
+    `  ${colors.cyan("›")} Running ${colors.bold(colors.white(commandDisplayName(commandName, argumentValues)))}...`,
+  );
   console.error();
 }
 
@@ -190,11 +212,15 @@ export function displayMissingCommand() {
  * stdout belongs to the command's output; status chrome belongs to stderr,
  * where it stays visible to a person in a terminal and out of a pipe.
  */
-export function displayCommandSuccess(commandName: string, durationMs?: number) {
+export function displayCommandSuccess(
+  commandName: string,
+  durationMs?: number,
+  argumentValues: readonly string[] = [],
+) {
   const duration = durationMs ? colors.dim(` (${durationMs}ms)`) : "";
   console.error();
   console.error(
-    `  ${colors.green("✔")} ${colors.bold(commandName)} completed successfully${duration}`,
+    `  ${colors.green("✔")} ${colors.bold(commandDisplayName(commandName, argumentValues))} completed successfully${duration}`,
   );
   console.error();
 }
@@ -208,7 +234,7 @@ export function displayCommandSuccess(commandName: string, durationMs?: number) 
  */
 export function displayCommandError(commandName: string, error: Error) {
   console.error();
-  console.error(`  ${colors.red("✖")} ${colors.bold(commandName)} failed`);
+  console.error(`  ${colors.red("✖")} ${colors.bold(commandDisplayName(commandName))} failed`);
   console.error(`  ${colors.dim(error.message)}`);
   console.error();
 }

@@ -35,6 +35,17 @@ describe("the development dashboard's session and panel routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
+      warlockVersion: expect.toSatisfy(
+        (value: unknown) => value === null || typeof value === "string",
+      ),
+      app: expect.toSatisfy(
+        (value: unknown) =>
+          value === null ||
+          (typeof value === "object" &&
+            Object.keys(value as object)
+              .sort()
+              .join() === "name,version"),
+      ),
       mode: "development",
       stage: "active",
       account: null,

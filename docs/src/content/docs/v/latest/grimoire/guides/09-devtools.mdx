@@ -42,6 +42,11 @@ It looks across flows, blocks, pages, routes, files, exports and tasks, and grou
 with the arrow keys and press `Enter` to open one. Views link to each other with hash links such as
 `#grimoire/flow/catalog/new-arrivals`, so you can copy the address of what you are looking at.
 
+Under the Warlock.js adapter, the header shows the Warlock logo with the installed framework version, and the bottom of
+the tab shows your app's own name and version (from its `package.json`), for example `shop 1.4.0`. Another adapter
+shows these only when it supplies a `host()` (see below); with none, nothing is shown. The static export and the
+shared Product map show the same.
+
 A large book can take a few seconds to open the first time. The tab shows an "Opening the book" state at once, and a
 failed view says what failed, why and what to do next, with a button to try again.
 
@@ -49,12 +54,12 @@ failed view says what failed, why and what to do next, with a button to try agai
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Overview        | Cards for the features by status, flows, apps, pages and screens, open and waiting tasks, check errors and warnings, and the size of the book; the route facts with the build hint when they are old or missing; recent releases and the top check problems. |
 | Features        | Every feature as a card with its status, version, flow count and flow names. Filter by status or text, sort by name, status, flows or last update; the count reads "12 of 30 features".                                                                      |
-| Feature         | The README header, its flows, owned and borrowed files, routes, pages, files no flow reaches, open tasks, recent changes, findings, and a graph of the feature and its neighbours.                                                                           |
-| Flow            | See [The flow page](#the-flow-page).                                                                   |
+| Feature         | A page of tabs: see [The feature page](#the-feature-page).                                                                                                                                                                                                   |
+| Flow            | See [The flow page](#the-flow-page).                                                                                                                                                                                                                         |
 | Apps            | One card per written app (site or mobile) with its root and counts. Pages and screens are grouped by the first segment of their route, with a text filter and a confirmed, inferred or unmarked status per row.                                              |
 | Page or screen  | Its blocks (with the layout's), who sees each, what each changes with, the files in the book, and a graph of the page and its blocks.                                                                                                                        |
 | Tasks, Releases | The open, waiting and done tasks from the index (a task waiting for approval is listed only under waiting) with a filter, and each release with what it collected, grouped by feature.                                                                       |
-| Check           | The findings of `warlock grimoire check`, grouped by code. See [The Check tab](#the-check-tab).                                                                 |
+| Check           | The findings of `warlock grimoire check`, grouped by code. See [The Check tab](#the-check-tab).                                                                                                                                                              |
 | File, route     | The book entry: exports, imports, importers, owner, flows, routes, and a graph of the file's neighbours; or a route with the files behind it.                                                                                                                |
 | Modules         | Module coupling as a graph, with the modules listed by how many imports tie them to others.                                                                                                                                                                  |
 
@@ -63,22 +68,51 @@ The graphs are plain SVG with at most 60 nodes. Click a node to open it.
 With no features written, the tab still works from the book: search, files, routes and the module graph. The overview
 says that no features are written yet.
 
+## The feature page
+
+The feature page has a header (breadcrumb, title, status, version, origin) and five tabs. The counts on the tabs read
+from the answer, and a tab's content is built only when it opens, so a feature with thousands of files stays light.
+Each tab has its own address, and an address without a tab opens the first one.
+
+| Tab      | Address                           | What it shows                                                                                                                                                                                                |
+| -------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Overview | `#grimoire/feature/<id>`          | The summary, a health strip (flows, criteria proven, findings, own files), the feature map, the flows as cards, a graph of the feature and its neighbours, open tasks and recent changes.                    |
+| Flows    | `#grimoire/feature/<id>/flows`    | One row per flow: status, steps, cases, criteria tested out of written and findings.                                                                                                                         |
+| Files    | `#grimoire/feature/<id>/files`    | The feature's own files grouped by module, every group closed until opened, with a filter box and a count on each group. Routes, pages and screens, borrowed files and files no flow reaches are groups too. |
+| Findings | `#grimoire/feature/<id>/findings` | The feature's findings grouped by code, every group closed, with the severity, the check's title and a count. The tab count leaves out expected findings.                                                    |
+| Tests    | `#grimoire/feature/<id>/tests`    | Each flow's criteria with the tests that prove them (file, line, name, result).                                                                                                                              |
+
+**The feature map** is a grid: one row per flow and one column per place the feature runs. The columns are each site
+and each mobile app the flows touch (named by the app's title, or its id when none is written), then **API** (the route
+steps), then **Background** (mail, job, event and notification steps). A cell holds small chips for the pages, screens,
+routes and named steps that the flow's steps resolve to; each chip links to the page, route or file view. A step the book
+could not find shows as a dashed chip. An empty cell is a dash, and a column no flow reaches is left out. On a phone each
+flow becomes a card that lists only the places it touches. The data comes with the feature answer (`map`), built from
+the steps the book already resolved; nothing is looked up twice.
+
+On the Overview each flow is a card that links to the flow page: the heading as the title, the flow id under it, a status
+pill coloured by meaning, "since" version, and the counts it has (steps, cases, criteria tested out of written, and a
+warning pill when the flow has findings). The cards sit in a responsive grid and stack in one column on a phone.
+
 ## The flow page
 
-The flow page reads top to bottom:
+The flow page has a header and a health strip above four tabs:
 
 1. **Header**: breadcrumb, title, the summary (the paragraph under the title, or a hint to add one), status, origin
    (`inferred` or `confirmed`), version, who, the apps, and links to the previous and next flow of the feature.
 2. **Health strip**: criteria proven, the last test run (or "no results recorded"), findings (a link to the Check tab
    filtered to this flow) and steps resolved.
-3. **Fix next**: the first failing criterion, else the first without a test, else one that has not run or is stale. For a
-   criterion without a test it shows the `// @proves <feature>/<flow> AC-n` line with a Copy button.
-4. **Journey**: the steps as a stepper. Each step shows its type, target, note, the file it starts from and counts such as
-   "6 direct · 8 in feature · 1192 reachable". "Show files" opens tabs (direct imports, in this feature, all reachable,
-   type-only) that load from the server 200 files at a time, grouped by module. An `affects` step shows the linked flow.
-5. **Proof**: one row per criterion with one status and its tests (file, line, name, result).
-6. **Differs by app**, **Cases** (handled cases first with buttons that jump to their criteria; "Does not apply" is
-   collapsed), **Not handled**, **Unknowns**, **Where users see it**, **History** and any remaining findings.
+
+| Tab      | Address                                    | What it shows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Journey  | `#grimoire/flow/<feature>/<flow>`          | The `## Story` when written, then the written steps drawn in order as connected nodes (a row that wraps; one column on a phone). A node has a glyph for its type (page, route, mail, job, event, notification, affects), the number and the name. A step the book could not find is dashed and tinted. Click a node to open its panel: the note, the linked flow of an `affects` step, the file it starts from and counts such as "6 direct · 8 in feature · 1192 reachable"; "Show files" opens tabs (direct imports, in this feature, all reachable, type-only) that load 200 files at a time. Under the drawing a **What if…** lane lists each handled case as a small card (the question, the answer and links to the criteria that prove it; "Does not apply" is collapsed). The cases are not tied to a step because the written files do not say which step a case belongs to. Then differs by app, not handled, unknowns, where users see it, and history. |
+| Proof    | `#grimoire/flow/<feature>/<flow>/proof`    | **Fix next** (the first failing criterion, else the first without a test, else one that has not run or is stale; for a criterion without a test, the `// @proves <feature>/<flow> AC-n` line with a Copy button), then one row per criterion with one status and its tests.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Files    | `#grimoire/flow/<feature>/<flow>/files`    | One closed group per step with its file count; opening a group loads that step's files.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Findings | `#grimoire/flow/<feature>/<flow>/findings` | The flow's findings grouped by code, every group closed. Missing tests (`GR4001`) are left out because the Proof tab shows them per criterion.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+
+The tabs are real buttons (`role="tab"`, `aria-selected`); the arrow keys, Home and End move between them. Collapsible groups
+are buttons with `aria-expanded`. Choosing a tab updates the address without reloading the page, so a copied address opens
+the same tab.
 
 When the project has `@proves` lines but no test results were ever recorded, the page says "No test results recorded
 yet" once, with the fix (add `grimoireReporter()`, run the tests, or set the panel option `testResultsFile`), and tagged
@@ -129,8 +163,10 @@ changed since the last one.
 
 It keeps the snapshot in memory and opens it again when the book manifest changes, or once it is two seconds old (longer
 when an open took long), so edits to the written files show on the next view. Requests that arrive together share one
-open, so two views never rebuild the book at the same time. If the cached routes are old or missing, the overview says
-so; run `warlock grimoire build` to refresh them.
+open, so two views never rebuild the book at the same time. The Overview and the Check tab use the same words for the
+route facts (`fresh`, `cached`, `stale` or `missing`, with what each means). When they are missing, the route, mail
+and notification steps are not checked: a flow's "Steps resolved" count leaves them out and says how many were not
+checked, and no `GR5008` is reported. Run `warlock grimoire build` to refresh the facts.
 
 Every route sits behind the devtools guard, so only a local browser reaches it.
 
@@ -144,17 +180,19 @@ Served at `/__warlock/api/grimoire`, all `GET`:
 | `/search?q=&limit=`                                                                        | Ranked hits, as `warlock scry --search`.                                                                                                                     |
 | `/file?path=`, `/impact?path=`, `/route?method=&path=`                                     | Answers of `warlock scry`.                                                                                                                                   |
 | `/features`                                                                                | The features listing: the index with each README summary and flow headings.                                                                                  |
-| `/features/:feature`                                                                       | The feature with its book map, changes and findings.                                                                                                 |
+| `/features/:feature`                                                                       | The feature with its book map, changes and findings.                                                                                                         |
 | `/apps`, `/apps/:app/pages/:page`                                                          | Written apps with a row per page and screen (route, title, layout, blocks, confirmed or inferred); one page (by id or route) with its layout and book facts. |
-| `/flows/:feature/:flow`                                                                    | The flow with counts per step (never every file), the first 50 direct imports, health, the test results state, and the previous and next flow. |
-| `/flows/:feature/:flow/steps/:index/files?set=&offset=&limit=`                             | One page (up to 200) of a step's files; `set` is `direct`, `feature`, `reachable` (default) or `type-only`. |
-| `/check`                                                                                   | The whole report; with `code`, `feature`, `flow`, `severity`, `state`, `offset` or `limit` one page of matching findings. |
-| `/check/groups`                                                                            | The check by code: count, expected count, title, fix and features. |
-| `/product`, `/product/features/:feature`, `/product/flows/:feature/:flow`                  | The product map answers. |
-| `/tasks`, `/releases`, `/releases/:release`                                                | Tasks index, releases, one release.                                                                                                        |
+| `/flows/:feature/:flow`                                                                    | The flow with counts per step (never every file), the first 50 direct imports, health, the test results state, and the previous and next flow.               |
+| `/flows/:feature/:flow/steps/:index/files?set=&offset=&limit=`                             | One page (up to 200) of a step's files; `set` is `direct`, `feature`, `reachable` (default) or `type-only`.                                                  |
+| `/check`                                                                                   | The whole report; with `code`, `feature`, `flow`, `severity`, `state`, `offset` or `limit` one page of matching findings.                                    |
+| `/check/groups`                                                                            | The check by code: count, expected count, title, fix and features.                                                                                           |
+| `/product`, `/product/features/:feature`, `/product/flows/:feature/:flow`                  | The product map answers.                                                                                                                                     |
+| `/tasks`, `/releases`, `/releases/:release`                                                | Tasks index, releases, one release.                                                                                                                          |
 | `/graph/file?path=`, `/graph/feature/:feature`, `/graph/page?app=&page=`, `/graph/modules` | `{ nodes, edges }`, at most 60 nodes.                                                                                                                        |
 
 An unknown item answers `404` with a message, and a missing parameter `400`.
+
+The tab never collects the route, event and job facts itself: collecting them boots the app's connectors and re-imports its route and event modules, which would register everything a second time inside the running dev server. When the facts are missing or stale the tab says so (`routes: missing` or `stale`) and the steps that need them stay unchecked until you run `warlock grimoire build` in another terminal; the summary and flow health count a step as resolved only when it was checked and found, and report the unchecked ones (`steps.unchecked`) apart, never as a failure.
 
 ## Export a static folder
 
@@ -173,6 +211,13 @@ leaves it alone, and git ignores it. Pass `outDir` (project-relative or absolute
 returns the folder relative to the project.
 
 The static page answers everything in the table above except impact and route views, which need the running app and say
-so in place. Search runs in the page over the exported names. The page carries its own light and dark colours (it follows the system setting), so it reads the same as the tab. Per-file answers cover the 3000 most imported files.
+so in place. Search runs in the page over the exported names. The page carries its own light and dark colours (it follows the system setting), so it reads the same as the tab. Per-file answers cover the 3000 most imported files. The search reads the written text of features and flows too and groups hits by type. For a version without code detail, pass `product: true` (the CLI is `warlock grimoire build --site --product`): it exports the Product map only, with no file paths, test names or per-file answers. `exportGrimoireSiteDetailed()` also says whether the folder was already current (`upToDate`) and then writes nothing.
 
 The export function takes the same adapter as the rest of the package; with no `adapter` option it uses the Warlock one.
+
+### Showing a framework and app name
+
+An adapter may add an optional `host(root)` method. It returns `{ name, version, logo, app }`: the framework name and
+installed version, a small logo as a `data:image/...` URI, and the app's own `{ name, version }`, or `null`. The tab
+passes it to the view in the summary answer (`host`), so the header and footer fill in. The Warlock adapter supplies
+the Warlock.js logo and the installed `@warlock.js/core` version; Grimoire itself stays framework-neutral.

@@ -120,6 +120,21 @@ console.log(formatCheckReport(report).join("\n"));
 `scanProofsInText(text, file)` reads the `@proves` lines of one test file's text, and `scanProofs(root, files)` reads
 them from a list of project-relative test files. Both return the proof lines and the `GR4003`–`GR4005` findings.
 
+### What `GR3006` leaves out
+
+A route step reaches the handler's files and the middleware files the matched route names; the routes file's other
+imports are not followed, because it imports every controller of its module. Files whose role runs them by being
+present (`migration`, `seed`, `command`, `main`, `layout` and `root`) are never reported. A `command` is a file named
+`*.command.ts` or one directly in a module's `commands` folder. A file only spec files import is left out only when it
+is a test helper, that is, it sits in a `tests`, `__tests__`, `fixtures`, `support` or `test-utils` location (or is
+named `*.test-utils.*`). A source file only its own spec imports is still reported: it is dead code.
+
+### `GR5008` without route facts
+
+Mail and notification entries are checked against what the booted app reports. Without route facts
+(`routes: missing`) they are skipped, like the route and named-thing steps, so a first open in dev shows no false
+`GR5008`.
+
 ## Codes
 
 Each code keeps its meaning across releases. An error fails the check unless it is expected; a warning never does.

@@ -3,8 +3,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design tokens. The shadcn names stay; the palette is a cool, slightly tinted
- * neutral with one indigo brand colour. Every text colour (foreground,
+ * Design tokens. The shadcn names stay; the palette is the Warlock logo's gold on
+ * near-black (dark) and warm off-white (light). In the light theme --primary is the
+ * gold fill (dark text on it) and --brand is the deep amber that is safe as text. Every text colour (foreground,
  * muted-foreground, brand, success, warning, info, destructive) is at least
  * 4.5:1 on --background and --card in both themes; tests/panel-tokens.spec.ts
  * checks it. Package panel stylesheets may use only the tokens listed in
@@ -13,65 +14,65 @@
 :root {
   color-scheme: light;
   --radius: 0.625rem;
-  --background: #f6f7fb;
-  --foreground: #14162b;
+  --background: #faf8f3;
+  --foreground: #1a1710;
   --card: #ffffff;
-  --card-foreground: #14162b;
+  --card-foreground: #1a1710;
   --popover: #ffffff;
-  --popover-foreground: #14162b;
-  --primary: #4f46e5;
-  --primary-foreground: #ffffff;
-  --secondary: #eceef7;
-  --secondary-foreground: #232647;
-  --muted: #eceef7;
-  --muted-foreground: #566078;
-  --accent: #e6e8fb;
-  --accent-foreground: #312e81;
+  --popover-foreground: #1a1710;
+  --primary: #f5b800;
+  --primary-foreground: #1a1300;
+  --secondary: #f1eee6;
+  --secondary-foreground: #2b261a;
+  --muted: #f1eee6;
+  --muted-foreground: #5c5648;
+  --accent: #fbefc8;
+  --accent-foreground: #5c3a00;
   --destructive: #c81e1e;
-  --border: #c9cee0;
-  --input: #bcc2d8;
-  --ring: #6d65f0;
-  --brand: #4f46e5;
+  --border: #d6cfbd;
+  --input: #c4bca6;
+  --ring: #b07a00;
+  --brand: #8a5700;
   --brand-foreground: #ffffff;
   --success: #047857;
-  --warning: #9a4a07;
+  --warning: #c2410c;
   --info: #0369a1;
-  --chart-1: #4f46e5;
+  --chart-1: #e0a000;
   --chart-2: #0d9488;
-  --chart-3: #d97706;
-  --chart-4: #c026d3;
+  --chart-3: #c2410c;
+  --chart-4: #7c3aed;
   --chart-5: #e11d48;
 }
 
 .dark {
   color-scheme: dark;
-  --background: #0d0f1f;
-  --foreground: #e8eaf6;
-  --card: #151932;
-  --card-foreground: #e8eaf6;
-  --popover: #1a1f3b;
-  --popover-foreground: #e8eaf6;
-  --primary: #9a9dff;
-  --primary-foreground: #0d0f1f;
-  --secondary: #1c2140;
-  --secondary-foreground: #e8eaf6;
-  --muted: #1c2140;
-  --muted-foreground: #9aa3c0;
-  --accent: #232a52;
-  --accent-foreground: #dcdfff;
+  --background: #0b0b0c;
+  --foreground: #f2efe6;
+  --card: #141416;
+  --card-foreground: #f2efe6;
+  --popover: #1a1a1d;
+  --popover-foreground: #f2efe6;
+  --primary: #ffc61a;
+  --primary-foreground: #0b0b0c;
+  --secondary: #1d1d20;
+  --secondary-foreground: #f2efe6;
+  --muted: #1d1d20;
+  --muted-foreground: #a3a094;
+  --accent: #2a2410;
+  --accent-foreground: #ffe08a;
   --destructive: #ff8080;
-  --border: #2f3558;
-  --input: #3a4170;
-  --ring: #8f93ff;
-  --brand: #9a9dff;
-  --brand-foreground: #0d0f1f;
+  --border: #323237;
+  --input: #3f3f45;
+  --ring: #ffc61a;
+  --brand: #ffc61a;
+  --brand-foreground: #0b0b0c;
   --success: #3ddc97;
-  --warning: #fbbf24;
+  --warning: #fb923c;
   --info: #5cc8ff;
-  --chart-1: #9a9dff;
-  --chart-2: #2dd4bf;
-  --chart-3: #fbbf24;
-  --chart-4: #e879f9;
+  --chart-1: #ffd000;
+  --chart-2: #e08a00;
+  --chart-3: #2dd4bf;
+  --chart-4: #a78bfa;
   --chart-5: #fb7185;
 }
 

@@ -8,6 +8,8 @@ type RuntimeScope = {
   worker?: TestWorkerConfiguration;
   cleanupRegistered?: boolean;
   lifetime: "file" | "worker";
+  /** `tests.lifetime: "worker-isolated"`: each file gets a fresh module graph. */
+  freshModules?: boolean;
   fileOpen: boolean;
   /** When the open file's tests could start, for the `body` profile step. */
   bodyStartedAt?: number;
@@ -60,12 +62,15 @@ export function configureTestWorker(
 }
 
 export function selectTestLifetime(value: unknown): "file" | "worker" {
+  const scope = testRuntimeScope();
+  scope.freshModules = value === "worker-isolated";
   if (value === undefined || value === null || value === "file") return "file";
-  if (value !== "worker") throw new Error('tests.lifetime must be "file" or "worker".');
-  const worker = testRuntimeScope().worker;
+  if (value !== "worker" && value !== "worker-isolated")
+    throw new Error('tests.lifetime must be "file", "worker" or "worker-isolated".');
+  const worker = scope.worker;
   if (!worker || worker.pool !== "forks" || worker.watch || worker.isolate) {
     throw new Error(
-      'tests.lifetime: "worker" requires the Warlock test runner, pool: "forks", isolate: false and vitest run (watch is unsupported).',
+      `tests.lifetime: "${value}" requires the Warlock test runner, pool: "forks", isolate: false and vitest run (watch is unsupported).`,
     );
   }
   return "worker";

@@ -5,10 +5,8 @@ export type PanelModuleLoader = (id: string, shared?: boolean) => Promise<Legacy
 
 const defaultLoader: PanelModuleLoader = (id, shared = false) =>
   import(
-    /* @vite-ignore */ new URL(
-      shared ? "api/share/view.js" : `panels/${id}/view.js`,
-      location.href,
-    ).href
+    /* @vite-ignore */ new URL(shared ? "api/share/view.js" : `panels/${id}/view.js`, location.href)
+      .href
   );
 
 let loader: PanelModuleLoader = defaultLoader;

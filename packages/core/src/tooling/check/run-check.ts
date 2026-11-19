@@ -30,8 +30,16 @@ import {
   type VitestRunner,
   runVitestBatches,
   vitestArgumentBatches,
+  testTimeoutMs,
   vitestRunFailure,
 } from "./tests-step";
+import {
+  findReusableResult,
+  TEST_REPORT_ENV,
+  readTestRecord,
+  treeHash,
+  writeTestRecord,
+} from "./test-reuse";
 
 /** Runs the typecheck step. The CLI swaps in a child process so a heap overflow cannot end `check`. */
 export type TypecheckRunner = (
@@ -62,6 +70,10 @@ export type CheckOptions = {
   vitest?: VitestRunner;
   /** Where the app's vitest CLI is. Default: resolved from the app root. */
   vitestBinary?: string | null;
+  /** Run the whole suite even when a recorded passing result matches the tree. */
+  rerunTests?: boolean;
+  /** A vitest JSON report the app wrote; accepted for the same tree. Default: `node_modules/.cache/warlock/vitest-report.json`. */
+  testReport?: string;
   /** The Node.js version to check. Default: the running one. */
   nodeVersion?: string;
   /** Receives one line when a step starts and ends, and the conventions step's own milestones. */
@@ -274,7 +286,33 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
     }
 
     const vitest = options.vitest ?? runVitest;
-    const outcome = await runVitestBatches(vitest, binary, vitestArgumentBatches(files), cwd);
+    const tree = files === null ? await treeHash(cwd, options.git) : null;
+
+    if (tree && !options.rerunTests) {
+      const reused = findReusableResult({
+        cwd,
+        tree,
+        reportPath: options.testReport ?? (process.env[TEST_REPORT_ENV]?.trim() || undefined),
+      });
+
+      if (reused) {
+        return {
+          status: "passed",
+          detail: `reused the passing result of ${reused.finishedAt} from ${reused.source} for the same tree${reused.total === null ? "" : ` (${reused.total} test(s))`}; use --rerun-tests to run again`,
+          problems: [],
+        };
+      }
+    }
+
+    const lastRun = files === null ? readTestRecord(cwd) : null;
+    const limit = testTimeoutMs(process.env, lastRun?.durationMs);
+    const outcome = await runVitestBatches(
+      vitest,
+      binary,
+      vitestArgumentBatches(files),
+      cwd,
+      limit,
+    );
     const found =
       outcome.report === undefined
         ? vitestRunFailure(outcome)
@@ -283,6 +321,22 @@ export async function runCheck(options: CheckOptions = {}): Promise<CheckReport>
       typeof outcome.report === "object" && outcome.report !== null
         ? Reflect.get(outcome.report, "numTotalTests")
         : undefined;
+
+    if (tree && outcome.report !== undefined && !outcome.timedOut) {
+      writeTestRecord(cwd, {
+        treeHash: tree.hash,
+        finishedAt: new Date().toISOString(),
+        durationMs: outcome.elapsedMs ?? 0,
+        success:
+          found.length === 0 &&
+          !(
+            typeof outcome.report === "object" &&
+            outcome.report !== null &&
+            Reflect.get(outcome.report, "success") === false
+          ),
+        total: typeof total === "number" ? total : null,
+      });
+    }
 
     return {
       detail: typeof total === "number" ? `${total} test(s) ran` : null,

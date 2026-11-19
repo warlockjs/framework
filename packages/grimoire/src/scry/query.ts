@@ -411,27 +411,40 @@ function scryFeature(
     );
   }
 
+  const findings = findingsFor(
+    snapshot,
+    (finding) =>
+      finding.subject.feature === feature.id ||
+      (finding.subject.flow ?? "").startsWith(`${feature.id}/`),
+  );
+
   return {
     type: "feature",
     ...notesOf(snapshot, false),
     readme: feature.readme,
     flows: [...feature.flows]
       .sort((left, right) => byText(left.id.value, right.id.value))
-      .map((flow) => ({
-        id: flow.id.value,
-        status: flow.status.value,
-        since: flow.since.value,
-        heading: flow.heading?.value ?? null,
-      })),
+      .map((flow) => {
+        const criteria = snapshot.collected.flows[flow.ref]?.criteria ?? [];
+
+        return {
+          id: flow.id.value,
+          status: flow.status.value,
+          since: flow.since.value,
+          heading: flow.heading?.value ?? null,
+          steps: flow.steps.length,
+          cases: flow.cases.length,
+          criteria: flow.criteria.length,
+          tested: criteria.filter((criterion) => criterion.tests.length > 0).length,
+          findings: findings.filter(
+            (finding) => !finding.expected && finding.subject.flow === flow.ref,
+          ).length,
+        };
+      }),
     bookmap: snapshot.collected.features[feature.id] ?? emptyFeatureBookmap(feature.id),
     changes: (feature.changelog?.entries ?? []).slice(0, 10),
     tasks: snapshot.collected.tasksIndex.open.filter((task) => task.feature === feature.id),
-    findings: findingsFor(
-      snapshot,
-      (finding) =>
-        finding.subject.feature === feature.id ||
-        (finding.subject.flow ?? "").startsWith(`${feature.id}/`),
-    ),
+    findings,
   };
 }
 
@@ -511,17 +524,57 @@ function slug(text: string): string {
   return words(text).split(" ").join("-");
 }
 
-type Candidate = Omit<ScryHit, "score">;
+/** One searchable piece of written text of a feature or flow (a summary, a story, a case, a criterion). */
+type BodyPart = { label: string; text: string };
+
+type Candidate = Omit<ScryHit, "score" | "matched"> & { body?: BodyPart[] };
+
+/** The searchable written text of a flow: summary, who, story, cases, criteria. */
+function flowBody(flow: WrittenFlow): BodyPart[] {
+  return [
+    ...(flow.summary === null ? [] : [{ label: "summary", text: flow.summary }]),
+    { label: "who", text: flow.who.value },
+    ...flow.story.map((step) => ({ label: `story ${step.index}`, text: step.text })),
+    ...flow.cases.map((item) => ({
+      label: `case ${item.question}`,
+      text: `${item.question} ${item.answer} ${item.criteria.join(" ")}`,
+    })),
+    ...flow.criteria.map((item) => ({ label: item.id, text: `${item.id} ${item.text}` })),
+  ];
+}
+
+/** The searchable written text of a feature: summary, why, audience. */
+function featureBody(feature: WrittenFeature): BodyPart[] {
+  const readme = feature.readme;
+
+  if (readme === null) return [];
+
+  return [
+    ...(readme.summary === null ? [] : [{ label: "summary", text: readme.summary }]),
+    ...(readme.why === null ? [] : [{ label: "why", text: readme.why }]),
+    ...readme.audience.map((item) => ({ label: "audience", text: item.value })),
+  ];
+}
 
 function candidates(snapshot: GrimoireSnapshot): Candidate[] {
   const facts = snapshot.book.facts;
   const list: Candidate[] = [];
 
   for (const feature of snapshot.written.features) {
-    list.push({ type: "feature", id: feature.id, detail: feature.readme?.title.value ?? null });
+    list.push({
+      type: "feature",
+      id: feature.id,
+      detail: feature.readme?.title.value ?? null,
+      body: featureBody(feature),
+    });
 
     for (const flow of feature.flows) {
-      list.push({ type: "flow", id: flow.ref, detail: flow.heading?.value ?? null });
+      list.push({
+        type: "flow",
+        id: flow.ref,
+        detail: flow.heading?.value ?? null,
+        body: flowBody(flow),
+      });
     }
   }
 
@@ -615,35 +668,108 @@ function isSubsequence(needle: string, text: string): boolean {
 /** Shortest query that may match by fuzzy (in-order letters), so short queries stay precise. */
 const FUZZY_MIN = 4;
 
+/** Added to the score of written content (features, flows) so it ranks above files and exports of the same match. */
+const WRITTEN_BOOST = 2;
+
+/** Whether a word list holds a word that is, or starts with, every token (a short token must equal a word). */
+function partMatches(partWords: readonly string[], tokens: readonly string[]): boolean {
+  return tokens.every((token) =>
+    partWords.some((word) => (token.length >= 3 ? word.startsWith(token) : word === token)),
+  );
+}
+
+/** The first body part holding every token, as `label: text`, or `null`. */
+function bodyMatch(candidate: Candidate, tokens: readonly string[], base: string): string | null {
+  for (const part of candidate.body ?? []) {
+    const partWords = words(part.text).split(" ");
+    // Tokens may be split between the name and one written part.
+    const rest = tokens.filter((token) => !base.includes(token));
+
+    if (rest.length > 0 && partMatches(partWords, rest)) {
+      const text = part.text.replace(/\s+/g, " ").trim();
+
+      return `${part.label}: ${text.length > 90 ? `${text.slice(0, 89)}…` : text}`;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Score of a candidate for the query words, or 0 when it does not match. From best
  * to worst: exact name or path (7), prefix (6), whole-word match (5), substring of
- * the name or path (4), the words found only in the detail (3), fuzzy (2).
+ * the name or path (4), the words found only in the detail or in written text (3),
+ * fuzzy (2). Features and flows add {@link WRITTEN_BOOST} to a match.
  */
-function scoreOf(candidate: Candidate, query: string, tokens: readonly string[]): number {
+function scoreOf(
+  candidate: Candidate,
+  query: string,
+  tokens: readonly string[],
+): { score: number; matched: string | null } {
   const id = words(
     candidate.type === "export" ? (candidate.id.split("#")[1] ?? candidate.id) : candidate.id,
   );
   const last = words(lastSegment(candidate.id));
-  const all = `${id} ${words(candidate.detail ?? "")}`;
+  const base = `${id} ${words(candidate.detail ?? "")}`;
+  const boost = candidate.type === "feature" || candidate.type === "flow" ? WRITTEN_BOOST : 0;
 
-  if (!tokens.every((token) => all.includes(token))) {
+  if (!tokens.every((token) => base.includes(token))) {
+    const matched = bodyMatch(candidate, tokens, base);
+
+    if (matched !== null) return { score: 3 + boost, matched };
+
     const squeezed = id.replace(/ /g, "");
 
     return query.length >= FUZZY_MIN && tokens.every((token) => isSubsequence(token, squeezed))
-      ? 2
-      : 0;
+      ? { score: 2, matched: null }
+      : { score: 0, matched: null };
   }
 
-  if (id === query || last === query) return 7;
-  if (id.startsWith(query) || last.startsWith(query)) return 6;
+  if (id === query || last === query) return { score: 7 + boost, matched: null };
+  if (id.startsWith(query) || last.startsWith(query)) return { score: 6 + boost, matched: null };
 
   const idWords = id.split(" ");
 
-  if (tokens.every((token) => idWords.includes(token))) return 5;
-  if (tokens.every((token) => id.includes(token))) return 4;
+  if (tokens.every((token) => idWords.includes(token))) return { score: 5 + boost, matched: null };
+  if (tokens.every((token) => id.includes(token))) return { score: 4 + boost, matched: null };
 
-  return 3;
+  return { score: 3 + boost, matched: null };
+}
+
+/** The most hits of features and flows set aside before files and exports fill the list (a share of the limit). */
+const WRITTEN_SHARE = 0.75;
+
+const byRank = (left: ScryHit, right: ScryHit): number =>
+  right.score - left.score ||
+  TYPE_ORDER.indexOf(left.type) - TYPE_ORDER.indexOf(right.type) ||
+  byText(left.id, right.id);
+
+/**
+ * The hits to return: the best features and flows first (up to a share of the
+ * limit, so files and exports never push matching written content out), then
+ * the best of the rest. Grouped by type in {@link TYPE_ORDER}, best first.
+ */
+function pickHits(hits: ScryHit[], limit: number): ScryHit[] {
+  const ranked = [...hits].sort(byRank);
+  const written = ranked
+    .filter((hit) => hit.type === "feature" || hit.type === "flow")
+    .slice(0, Math.max(1, Math.ceil(limit * WRITTEN_SHARE)));
+  const chosen = new Set(written);
+
+  for (const hit of ranked) {
+    if (chosen.size >= limit) break;
+
+    chosen.add(hit);
+  }
+
+  return [...chosen]
+    .slice(0, limit)
+    .sort(
+      (left, right) =>
+        TYPE_ORDER.indexOf(left.type) - TYPE_ORDER.indexOf(right.type) ||
+        right.score - left.score ||
+        byText(left.id, right.id),
+    );
 }
 
 function scrySearch(
@@ -670,23 +796,29 @@ function scrySearch(
 
     seen.add(key);
 
-    const score = scoreOf(candidate, text, tokens);
+    const { score, matched } = scoreOf(candidate, text, tokens);
 
-    if (score > 0) hits.push({ ...candidate, score });
+    if (score > 0) {
+      hits.push({
+        type: candidate.type,
+        id: candidate.id,
+        detail: candidate.detail,
+        score,
+        ...(matched === null ? {} : { matched }),
+      });
+    }
   }
 
-  hits.sort(
-    (left, right) =>
-      right.score - left.score ||
-      TYPE_ORDER.indexOf(left.type) - TYPE_ORDER.indexOf(right.type) ||
-      byText(left.id, right.id),
-  );
+  const counts: Partial<Record<ScryHitType, number>> = {};
+
+  for (const hit of hits) counts[hit.type] = (counts[hit.type] ?? 0) + 1;
 
   return {
     type: "search",
     ...notesOf(snapshot, false),
     text: query.text,
-    hits: hits.slice(0, query.limit ?? 20),
+    counts,
+    hits: pickHits(hits, query.limit ?? 20),
   };
 }
 

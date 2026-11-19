@@ -3,6 +3,14 @@ import { log } from "@warlock.js/logger";
 import { config } from "../config";
 import { type RegisteredUseCase, type UseCaseConfigurations, type UseCaseResult } from "./types";
 
+type Silencer = { count: number; current?: Set<string>; previous?: Set<string> };
+
+function reRegistrationSilencer(): Silencer | undefined {
+  return (globalThis as { [key: symbol]: Silencer | undefined })[
+    Symbol.for("@warlock.js/test:silence-re-registration")
+  ];
+}
+
 /**
  * Store registered use cases
  */
@@ -15,10 +23,25 @@ export function $registerUseCase<Output, Input>(
   name: string,
   useCase: RegisteredUseCase<Output, Input>,
 ) {
+  const silencer = reRegistrationSilencer();
+  const key = `use-case:${name}`;
+
   if (useCaseRegister.has(name) && process.env.NODE_ENV !== "production") {
-    log.warn("use-cases", "registering", `Use case "${name}" is already registered. Overwriting.`);
+    // A worker-scoped test runtime that gives every file a fresh module graph
+    // registers the same names again by design; it counts a name an earlier file
+    // registered. The same name twice inside one file still warns.
+    if (silencer && !silencer.current?.has(key) && silencer.previous?.has(key)) {
+      silencer.count += 1;
+    } else {
+      log.warn(
+        "use-cases",
+        "registering",
+        `Use case "${name}" is already registered. Overwriting.`,
+      );
+    }
   }
 
+  silencer?.current?.add(key);
   useCaseRegister.set(name, useCase);
 }
 

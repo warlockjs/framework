@@ -298,6 +298,25 @@ describe("bootProductionDevtools", () => {
     expect((deps.routes.isDevelopment as () => boolean)()).toBe(false);
   });
 
+  it.each([
+    ["off", 1],
+    ["admins", 0],
+    ["everyone", 0],
+  ])("twoFactor %s logs %i two-factor warnings at boot", async (twoFactor, count) => {
+    const log = logger();
+    const dispose = await bootProductionDevtools(
+      input({
+        log,
+        options: resolveDevtoolsOptions({ production: { enabled: true, twoFactor } as never }),
+      }),
+    );
+    const lines = log.warn.mock.calls.filter((call) => String(call[2]).includes("Two-factor"));
+
+    expect(lines).toHaveLength(count);
+    if (count) expect(lines[0]?.[2]).toContain('production.twoFactor is "off"');
+    dispose();
+  });
+
   it("returns a disposer that stops everything it started", async () => {
     const dispose = await bootProductionDevtools(input());
 

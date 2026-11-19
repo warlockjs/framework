@@ -251,23 +251,35 @@ describe("scry search ranking and impact caps", () => {
     return result.type === "search" ? result.hits : [];
   };
 
-  it("ranks exact, prefix, whole word, substring, then fuzzy matches", () => {
+  it("ranks exact, prefix, whole word, substring, then fuzzy matches, with features and flows two ranks up", () => {
+    const flowScore = (text: string) =>
+      scoresOf(text).find((hit) => hit.id === "catalog/new-arrivals")?.score;
+
     expect(new Set(scoresOf("new arrivals").map((hit) => hit.score))).toContain(7);
-    expect(scoresOf("new-arr").every((hit) => hit.score <= 6)).toBe(true);
-    expect(scoresOf("arrivals").find((hit) => hit.id === "catalog/new-arrivals")?.score).toBe(5);
-    expect(scoresOf("arrival").find((hit) => hit.id === "catalog/new-arrivals")?.score).toBe(4);
-    expect(scoresOf("newarr").find((hit) => hit.id === "catalog/new-arrivals")?.score).toBe(2);
+    // A flow adds two ranks (WRITTEN_BOOST); every other type tops out at 6 for a prefix.
+    expect(flowScore("new arrivals")).toBe(9);
+    expect(scoresOf("new-arr").every((hit) => hit.score <= (hit.type === "flow" ? 8 : 6))).toBe(
+      true,
+    );
+    expect(flowScore("arrivals")).toBe(7);
+    expect(flowScore("arrival")).toBe(6);
+    expect(flowScore("newarr")).toBe(2);
     expect(scoresOf("ne")).not.toContainEqual(expect.objectContaining({ score: 2 }));
 
     for (const text of ["arrivals", "products", "new arrivals"]) {
-      const scores = scoresOf(text).map((hit) => hit.score);
+      // The answer is grouped by type; within a type the best match comes first.
+      const byType = new Map<string, number[]>();
 
-      expect(scores).toEqual([...scores].sort((left, right) => right - left));
+      for (const hit of scoresOf(text))
+        byType.set(hit.type, [...(byType.get(hit.type) ?? []), hit.score]);
+
+      for (const scores of byType.values())
+        expect(scores).toEqual([...scores].sort((left, right) => right - left));
     }
   });
 
-  it("orders equal scores by type: flow, block, route, file, task", () => {
-    const hits = scoresOf("new arrivals").filter((hit) => hit.score === 7);
+  it("groups hits by type: flow, block, route, file, task, best match first in each group", () => {
+    const hits = scoresOf("new arrivals");
     const order = [
       "feature",
       "flow",
