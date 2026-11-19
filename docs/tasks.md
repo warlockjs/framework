@@ -4,9 +4,9 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Owner decisions waiting
 
-- T-148: keep request paths as served in production samples, or store only the route pattern.
 - T-158: product map usage analytics and member feedback: leave out, add a project extension point, or build first-party sources.
-- T-170: business fields in features and flows: a fixed set of fields, one `extra:` key, or leave out (strictness stays).
+- T-142: read-only flows may skip the write-only case questions (`duplicate`, `double submit`).
+- T-143: check condition names in a block's "Changes with" column (only names written as code).
 
 ## From the 5.60.0 release
 
@@ -60,17 +60,6 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 - What and why: the first open is the first impression. The three first calls each rebuild the same data. Overlaps T-161 (collect route facts in dev) and T-141 (keep the opened book in memory).
 - Acceptance: the first open runs the build once and shares it across the three calls; the book is warmed at dev start; partial answers stream where possible; the measured first-open time is recorded in the CHANGELOG entry; a spec counts builds per first open.
 - Status: open.
-
-### T-170 [decision] Open content model for business fields in features and flows
-
-- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0). The app wants owner, success measures (KPIs), support notes (FAQ), risks, links (designs, docs, tickets) and a glossary shown on the Product map.
-- What and why: an unknown front-matter key is GR1005 and an unknown heading is GR1007 (`packages/grimoire/src/written/markdown.ts`, find the two codes), which keeps the written format strict and checkable. The review's "accept anything" ask would lose that.
-- Options: (a) keep strictness and add a fixed set of business fields (owner, success measures, support notes, risks, links); (b) keep strictness and allow one `extra:` front-matter key that holds free-form fields and is shown as-is on the Product map; (c) leave it out.
-- Needs owner decision: which option. Keep GR1005/GR1007 for everything else.
-- Recommendation (2026-11-19): (c) with one exception. Grimoire's job is product behaviour checked against code and
-  tests; KPIs, FAQ, risks and roadmap cannot be checked and go stale, so they belong in the app's own docs or tools.
-  Allow only `owner` and a `## Links` section (pointers to those docs), because they help readers find the rest.
-- Status: waiting for the owner's answer on the recommendation.
 
 ### T-171 [feature] Parked: requests only one app has made
 
@@ -161,15 +150,6 @@ Design: `findings/5.58/ARCHITECTURE.md` (decisions D1–D28); work-package brief
 - Evidence: `packages/devtools/src/production/auth/passkeys.ts`, `findings/5.56/reports/E2E.md`.
 - Acceptance: a Playwright run with a CDP virtual authenticator registers a passkey, signs in with it, and uses it as
   the step-up for recovery codes.
-- Status: open.
-
-### T-148 [decision] Request paths in production samples
-
-- Source: 5.56.0 security review, 2026-11-17.
-- What and why: sampled requests keep the path as served (query string dropped per the docs), so a path segment that
-  carries a token (`/reset/<token>`) reaches the monitor's table. Decision to take: keep the path, or store only the
-  route pattern with the parameters masked.
-- Evidence: `packages/devtools/src/production/capture/redact.ts`; `docs/src/content/docs/v/latest/devtools/security.mdx`.
 - Status: open.
 
 ### T-149 [feature] Core sees the monitor's production flag when it is set only through connector options

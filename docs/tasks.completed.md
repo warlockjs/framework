@@ -2,6 +2,28 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+## Owner decisions (2026-11-19)
+
+### T-170 [decision] Open content model for business fields in features and flows
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0). The app wants owner, success measures (KPIs), support notes (FAQ), risks, links (designs, docs, tickets) and a glossary shown on the Product map.
+- What and why: an unknown front-matter key is GR1005 and an unknown heading is GR1007 (`packages/grimoire/src/written/markdown.ts`, find the two codes), which keeps the written format strict and checkable. The review's "accept anything" ask would lose that.
+- Options: (a) keep strictness and add a fixed set of business fields (owner, success measures, support notes, risks, links); (b) keep strictness and allow one `extra:` front-matter key that holds free-form fields and is shown as-is on the Product map; (c) leave it out.
+- Needs owner decision: which option. Keep GR1005/GR1007 for everything else.
+- Recommendation (2026-11-19): (c) with one exception. Grimoire's job is product behaviour checked against code and
+  tests; KPIs, FAQ, risks and roadmap cannot be checked and go stale, so they belong in the app's own docs or tools.
+  Allow only `owner` and a `## Links` section (pointers to those docs), because they help readers find the rest.
+- Decision (owner, 2026-11-19): skip the feature. No business fields; GR1005/GR1007 stay strict.
+
+### T-148 [decision] Request paths in production samples
+
+- Source: 5.56.0 security review, 2026-11-17.
+- What and why: sampled requests keep the path as served (query string dropped per the docs), so a path segment that
+  carries a token (`/reset/<token>`) reaches the monitor's table. Decision to take: keep the path, or store only the
+  route pattern with the parameters masked.
+- Evidence: `packages/devtools/src/production/capture/redact.ts`; `docs/src/content/docs/v/latest/devtools/security.mdx`.
+- Decision (owner, 2026-11-19): keep the path as served (query string dropped, as documented). No change.
+
 ## 5.60.0 (2026-11-19)
 
 ### T-177 [feature] AI section in devtools: every Panoptic view plus reports and charts (5.60.0)
