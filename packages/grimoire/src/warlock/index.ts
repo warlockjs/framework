@@ -15,7 +15,13 @@
  * modules that build the book are loaded inside actions, tool `run`
  * functions and adapter methods.
  */
-export { createWarlockAdapter, type WarlockAdapterOptions, type WarlockInspect } from "./adapter";
+export {
+  createWarlockAdapter,
+  liveInspect,
+  type LiveInspectTooling,
+  type WarlockAdapterOptions,
+  type WarlockInspect,
+} from "./adapter";
 export { registerGrimoireCommands } from "./commands";
 export {
   collectMobileFacts,

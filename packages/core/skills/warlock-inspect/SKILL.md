@@ -97,6 +97,16 @@ const boot = await bootForInspect();
 const report = await inspectApp({ ...inspectOptionsFromBoot(boot) });
 ```
 
+Inside `warlock dev` (a devtools panel), read the facts without a second boot: the dev server calls
+`startLiveEventRecording()` before the app modules load, and `liveInspectOptions()` hands `inspectApp()` the event
+listeners noted since then (routes come from the live router):
+
+```ts
+import { inspectApp, liveInspectOptions } from "@warlock.js/core/tooling";
+
+const report = await inspectApp({ ...liveInspectOptions(), sections: ["routes", "events"] });
+```
+
 Validate a report with the published schema — `INSPECT_REPORT_JSON_SCHEMA` (draft 2020-12), also shipped as `node_modules/@warlock.js/core/schemas/inspect-report.schema.json`:
 
 ```ts

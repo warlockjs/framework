@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Fastify, {
@@ -133,7 +134,37 @@ export type AppConfig = {
    * app-wide security headers (a `frame-ancestors` CSP) on the raw response.
    */
   coreServer?: boolean;
+  /**
+   * Register core's router with a root `GET /*` route that answers unknown URLs
+   * the way a web site does (a JSON body, or a document for `Accept: text/html`),
+   * and hand the mount core's `answerUnknownUrl`.
+   */
+  catchAll?: boolean;
+  /**
+   * Register `@fastify/rate-limit` (global, this many requests a minute) before
+   * the routes, as core does by default. Only with `catchAll`.
+   */
+  rateLimit?: number;
 };
+
+/** `@fastify/rate-limit` is core's dependency, not devtools': resolved from core's folder. */
+function loadRateLimitPlugin(): Parameters<FastifyInstance["register"]>[0] {
+  const required = createRequire(new URL("../../../../core/package.json", import.meta.url))(
+    "@fastify/rate-limit",
+  ) as { default?: unknown };
+
+  return (required.default ?? required) as Parameters<FastifyInstance["register"]>[0];
+}
+
+/** The source file the catch-all route is registered under, so it can be removed again. */
+export const CATCH_ALL_SOURCE = "devtools-uniform-404.spec";
+
+/** Removes the catch-all route of a test app from the shared router. */
+export async function removeCatchAll(): Promise<void> {
+  const { router } = await import("../../../../core/src/router/router");
+
+  router.removeRoutesBySourceFile(CATCH_ALL_SOURCE);
+}
 
 export async function createApp(config: AppConfig = {}) {
   const store = config.store ?? createMemoryStore();
@@ -195,6 +226,55 @@ export async function createApp(config: AppConfig = {}) {
 
   app.get("/app-route", async () => ({ app: true }));
 
+  // Loaded on demand: most specs mock the packages core's router pulls in.
+  const catchAll = config.catchAll
+    ? {
+        ...(await import("../../../../core/src/router/router")),
+        ...(await import("../../../../web/src/server/route-not-found-response")),
+      }
+    : undefined;
+
+  if (catchAll) {
+    const { router, sendRouteNotFound } = catchAll;
+
+    if (config.rateLimit !== undefined) {
+      await app.register(loadRateLimitPlugin(), { max: config.rateLimit, timeWindow: 60_000 });
+    }
+
+    await router.withSourceFile(CATCH_ALL_SOURCE, async () => {
+      // Like a web site, the catch-all answers POST too.
+      router.post("/*", async ({ request, response }) => sendRouteNotFound({ request, response }), {
+        name: "spec.catch-all.post",
+      });
+      router.get(
+        "/*",
+        async ({ request, response }) => {
+          if (String(request.header("accept") ?? "").includes("text/html")) {
+            response.header("Cache-Control", "no-store");
+
+            return response.html(`<h1>Page not found: ${request.path}</h1>`, 404);
+          }
+
+          response.header("Cache-Control", "no-store");
+
+          return sendRouteNotFound({ request, response });
+        },
+        {
+          name: "spec.catch-all",
+          serverOptions: {
+            // A failing catch-all, on request: its error must get the app's own error answer.
+            onRequest: async (request) => {
+              if (request.headers["x-spec-fail"] !== undefined) {
+                throw Object.assign(new Error("catch-all failed"), { statusCode: 418 });
+              }
+            },
+          },
+        },
+      );
+    });
+    router.scan(app);
+  }
+
   const resolved = {
     path: "/__unused",
     maxRequests: 200,
@@ -235,6 +315,7 @@ export async function createApp(config: AppConfig = {}) {
     ],
     state,
     warn: (message) => warnings.push(message),
+    ...(catchAll ? { answerUnknownUrl: catchAll.answerUnknownUrl } : {}),
     hmac: fakeCrypto().hmac,
   });
 

@@ -108,8 +108,10 @@ The first page a visitor sees.
   preferences are a few rows, not six pages.
 - **Flow** is `feature/flow`. The rule for what the block shows lives there. Do not restate it.
 - **Who sees it** uses the app's condition names, and the check reports a name the README does
-  not declare (`GR5002`). **Changes with** is free text: it is not checked, but starting an item
-  with a condition name (`vip: member prices`) keeps it readable.
+  not declare (`GR5002`). **Changes with** is mostly free text: starting an item
+  with a condition name (`vip: member prices`) is checked like Who sees it (`GR5002`), and a name written in backticks
+  (`` `vip` ``) that the README does not declare is a warning (`GR5010`). Plain text is never reported, so write
+  a condition in backticks only when it is one.
 - Do not list blocks that come from the layout.
 
 ## A layout
@@ -170,5 +172,5 @@ npx warlock grimoire check
 
 It reports a block that points to a flow that does not exist, a condition that is not declared in
 the app README, a page whose route is gone, a screen with no route (file-based apps), and a
-feature that lists an app with no folder here. Its codes are `GR5001` to `GR5009`;
+feature that lists an app with no folder here. Its codes are `GR5001` to `GR5010`;
 `npx warlock explain GR5003` describes one.

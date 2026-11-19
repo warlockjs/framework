@@ -1973,7 +1973,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/cache/src/utils.ts` - CACHE_FOR, cache/src/utils.ts, escapeCacheKeySegment, escapeKeyObject, parseCacheKey, parseTtl, expiresAtToTtl, normalizeToOptions
 - `packages/cache/vitest.config.ts` - cache/vitest.config.ts
 
-## packages/cascade (154 test files not listed)
+## packages/cascade (155 test files not listed)
 
 - `packages/cascade/README.md`
 - `packages/cascade/bin/cascade.js`
@@ -2212,7 +2212,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/context/src/shared-storage.ts` - ContextFrame, ContextStorage, ContextSlot, sharedStorage, NO_SCOPE, currentContextScope, runWithSlots, withSlots
 - `packages/context/vitest.config.ts` - context/vitest.config.ts
 
-## packages/core (681 test files not listed)
+## packages/core (683 test files not listed)
 
 - `packages/core/README.md`
 - `packages/core/TODO.md`
@@ -2477,7 +2477,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/connectors/cache-connector.ts` - CacheConnector
 - `packages/core/src/connectors/connectors-manager.ts` - ConnectorTiming, ConnectorsManager, connectorsManager
 - `packages/core/src/connectors/database-connector.ts` - DatabaseConnector
-- `packages/core/src/connectors/database-query-events.ts` - resolveDatabaseConnectionConfig
+- `packages/core/src/connectors/database-query-events.ts` - DEVTOOLS_PRODUCTION_REQUESTED, devtoolsProductionEnabled, resolveDatabaseConnectionConfig
 - `packages/core/src/connectors/describe-server-address.ts` - ServerAddressReport, LOOPBACK_HOSTS, DISPLAY_AS_LOCALHOST, WILDCARD_HOSTS, isWildcardBind, isWildcardHost, toDisplayUrl, parseUrl
 - `packages/core/src/connectors/herald-connector.ts` - HeraldConnector
 - `packages/core/src/connectors/http-connector.ts` - HttpConnector, environmentColor
@@ -3078,6 +3078,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tooling/inspect/inspect-report.schema.ts` - nullableString, stringArray, jsonSchema, authSource, route, model, resource, configKey
 - `packages/core/src/tooling/inspect/inspect-report.types.ts` - InspectSection, JsonSchema, InspectRouteAuth, InspectRouteRateLimit, InspectRouteLogging, InspectParameter, InspectRoute, InspectModelColumn
 - `packages/core/src/tooling/inspect/lazy-value`
+- `packages/core/src/tooling/inspect/live-inspect.ts` - LiveRecorder, RECORDER_KEY, currentRecorder, startLiveEventRecording, liveInspectOptions
 - `packages/core/src/tooling/inspect/t-lazy`
 - `packages/core/src/tooling/inspect/t-query`
 - `packages/core/src/tooling/mcp/__fixtures__/fake-mcp-context.ts` - FakeContextCalls, fixtureReport, cleanCheckReport, fakeDevtools, fakeMcpContext
@@ -3505,7 +3506,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/tests/acceptance/starter-browser-gate.mjs` - Cdp, file, checkout, requireFromCheckout, options, candidate, state, output
 - `packages/create-warlock/vitest.config.ts` - create-warlock/vitest.config.ts
 
-## packages/devtools (120 test files not listed)
+## packages/devtools (122 test files not listed)
 
 - `packages/devtools/README.md`
 - `packages/devtools/bench/production-overhead.ts` - production, instance, body, noop, noopHooks, startServer, load, median
@@ -3537,7 +3538,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/caller-location.ts` - packageDirectory, captureCallerLocation, parseFrame, normalizePath, shouldSkip
 - `packages/devtools/src/collector.ts` - src/collector.ts, createCollector, summary, mailSummary, copyRequest
 - `packages/devtools/src/current-request-id.ts` - currentRequestId
-- `packages/devtools/src/devtools-connector.ts` - DevtoolsConnectorOptions, ConnectorLogger, PostmanBuilder, DEVTOOLS_CONNECTOR_PRIORITY, readConfiguredOptions, devtoolsConnector, attachSource, wireDevelopmentInsights
+- `packages/devtools/src/devtools-connector.ts` - DevtoolsConnectorOptions, ConnectorLogger, PostmanBuilder, DEVTOOLS_CONNECTOR_PRIORITY, DEVTOOLS_PRODUCTION_REQUESTED, readConfiguredOptions, devtoolsConnector, attachSource
 - `packages/devtools/src/index.ts` - devtools/src/index.ts
 - `packages/devtools/src/n-plus-one.ts` - detectNPlusOne, truncate, mostFrequentCaller
 - `packages/devtools/src/options.ts` - src/options.ts, resolveDevtoolsOptions
@@ -3586,7 +3587,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/production/insights/index.ts` - insights/index.ts
 - `packages/devtools/src/production/insights/insights.ts` - ReportLoader, DEFAULT_INSIGHT_LIMIT, MAX_INSIGHT_LIMIT, limitOf, matches, infoOf, build, select
 - `packages/devtools/src/production/insights/instance.ts` - createInstanceInfo
-- `packages/devtools/src/production/insights/jobs.ts` - SchedulerJobLike, DevtoolsJobsLoaders, SCHEDULER_KEY, importOptional, defaultLoaders, readableInterval, toSchedule, createJobsReader
+- `packages/devtools/src/production/insights/jobs.ts` - SchedulerJobLike, DevtoolsJobsLoaders, SCHEDULER_KEY, importOptional, defaultLoaders, readableInterval, toRun, toSchedule
 - `packages/devtools/src/production/insights/readiness.ts` - DevtoolsHealthStatusReader
 - `packages/devtools/src/production/insights/reporter.ts` - emptyJobs, createLocalReporter
 - `packages/devtools/src/production/insights/resources.ts` - GcKind, DevtoolsResourceSources, insights/resources.ts, gcKindName, defaultSources, nsToMs, createResourceMonitor, sample
@@ -3783,7 +3784,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/panels/api/index.tsx` - api/index.tsx, VIEWERS, DOCS_VIEWER_KEY, savedViewer, saveViewer, ApiPanel
 - `packages/devtools/ui-src/src/panels/errors/index.tsx` - Group, errors/index.tsx, SOURCES, ErrorsPanel, GroupRows
 - `packages/devtools/ui-src/src/panels/health/index.tsx` - health/index.tsx, statusPill, HistoryStrip, HealthPanel
-- `packages/devtools/ui-src/src/panels/jobs/index.tsx` - jobs/index.tsx, Schedules, Queues, JobsPanel
+- `packages/devtools/ui-src/src/panels/jobs/index.tsx` - jobs/index.tsx, RUN_TONE, RecentRuns, Schedules, Queues, JobsPanel
 - `packages/devtools/ui-src/src/panels/logs/index.tsx` - logs/index.tsx, LEVELS, LogsPanel
 - `packages/devtools/ui-src/src/panels/mail/index.tsx` - MailSummary, Mail, mail/index.tsx, MailDetail, MailPanel
 - `packages/devtools/ui-src/src/panels/queries/BackgroundQueries.tsx` - BackgroundQuery, BackgroundQueries
@@ -3807,7 +3808,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/tests/panels/helpers.tsx` - Answer, Route, ApiCall, FakeEventSource, instanceA, instanceB, session, devSession
 - `packages/devtools/ui-src/tests/setup.ts` - tests/setup.ts
 - `packages/devtools/ui-src/vite.config.ts` - ui-src/vite.config.ts, devBase, proxied
-- `packages/devtools/ui/dashboard/assets/app.js` - be, C, ce, me, ve, xe, ye, ae
+- `packages/devtools/ui/dashboard/assets/app.js` - i, pe, be, ce, me, ve, xe, ye
 - `packages/devtools/ui/docs-swagger.js`
 - `packages/devtools/ui/panels/processes.js` - renderProcesses
 - `packages/devtools/vitest.config.ts` - devtools/vitest.config.ts
@@ -3859,7 +3860,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/fs/tests/helpers.ts` - tests/helpers.ts, withTempDir
 - `packages/fs/vitest.config.ts` - fs/vitest.config.ts
 
-## packages/grimoire (62 test files not listed)
+## packages/grimoire (64 test files not listed)
 
 - `packages/grimoire/README.md`
 - `packages/grimoire/scripts/generate-llms.mjs` - grimoire/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -3870,7 +3871,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/grimoire/skills/record-a-change/SKILL.md` - record-a-change - Finish a change the Grimoire way: tie each test to the acceptance criterion it proves, re…
 - `packages/grimoire/skills/use-the-grimoire/SKILL.md` - use-the-grimoire - Find the right files before changing a Warlock.js project by asking the Grimoire (experim…
 - `packages/grimoire/skills/write-a-feature/SKILL.md` - write-a-feature - Describe a new feature, or a new version of one, in `grimoire/features/` before writing c…
-- `packages/grimoire/src/apps/check-apps.ts` - Subject, flowSubject, pageSubject, normalizeRoute, blockSlug, pagesOf, checkApps, checkReached
+- `packages/grimoire/src/apps/check-apps.ts` - Subject, flowSubject, pageSubject, normalizeRoute, blockSlug, codeNames, pagesOf, checkApps
 - `packages/grimoire/src/apps/index.ts` - apps/index.ts
 - `packages/grimoire/src/apps/match-apps.ts` - sameRoot, matchApps
 - `packages/grimoire/src/book/build.ts` - StoredBook, StoredFactsCache, Scan, book/build.ts, WRITE_STATE_PATH, grimoireVersion, absolutePath, readStoredBook
@@ -3931,7 +3932,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/grimoire/src/test-results/index.ts` - test-results/index.ts, hashTestFile, resolveResultsFile, resultsFileLabel, readTestResults, isStore, testResultsInfo, compareResults
 - `packages/grimoire/src/vitest/index.ts` - GrimoireReporterOptions, GrimoireReporter, ReportedCase, ReportedModule, VitestContext, ModuleRecord, vitest/index.ts, OUTCOMES
 - `packages/grimoire/src/warlock/actions.ts` - CommandIO, CommandContext, Options, warlock/actions.ts, plural, reportError, printJson, withFreshRoutes
-- `packages/grimoire/src/warlock/adapter.ts` - WarlockInspect, WarlockAdapterOptions, ExportIndex, warlock/adapter.ts, versionIn, installedVersion, coreVersion, appIdentity
+- `packages/grimoire/src/warlock/adapter.ts` - WarlockInspect, WarlockAdapterOptions, LiveInspectTooling, ExportIndex, warlock/adapter.ts, versionIn, installedVersion, coreVersion
 - `packages/grimoire/src/warlock/commands.ts` - warlock/commands.ts, BOOT, WEB_CONFIG, preloadFor, GRIMOIRE_ACTIONS, io, exitWith, explainCode
 - `packages/grimoire/src/warlock/index.ts` - warlock/index.ts
 - `packages/grimoire/src/warlock/logo.ts` - WARLOCK_LOGO_DATA_URI
@@ -4204,7 +4205,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/process/src/windows-helper.ts` - HelperChild, HelperSpawn, WindowsHelperOptions, Waiter, Batch, Flight, Snapshot, WindowsProcessHelper
 - `packages/process/vitest.config.ts` - process/vitest.config.ts
 
-## packages/queue (19 test files not listed)
+## packages/queue (20 test files not listed)
 
 - `packages/queue/README.md`
 - `packages/queue/scripts/generate-llms.mjs` - queue/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -4223,7 +4224,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/queue/src/dispatch-interceptor.ts` - DispatchInterceptor, InterceptorHolder, INTERCEPTOR_KEY, setDispatchInterceptor, getDispatchInterceptor
 - `packages/queue/src/driver.ts` - DriverDispatch, QueueDriver
 - `packages/queue/src/drivers/bullmq.ts` - BullMQDriver, toKeepJobs, toSnapshot, closeWorker
-- `packages/queue/src/drivers/local-store.ts` - LocalJob, RetentionWindow, LocalStore, jsonCopy
+- `packages/queue/src/drivers/local-store.ts` - LocalJob, RetentionWindow, LocalStore, addToCounts, jsonCopy
 - `packages/queue/src/drivers/local.ts` - ActiveJob, LocalWorker, LocalDriver, drivers/local.ts, snapshot, newestFirst, positiveInteger, validateOptions
 - `packages/queue/src/drivers/memory-store.ts` - MemoryStore, drivers/memory-store.ts, READY_STATES
 - `packages/queue/src/drivers/sqlite-store.ts` - SqliteValue, SqliteRow, SqliteStatement, DatabaseSync, SqliteModule, SqliteStore, decode
@@ -4239,14 +4240,14 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/queue/src/queue-context.ts` - QueueContext, QueueEnvelope, defineQueueContext, setQueueContext, getQueueContext, resetQueueContext, wrapPayload, unwrapPayload
 - `packages/queue/src/queue-dashboard-unguarded.error.ts` - QueueDashboardUnguardedError
 - `packages/queue/src/queue-driver.ts` - getQueueDriver, currentQueueDriver, forgetQueueDriver
-- `packages/queue/src/queue-manager.ts` - CloseQueueOptions, getQueue, startWorkers, runningWorkers, closeQueue, configuredShutdownTimeout
+- `packages/queue/src/queue-manager.ts` - CloseQueueOptions, getQueue, startWorkers, runningWorkers, queueCounts, closeQueue, configuredShutdownTimeout
 - `packages/queue/src/types.ts` - DurationUnit, Duration, JobBackoff, JobRetention, JobOptions, QueueWorkersConfig, QueueDashboardConfig, LocalQueueConfig
 - `packages/queue/tests/fixtures/local-worker.mjs` - config, driver, handle
 - `packages/queue/tests/redis-availability.ts` - pingRedis, redisTestsAvailable
 - `packages/queue/tests/test-redis.ts` - testQueueConfig, waitFor, sleep
 - `packages/queue/vitest.config.ts` - queue/vitest.config.ts
 
-## packages/scheduler (8 test files not listed)
+## packages/scheduler (9 test files not listed)
 
 - `packages/scheduler/README.md`
 - `packages/scheduler/domains/backlog.md`
@@ -4264,7 +4265,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/scheduler/src/process-roles.ts` - parsedRoles, hasWorkerRole, rolesLabel
 - `packages/scheduler/src/running-schedulers.ts` - StoppableScheduler, SchedulerHost, RUNNING_SCHEDULERS_KEY, runningSchedulers, trackRunningScheduler, untrackRunningScheduler
 - `packages/scheduler/src/scheduler.ts` - TypedEventEmitter, Scheduler, scheduler
-- `packages/scheduler/src/types.ts` - TimeType, Day, DayOfMonthMode, JobIntervals, JobResult, JobStatus, RetryConfig, SchedulerEvents
+- `packages/scheduler/src/types.ts` - TimeType, Day, DayOfMonthMode, JobIntervals, JobResult, JobRunOutcome, JobRunRecord, JobStats
 - `packages/scheduler/src/utils.ts` - scheduler/src/utils.ts, parseWeekDayNumber
 - `packages/scheduler/vitest.config.ts` - scheduler/vitest.config.ts
 

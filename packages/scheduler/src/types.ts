@@ -65,6 +65,46 @@ export type JobResult = {
 };
 
 /**
+ * How one recorded run ended
+ */
+export type JobRunOutcome = "success" | "failed" | "skipped";
+
+/**
+ * One entry of a job's run history. Holds the message only, never the stack.
+ */
+export type JobRunRecord = {
+  /** When the run started (epoch ms) */
+  startedAt: number;
+  /** How long it took in milliseconds (0 for an overlap skip) */
+  durationMs: number;
+  outcome: JobRunOutcome;
+  /** Error message of a failed run (cut to 500 characters) */
+  error?: string;
+  /** Why a skipped run did not execute */
+  skipReason?: string;
+};
+
+/**
+ * Running totals of a job since the process started
+ */
+export type JobStats = {
+  /** Executed runs (successful and failed; skipped runs are not counted) */
+  runs: number;
+  /** Runs that ended in an error */
+  failures: number;
+  /** Ticks skipped (overlap prevention, another server held the lock, a hook declined) */
+  skips: number;
+  /** Start time of the last executed run (epoch ms) */
+  lastRunAt: number | null;
+  /** Duration of the last executed run */
+  lastDurationMs: number | null;
+  /** Message of the last failure, cleared by the next successful run */
+  lastError: string | null;
+  /** Outcome of the last recorded entry */
+  lastOutcome: JobRunOutcome | null;
+};
+
+/**
  * Job execution status
  */
 export type JobStatus = "idle" | "running" | "completed" | "failed";

@@ -157,11 +157,20 @@ export function mountProductionDevtools(
     deps.warn?.(message);
   };
 
-  const notFound = (request: FastifyRequest, reply: FastifyReply): FastifyReply => {
+  const notFound = async (request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
     uniformNotFound.add(request);
 
-    // The app's own not-found handler answers, so the reply is the one any unknown URL gets.
-    reply.callNotFound();
+    // The app's own answer for an unknown URL (a web site's catch-all route);
+    // without one, Fastify's not-found handler gives the same 404 any URL gets.
+    try {
+      if (!((await deps.answerUnknownUrl?.(request, reply)) ?? false)) reply.callNotFound();
+    } catch (error) {
+      warn(
+        `The app's answer for an unknown URL failed, the dashboard answers with the plain 404: ${error instanceof Error ? error.message : String(error)}`,
+      );
+
+      if (!reply.sent) reply.callNotFound();
+    }
 
     // Returning the reply is what stops an async hook's lifecycle.
     return reply;
@@ -429,6 +438,10 @@ export function mountProductionDevtools(
       // ---- Errors ---------------------------------------------------------
       instance.setErrorHandler(
         (error: Error & { statusCode?: number; code?: string }, request, reply) => {
+          // A request answered like an unknown URL (a rate-limit 429, a failing catch-all) gets the app's own error
+          // answer: thrown on, Fastify hands it to the parent error handler.
+          if (uniformNotFound.has(request)) throw error;
+
           // A malformed grant exchange (bad JSON, too large) answers like any unknown URL.
           if (devtoolsRequestContext(request)?.pattern === SHARE_OPEN_PATTERN) {
             return notFound(request, reply);

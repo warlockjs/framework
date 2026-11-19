@@ -146,7 +146,12 @@ job.lastRun; // Dayjs | null — success OR failure
 job.isRunning; // boolean
 job.intervals; // readonly schedule config
 job.cronExpression; // string | null
+job.stats; // { runs, failures, skips, lastRunAt, lastDurationMs, lastError, lastOutcome }
+job.history; // JobRunRecord[], newest first: { startedAt, durationMs, outcome: "success" | "failed" | "skipped", error?, skipReason? }
+job.keepHistory(50); // history size, default 20 (0 = none); Job.defaultHistorySize sets the default
 ```
+
+History is in memory, per process; `error` is the message only (cut to 500 characters, no stack). Overlap skips add one `skipped` entry per due tick and count in `stats.skips`, not `runs`.
 
 ## See also
 

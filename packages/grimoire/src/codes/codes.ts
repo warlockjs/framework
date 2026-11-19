@@ -135,7 +135,7 @@ export const GRIMOIRE_CODE_LIST = [
     "structure",
     "warning",
     "A case question is not answered",
-    "Answer the question under Cases (or `does not apply` and why), or list it under Not handled.",
+    "Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`.",
     WRITE,
   ),
   define(
@@ -600,6 +600,14 @@ export const GRIMOIRE_CODE_LIST = [
     "warning",
     "A site or mobile app has no folder in grimoire/apps",
     "Add `grimoire/apps/<app>/README.md` for it.",
+    APP,
+  ),
+  define(
+    "GR5010",
+    "apps",
+    "warning",
+    "A name in backticks in Changes with is not a declared condition",
+    "Declare the condition under Conditions in the app README, fix the name, or write it without backticks when it is not a condition.",
     APP,
   ),
 

@@ -728,7 +728,11 @@ export function parseFlow(
       ...flow.notHandled.map((entry) => normalizeKey(entry.name)),
     ]);
 
+    const readOnly = isReadOnlyFlow(flow.steps);
+
     for (const question of CASE_QUESTIONS) {
+      if (readOnly && (WRITE_ONLY_QUESTIONS as readonly string[]).includes(question)) continue;
+
       if (!answered.has(question)) {
         sink.report(
           "GR1012",
@@ -740,6 +744,26 @@ export function parseFlow(
   }
 
   return flow;
+}
+
+/** Case questions a flow with no writes may leave out. */
+const WRITE_ONLY_QUESTIONS = ["duplicate", "double submit"];
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * A flow writes nothing when it has steps and every one is a page or a route
+ * with a safe method (`GET`, `HEAD`, `OPTIONS`). Any other step (a write route,
+ * mail, job, event, affects, outside service) or no steps at all counts as a write.
+ */
+function isReadOnlyFlow(steps: readonly WrittenStep[]): boolean {
+  if (steps.length === 0) return false;
+
+  return steps.every(
+    (step) =>
+      step.type === "page" ||
+      (step.type === "route" && step.route !== null && SAFE_METHODS.has(step.route.method)),
+  );
 }
 
 // ── Version briefs ─────────────────────────────────────────────────────────

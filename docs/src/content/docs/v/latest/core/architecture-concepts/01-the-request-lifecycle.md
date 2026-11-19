@@ -98,6 +98,30 @@ Fastify hands the incoming request to Warlock's wildcard handler, which delegate
 
 If no route matches, Warlock returns a 404 immediately — no middleware, no controller, no logging beyond an info line.
 
+A Fastify plugin that answers inside its own encapsulated context can hand a request back to this step with
+`answerUnknownUrl(request, reply)` from `@warlock.js/core`. The devtools production monitor does this for every request
+it refuses, so a closed monitor URL answers exactly like an unknown URL:
+
+```ts
+import { answerUnknownUrl } from "@warlock.js/core";
+
+instance.addHook("onRequest", async (request, reply) => {
+  if (!allowed(request)) {
+    if (!(await answerUnknownUrl(request, reply))) reply.callNotFound();
+
+    return reply;
+  }
+});
+```
+
+For `GET` and `HEAD` it runs the app route that would match the URL if the plugin were not there (a `/:locale/*` route
+before a catch-all `/*`, with its params); for other methods only the catch-all `/*` a `@warlock.js/web` site registers.
+The route's rate limit applies (the same `x-ratelimit-*` headers and bucket, the same `429`), then its hooks and
+handler. An error the route throws is handed to Fastify's error handling with `reply.send(error)`; a plugin with its own
+`setErrorHandler` should rethrow the errors of these requests so the app's handler answers them. It resolves `false`
+when no app route matches. A path registered with `excludeFromRequestLog()` gets no `Starting Request` /
+`Completed Request` log lines, so a private path does not reach the log.
+
 ### Step 2 — Middleware chain
 
 The route carries a `middleware` array (from `router.group({ middleware }, ...)`, the `guarded(...)` helper, or per-route options). They run in array order, each receiving the same `request` and `response`:

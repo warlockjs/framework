@@ -85,6 +85,7 @@ that is still `proposed`; it does not fail the check.
 
 - **Exports, imports, importers, routes, middleware, pages:** read from the code. Trust them.
 - **Route middleware:** a route step also reaches the middleware files the matched route names (not the routes file's other imports). Roles that run by being present (migration, seed, command, main, layout, root) and spec-only helpers are not listed as unreached.
+- **Dev tab route facts:** the dev tab reads routes, events and jobs from the running dev server (nothing is booted twice), so it shows `routes: fresh` on the first open; they are read once, so rebuild with `warlock grimoire build` after changing routes.
 - **Without route facts** (`routes: missing`): route, mail, notification, job and event steps are `found: null` (not checked), not resolved and not failed; `GR5008` skips mail and notification entries.
 - **Files behind a route:** every file the handler can reach through imports. It is not the exact
   call path; open the handler to see which ones it really uses.

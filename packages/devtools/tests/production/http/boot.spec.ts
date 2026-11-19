@@ -76,6 +76,7 @@ const h = vi.hoisted(() => {
     core: {
       Application: { runtimeStrategy: "production" },
       getHttpServer: vi.fn(() => ({ fastify: true })),
+      answerUnknownUrl: vi.fn(async () => false),
       config: { get: vi.fn() as (key: string) => unknown },
       excludeFromRequestLog: vi.fn((..._args: unknown[]) => {
         calls.push("exclude");

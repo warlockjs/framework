@@ -283,8 +283,10 @@ The first page a visitor sees.
   preferences are a few rows, not six pages.
 - **Flow** is `feature/flow`. The rule for what the block shows lives there. Do not restate it.
 - **Who sees it** uses the app's condition names, and the check reports a name the README does
-  not declare (`GR5002`). **Changes with** is free text: it is not checked, but starting an item
-  with a condition name (`vip: member prices`) keeps it readable.
+  not declare (`GR5002`). **Changes with** is mostly free text: starting an item
+  with a condition name (`vip: member prices`) is checked like Who sees it (`GR5002`), and a name written in backticks
+  (`` `vip` ``) that the README does not declare is a warning (`GR5010`). Plain text is never reported, so write
+  a condition in backticks only when it is one.
 - Do not list blocks that come from the layout.
 
 ## A layout
@@ -345,7 +347,7 @@ npx warlock grimoire check
 
 It reports a block that points to a flow that does not exist, a condition that is not declared in
 the app README, a page whose route is gone, a screen with no route (file-based apps), and a
-feature that lists an app with no folder here. Its codes are `GR5001` to `GR5009`;
+feature that lists an app with no folder here. Its codes are `GR5001` to `GR5010`;
 `npx warlock explain GR5003` describes one.
 
 
@@ -670,6 +672,7 @@ that is still `proposed`; it does not fail the check.
 
 - **Exports, imports, importers, routes, middleware, pages:** read from the code. Trust them.
 - **Route middleware:** a route step also reaches the middleware files the matched route names (not the routes file's other imports). Roles that run by being present (migration, seed, command, main, layout, root) and spec-only helpers are not listed as unreached.
+- **Dev tab route facts:** the dev tab reads routes, events and jobs from the running dev server (nothing is booted twice), so it shows `routes: fresh` on the first open; they are read once, so rebuild with `warlock grimoire build` after changing routes.
 - **Without route facts** (`routes: missing`): route, mail, notification, job and event steps are `found: null` (not checked), not resolved and not failed; `GR5008` skips mail and notification entries.
 - **Files behind a route:** every file the handler can reach through imports. It is not the exact
   call path; open the handler to see which ones it really uses.
@@ -939,7 +942,8 @@ pages, or its screens for a mobile app). Without brackets it looks in the apps t
 **Cases.** End a case line with `(AC-n)` (or `(AC-1, AC-2)`) to link it to the criterion that
 proves it; a number the flow does not have is an error (`GR2013`). Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
 expiry, double submit, outside service down), each with a case or "does not apply" and the
-reason. A flow that skips one gets a finding. Do not invent cases beyond the questions unless the owner described one.
+reason. A flow that skips one gets a finding, except that a flow with no writes (only pages and
+`GET` routes) may leave out `duplicate` and `double submit`. Do not invent cases beyond the questions unless the owner described one.
 
 **Criteria.** One per case that changes what the user gets. Number them `AC-1`, `AC-2`, … and
 never renumber. Scope one to an app with `[app-id]`.

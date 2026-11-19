@@ -32,7 +32,10 @@ const BLOCK_CACHE_SIZE = 1000;
 /** A cookie failure is audited at most this often per client (a revoked link in use must not flood the log). */
 const COOKIE_AUDIT_INTERVAL_MS = 60_000;
 
-type Notfound = (request: FastifyRequest, reply: FastifyReply) => FastifyReply;
+type Notfound = (
+  request: FastifyRequest,
+  reply: FastifyReply,
+) => FastifyReply | Promise<FastifyReply>;
 
 /** The path pattern `pattern` (`/flows/:feature`) matched against `path`, as its params; `null` for no match. */
 export function matchSharePath(pattern: string, path: string): Record<string, string> | null {

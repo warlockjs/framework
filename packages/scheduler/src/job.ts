@@ -3,7 +3,15 @@ import isSameOrAfter from "dayjs/plugin/isSameOrAfter.js";
 import timezone from "dayjs/plugin/timezone.js";
 import utc from "dayjs/plugin/utc.js";
 import { CronParser } from "./cron-parser";
-import type { Day, JobIntervals, JobResult, RetryConfig, TimeType } from "./types";
+import type {
+  Day,
+  JobIntervals,
+  JobResult,
+  JobRunRecord,
+  JobStats,
+  RetryConfig,
+  TimeType,
+} from "./types";
 
 /**
  * `@warlock.js/cache` is an optional peer, loaded only when `onOneServer()` is
@@ -126,6 +134,31 @@ export class Job {
   private _isRunning = false;
 
   /**
+   * Bounded run history, oldest first
+   */
+  private _history: JobRunRecord[] = [];
+
+  /**
+   * How many runs the history keeps
+   */
+  private _historySize: number;
+
+  private _stats: JobStats = {
+    runs: 0,
+    failures: 0,
+    skips: 0,
+    lastRunAt: null,
+    lastDurationMs: null,
+    lastError: null,
+    lastOutcome: null,
+  };
+
+  /**
+   * The due tick an overlap skip was already recorded for, so one busy tick is one entry
+   */
+  private _overlapSkipFor: number | null = null;
+
+  /**
    * Supplies the owning scheduler's around hooks (set via `bindAroundHooks`).
    */
   private _aroundHooks: () => readonly JobAroundHook[] = () => [];
@@ -171,6 +204,11 @@ export class Job {
   // ─────────────────────────────────────────────────────────────────────────────
 
   /**
+   * Run history size new jobs start with (default 20). Set it before creating jobs.
+   */
+  public static defaultHistorySize = 20;
+
+  /**
    * Next scheduled execution time
    */
   public nextRun: Dayjs | null = null;
@@ -188,7 +226,9 @@ export class Job {
   public constructor(
     public readonly name: string,
     private readonly _callback: JobCallback,
-  ) {}
+  ) {
+    this._historySize = Job.defaultHistorySize;
+  }
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Public Getters
@@ -206,6 +246,22 @@ export class Job {
    */
   public get lastRun(): Dayjs | null {
     return this._lastRun;
+  }
+
+  /**
+   * The most recent runs, newest first, at most `keepHistory()` entries.
+   * Failed runs carry the error message (no stack); overlap and lock skips are entries too.
+   */
+  public get history(): readonly JobRunRecord[] {
+    return [...this._history].reverse();
+  }
+
+  /**
+   * Totals since the process started: runs, failures, skips and the last run's
+   * start, duration and error.
+   */
+  public get stats(): Readonly<JobStats> {
+    return { ...this._stats };
   }
 
   /**
@@ -647,6 +703,71 @@ export class Job {
   // ─────────────────────────────────────────────────────────────────────────────
 
   /**
+   * Set how many runs the history keeps (default 20, `0` keeps none; totals still count).
+   * Keeping fewer than are stored drops the oldest.
+   *
+   * @param size - Number of runs to keep
+   */
+  public keepHistory(size: number): this {
+    this._historySize = Math.max(0, Math.floor(size));
+    this._trimHistory();
+
+    return this;
+  }
+
+  /**
+   * Record a tick that was skipped because the previous run was still going.
+   * Called by the scheduler; one entry per due tick however many polls see it.
+   *
+   * @internal
+   */
+  public recordOverlapSkip(): void {
+    const due = this.nextRun ? this.nextRun.valueOf() : null;
+
+    if (due !== null && this._overlapSkipFor === due) return;
+
+    this._overlapSkipFor = due;
+    this._record({
+      startedAt: Date.now(),
+      durationMs: 0,
+      outcome: "skipped",
+      skipReason: "Job is already running",
+    });
+  }
+
+  private _record(entry: JobRunRecord): void {
+    const stats = this._stats;
+
+    stats.lastOutcome = entry.outcome;
+
+    if (entry.outcome === "skipped") {
+      stats.skips++;
+    } else {
+      stats.runs++;
+      stats.lastRunAt = entry.startedAt;
+      stats.lastDurationMs = entry.durationMs;
+
+      if (entry.outcome === "failed") {
+        stats.failures++;
+        stats.lastError = entry.error ?? "Job failed";
+      } else {
+        stats.lastError = null;
+      }
+    }
+
+    if (this._historySize > 0) {
+      this._history.push(entry);
+      this._trimHistory();
+    }
+  }
+
+  private _trimHistory(): void {
+    const extra = this._history.length - this._historySize;
+
+    if (extra > 0) this._history.splice(0, extra);
+  }
+
+  /**
    * Terminate the job and clear all scheduling data
    */
   public terminate(): this {
@@ -753,6 +874,12 @@ export class Job {
         ...(skipped ? { skipped: true } : {}),
         ...(skipReason ? { skipReason } : {}),
       };
+      this._record({
+        startedAt: startTime,
+        durationMs: result.duration,
+        outcome: skipped ? "skipped" : "success",
+        ...(skipped ? { skipReason: skipReason ?? "Another server holds the lock" } : {}),
+      });
     } catch (error) {
       result = {
         success: false,
@@ -760,6 +887,12 @@ export class Job {
         error,
         retries: this._retryConfig?.maxRetries ?? 0,
       };
+      this._record({
+        startedAt: startTime,
+        durationMs: result.duration,
+        outcome: "failed",
+        error: errorMessage(error),
+      });
     } finally {
       this._lastRun = this._now();
       this._lastScheduledAt = scheduledAt;
@@ -1094,4 +1227,11 @@ export class Job {
  */
 export function job(name: string, callback: JobCallback): Job {
   return new Job(name, callback);
+}
+
+/** The message of a thrown value, cut short; never the stack. */
+function errorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return message.length > 500 ? `${message.slice(0, 500)}...` : message;
 }

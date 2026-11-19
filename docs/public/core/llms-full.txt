@@ -13891,6 +13891,16 @@ const boot = await bootForInspect();
 const report = await inspectApp({ ...inspectOptionsFromBoot(boot) });
 ```
 
+Inside `warlock dev` (a devtools panel), read the facts without a second boot: the dev server calls
+`startLiveEventRecording()` before the app modules load, and `liveInspectOptions()` hands `inspectApp()` the event
+listeners noted since then (routes come from the live router):
+
+```ts
+import { inspectApp, liveInspectOptions } from "@warlock.js/core/tooling";
+
+const report = await inspectApp({ ...liveInspectOptions(), sections: ["routes", "events"] });
+```
+
 Validate a report with the published schema — `INSPECT_REPORT_JSON_SCHEMA` (draft 2020-12), also shipped as `node_modules/@warlock.js/core/schemas/inspect-report.schema.json`:
 
 ```ts
@@ -14290,6 +14300,17 @@ and exits non-zero.
 - **Fails loudly on a broken dev boot**, same as `warlock routes` / `warlock doctor` — a route module that throws on import, or a connector registration error, aborts before any comparison happens.
 - **Only page routes are compared.** API routes registered without `isPage` never appear on either side of the diff; this command exists for the file-system page-routing surface `@warlock.js/web` adds, not the general route table.
 - **Core reads the snapshot; it does not write it.** `warlock build` writes `page-routes.manifest.json` through a connector's `build`/`emit` contribution (`@warlock.js/web`'s build integration, keyed off pages it discovers) — a project with no `@warlock.js/web` page routes never produces one, and `routes:diff` has nothing to compare against.
+
+## Answering like an unknown URL from a plugin
+
+A Fastify plugin that refuses a request inside its own encapsulated context (the devtools production monitor does) can
+call `answerUnknownUrl(request, reply)` from `@warlock.js/core`. For `GET`/`HEAD` it runs the app route that would match
+the URL without the plugin (a `/:locale/*` route before the catch-all `/*`), for other methods only the catch-all, with
+that route's params, rate limit (same headers, same bucket, same 429), hooks and handler, so the refusal is the app's own
+unknown-URL answer (a web site's `route_not_found` JSON or its document 404). An error that route throws goes to
+Fastify's error handling (`reply.send(error)`); a plugin with its own `setErrorHandler` rethrows the errors of these
+requests so the app's handler answers. It resolves `false` when no app route matches; then call `reply.callNotFound()`.
+A path registered with `excludeFromRequestLog` gets no `Starting Request`/`Completed Request` log lines.
 
 ## Gotchas
 

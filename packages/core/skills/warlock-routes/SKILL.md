@@ -121,6 +121,17 @@ and exits non-zero.
 - **Only page routes are compared.** API routes registered without `isPage` never appear on either side of the diff; this command exists for the file-system page-routing surface `@warlock.js/web` adds, not the general route table.
 - **Core reads the snapshot; it does not write it.** `warlock build` writes `page-routes.manifest.json` through a connector's `build`/`emit` contribution (`@warlock.js/web`'s build integration, keyed off pages it discovers) — a project with no `@warlock.js/web` page routes never produces one, and `routes:diff` has nothing to compare against.
 
+## Answering like an unknown URL from a plugin
+
+A Fastify plugin that refuses a request inside its own encapsulated context (the devtools production monitor does) can
+call `answerUnknownUrl(request, reply)` from `@warlock.js/core`. For `GET`/`HEAD` it runs the app route that would match
+the URL without the plugin (a `/:locale/*` route before the catch-all `/*`), for other methods only the catch-all, with
+that route's params, rate limit (same headers, same bucket, same 429), hooks and handler, so the refusal is the app's own
+unknown-URL answer (a web site's `route_not_found` JSON or its document 404). An error that route throws goes to
+Fastify's error handling (`reply.send(error)`); a plugin with its own `setErrorHandler` rethrows the errors of these
+requests so the app's handler answers. It resolves `false` when no app route matches; then call `reply.callNotFound()`.
+A path registered with `excludeFromRequestLog` gets no `Starting Request`/`Completed Request` log lines.
+
 ## Gotchas
 
 - **No connectors are started.** The list reflects what's _registered_, not what would connect. It never opens a DB/cache/socket.

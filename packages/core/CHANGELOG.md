@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.61.0 - 2026-11-20
+
+### Added
+
+- `answerUnknownUrl(request, reply)` on the router lets a plugin answer a refused request exactly like an unknown URL: for `GET` and `HEAD` through the app route that would match the URL without the plugin (with its params), for other methods through the catch-all route, with that route's rate limit (same headers, same bucket, same 429), hooks and handler. An error the route throws goes to Fastify's error handling. It returns `false` when no app route matches.
+- `warlock dev` records which module registers each event listener. `startLiveEventRecording()` and `liveInspectOptions()` are new on `@warlock.js/core/tooling`, so tools can read route, event and job facts from the running dev server.
+
+### Fixed
+
+- MongoDB query events are also turned on when the devtools production monitor is enabled through `devtoolsConnector({ production })` options.
+- A path registered with `excludeFromRequestLog()` no longer gets `Starting Request` / `Completed Request` log lines, so a private path stays out of the log.
+
 ## 5.60.0 - 2026-11-19
 
 ### Added

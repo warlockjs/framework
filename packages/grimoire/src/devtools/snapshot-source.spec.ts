@@ -276,3 +276,44 @@ describe("collecting route facts in development", () => {
     expect(routes.mock.calls.length).toBe(calls);
   });
 });
+
+describe("live route facts in the serving process", () => {
+  it("shows fresh routes after the first open, in one build shared by three concurrent calls", async () => {
+    copy = copyFixture();
+    const adapter = createShopAdapter();
+    const source = createSnapshotSource(copy.root, { adapter, write: true, liveFacts: true });
+
+    const [first, second, third] = await Promise.all([source.get(), source.get(), source.get()]);
+
+    expect(first.routes).toBe("fresh");
+    expect(second).toBe(first);
+    expect(third).toBe(first);
+    // One build for the first open: the files were scanned once and the routes read once.
+    expect(adapter.calls.files).toBe(1);
+    expect(adapter.calls.routes).toBe(1);
+
+    source.invalidate();
+    const again = await source.get();
+
+    // The facts now live in the book: the next open does not read them again.
+    expect(again.routes).not.toBe("missing");
+    expect(adapter.calls.routes).toBe(1);
+  });
+
+  it("keeps the cached answer when the live facts cannot be read", async () => {
+    copy = copyFixture();
+    const adapter = createShopAdapter();
+
+    adapter.routes = async () => {
+      throw new Error("registries not ready");
+    };
+
+    const snapshot = await createSnapshotSource(copy.root, {
+      adapter,
+      write: true,
+      liveFacts: true,
+    }).get();
+
+    expect(snapshot.routes).toBe("missing");
+  });
+});

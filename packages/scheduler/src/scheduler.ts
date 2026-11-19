@@ -478,6 +478,7 @@ export class Scheduler
     for (const job of this._jobs) {
       // A due job whose previous run is still going is skipped for this tick.
       if (job.isDue() && job.isRunning) {
+        job.recordOverlapSkip();
         this._emitSafely("job:skip", job.name, "Job is already running");
       }
     }
@@ -527,6 +528,7 @@ export class Scheduler
 
       // Started elsewhere (a manual `run()`) while it waited.
       if (job.isRunning) {
+        job.recordOverlapSkip();
         this._emitSafely("job:skip", job.name, "Job is already running");
         continue;
       }

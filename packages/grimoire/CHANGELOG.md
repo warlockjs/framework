@@ -2,6 +2,22 @@
 
 `@warlock.js/grimoire` is new in 5.55.0 and experimental: its file layout, `GR` codes and API may change in any release until it is marked stable.
 
+## 5.61.0 - 2026-11-20
+
+### Added
+
+- A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out the `duplicate` and `double submit` case questions; the other six are still required (`GR1012`).
+- New check `GR5010` (warning): a name written in backticks in a block table's "Changes with" that is not a condition declared in the app README. Plain text is never reported.
+- The dev Grimoire tab reads route, event and job facts from the running dev server, so the first open shows fresh routes without `warlock grimoire build` and without booting the app a second time. New `createWarlockAdapter({ live: true })`, `liveInspect()` and snapshot source option `liveFacts`.
+
+### Changed
+
+- The dev Grimoire tab warms the book in the background when the dev server starts. On a 10,400-file app, the first open after the warm-up takes about 0.1 s instead of about 6.6 s; an open that comes before the warm-up ends still waits for it (about 6.7 s). Concurrent first requests share one build, as before. Streaming partial answers is not part of this release.
+
+### Fixed
+
+- Docs: items written `name: text` in "Changes with" are checked against the app's conditions (`GR5002`); this was always so, but the docs said otherwise.
+
 ## 5.59.0 - 2026-11-19
 
 ### Added

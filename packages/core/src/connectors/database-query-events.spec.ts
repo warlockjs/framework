@@ -11,7 +11,10 @@ vi.mock("@warlock.js/cascade", async (importOriginal) => ({
 }));
 
 import { DatabaseConnector } from "./database-connector";
-import { resolveDatabaseConnectionConfig } from "./database-query-events";
+import {
+  DEVTOOLS_PRODUCTION_REQUESTED,
+  resolveDatabaseConnectionConfig,
+} from "./database-query-events";
 
 /**
  * The request log counts queries from the ORM's query events, which MongoDB
@@ -30,6 +33,7 @@ describe("database connection queryEvents", () => {
     config.set("http", undefined);
     config.set("database", undefined);
     config.set("devtools", undefined);
+    delete (globalThis as Record<symbol, unknown>)[DEVTOOLS_PRODUCTION_REQUESTED];
     connectToDatabase.mockClear();
 
     if (originalRoles === undefined) delete process.env.WARLOCK_ROLES;
@@ -72,6 +76,22 @@ describe("database connection queryEvents", () => {
   it("turns query events on for the devtools production monitor even with the request log off", () => {
     config.set("http", { logging: { requests: { enabled: false } } });
     config.set("devtools", { production: { enabled: true } });
+
+    expect(resolveDatabaseConnectionConfig(database)).toEqual({ ...database, queryEvents: true });
+    expect(resolveDatabaseConnectionConfig({ ...database, queryEvents: false })).toEqual({
+      ...database,
+      queryEvents: false,
+    });
+
+    process.env.WARLOCK_ROLES = "worker";
+    resetRolesCacheForTests();
+
+    expect(resolveDatabaseConnectionConfig(database)).toEqual(database);
+  });
+
+  it("turns query events on when the monitor is enabled only through the connector's options", () => {
+    config.set("http", { logging: { requests: { enabled: false } } });
+    (globalThis as Record<symbol, unknown>)[DEVTOOLS_PRODUCTION_REQUESTED] = true;
 
     expect(resolveDatabaseConnectionConfig(database)).toEqual({ ...database, queryEvents: true });
     expect(resolveDatabaseConnectionConfig({ ...database, queryEvents: false })).toEqual({

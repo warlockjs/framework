@@ -216,6 +216,17 @@ export type DevtoolsScheduleInfo = {
   lastError: string | null;
   runs: number;
   failures: number;
+  /** The latest runs, newest first (at most 10). Absent when the scheduler keeps no history. */
+  recentRuns?: DevtoolsScheduleRun[];
+};
+
+/** One recorded run of a scheduled job; the error is a message, never a stack. */
+export type DevtoolsScheduleRun = {
+  startedAt: number;
+  durationMs: number;
+  outcome: "success" | "failed" | "skipped";
+  error?: string;
+  skipReason?: string;
 };
 
 /** Background work of one process: schedules and queue counts, each `available: false` when its package is not installed. */
@@ -223,7 +234,14 @@ export type DevtoolsJobsReport = {
   available: { scheduler: boolean; queue: boolean };
   schedules: DevtoolsScheduleInfo[];
   /** Job counts per queue and state (`waiting`, `active`, `delayed`, `failed`, `completed`). */
-  queues: { name: string; counts: Record<string, number> }[];
+  queues: DevtoolsQueueInfo[];
+};
+
+/** One queue's job counts. `countsAvailable: false` when the active driver cannot count. */
+export type DevtoolsQueueInfo = {
+  name: string;
+  counts: Record<string, number>;
+  countsAvailable?: boolean;
 };
 
 /** What the capture did since the process started. */

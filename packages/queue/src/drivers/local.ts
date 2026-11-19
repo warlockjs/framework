@@ -5,7 +5,14 @@ import { FailedJobNotFoundError, JobTimeoutError, UnrecoverableJobError } from "
 import { createJobAbort } from "../job-timeout";
 import { findRegisteredJob } from "../job-registry";
 import { getQueueContext, unwrapPayload } from "../queue-context";
-import type { DispatchedJob, FailedJob, JobContext, JobSnapshot, QueueConfig } from "../types";
+import type {
+  DispatchedJob,
+  FailedJob,
+  JobContext,
+  JobSnapshot,
+  QueueConfig,
+  QueueCounts,
+} from "../types";
 import { jsonCopy, type LocalJob, type LocalStore } from "./local-store";
 
 type ActiveJob = {
@@ -116,6 +123,11 @@ export class LocalDriver implements QueueDriver {
       job.stacktrace = [];
       this.store.put(job);
     });
+  }
+
+  public async counts(queue: string): Promise<QueueCounts> {
+    this.assertOpen();
+    return this.store.counts(queue);
   }
 
   public async start(queue: string): Promise<void> {

@@ -296,6 +296,10 @@ ignored; a route's method matches whatever its case, and `ALL` matches any metho
 `invalid input`, `not allowed`, `not found`, `duplicate`, `limits`, `expiry`, `double submit`,
 `outside service down`.
 
+A flow with no writes (every step is a page, or a `GET`, `HEAD` or `OPTIONS` route) may leave out `duplicate` and
+`double submit`; the other six stay required. Answering the two anyway is fine. A flow with no steps, or with any
+other kind of step (a write route, mail, notification, job, event, outside service, affects), counts as a flow that writes.
+
 An answer that starts with `does not apply` marks the question as not relevant; say why after it. A case with
 another question is read as the owner's own case.
 
@@ -371,8 +375,10 @@ Layouts, pages and screens describe their parts in a `## Blocks` table:
 - **Flow**: `<feature>/<flow>`, or `—` (or `-`, or empty) when the part shows no flow.
 - **Who sees it**: `everyone`, or condition names separated by `,`. Each name is checked against the app's
   conditions (`GR5002`).
-- **Changes with**: items separated by `;`. It is free text and is not checked against the
-  conditions; an item may start with a condition name (`vip: member prices`) to say what that condition changes. `—` means nothing changes.
+- **Changes with**: items separated by `;`. An item may start with a condition name (`vip: member prices`) to say
+  what that condition changes; that name is checked against the app's conditions (`GR5002`). A name written in
+  backticks anywhere in an item (`` `vip` ``) is checked too, as a warning (`GR5010`). Plain text is free and is never
+  reported. `—` means nothing changes.
 - A `|` inside a cell is written `\|`.
 
 Any other shape is `GR1018`.

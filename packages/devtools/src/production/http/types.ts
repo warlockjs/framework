@@ -1,3 +1,4 @@
+import type { FastifyReply, FastifyRequest } from "fastify";
 import type { DevtoolsInstanceInfo, DevtoolsRole, DevtoolsSessionStage } from "../contracts";
 import type { DevtoolsAuthService } from "../auth/types";
 import type { DevtoolsProductionCapture } from "../capture/types";
@@ -60,6 +61,12 @@ export type MountProductionDevtoolsDeps = {
   builtInPanels: readonly string[];
   state: DevtoolsDashboardState;
   warn?: (message: string) => void;
+  /**
+   * Answers a refused request the way the app answers an unknown URL (core's
+   * `answerUnknownUrl`); resolves `false` when the app has no catch-all route.
+   * Without it a refused request gets Fastify's own 404.
+   */
+  answerUnknownUrl?: (request: FastifyRequest, reply: FastifyReply) => Promise<boolean>;
   /**
    * HMAC-SHA256 of a value, keyed with the app key (core's `hmacHash`):
    * signs the share cookie. Required when `production.share.enabled`.

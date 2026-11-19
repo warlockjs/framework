@@ -61,6 +61,13 @@ export type SnapshotSourceOptions = {
    * does not set it; use it from a separate tool process.
    */
   collectRoutes?: boolean;
+  /**
+   * The adapter reads the route, event and job facts from the running process (`createWarlockAdapter({ live: true })`),
+   * which is cheap and boots nothing. The first open then collects them in the same pass as the book
+   * (`routes: "fresh"`), so the tab never opens "missing" and the first open runs once. Safe in the process that
+   * serves the app. Default `false`; the devtools panel sets it in development with the Warlock adapter.
+   */
+  liveFacts?: boolean;
 };
 
 /** A cached, shared snapshot of one project. */
@@ -119,7 +126,9 @@ export function createSnapshotSource(
   let cached: { snapshot: GrimoireSnapshot; at: number; stamp: string; took: number } | null = null;
   let opening: Promise<GrimoireSnapshot> | null = null;
 
+  const live = options.liveFacts === true && options.mode !== "production";
   let collected = options.collectRoutes !== true || options.mode === "production";
+  let liveCollected = !live;
   const resultsFile = resolveResultsFile(root, options.testResultsFile);
 
   const keepUntilChanged = options.mode === "production" && options.ttlMs === undefined;
@@ -134,7 +143,21 @@ export function createSnapshotSource(
         ? {}
         : { testResultsFile: options.testResultsFile }),
     };
-    let snapshot = await openGrimoire(root, adapter, { routes: "cached", ...openOptions });
+    let snapshot: GrimoireSnapshot;
+
+    if (!liveCollected) {
+      // One pass: the book and the live route facts together, so a first open never builds twice.
+      liveCollected = true;
+
+      try {
+        snapshot = await openGrimoire(root, adapter, { routes: "fresh", ...openOptions });
+      } catch {
+        // The facts could not be read: fall back to what the book already holds.
+        snapshot = await openGrimoire(root, adapter, { routes: "cached", ...openOptions });
+      }
+    } else {
+      snapshot = await openGrimoire(root, adapter, { routes: "cached", ...openOptions });
+    }
 
     if (!collected && snapshot.routes === "missing") {
       // Once per source: the route, event and job facts come from one boot pass, then live in the book.

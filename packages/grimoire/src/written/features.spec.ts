@@ -55,6 +55,62 @@ const ALL_CASES = [
 ];
 
 describe("parseFlow", () => {
+  describe("write-only case questions", () => {
+    const READ_ONLY_CASES = [
+      "## Cases",
+      "- invalid input   a",
+      "- not allowed   b",
+      "- not found   c",
+      "- limits   e",
+      "- expiry   does not apply: f",
+      "- outside service down   h",
+    ];
+
+    function messages(steps: string[], cases: string[]): string[] {
+      const { sink, findings } = collect();
+
+      parseFlow(
+        FLOW,
+        flowText(["## Steps", "", ...steps, "", ...cases]),
+        "catalog",
+        "wishlist",
+        sink,
+      );
+
+      return findings.filter((item) => item.code === "GR1012").map((item) => item.message);
+    }
+
+    it("lets a flow with no writes leave out duplicate and double submit", () => {
+      expect(
+        messages(["1. page /products/:id", "2. route GET /products/:id"], READ_ONLY_CASES),
+      ).toEqual([]);
+    });
+
+    it("still asks a flow that writes for duplicate and double submit", () => {
+      expect(
+        messages(["1. page /products/:id", "2. route POST /wishlist"], READ_ONLY_CASES),
+      ).toEqual([
+        'the case question "duplicate" is answered neither under Cases nor under Not handled.',
+        'the case question "double submit" is answered neither under Cases nor under Not handled.',
+      ]);
+    });
+
+    it("still asks a flow with no writes for the other six questions", () => {
+      expect(
+        messages(
+          ["1. page /products/:id"],
+          READ_ONLY_CASES.filter((line) => !line.startsWith("- not found")),
+        ),
+      ).toEqual([
+        'the case question "not found" is answered neither under Cases nor under Not handled.',
+      ]);
+    });
+
+    it("accepts a flow with no writes that answers them anyway", () => {
+      expect(messages(["1. page /products/:id"], ALL_CASES)).toEqual([]);
+    });
+  });
+
   it("reads every step kind, notes, routes and affects targets", () => {
     const { sink, findings } = collect();
     const flow = parseFlow(

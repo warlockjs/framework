@@ -5,7 +5,14 @@ import { FailedJobNotFoundError } from "../errors";
 import type { ResolvedJobRetention } from "../job-options";
 import { processJob } from "../process-job";
 import { unwrapPayload } from "../queue-context";
-import type { DispatchedJob, FailedJob, JobSnapshot, JobState, QueueConfig } from "../types";
+import type {
+  DispatchedJob,
+  FailedJob,
+  JobSnapshot,
+  JobState,
+  QueueConfig,
+  QueueCounts,
+} from "../types";
 
 export class BullMQDriver implements QueueDriver {
   private queues = new Map<string, Queue>();
@@ -60,6 +67,24 @@ export class BullMQDriver implements QueueDriver {
       failedAt: job.finishedOn ? new Date(job.finishedOn) : undefined,
       retry: () => job.retry("failed"),
     }));
+  }
+
+  public async counts(queue: string): Promise<QueueCounts> {
+    const counts = await this.getQueue(queue).getJobCounts(
+      "waiting",
+      "prioritized",
+      "active",
+      "delayed",
+      "failed",
+      "completed",
+    );
+    return {
+      waiting: (counts.waiting ?? 0) + (counts.prioritized ?? 0),
+      active: counts.active ?? 0,
+      delayed: counts.delayed ?? 0,
+      failed: counts.failed ?? 0,
+      completed: counts.completed ?? 0,
+    };
   }
 
   public async retry(queue: string, id: string): Promise<void> {

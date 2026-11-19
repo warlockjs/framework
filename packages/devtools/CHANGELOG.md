@@ -4,6 +4,19 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.61.0 - 2026-11-20
+
+### Added
+
+- The Jobs tab shows each schedule's last duration, last error, runs, failures and recent runs, and the job counts (waiting, active, delayed, failed, completed) of each queue. "Counts not available" appears only for a queue driver without `counts()`.
+
+### Fixed
+
+- Closed production monitor URLs answer exactly like any unknown URL of the app, including a web site's `route_not_found` answer (JSON and document), instead of Fastify's default 404. The app's global rate limit applies to them as to any unknown URL (same `x-ratelimit-*` headers, same 429), and an error of the app's catch-all gets the app's own error answer.
+- The Jobs tab finds the active queue driver; before, it could not and always said the queue was not available.
+- Error messages in the Jobs tab (last error, recent runs) are scrubbed like request errors: quoted values, emails and documents are removed.
+- The Queries tab works when production mode is enabled only through `devtoolsConnector` options; `queryEvents: true` is no longer needed.
+
 ## 5.60.0 - 2026-11-19
 
 ### Added

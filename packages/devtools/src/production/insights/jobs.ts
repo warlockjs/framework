@@ -1,4 +1,10 @@
-import type { DevtoolsJobsReport, DevtoolsScheduleInfo } from "../contracts";
+import type {
+  DevtoolsJobsReport,
+  DevtoolsQueueInfo,
+  DevtoolsScheduleInfo,
+  DevtoolsScheduleRun,
+} from "../contracts";
+import { scrubErrorText } from "../capture/redact";
 import type { DevtoolsJobsReader } from "./types";
 
 /** The shape of a scheduler job this reader needs (duck-typed: the packages stay optional). */
@@ -9,12 +15,26 @@ type SchedulerJobLike = {
   isRunning?: boolean;
   lastRun?: { valueOf(): number } | null;
   nextRun?: { valueOf(): number } | null;
+  /** Totals and run history (scheduler 5.61+). */
+  stats?: {
+    runs?: number;
+    failures?: number;
+    lastRunAt?: number | null;
+    lastDurationMs?: number | null;
+    lastError?: string | null;
+  };
+  history?: readonly DevtoolsScheduleRun[];
 };
+
+const RECENT_RUNS = 10;
+
+/** Longest job error text the tab shows, the same cut as a request error. */
+const JOB_ERROR_MAX = 500;
 
 /** Where the jobs come from; replaced in specs. Each returns `null` when its package is absent. */
 export type DevtoolsJobsLoaders = {
   scheduler(): Promise<readonly SchedulerJobLike[] | null>;
-  queue(): Promise<{ name: string; counts: Record<string, number> }[] | null>;
+  queue(): Promise<DevtoolsQueueInfo[] | null>;
 };
 
 const SCHEDULER_KEY = Symbol.for("warlock.scheduler.running");
@@ -54,13 +74,25 @@ const defaultLoaders: DevtoolsJobsLoaders = {
         }
       | undefined;
 
-    if (!driver || typeof driver.counts !== "function" || typeof driver.running !== "function") {
-      return null;
+    if (!driver || typeof driver.running !== "function") return null;
+
+    // Queues with a worker here, plus the queues registered jobs are dispatched to.
+    const names = new Set(driver.running());
+    const registered = queue?.registeredJobs as (() => unknown[]) | undefined;
+    const queueOf = queue?.queueOf as ((job: unknown) => string) | undefined;
+
+    for (const job of registered?.() ?? []) {
+      if (queueOf) names.add(queueOf(job));
     }
 
-    const queues: { name: string; counts: Record<string, number> }[] = [];
+    const queues: DevtoolsQueueInfo[] = [];
 
-    for (const name of driver.running()) {
+    for (const name of names) {
+      if (typeof driver.counts !== "function") {
+        queues.push({ name, counts: {}, countsAvailable: false });
+        continue;
+      }
+
       queues.push({ name, counts: await driver.counts(name) });
     }
 
@@ -79,19 +111,33 @@ function readableInterval(job: SchedulerJobLike): string | null {
   return value === 1 ? `every ${unit}` : `every ${value} ${unit}s`;
 }
 
+/**
+ * Copies the public fields only, so nothing else a scheduler adds leaks into the report. The error is scrubbed
+ * like every other error text the monitor keeps (quoted values, emails and documents removed).
+ */
+function toRun(run: DevtoolsScheduleRun): DevtoolsScheduleRun {
+  return {
+    startedAt: run.startedAt,
+    durationMs: run.durationMs,
+    outcome: run.outcome,
+    ...(run.error ? { error: scrubErrorText(run.error, JOB_ERROR_MAX) } : {}),
+    ...(run.skipReason ? { skipReason: run.skipReason } : {}),
+  };
+}
+
 function toSchedule(job: SchedulerJobLike): DevtoolsScheduleInfo {
   return {
     name: job.name,
     cron: job.cronExpression ?? null,
     interval: readableInterval(job),
     isRunning: job.isRunning === true,
-    lastRunAt: job.lastRun ? Number(job.lastRun.valueOf()) : null,
+    lastRunAt: job.stats?.lastRunAt ?? (job.lastRun ? Number(job.lastRun.valueOf()) : null),
     nextRunAt: job.nextRun ? Number(job.nextRun.valueOf()) : null,
-    // The scheduler keeps no per-run history; these stay empty.
-    lastDurationMs: null,
-    lastError: null,
-    runs: 0,
-    failures: 0,
+    lastDurationMs: job.stats?.lastDurationMs ?? null,
+    lastError: job.stats?.lastError ? scrubErrorText(job.stats.lastError, JOB_ERROR_MAX) : null,
+    runs: job.stats?.runs ?? 0,
+    failures: job.stats?.failures ?? 0,
+    ...(job.history ? { recentRuns: job.history.slice(0, RECENT_RUNS).map(toRun) } : {}),
   };
 }
 

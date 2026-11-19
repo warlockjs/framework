@@ -20,6 +20,7 @@ import {
   startWorkers,
   closeQueue,
   getQueue,
+  currentQueueDriver,
   getQueueDriver,
   runningWorkers,
   toMilliseconds,
@@ -262,10 +263,35 @@ connection. Safe to call more than once, and when nothing was started.
 `name`. `runningWorkers()` lists the queue names with a running worker
 in this process.
 
-### `getQueueDriver()` / `QueueDriver`
+### `queueCounts(queue)` / `QueueCounts`
+
+`queueCounts(queue): Promise<QueueCounts | undefined>` asks the active driver
+how many jobs a queue holds. It resolves to `undefined` when no driver is
+active or the driver does not implement `counts()`.
+
+```ts
+type QueueCounts = {
+  waiting?: number; // includes prioritized jobs
+  active?: number;
+  delayed?: number;
+  failed?: number;
+  completed?: number;
+};
+```
+
+The BullMQ driver reads them from Redis, the SQLite and memory drivers count
+their stored jobs. Each field is optional so a custom driver reports only what
+it can count cheaply. Counts include finished jobs only while retention keeps
+them. The devtools Jobs tab shows these per queue.
+
+### `getQueueDriver()` / `currentQueueDriver()` / `QueueDriver`
 
 `getQueueDriver(): QueueDriver` lazily creates the configured backend. The
 same instance powers every job and worker until `closeQueue()` closes it.
+`currentQueueDriver(): QueueDriver | undefined` returns that instance without
+creating one: `undefined` until the process dispatched a job or started a
+worker. Tools that only read (the devtools Jobs tab) use it, so looking never
+opens a connection.
 The built-in BullMQ, SQLite, and memory drivers implement:
 
 ```ts
@@ -276,6 +302,8 @@ interface QueueDriver {
   retry(queue: string, id: string): Promise<void>;
   start(queue: string): Promise<void>;
   running(): string[];
+  /** Optional: job counts of one queue. */
+  counts?(queue: string): Promise<QueueCounts>;
   close(timeout: number): Promise<void>;
 }
 ```

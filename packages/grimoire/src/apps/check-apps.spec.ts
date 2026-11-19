@@ -323,6 +323,43 @@ describe("checkApps", () => {
     expect(findings.map((finding) => finding.at?.line)).toEqual([2]);
   });
 
+  describe("GR5010: backticked names in Changes with", () => {
+    function withText(text: string): GrimoireSnapshot {
+      const target = build({
+        app: {
+          pages: [
+            page("home", {
+              blocks: [{ ...row("Hero", null), changesWith: [{ condition: null, text }] }],
+            }),
+          ],
+        },
+      });
+
+      return target;
+    }
+
+    it("passes a backticked name that is a declared condition", () => {
+      expect(codes(checkApps(withText("shows `guest` prices")))).toEqual([]);
+    });
+
+    it("warns about an unknown backticked name, naming the block and the name", () => {
+      const findings = checkApps(withText("shows `vip` prices"));
+
+      expect(codes(findings)).toEqual(["GR5010"]);
+      expect(findings[0]?.severity).toBe("warning");
+      expect(findings[0]?.message).toContain('block "Hero"');
+      expect(findings[0]?.message).toContain("`vip`");
+    });
+
+    it("never reports plain text", () => {
+      expect(codes(checkApps(withText("vip members, the country and the cart")))).toEqual([]);
+    });
+
+    it("ignores code that is not shaped like a condition name", () => {
+      expect(codes(checkApps(withText("the `GET /prices` response")))).toEqual([]);
+    });
+  });
+
   it("GR5009: a site or mobile app with no folder, only when grimoire/apps has apps", () => {
     const target = build();
 

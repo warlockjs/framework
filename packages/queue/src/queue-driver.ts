@@ -28,6 +28,7 @@ export function getQueueDriver(): QueueDriver {
   return activeDriver;
 }
 
+/** The driver already created in this process, without creating one; `undefined` before first use. */
 export function currentQueueDriver(): QueueDriver | undefined {
   return activeDriver;
 }

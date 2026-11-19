@@ -6,16 +6,36 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 - None. Next-major items (T-007, T-009, T-033) wait for 6.0.
 
-## Next release (5.61.0): ready to build
+## Next release
 
-Decided and self-contained; each entry below has its evidence and acceptance.
+- Nothing planned yet. 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
 
-- Grimoire checks: T-142 (read-only flows skip `duplicate` / `double submit`), T-143 (backticked names in
-  "Changes with").
-- Devtools and production monitor: T-151 (closed monitor paths answer the app's 404), T-149 (connector-only production
-  flag turns on query events), T-146 (scheduler run history, queue counts).
-- Grimoire speed: T-178 (route facts without a second boot), T-169 (faster first open).
-- Release flow: follow `skills/release-the-warlock-family/SKILL.md`; private notes go in `findings/5.61/`.
+## From the 5.61.0 release
+
+### T-182 [feature] Production monitor: closed URLs hit with a request body differ from an unknown URL
+
+- Source: 5.61.0 review, 2026-11-20.
+- What and why: 5.61.0 makes closed monitor URLs answer like an unknown URL for `GET` and `HEAD` (same body, headers,
+  rate-limit headers and 429). For `POST` and other methods with a body, an unknown URL can answer 400/413 from body
+  parsing before routing, while the monitor refuses before reading the body and answers 404. That difference existed
+  before 5.61.0; `devtools/security.mdx` now says so.
+- Evidence: `packages/devtools/src/production/http/mount.ts` (the gate and `notFound`), `answerUnknownUrl` in
+  `packages/core/src/router/router.ts`.
+- Acceptance: a spec sends the same malformed and oversized bodies to a closed monitor URL and an unknown URL and gets
+  the same status and body; the security page sentence is narrowed back if it matches.
+- Status: open.
+
+### T-183 [feature] Grimoire dev tab: stream partial answers on the first open, refresh live facts after route edits
+
+- Source: 5.61.0 build (T-169, T-178), 2026-11-20.
+- What and why: an open that comes before the dev-start warm-up ends still waits for the whole build (about 6.7 s on a
+  10,400-file app); the panel routes return whole JSON, so partial answers need a streaming panel contract. Live
+  route facts are read on the first open only; after a route edit the tab needs `warlock grimoire build` or a restart.
+- Evidence: `findings/5.61/reports/live-checks.md` (timings), `packages/grimoire/src/devtools/snapshot-source.ts`
+  (`liveFacts`), `packages/grimoire/src/devtools/index.ts` (warm-up).
+- Acceptance: the first open shows the summary before the full book is built; a route edit in dev shows up in the tab
+  without a manual build; specs.
+- Status: open; do only if an app asks (vet first).
 
 ## From the 5.60.0 release
 
@@ -40,21 +60,6 @@ Decided and self-contained; each entry below has its evidence and acceptance.
 
 ## From the 2026-11-19 app reviews
 
-### T-178 [feature] Dev Grimoire tab: collect route facts without booting the app a second time
-
-- Source: 5.59.0 review (2026-11-19). T-161 first collected route facts in the dev panel by calling the Warlock
-  adapter's inspect boot inside the running dev server. That runs `bootForDiagnostics`
-  (`packages/core/src/cli/commands/doctor/boot-for-diagnostics.ts`): every connector's `boot()` (a second Fastify) and
-  `moduleLoader.loadAll()` (routes and event listeners registered again), and swaps `console.log`. 5.59.0 removed it
-  from the panel; `collectRoutes` stays an opt-in option of the snapshot source for tooling processes only
-  (`packages/grimoire/src/devtools/snapshot-source.ts`).
-- What: give the dev tab real route/named facts without a manual `warlock grimoire build`: either read them from the
-  running app (core/devtools passes its live router, events and named registries to the panel context), or run the
-  inspect in a child process and store the result in the book.
-- Acceptance: a fresh checkout's dev tab shows `routes: fresh` after the first open; no second boot in the serving
-  process (spec asserting connectors boot once); docs and skill; CHANGELOG.
-- Status: open (after 5.59.0).
-
 ### T-168 [feature] Stamp releases from the app's release flow and add a "What's new" view to the Product map
 
 - Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0): the app shipped two releases but its Grimoire had none, so every changelog line read "Not released yet".
@@ -62,13 +67,6 @@ Decided and self-contained; each entry below has its evidence and acceptance.
 - Evidence: the release and changelog reading code is under `packages/grimoire/src/` (find `release` and `changelog`); the Product map "What changed" list is `packages/grimoire/ui/product-map.js:579` (T-159 redesigns it first).
 - Acceptance: after a release, the changelog lines carry the version and the Product map shows a "What's new" view; specs; docs and CHANGELOG entry.
 - Status: open; do after T-159 settles the "What changed" layout.
-
-### T-169 [feature] Faster first open of the Grimoire tab on a large app
-
-- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0, 11,223-file book): first tab open with no book on disk 17.1 s (3 API calls of 16.2 s each); cold open after a restart with the book on disk 5.4 s; warm answers 2-80 ms.
-- What and why: the first open is the first impression. The three first calls each rebuild the same data. Overlaps T-161 (collect route facts in dev) and T-141 (keep the opened book in memory).
-- Acceptance: the first open runs the build once and shares it across the three calls; the book is warmed at dev start; partial answers stream where possible; the measured first-open time is recorded in the CHANGELOG entry; a spec counts builds per first open.
-- Status: open.
 
 ### T-171 [feature] Parked: requests only one app has made
 
@@ -100,42 +98,6 @@ Design: `findings/5.58/ARCHITECTURE.md` (decisions D1–D28); work-package brief
 
 ## After 5.56.0: production monitor follow-ups
 
-### T-151 [bug] Monitor's closed cases answer Fastify's default 404, not the app's, when the app answers unknown URLs from a wildcard route
-
-- Source: owner, 2026-11-18, write-up https://claude.ai/artifact/R1udpAk9joCUQB5Rtnq7ed (seen live on an app on 5.56.0).
-- What and why: every closed case of the production monitor (wrong host, plain http with `requireHttps`, disabled,
-  tab off, no session, unknown asset) calls `reply.callNotFound()` inside the monitor's encapsulated Fastify context.
-  That only reaches a handler registered with `setNotFoundHandler`; core and web register none, and a `@warlock.js/web`
-  site answers unknown URLs from a root `GET /*` route (`route_not_found` body). So the monitor path answers
-  `{"message":"Route GET:/<path> not found","error":"Not Found","statusCode":404}` while any unknown URL gets the app's
-  `route_not_found` JSON. One request per candidate path tells which path is the monitor. It leaks existence only
-  (sign-in and second factor still apply), but it breaks the documented promise in `devtools/security.mdx:28` ("The
-  answer is the same as for any unknown URL of your app").
-- Evidence: `packages/devtools/src/production/http/mount.ts:142-146` (`notFound` → `reply.callNotFound()`), used at
-  `:236`, `:240`, `:243`, `:275`, `:284`, `:298`, `:302`, `:316` and by `registerUiAssets(instance, { notFound })` at
-  `:427`; `grep setNotFoundHandler packages/core/src packages/web/src` finds nothing.
-- Repro (ran 2026-11-18 on fastify 5.12.8 from this workspace): a root `app.get("/*")` answering 404 JSON, plus a plugin
-  under `/monitor-path` whose `onRequest` hook calls `reply.callNotFound()`. `GET /__nope__/` returns the wildcard's
-  body; `GET /monitor-path/` returns Fastify's default body. Distinguishable.
-- Suggested fix: answer closed cases the way the app answers an unknown URL: forward to the root wildcard/not-found
-  path (e.g. re-dispatch through the root instance or a core-registered not-found responder shared with web's
-  `route_not_found` builder), or a `production.notFound(request, reply)` option with that as the default. Spec: an app
-  with a web site wildcard and the monitor mounted gives byte-identical status, headers and body (apart from the echoed
-  path and request id) for a closed monitor URL and an unknown URL, in JSON and in the HTML (browser) variant. Fix the
-  `security.mdx` sentence if any difference stays.
-- Acceptance: the spec above passes for every closed case; changelog and docs updated.
-- Status: open. Unconfirmed parts: the HTML variant was not compared.
-
-### T-146 [feature] Scheduler run history and queue counts for the Jobs tab
-
-- Source: 5.56.0 build, 2026-11-17.
-- What and why: the Jobs tab cannot show a schedule's last duration, last error, runs or failures (the scheduler keeps
-  no per-run history), and queue counts show "not available" because `QueueDriver` has no `counts()` method.
-- Evidence: `packages/devtools/src/production/insights/jobs.ts`; `packages/scheduler/src/`; `packages/queue/src/`.
-- Acceptance: the scheduler records a bounded per-job run history; queue drivers that can count expose `counts()`;
-  the Jobs tab shows both, with specs.
-- Status: open.
-
 ### T-147 [chore] Real passkey sign-in in a browser
 
 - Source: 5.56.0 security review and end-to-end run, 2026-11-17.
@@ -144,16 +106,6 @@ Design: `findings/5.58/ARCHITECTURE.md` (decisions D1–D28); work-package brief
 - Evidence: `packages/devtools/src/production/auth/passkeys.ts`, `findings/5.56/reports/E2E.md`.
 - Acceptance: a Playwright run with a CDP virtual authenticator registers a passkey, signs in with it, and uses it as
   the step-up for recovery codes.
-- Status: open.
-
-### T-149 [feature] Core sees the monitor's production flag when it is set only through connector options
-
-- Source: 5.56.0 final pass, 2026-11-17.
-- What and why: core turns on MongoDB `queryEvents` for the monitor only when `devtools.production.enabled` is set in
-  config; enabling production mode only through `devtoolsConnector({ production })` options leaves the Queries tab
-  empty unless the app sets `queryEvents: true` (documented).
-- Evidence: `packages/core/src/connectors/database-query-events.ts`.
-- Acceptance: both ways of enabling the monitor turn on query events; a spec covers each.
 - Status: open.
 
 ## After 5.55.0: Grimoire follow-ups
@@ -190,35 +142,6 @@ Design: `findings/5.58/ARCHITECTURE.md` (decisions D1–D28); work-package brief
 - Acceptance: a mobile app fixture with `App.tsx` and `index.ts` at its root lists both in the book; a spec covers the
   new file entries (or the skip list).
 - Status: open.
-
-### T-142 [feature] Read-only flows may skip the write-only case questions
-
-- Source: 5.55.0 build and pilot, 2026-11-16.
-- What and why: a read-only flow has to answer all eight case questions (`CASE_QUESTIONS`), most of them with "does not
-  apply". The pilot found this padding in the written flows.
-- Decision (owner, 2026-11-19): a flow with no writes may leave out `duplicate` and `double submit`; the other six
-  questions stay required. A read-only flow that still answers them is fine (no finding).
-- Evidence: `CASE_QUESTIONS` in `packages/grimoire/src/contracts/written.ts:164`; GR1012 in
-  `packages/grimoire/src/codes/codes.ts`. Find where GR1012 is raised and how the check knows a flow writes (its
-  steps / reach facts); if "has no writes" is not known at that point, decide it from the flow's resolved steps.
-- Acceptance: specs for a read-only flow missing both questions (no GR1012), a writing flow missing them (GR1012 as
-  today), a read-only flow missing `not found` (GR1012); the written-flow docs page, the Grimoire skill that teaches
-  `## Cases`, the GR1012 code description and a CHANGELOG entry.
-- Status: open, ready to build.
-
-### T-143 [feature] Block tables: check condition names written as code in "Changes with"
-
-- Source: 5.55.0 build and pilot, 2026-11-16.
-- What and why: a page's block table checks "Who sees it" against the app's conditions (GR5002), but "Changes with" is
-  free text, so a renamed or removed condition named there goes unnoticed.
-- Decision (owner, 2026-11-19): check only names written as code (backticks) in "Changes with". A backticked name that
-  is not a known condition is a warning (a new GR50xx code, or GR5002 with its own message if that fits the code
-  table); plain text stays free and is never reported.
-- Evidence: `packages/grimoire/src/apps/check-apps.ts:99` (GR5002); the `describe-an-app` skill.
-- Acceptance: specs for a known backticked condition (no finding), an unknown backticked name (warning naming the
-  block and the name), plain text (no finding); code table entry, the app-description docs page, the
-  `describe-an-app` skill and a CHANGELOG entry.
-- Status: open, ready to build.
 
 ### T-144 [feature] Third measurement arm: the book alone
 

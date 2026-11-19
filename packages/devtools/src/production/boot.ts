@@ -250,6 +250,9 @@ export async function bootProductionDevtools(
       builtInPanels: builtIn,
       state,
       warn,
+      ...(typeof core.answerUnknownUrl === "function"
+        ? { answerUnknownUrl: core.answerUnknownUrl }
+        : {}),
       hmac: (value) => crypto.hmac(value),
     });
 

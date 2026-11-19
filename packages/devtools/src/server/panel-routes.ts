@@ -6,7 +6,10 @@ import { resolvePanelFile } from "./panel-files";
 import { sendFile } from "./ui-assets";
 
 /** Answers 404; the production mount passes its uniform not-found answer. */
-export type PanelNotFound = (request: FastifyRequest, reply: FastifyReply) => FastifyReply;
+export type PanelNotFound = (
+  request: FastifyRequest,
+  reply: FastifyReply,
+) => FastifyReply | Promise<FastifyReply>;
 
 /** Sends one image of a panel's folder with its content type, or answers 404. */
 export async function sendPanelFile(

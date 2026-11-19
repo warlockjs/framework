@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/queue` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.61.0 - 2026-11-20
+
+### Added
+
+- `QueueDriver` gains an optional `counts(queue)` that returns `QueueCounts` (waiting, active, delayed, failed, completed). The BullMQ, local and memory drivers implement it, and `queueCounts(queue)` reads it from the active driver.
+- `currentQueueDriver()` is exported: the active driver without creating one (`undefined` before the first dispatch or worker), for tools that only read.
+
 ## 5.54.0 - 2026-11-16
 
 ### Changed

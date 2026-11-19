@@ -26,10 +26,11 @@ export { QueueDashboardUnguardedError } from "./queue-dashboard-unguarded.error"
 export {
   closeQueue,
   getQueue,
+  queueCounts,
   runningWorkers,
   startWorkers,
   type CloseQueueOptions,
 } from "./queue-manager";
 export * from "./types";
-export { getQueueDriver } from "./queue-driver";
+export { currentQueueDriver, getQueueDriver } from "./queue-driver";
 export type { DriverDispatch, QueueDriver } from "./driver";

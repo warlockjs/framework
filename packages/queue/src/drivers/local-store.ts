@@ -1,5 +1,5 @@
 import type { ResolvedJobOptions } from "../job-options";
-import type { JobProgress, JobState } from "../types";
+import type { JobProgress, JobState, QueueCounts } from "../types";
 
 export type LocalJob = {
   id: string;
@@ -32,6 +32,8 @@ export interface LocalStore {
   list(queue: string, state?: JobState): LocalJob[];
   /** Earliest eligible job, including active jobs with an expired lease. */
   ready(queue: string, now: number): LocalJob | undefined;
+  /** Number of jobs per state in one queue, without copying them. */
+  counts(queue: string): QueueCounts;
   put(job: LocalJob): void;
   remove(queue: string, id: string): void;
   /**
@@ -41,6 +43,19 @@ export interface LocalStore {
    */
   prune(queue: string, state: "completed" | "failed", keep: RetentionWindow): void;
   close(): void;
+}
+
+/** Folds a job state into the public counts (`prioritized` counts as waiting). */
+export function addToCounts(counts: QueueCounts, state: JobState, amount = 1): void {
+  const key = state === "prioritized" ? "waiting" : state;
+  if (
+    key === "waiting" ||
+    key === "active" ||
+    key === "delayed" ||
+    key === "failed" ||
+    key === "completed"
+  )
+    counts[key] = (counts[key] ?? 0) + amount;
 }
 
 /** Match JSON transport on every backend, without sharing mutable objects. */

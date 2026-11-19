@@ -13900,6 +13900,16 @@ const boot = await bootForInspect();
 const report = await inspectApp({ ...inspectOptionsFromBoot(boot) });
 ```
 
+Inside `warlock dev` (a devtools panel), read the facts without a second boot: the dev server calls
+`startLiveEventRecording()` before the app modules load, and `liveInspectOptions()` hands `inspectApp()` the event
+listeners noted since then (routes come from the live router):
+
+```ts
+import { inspectApp, liveInspectOptions } from "@warlock.js/core/tooling";
+
+const report = await inspectApp({ ...liveInspectOptions(), sections: ["routes", "events"] });
+```
+
 Validate a report with the published schema — `INSPECT_REPORT_JSON_SCHEMA` (draft 2020-12), also shipped as `node_modules/@warlock.js/core/schemas/inspect-report.schema.json`:
 
 ```ts
@@ -14299,6 +14309,17 @@ and exits non-zero.
 - **Fails loudly on a broken dev boot**, same as `warlock routes` / `warlock doctor` — a route module that throws on import, or a connector registration error, aborts before any comparison happens.
 - **Only page routes are compared.** API routes registered without `isPage` never appear on either side of the diff; this command exists for the file-system page-routing surface `@warlock.js/web` adds, not the general route table.
 - **Core reads the snapshot; it does not write it.** `warlock build` writes `page-routes.manifest.json` through a connector's `build`/`emit` contribution (`@warlock.js/web`'s build integration, keyed off pages it discovers) — a project with no `@warlock.js/web` page routes never produces one, and `routes:diff` has nothing to compare against.
+
+## Answering like an unknown URL from a plugin
+
+A Fastify plugin that refuses a request inside its own encapsulated context (the devtools production monitor does) can
+call `answerUnknownUrl(request, reply)` from `@warlock.js/core`. For `GET`/`HEAD` it runs the app route that would match
+the URL without the plugin (a `/:locale/*` route before the catch-all `/*`), for other methods only the catch-all, with
+that route's params, rate limit (same headers, same bucket, same 429), hooks and handler, so the refusal is the app's own
+unknown-URL answer (a web site's `route_not_found` JSON or its document 404). An error that route throws goes to
+Fastify's error handling (`reply.send(error)`); a plugin with its own `setErrorHandler` rethrows the errors of these
+requests so the app's handler answers. It resolves `false` when no app route matches; then call `reply.callNotFound()`.
+A path registered with `excludeFromRequestLog` gets no `Starting Request`/`Completed Request` log lines.
 
 ## Gotchas
 
@@ -26947,7 +26968,12 @@ job.lastRun; // Dayjs | null — success OR failure
 job.isRunning; // boolean
 job.intervals; // readonly schedule config
 job.cronExpression; // string | null
+job.stats; // { runs, failures, skips, lastRunAt, lastDurationMs, lastError, lastOutcome }
+job.history; // JobRunRecord[], newest first: { startedAt, durationMs, outcome: "success" | "failed" | "skipped", error?, skipReason? }
+job.keepHistory(50); // history size, default 20 (0 = none); Job.defaultHistorySize sets the default
 ```
+
+History is in memory, per process; `error` is the message only (cut to 500 characters, no stack). Overlap skips add one `skipped` entry per due tick and count in `stats.skips`, not `runs`.
 
 ## See also
 
@@ -27556,6 +27582,10 @@ Every process must use the same `prefix`, or they will not see each other's jobs
 ## Dashboard
 
 `QueueConfig` also takes a `dashboard: { enabled, path, middleware }` block — see the "Dashboard (optional)" section of the `manage-failed-jobs` topic for the `warlock add bull-board` setup and the production guard (`QueueDashboardUnguardedError`).
+
+## Counting jobs
+
+`queueCounts(queue)` returns `{ waiting?, active?, delayed?, failed?, completed? }` from the active driver, or `undefined` when no driver is active or it cannot count. BullMQ, local and memory drivers implement `counts?(queue)` on `QueueDriver`; a custom driver may leave it out or report only some fields. `waiting` includes prioritized jobs; finished jobs count only while retention keeps them. `currentQueueDriver()` returns the active driver without creating one (`undefined` before the first dispatch or worker), for tools that only read.
 
 
 ## define-jobs  `@warlock.js/queue/skills/define-jobs/SKILL.md`
@@ -52950,8 +52980,10 @@ The first page a visitor sees.
   preferences are a few rows, not six pages.
 - **Flow** is `feature/flow`. The rule for what the block shows lives there. Do not restate it.
 - **Who sees it** uses the app's condition names, and the check reports a name the README does
-  not declare (`GR5002`). **Changes with** is free text: it is not checked, but starting an item
-  with a condition name (`vip: member prices`) keeps it readable.
+  not declare (`GR5002`). **Changes with** is mostly free text: starting an item
+  with a condition name (`vip: member prices`) is checked like Who sees it (`GR5002`), and a name written in backticks
+  (`` `vip` ``) that the README does not declare is a warning (`GR5010`). Plain text is never reported, so write
+  a condition in backticks only when it is one.
 - Do not list blocks that come from the layout.
 
 ## A layout
@@ -53012,7 +53044,7 @@ npx warlock grimoire check
 
 It reports a block that points to a flow that does not exist, a condition that is not declared in
 the app README, a page whose route is gone, a screen with no route (file-based apps), and a
-feature that lists an app with no folder here. Its codes are `GR5001` to `GR5009`;
+feature that lists an app with no folder here. Its codes are `GR5001` to `GR5010`;
 `npx warlock explain GR5003` describes one.
 
 
@@ -53337,6 +53369,7 @@ that is still `proposed`; it does not fail the check.
 
 - **Exports, imports, importers, routes, middleware, pages:** read from the code. Trust them.
 - **Route middleware:** a route step also reaches the middleware files the matched route names (not the routes file's other imports). Roles that run by being present (migration, seed, command, main, layout, root) and spec-only helpers are not listed as unreached.
+- **Dev tab route facts:** the dev tab reads routes, events and jobs from the running dev server (nothing is booted twice), so it shows `routes: fresh` on the first open; they are read once, so rebuild with `warlock grimoire build` after changing routes.
 - **Without route facts** (`routes: missing`): route, mail, notification, job and event steps are `found: null` (not checked), not resolved and not failed; `GR5008` skips mail and notification entries.
 - **Files behind a route:** every file the handler can reach through imports. It is not the exact
   call path; open the handler to see which ones it really uses.
@@ -53606,7 +53639,8 @@ pages, or its screens for a mobile app). Without brackets it looks in the apps t
 **Cases.** End a case line with `(AC-n)` (or `(AC-1, AC-2)`) to link it to the criterion that
 proves it; a number the flow does not have is an error (`GR2013`). Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
 expiry, double submit, outside service down), each with a case or "does not apply" and the
-reason. A flow that skips one gets a finding. Do not invent cases beyond the questions unless the owner described one.
+reason. A flow that skips one gets a finding, except that a flow with no writes (only pages and
+`GET` routes) may leave out `duplicate` and `double submit`. Do not invent cases beyond the questions unless the owner described one.
 
 **Criteria.** One per case that changes what the user gets. Number them `AC-1`, `AC-2`, … and
 never renumber. Scope one to an app with `[app-id]`.
@@ -54034,23 +54068,23 @@ export default {
 
 ## What each panel shows
 
-| Panel                          | What you see                                                                                                                                                                                                                                      | Where it comes from                                           |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| **Requests**                   | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis. | core `registerTracingHooks()`                                 |
-| **Queries**                    | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`)                                                                                            | cascade `dataSourceRegistry.on("query")`                      |
-| **N+1**                        | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal                                                                                                    | same query shape ≥ 5 times in one request                     |
-| **Mail**                       | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                              | core `mailEvents.onCaptured()`                                |
-| **Logs**                       | Log entries per request, filterable by level and module                                                                                                                                                                                           | a logger channel                                              |
-| **Cache**                      | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                   | cache `cache.on(...)`                                         |
-| **Resources**                  | Memory, CPU, event-loop delay and garbage collection, with a 10-minute history                                                                                                                                                                    | the process                                                   |
-| **Health**                     | Readiness checks over time                                                                                                                                                                                                                        | core `health.readiness()`                                     |
-| **Errors**                     | Failed requests grouped by cause with counts                                                                                                                                                                                                      | tracing and logger                                            |
-| **Jobs**                       | Registered scheduled jobs with schedule, last and next run (no run history, duration or error yet); queue counts only when the queue driver reports them (not available today)                                                                    | `@warlock.js/scheduler`, `@warlock.js/queue`                  |
-| **AI Reports, Models, Errors** | Hourly totals of agent runs, tokens, estimated cost (from model pricing; unpriced models flagged), errors by category, latency, fallbacks and refusals, with 24h / 7d / 30d / custom ranges and Agent, Model, Provider filters. Production too    | `@warlock.js/ai-panoptic` trace feed, saved as hourly rollups |
-| **AI Runs, Evaluate**          | Single runs with filters, grouping and a cost tint; grade a system prompt with a judge model. Development only                                                                                                                                    | Panoptic traces in memory; `panoptic.evaluate`                |
-| **Agents**                     | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                      | `@warlock.js/ai` `agentTraces` store                          |
-| **Routes**                     | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                                                   |
-| **API**                        | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`                        |
+| Panel                          | What you see                                                                                                                                                                                                                                                                                                                                    | Where it comes from                                           |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Requests**                   | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis.                                                                                               | core `registerTracingHooks()`                                 |
+| **Queries**                    | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`)                                                                                                                                                                                          | cascade `dataSourceRegistry.on("query")`                      |
+| **N+1**                        | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal                                                                                                                                                                                                  | same query shape ≥ 5 times in one request                     |
+| **Mail**                       | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                                                                                                                            | core `mailEvents.onCaptured()`                                |
+| **Logs**                       | Log entries per request, filterable by level and module                                                                                                                                                                                                                                                                                         | a logger channel                                              |
+| **Cache**                      | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                                                                                                                 | cache `cache.on(...)`                                         |
+| **Resources**                  | Memory, CPU, event-loop delay and garbage collection, with a 10-minute history                                                                                                                                                                                                                                                                  | the process                                                   |
+| **Health**                     | Readiness checks over time                                                                                                                                                                                                                                                                                                                      | core `health.readiness()`                                     |
+| **Errors**                     | Failed requests grouped by cause with counts                                                                                                                                                                                                                                                                                                    | tracing and logger                                            |
+| **Jobs**                       | Registered scheduled jobs with schedule, last and next run, last duration, last error, runs, failures and recent runs (from the scheduler run history; error messages scrubbed like request errors); queue counts per queue when the driver implements `counts()` (the built-in BullMQ, local and memory drivers do), "not available" otherwise | `@warlock.js/scheduler`, `@warlock.js/queue`                  |
+| **AI Reports, Models, Errors** | Hourly totals of agent runs, tokens, estimated cost (from model pricing; unpriced models flagged), errors by category, latency, fallbacks and refusals, with 24h / 7d / 30d / custom ranges and Agent, Model, Provider filters. Production too                                                                                                  | `@warlock.js/ai-panoptic` trace feed, saved as hourly rollups |
+| **AI Runs, Evaluate**          | Single runs with filters, grouping and a cost tint; grade a system prompt with a judge model. Development only                                                                                                                                                                                                                                  | Panoptic traces in memory; `panoptic.evaluate`                |
+| **Agents**                     | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                                                                                                                    | `@warlock.js/ai` `agentTraces` store                          |
+| **Routes**                     | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                                                                                                                     | core router                                                   |
+| **API**                        | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                                                                                                                      | core `getDevelopmentOpenApiDocument()`                        |
 
 Work outside a request (boot, scheduler ticks, queue jobs) goes to a separate
 background list, so it never clutters a request's timeline.
@@ -54297,7 +54331,7 @@ The accounts live in the app's database through Cascade. Roles are `viewer`
 and `admin`. Admins invite users with a 24-hour single-use link. Two-factor is
 required for admins by default (`twoFactor: "admins"`; or `"everyone"`, or `"off"` for nobody, which logs a boot warning; an account that has a factor is always asked for it): an
 authenticator app, or passkeys when `@simplewebauthn/server` is installed, plus
-10 recovery codes. Every closed case answers the app's own 404.
+10 recovery codes. Every closed case answers like any unknown URL of the app: through its catch-all route (a web site's `route_not_found` answer, JSON or document) or its not-found handler.
 
 Options under `production` (all optional, defaults in brackets):
 `enabled` [false], `path` [`DEVTOOLS_PATH`], `sampleRate` [0.1],
@@ -54321,10 +54355,10 @@ Options under `production` (all optional, defaults in brackets):
   rolled back. `explain.executing: true` allows `EXPLAIN ANALYZE` and
   `executionStats`; they run the query, so leave it off unless accepted.
   Production plans show `?` in place of the query's values.
-- MongoDB: with `devtools.production.enabled` in `src/config/devtools.ts`, core
-  turns `queryEvents` on in processes that serve HTTP (command monitoring is off
-  in production by default); an explicit `queryEvents: false` wins. With the
-  option passed only to `devtoolsConnector()`, set `queryEvents: true` yourself.
+- MongoDB: with `devtools.production.enabled` in `src/config/devtools.ts` or
+  `production: { enabled: true }` passed to `devtoolsConnector()`, core turns
+  `queryEvents` on in processes that serve HTTP (command monitoring is off in
+  production by default); an explicit `queryEvents: false` wins.
 - A correct password does not reset an account's failed-try count; only a
   completed sign-in (second factor included) does. A caller over the IP limit
   costs no password check, and refused tries are audited at most once a minute

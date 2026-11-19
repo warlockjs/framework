@@ -170,6 +170,26 @@ const report = await inspectApp({
 });
 ```
 
+### Facts from the running dev server
+
+`warlock dev` calls `startLiveEventRecording()` before the app modules load: from then on it notes which module
+registers each event listener. A tool running in the same process (a devtools panel) passes `liveInspectOptions()` to
+`inspectApp()` to get the event facts too, without booting the app a second time; routes come from the live router and
+jobs and schedules from the app's own packages, as above.
+
+```ts
+import { inspectApp, liveInspectOptions } from "@warlock.js/core/tooling";
+
+const report = await inspectApp({
+  ...liveInspectOptions(),
+  sections: ["routes", "events", "jobs", "schedules"],
+});
+```
+
+`startLiveEventRecording()` is safe to call more than once. A listener registered again by a reloaded module is listed
+once; one removed by a reload stays listed until the dev server restarts. Outside `warlock dev` (and before recording
+starts) `liveInspectOptions()` lists no events.
+
 ## Gotchas
 
 - **Events are listeners registered while app modules load.** Listeners the framework registers itself, and listeners added later at runtime, are not listed. Model events registered through `Model.events()` are a separate bus and are not listed.

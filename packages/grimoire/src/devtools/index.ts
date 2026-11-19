@@ -101,19 +101,30 @@ export async function grimoireDevtoolsPanel(
   // In development the tab keeps Warlock's generated files (book, book maps, indexes) up to date, so
   // the next open is incremental. In production it writes nothing. Agent-written files are only read,
   // and cached routes never boot the app.
+  const development = context.mode !== "production";
+  let live: Promise<BookAdapter> | undefined;
+  const liveAdapter = (): Promise<BookAdapter> =>
+    (live ??= import("../warlock").then(({ createWarlockAdapter }) =>
+      createWarlockAdapter({ live: true }),
+    ));
   const source = createSnapshotSource(context.root, {
     write: context.mode !== "production",
     mode: context.mode ?? "development",
-    // The panel runs inside the app's own process. Collecting route facts there boots every connector and
-    // re-imports the route and event modules, which would register them twice in the live app. So the tab
-    // reads the cached facts and says "missing" or "stale" until `warlock grimoire build` runs elsewhere.
-    ...(context.adapter === undefined ? {} : { adapter: context.adapter }),
+    // The panel runs inside the app's own process, so it never boots the app again (that would start every
+    // connector twice and register the route and event modules twice). In development the default adapter
+    // reads the route, event and job facts from the live registries; a custom adapter is used as given.
+    ...(context.adapter === undefined
+      ? development
+        ? { adapter: liveAdapter, liveFacts: true }
+        : {}
+      : { adapter: context.adapter }),
     ...(context.ttlMs === undefined ? {} : { ttlMs: context.ttlMs }),
     ...(context.testResultsFile === undefined ? {} : { testResultsFile: context.testResultsFile }),
   });
 
-  // In production, start opening the book now so the first tab view is fast.
-  if (context.mode === "production") source.warm();
+  // Start opening the book now so the first tab view is fast. In development this runs in the background
+  // (never awaited, failures ignored) and only with the default adapter, so a custom one is not called early.
+  if (!development || context.adapter === undefined) source.warm();
 
   const answer =
     <Answer>(read: (snapshot: GrimoireSnapshot, request: GrimoirePanelRequest) => Answer) =>

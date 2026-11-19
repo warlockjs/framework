@@ -78,7 +78,7 @@ case, and `ALL` matching any method. `GR2001` means no route matches that way.
 | References    | a changelog entry or README relation naming a flow or criterion that does not exist                        | `GR2010`–`GR2012`  |
 | Source files  | no header sentence, no feature, two owners, a wrong `@feature` tag or folder, a file no flow reaches       | `GR3001`–`GR3006`  |
 | Tests         | a criterion with no test, a `@proves` line that names nothing or has the wrong form, failed or old results | `GR4001`–`GR4008`  |
-| Apps          | blocks, conditions, pages, layouts and screens that point at nothing                                       | `GR5001`–`GR5009`  |
+| Apps          | blocks, conditions, pages, layouts and screens that point at nothing                                       | `GR5001`–`GR5010`  |
 | Versions      | the README version or date out of step with the changelog, a release that does not match                   | `GR6001`–`GR6008`  |
 | Tasks         | a task naming a feature or flow that does not exist, or in the wrong folder                                | `GR7001`–`GR7005`  |
 
@@ -236,7 +236,7 @@ A case line has the wrong form.
 A case question is not answered.
 
 - **Severity:** warning
-- **What to do:** Answer the question under Cases (or `does not apply` and why), or list it under Not handled.
+- **What to do:** Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`.
 - **Skill:** `write-a-feature`
 
 ### GR1013
@@ -701,6 +701,14 @@ A site or mobile app has no folder in grimoire/apps.
 
 - **Severity:** warning
 - **What to do:** Add `grimoire/apps/<app>/README.md` for it.
+- **Skill:** `describe-an-app`
+
+### GR5010
+
+A name in backticks in Changes with is not a declared condition.
+
+- **Severity:** warning
+- **What to do:** Declare the condition under Conditions in the app README, fix the name, or write it without backticks when it is not a condition.
 - **Skill:** `describe-an-app`
 
 ## GR6xxx: versions, changelogs and releases

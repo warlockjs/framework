@@ -224,10 +224,10 @@ One random draw per request decides whether it is **sampled** (`sampleRate`, 0.1
 - Work outside a request is sampled per query at `sampleRate`.
 
 MongoDB reports its queries only when command monitoring is on, which it is not in production by default. With
-`devtools.production.enabled` set in `src/config/devtools.ts`, core turns `queryEvents` on for you in a process that
-serves HTTP; it adds a small cost to every query. An explicit `queryEvents: false` on the data source wins, and then the
-boot log says that query events are off and the Queries tab stays empty. (Enabling the monitor only through options passed
-to `devtoolsConnector()` is not seen by core: set `queryEvents: true` yourself in that case.) PostgreSQL needs nothing.
+`devtools.production.enabled` set in `src/config/devtools.ts`, or `production: { enabled: true }` passed to
+`devtoolsConnector()`, core turns `queryEvents` on for you in a process that serves HTTP; it adds a small cost to every
+query. An explicit `queryEvents: false` on the data source wins, and then the boot log says that query events are off
+and the Queries tab stays empty. PostgreSQL needs nothing.
 
 Memory is bounded per process: 200 sampled requests, 200 queries per request, 500 query shapes, 300 routes and 100 error
 groups. The oldest are dropped first. Each process writes at most `maxStoredSamplesPerMinute` (120) samples per minute.
@@ -275,7 +275,7 @@ the query calls from writing. Every run is audited.
 
 | Tab                                                              | In production                                                             |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Requests, Queries, Routes, Resources, Health, Errors, Logs, Jobs | On                                                                        |
+| Requests, Queries, Routes, Resources, Health, Errors, Logs, Jobs | On (Jobs shows each schedule's recent runs and the queue counts)          |
 | AI Reports, Models, Errors                                       | On when Panoptic is installed; see [AI reports](#ai-reports)              |
 | Mail, AI Runs, Agents, AI Evaluate, API, Processes               | Off unless `panels` sets the id to `true`                                 |
 | A package panel (such as Grimoire)                               | On when it declares `production: true`, or `panels` sets its id to `true` |

@@ -11,7 +11,11 @@ import { container } from "../container";
 import { registerLazyStatic } from "../http/lazy-static";
 import { buildCorsOptions } from "../http/build-cors-options";
 import { Request } from "../http/request";
-import { isRequestLogEnabled, trackRequestLog } from "../http/request-log";
+import {
+  isExcludedFromRequestLog,
+  isRequestLogEnabled,
+  trackRequestLog,
+} from "../http/request-log";
 import { buildRequestLogSnapshot } from "../http/request-log-snapshot";
 import { Response } from "../http/response";
 import { type FastifyInstance } from "../http/server";
@@ -190,6 +194,16 @@ const requestLifecycleLogPorts: RequestLogPorts = {
   now: () => performance.now(),
   // A logger replaced by a partial test double may lack `isEnabled`: keep the line.
   isEnabled: (level) => log.isEnabled?.(level) ?? true,
+};
+
+/**
+ * The same ports with every line switched off, for a path registered with
+ * `excludeFromRequestLog` (a private path must not reach the log). Tracing
+ * still runs.
+ */
+const excludedRequestLifecycleLogPorts: RequestLogPorts = {
+  ...requestLifecycleLogPorts,
+  isEnabled: () => false,
 };
 
 export class Router {
@@ -1265,6 +1279,109 @@ export class Router {
   }
 
   /**
+   * Answer a request the way the app answers an unknown URL: through the app
+   * route that would match it if the caller were not there (for `GET` and
+   * `HEAD`), or the catch-all route (`/*`) a `@warlock.js/web` site registers,
+   * with that route's rate limit, hooks and handler. Resolves `false` when no
+   * app route matches, so the caller falls back to Fastify's own 404.
+   *
+   * It lets an encapsulated plugin (the devtools production monitor) refuse a
+   * request without being told apart from an unknown URL: the same global or
+   * per-route rate limit applies (headers, and the 429 once the bucket is
+   * empty), and an error the route throws is handed to Fastify's error
+   * handling (`reply.send(error)`), exactly as the route itself would. A
+   * plugin with its own `setErrorHandler` rethrows the errors of these
+   * requests so the app's handler answers them.
+   */
+  public async answerUnknownUrl(
+    fastifyRequest: FastifyRequest,
+    fastifyReply: FastifyReply,
+  ): Promise<boolean> {
+    const match = this.unknownUrlRoute(fastifyRequest.method.toUpperCase(), fastifyRequest.url);
+
+    if (match === null) {
+      return false;
+    }
+
+    const { route, params } = match;
+
+    // The params the matched route would see, not the caller's.
+    fastifyRequest.params = params;
+
+    try {
+      await this.unknownUrlRateLimit(fastifyRequest.server)(route, fastifyRequest, fastifyReply);
+
+      if (fastifyReply.sent) return true;
+
+      for (const phase of FORWARDED_ROUTE_PHASES) {
+        if ((await runRouteHooks(route, phase, fastifyRequest, fastifyReply)) === fastifyReply) {
+          return true;
+        }
+      }
+
+      const { output, response } = await this.routeHandler(route)(fastifyRequest, fastifyReply);
+      const value = output || response.baseResponse;
+
+      if (value !== fastifyReply && !fastifyReply.sent) {
+        await fastifyReply.send(value);
+      }
+    } catch (error) {
+      if (fastifyReply.sent || fastifyReply.raw.headersSent) throw error;
+
+      // What Fastify does with an error a route hook or handler throws.
+      fastifyReply.send(error);
+    }
+
+    return true;
+  }
+
+  /** Routes {@link answerUnknownUrl} matches against, rebuilt when the route table changes. */
+  private unknownUrlRegistry?: { version: number; registry: RouteRegistry };
+
+  /** One rate limiter per Fastify instance, for {@link answerUnknownUrl}. */
+  private unknownUrlLimiters = new WeakMap<object, ReturnType<typeof createDevRateLimiter>>();
+
+  /**
+   * The app route an unknown URL would reach. `GET`/`HEAD` take the best match
+   * of the whole route table (a `/:locale/*` route answers before `/*`); other
+   * methods only the catch-all: the body is not parsed at that point, so no
+   * other app handler runs for them.
+   */
+  private unknownUrlRoute(
+    method: string,
+    url: string,
+  ): { route: Route; params: Record<string, string> } | null {
+    if (this.unknownUrlRegistry?.version !== this.routesVersion) {
+      const registry = new RouteRegistry();
+
+      registry.register(this.routes);
+      this.unknownUrlRegistry = { version: this.routesVersion, registry };
+    }
+
+    const match = this.unknownUrlRegistry.registry.find(method, url);
+
+    if (match === null) return null;
+
+    if (method === "GET" || method === "HEAD") return match;
+
+    return match.route.path === "/*" || match.route.path === "*" ? match : null;
+  }
+
+  private unknownUrlRateLimit(server: FastifyInstance | FastifyRequest["server"]) {
+    let limiter = this.unknownUrlLimiters.get(server);
+
+    if (!limiter) {
+      limiter = createDevRateLimiter(
+        server as FastifyInstance,
+        config.get("http.rateLimit.global") !== false,
+      );
+      this.unknownUrlLimiters.set(server, limiter);
+    }
+
+    return limiter;
+  }
+
+  /**
    * Scan routes for the development server
    * Uses wildcard routing with find-my-way for HMR support
    */
@@ -1656,7 +1773,9 @@ export class Router {
         a MISSING one legible as a hang.
       */
       const result = await logRequestLifecycle(
-        requestLifecycleLogPorts,
+        isExcludedFromRequestLog((fastifyRequest.url ?? "").split("?")[0] ?? "")
+          ? excludedRequestLifecycleLogPorts
+          : requestLifecycleLogPorts,
         {
           module: "route",
           action: describeRouteForLog(route.method, route.path),
@@ -1699,3 +1818,11 @@ export class Router {
 export const router = Router.getInstance();
 
 container.set("router", router);
+
+/**
+ * Answers `request` like any unknown URL of the app (see
+ * {@link Router.answerUnknownUrl}); `false` when the app has no catch-all route.
+ */
+export function answerUnknownUrl(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  return router.answerUnknownUrl(request, reply);
+}

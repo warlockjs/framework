@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
   InspectFile,
+  InspectOptions,
   InspectReport,
   InspectRoute,
   InspectSection,
@@ -55,6 +56,12 @@ export type WarlockAdapterOptions = {
   mobile?: readonly MobileAppOption[];
   /** How the booted sections are read. Default: the `warlock inspect` boot pass, run at most once. Pages never boot. */
   inspect?: WarlockInspect;
+  /**
+   * Read the route, event and job facts from the registries of the running process instead of booting the app
+   * (`inspect` wins when both are set). For code that runs inside `warlock dev`, such as the devtools panel;
+   * nothing is booted and no module is loaded twice. Default `false`.
+   */
+  live?: boolean;
 };
 
 /** The `version` of a `package.json` named `name`, or `null` when the file is not that package's. */
@@ -201,6 +208,27 @@ function bootedInspect(): WarlockInspect {
     }
 
     return tooling.inspectApp({ ...tooling.inspectOptionsFromBoot(booted), cwd: root, sections });
+  };
+}
+
+/** The slice of `@warlock.js/core/tooling` that {@link liveInspect} reads (a seam for specs). */
+export type LiveInspectTooling = {
+  inspectApp: (options: InspectOptions) => Promise<InspectReport>;
+  liveInspectOptions: () => InspectOptions;
+};
+
+/**
+ * The `inspect` for code running inside the app's own process (`warlock dev`): reads the live router and the
+ * event listeners recorded since dev start. It never boots a connector and never imports the route or event
+ * modules again, so the running app is not touched.
+ */
+export function liveInspect(
+  load: () => Promise<LiveInspectTooling> = () => import("@warlock.js/core/tooling"),
+): WarlockInspect {
+  return async (root, sections) => {
+    const tooling = await load();
+
+    return tooling.inspectApp({ ...tooling.liveInspectOptions(), cwd: root, sections });
   };
 }
 
@@ -396,7 +424,7 @@ async function mobileSourceFolders(root: string, app: BookMobileApp): Promise<st
 
 /** The adapter over `inspectApp()`, `collectFiles()` and the mobile app folders. */
 export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookAdapter {
-  const inspect = options.inspect ?? bootedInspect();
+  const inspect = options.inspect ?? (options.live === true ? liveInspect() : bootedInspect());
   const mobileOptions = options.mobile === undefined ? {} : { mobile: options.mobile };
   let lastFiles: { root: string; files: BookFile[] } | null = null;
   let lastPages: { root: string; pages: BookPage[] } | null = null;

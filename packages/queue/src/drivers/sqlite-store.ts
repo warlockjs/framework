@@ -1,8 +1,8 @@
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
-import type { JobState, QueueConfig } from "../types";
-import type { LocalJob, LocalStore, RetentionWindow } from "./local-store";
+import type { JobState, QueueConfig, QueueCounts } from "../types";
+import { addToCounts, type LocalJob, type LocalStore, type RetentionWindow } from "./local-store";
 
 /**
  * The part of `node:sqlite` this store uses. Declared here so apps type-check the
@@ -105,6 +105,16 @@ export class SqliteStore implements LocalStore {
       const job = decode(row);
       return job ? [job] : [];
     });
+  }
+  public counts(queue: string): QueueCounts {
+    const counts: QueueCounts = { waiting: 0, active: 0, delayed: 0, failed: 0, completed: 0 };
+    const rows = this.db
+      .prepare(
+        "SELECT state, COUNT(*) AS total FROM warlock_queue_jobs WHERE namespace = ? AND queue = ? GROUP BY state",
+      )
+      .all(this.namespace, queue);
+    for (const row of rows) addToCounts(counts, String(row.state) as JobState, Number(row.total));
+    return counts;
   }
   public ready(queue: string, now: number): LocalJob | undefined {
     return decode(

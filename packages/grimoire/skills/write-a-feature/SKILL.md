@@ -177,7 +177,8 @@ pages, or its screens for a mobile app). Without brackets it looks in the apps t
 **Cases.** End a case line with `(AC-n)` (or `(AC-1, AC-2)`) to link it to the criterion that
 proves it; a number the flow does not have is an error (`GR2013`). Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
 expiry, double submit, outside service down), each with a case or "does not apply" and the
-reason. A flow that skips one gets a finding. Do not invent cases beyond the questions unless the owner described one.
+reason. A flow that skips one gets a finding, except that a flow with no writes (only pages and
+`GET` routes) may leave out `duplicate` and `double submit`. Do not invent cases beyond the questions unless the owner described one.
 
 **Criteria.** One per case that changes what the user gets. Number them `AC-1`, `AC-2`, … and
 never renumber. Scope one to an app with `[app-id]`.

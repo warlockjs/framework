@@ -13,6 +13,7 @@ export {
   parseInspectSections,
   type InspectOptions,
 } from "./inspect-app";
+export { liveInspectOptions, startLiveEventRecording } from "./live-inspect";
 export { INSPECT_REPORT_JSON_SCHEMA } from "./inspect-report.schema";
 export * from "./inspect-report.types";
 export type { InspectModelModule } from "./collect-models";

@@ -75,7 +75,7 @@ One product with its price, stock and the order button.
 | Block        | The name of the block on the page.                                                    |
 | Flow         | The `<feature>/<flow>` the block shows, or `—` when it belongs to no flow (a header). |
 | Who sees it  | `everyone`, or condition names of the app (checked against the app's conditions).     |
-| Changes with | `—`, or items separated by `;`. Free text, not checked against the conditions.        |
+| Changes with | `—`, or items separated by `;`. Free text; names in backticks are checked (`GR5010`). |
 
 `route` is the route of the page in its site. A page whose route is not in the site any more is reported.
 
@@ -144,6 +144,7 @@ The check reports these. Each code is described on the [check page](../04-check/
 | `GR5007` | warning  | A block file has no row in its page's Blocks table.                                    |
 | `GR5008` | error    | An entry point in Also reached from names no mail, notification, page or screen.       |
 | `GR5009` | warning  | A site or mobile app has no folder in `grimoire/apps` (only once the folder has apps). |
+| `GR5010` | warning  | A name in backticks in Changes with is not a condition declared in the app README.     |
 
 A finding about a block or page fills its flow, so a proposed flow's findings are shown as expected.
 A flow or feature that names an app with no folder is `GR2008`.

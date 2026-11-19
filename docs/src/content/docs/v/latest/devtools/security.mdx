@@ -24,9 +24,19 @@ Every request under the dashboard path passes these checks in order. The first o
 
 ## The uniform 404
 
-When the dashboard is closed to a request, it answers through your app's own not-found handler, with none of the
-dashboard's headers. The answer is the same as for any unknown URL of your app. A scanner cannot tell the dashboard
-exists. The login page is the one public exception, and only while the gate above is open.
+When the dashboard is closed to a request, it answers the way your app answers an unknown URL, with none of the
+dashboard's headers. For a `GET` or `HEAD` request it hands the request to the app route that would match the URL if the
+dashboard were not there (a `@warlock.js/web` site answers unknown URLs from its catch-all route), with that route's rate
+limit, hooks and handler: a JSON client and a browser get the same body and headers, the same `x-ratelimit-*` headers
+from the same bucket, the same `429` once it is empty, and the app's own error answer when that route fails. Other
+methods go to the catch-all route only, and without one the app's not-found handler answers. A scanner sending `GET`
+requests cannot tell the dashboard exists. The login page is the one public exception, and only while the gate above is
+open.
+
+One difference stays for requests with a body (`POST`, `PUT`, `PATCH`): the dashboard refuses them before the body is
+read, so a malformed or oversized body gets the `404` above, where an unknown URL with a catch-all for that method answers
+Fastify's `400` or `413` from parsing the body. Such a probe can tell that something answers at the path, never more:
+sign-in and the second factor still apply.
 
 ## Threats and controls
 

@@ -3,6 +3,7 @@ import type { Queue } from "bullmq";
 import { getQueueConfig } from "./config";
 import { BullMQDriver } from "./drivers/bullmq";
 import { onJobRegistered, queueOf, registeredJobs } from "./job-registry";
+import type { QueueCounts } from "./types";
 import { currentQueueDriver, forgetQueueDriver, getQueueDriver } from "./queue-driver";
 
 let stopListening: (() => void) | undefined;
@@ -42,6 +43,15 @@ export async function startWorkers(): Promise<string[]> {
 /** Names of queues with workers in this process. */
 export function runningWorkers(): string[] {
   return currentQueueDriver()?.running() ?? [];
+}
+
+/**
+ * Job counts of one queue from the active driver. Resolves to `undefined` when
+ * no driver is active or the driver cannot count.
+ */
+export async function queueCounts(queue: string): Promise<QueueCounts | undefined> {
+  const driver = currentQueueDriver();
+  return driver?.counts ? driver.counts(queue) : undefined;
 }
 
 export type CloseQueueOptions = {

@@ -22,9 +22,16 @@ const view: DevtoolsJobsView = {
             lastError: "SMTP refused",
             runs: 30,
             failures: 2,
+            recentRuns: [
+              { startedAt: 1_000, durationMs: 1500, outcome: "failed", error: "SMTP refused" },
+              { startedAt: 500, durationMs: 900, outcome: "success" },
+            ],
           },
         ],
-        queues: [{ name: "emails", counts: { waiting: 4, failed: 1 } }],
+        queues: [
+          { name: "emails", counts: { waiting: 4, failed: 1 } },
+          { name: "legacy", counts: {}, countsAvailable: false },
+        ],
       },
     },
     {
@@ -50,6 +57,10 @@ describe("Jobs panel", () => {
 
     expect(within(queues).getByText("emails")).toBeInTheDocument();
     expect(within(queues).getByText("waiting")).toBeInTheDocument();
+    expect(within(queues).getByText(/Counts not available/)).toBeInTheDocument();
+    expect(within(schedules).getByLabelText("Recent runs")).toBeInTheDocument();
+    expect(within(schedules).getByRole("img", { name: "failed run" })).toBeInTheDocument();
+    expect(within(schedules).getByRole("img", { name: "success run" })).toBeInTheDocument();
   });
 
   it("shows the not-installed states", async () => {

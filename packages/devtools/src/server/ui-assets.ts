@@ -65,7 +65,12 @@ const NOT_BUILT_HTML =
  */
 export function registerUiAssets(
   server: FastifyInstance,
-  options: { notFound?: (request: FastifyRequest, reply: FastifyReply) => FastifyReply } = {},
+  options: {
+    notFound?: (
+      request: FastifyRequest,
+      reply: FastifyReply,
+    ) => FastifyReply | Promise<FastifyReply>;
+  } = {},
 ): void {
   const serveIndex = (request: FastifyRequest, reply: FastifyReply): void => {
     // The address as sent: core's server drops a trailing slash before routing.
@@ -102,7 +107,7 @@ export function registerUiAssets(
 
   server.get("/", serveIndex);
 
-  server.get<{ Params: { name: string } }>("/assets/:name", (request, reply) => {
+  server.get<{ Params: { name: string } }>("/assets/:name", async (request, reply) => {
     const asset = Object.hasOwn(UI_ASSETS, request.params.name)
       ? UI_ASSETS[request.params.name]
       : undefined;
@@ -110,14 +115,14 @@ export function registerUiAssets(
 
     if (!asset || !file || !existsSync(file)) {
       if (options.notFound) {
-        options.notFound(request, reply);
-        return;
+        return options.notFound(request, reply);
       }
 
-      reply.code(404).header("Cache-Control", "no-store").send();
-      return;
+      return reply.code(404).header("Cache-Control", "no-store").send();
     }
 
     sendFile(reply, file, asset.contentType);
+
+    return reply;
   });
 }

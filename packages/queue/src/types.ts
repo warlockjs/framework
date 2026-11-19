@@ -217,6 +217,18 @@ export type DispatchedJob = {
   queue: string;
 };
 
+/**
+ * Job counts of one queue. Every field is optional: a driver reports only the
+ * states it can count cheaply. `waiting` includes prioritized jobs.
+ */
+export type QueueCounts = {
+  waiting?: number;
+  active?: number;
+  delayed?: number;
+  failed?: number;
+  completed?: number;
+};
+
 /** A job's lifecycle state. */
 export type JobState =
   | "waiting"

@@ -35,6 +35,9 @@ import type { DevtoolsDisposer, DevtoolsOptions, DevtoolsQuery } from "./types";
  */
 export const DEVTOOLS_CONNECTOR_PRIORITY = 12;
 
+/** The slot core reads to turn query events on; see `resolveDatabaseConnectionConfig`. */
+export const DEVTOOLS_PRODUCTION_REQUESTED = Symbol.for("@warlock.js/devtools.productionRequested");
+
 /**
  * The app's `src/config/devtools.ts`, or `{}` when there is none (or the
  * config store cannot be read, which must never stop the dev server).
@@ -75,6 +78,12 @@ export type DevtoolsConnectorOptions = DevtoolsOptions;
  * import of this package); options passed here win over it.
  */
 export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Connector {
+  // Core reads this slot when it connects the database, so the monitor's
+  // Queries tab gets query events without `devtools.production.enabled` in config.
+  if (options.production?.enabled === true) {
+    (globalThis as Record<symbol, unknown>)[DEVTOOLS_PRODUCTION_REQUESTED] = true;
+  }
+
   let active = false;
   const disposers: DevtoolsDisposer[] = [];
 

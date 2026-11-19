@@ -1,5 +1,5 @@
 /**
- * GR5001–GR5009: the written apps against the sites, pages, screens, flows
+ * GR5001–GR5010: the written apps against the sites, pages, screens, flows
  * and conditions they mention.
  */
 import { createFinding } from "../codes";
@@ -48,12 +48,22 @@ function blockSlug(block: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+/** A name that can be a condition: `vip`, `plan:pro`. Other code in backticks is not a condition. */
+const CONDITION_NAME = /^[a-z][a-z0-9-]*(?::[a-z0-9-]+)?$/;
+
+/** The condition-shaped names written in backticks in a `Changes with` text. */
+function codeNames(text: string): string[] {
+  return [...text.matchAll(/`([^`]+)`/g)]
+    .map((match) => (match[1] ?? "").trim())
+    .filter((name) => CONDITION_NAME.test(name));
+}
+
 function pagesOf(app: WrittenApp): WrittenPage[] {
   return [...app.pages, ...app.screens];
 }
 
 /**
- * GR5001–GR5009. Read-only. Pages and screens are compared with the adapter's
+ * GR5001–GR5010. Read-only. Pages and screens are compared with the adapter's
  * facts only when the app matched a site or mobile app (`GR5005` otherwise).
  */
 export function checkApps(snapshot: GrimoireSnapshot): GrimoireFinding[] {
@@ -98,6 +108,23 @@ export function checkApps(snapshot: GrimoireSnapshot): GrimoireFinding[] {
           createFinding({
             code: "GR5002",
             message: `condition "${condition}" is not declared in the README of app "${appId}"`,
+            at: row.at,
+            app: appId,
+            ...subject,
+          }),
+        );
+      }
+
+      // Plain text in "Changes with" is free; only names written as code are checked.
+      const named = new Set(used);
+
+      for (const name of new Set(row.changesWith.flatMap((item) => codeNames(item.text)))) {
+        if (declared.has(name) || named.has(name)) continue;
+
+        findings.push(
+          createFinding({
+            code: "GR5010",
+            message: `block "${row.block}" names \`${name}\` in Changes with, which is not a condition declared in the README of app "${appId}"`,
             at: row.at,
             app: appId,
             ...subject,

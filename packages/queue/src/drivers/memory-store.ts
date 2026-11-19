@@ -1,5 +1,11 @@
-import type { JobState } from "../types";
-import { jsonCopy, type LocalJob, type LocalStore, type RetentionWindow } from "./local-store";
+import type { JobState, QueueCounts } from "../types";
+import {
+  addToCounts,
+  jsonCopy,
+  type LocalJob,
+  type LocalStore,
+  type RetentionWindow,
+} from "./local-store";
 
 const READY_STATES: readonly JobState[] = ["waiting", "delayed", "prioritized"];
 
@@ -76,6 +82,13 @@ export class MemoryStore implements LocalStore {
     return [...this.jobs.values()]
       .filter((job) => job.queue === queue && (!state || job.state === state))
       .map(jsonCopy);
+  }
+  public counts(queue: string): QueueCounts {
+    const counts: QueueCounts = { waiting: 0, active: 0, delayed: 0, failed: 0, completed: 0 };
+    for (const job of this.jobs.values()) {
+      if (job.queue === queue) addToCounts(counts, job.state);
+    }
+    return counts;
   }
   public ready(queue: string, now: number): LocalJob | undefined {
     let candidate: LocalJob | undefined;

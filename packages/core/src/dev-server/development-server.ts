@@ -4,6 +4,7 @@ import { fileExistsAsync, unlinkAsync } from "@warlock.js/fs";
 import { Application } from "../application";
 import { connectorsManager } from "../connectors/connectors-manager";
 import { ConnectorLifecyclePhase } from "../connectors/types";
+import { startLiveEventRecording } from "../tooling/inspect/live-inspect";
 import { warlockConfigManager } from "../warlock-config";
 import { registerDevelopmentOpenApiProvider } from "../openapi/development-openapi-provider";
 import { BootPreconditionError } from "./boot-precondition-error";
@@ -75,6 +76,10 @@ export class DevelopmentServer {
       filesOrchestrator.specialFilesCollector.collect(filesOrchestrator.getFiles());
 
       this.setupEventListeners();
+
+      // Note which module registers each event listener, so a devtools panel in this process can read
+      // the event facts later without booting the app a second time.
+      startLiveEventRecording();
 
       // Decorator-driven registries (models, etc.) must be populated before
       // routes/services can resolve symbols by name.

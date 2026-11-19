@@ -1,5 +1,5 @@
 import { RefreshCwIcon } from "lucide-react";
-import type { DevtoolsJobsReport, DevtoolsJobsView } from "@contracts";
+import type { DevtoolsJobsReport, DevtoolsJobsView, DevtoolsScheduleRun } from "@contracts";
 import { useApi } from "@/api/hooks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,37 @@ import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import { HEAD, NUM_CELL, PageHeader, Pill, StatTiles, TableCard } from "@/components/listing";
 import { DASH, formatMs, formatNumber, queryString, Time } from "@/components/ui/panel-kit";
 import type { DevtoolsPanelProps } from "@/panels/types";
+
+const RUN_TONE: Record<DevtoolsScheduleRun["outcome"], string> = {
+  success: "bg-emerald-500",
+  failed: "bg-destructive",
+  skipped: "bg-muted-foreground/40",
+};
+
+/** The latest runs as small marks, newest first; each carries its detail as a tooltip. */
+function RecentRuns({ runs }: { runs?: DevtoolsScheduleRun[] }) {
+  if (!runs?.length) return <span className="text-muted-foreground">{DASH}</span>;
+
+  return (
+    <span className="inline-flex items-center gap-1" aria-label="Recent runs">
+      {runs.map((run) => (
+        <span
+          key={run.startedAt + run.outcome}
+          role="img"
+          aria-label={`${run.outcome} run`}
+          title={[
+            `${run.outcome}, ${formatMs(run.durationMs)}`,
+            new Date(run.startedAt).toLocaleString(),
+            run.error ?? run.skipReason,
+          ]
+            .filter(Boolean)
+            .join(" - ")}
+          className={`inline-block h-3 w-1.5 rounded-sm ${RUN_TONE[run.outcome]}`}
+        />
+      ))}
+    </span>
+  );
+}
 
 function Schedules({ report }: { report: DevtoolsJobsReport }) {
   if (!report.available.scheduler) {
@@ -38,6 +69,7 @@ function Schedules({ report }: { report: DevtoolsJobsReport }) {
           <TableHead className={`${HEAD} ${NUM_CELL}`}>Duration</TableHead>
           <TableHead className={`${HEAD} ${NUM_CELL}`}>Runs</TableHead>
           <TableHead className={`${HEAD} ${NUM_CELL}`}>Failures</TableHead>
+          <TableHead className={HEAD}>Recent runs</TableHead>
           <TableHead className={HEAD}>Last error</TableHead>
         </TableRow>
       </TableHeader>
@@ -64,6 +96,9 @@ function Schedules({ report }: { report: DevtoolsJobsReport }) {
               ) : (
                 DASH
               )}
+            </TableCell>
+            <TableCell>
+              <RecentRuns runs={job.recentRuns} />
             </TableCell>
             <TableCell className="max-w-xs text-xs whitespace-normal text-destructive">
               {job.lastError ?? DASH}
@@ -100,6 +135,7 @@ function Queues({ report }: { report: DevtoolsJobsReport }) {
       <TableHeader>
         <TableRow>
           <TableHead className={HEAD}>Queue</TableHead>
+          {states.length === 0 ? <TableHead className={HEAD}>Counts</TableHead> : null}
           {states.map((state) => (
             <TableHead key={state} className={`${HEAD} ${NUM_CELL}`}>
               {state}
@@ -111,14 +147,24 @@ function Queues({ report }: { report: DevtoolsJobsReport }) {
         {report.queues.map((queue) => (
           <TableRow key={queue.name}>
             <TableCell className="font-mono text-xs">{queue.name}</TableCell>
-            {states.map((state) => (
+            {queue.countsAvailable === false ? (
               <TableCell
-                key={state}
-                className={`${NUM_CELL} ${state === "failed" && queue.counts[state] ? "font-semibold text-destructive" : ""}`}
+                colSpan={Math.max(states.length, 1)}
+                className="text-xs text-muted-foreground"
               >
-                {formatNumber(queue.counts[state] ?? 0)}
+                Counts not available: this queue driver cannot count jobs.
               </TableCell>
-            ))}
+            ) : null}
+            {queue.countsAvailable === false
+              ? null
+              : states.map((state) => (
+                  <TableCell
+                    key={state}
+                    className={`${NUM_CELL} ${state === "failed" && queue.counts[state] ? "font-semibold text-destructive" : ""}`}
+                  >
+                    {formatNumber(queue.counts[state] ?? 0)}
+                  </TableCell>
+                ))}
           </TableRow>
         ))}
       </TableBody>

@@ -1,5 +1,5 @@
 import type { ResolvedJobOptions } from "./job-options";
-import type { DispatchedJob, FailedJob, JobSnapshot } from "./types";
+import type { DispatchedJob, FailedJob, JobSnapshot, QueueCounts } from "./types";
 
 /** Driver-neutral request: data includes any captured queue context. */
 export type DriverDispatch = {
@@ -17,6 +17,8 @@ export interface QueueDriver {
   retry(queue: string, id: string): Promise<void>;
   start(queue: string): Promise<void>;
   running(): string[];
+  /** Job counts of one queue. Leave it out when the backend cannot count cheaply. */
+  counts?(queue: string): Promise<QueueCounts>;
   /** Stop taking jobs immediately, then drain or release within timeout. */
   close(timeout: number): Promise<void>;
 }
