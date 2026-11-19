@@ -4,6 +4,18 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.60.0 - 2026-11-19
+
+### Added
+
+- `transaction(fn, { savepoint: true })` on PostgreSQL runs a nested call inside a savepoint, so a failing inner block rolls back alone and the outer transaction stays usable. The default (flat join) is unchanged; MongoDB always joins flat. Savepoint blocks started at the same time on one transaction (for example under `Promise.all`) run one after another, and a failed block drops only the `afterCommit()` callbacks it queued.
+
+### Fixed
+
+- A model rebuilt from a cache snapshot (`Model.fromSnapshot()`, used by repository cached reads) has the same values as the one the database returned. Snapshots keep plain objects and arrays, so PostgreSQL `jsonb` and array columns no longer come back as strings on a cache hit. Snapshots stored by earlier versions still load.
+- `migrate:export-sql` writes statements in migration order (the order `migrate` runs them) instead of grouping them by kind; the down file is the exact inverse.
+- On MongoDB, two `atomic()` upserts of the same new key at the same time no longer fail with a duplicate-key error: the one that loses the race retries and updates the document the other inserted (outside a transaction, up to three tries).
+
 ## 5.59.0 - 2026-11-19
 
 ### Changed

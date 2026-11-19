@@ -1,9 +1,11 @@
 import type { RequestLogRecord } from "@warlock.js/core";
 import type { DevtoolsAgentTraceEvent } from "./sources/agent-trace-source";
+import type { DevtoolsAiOptions } from "./ai/types";
 import type { DevtoolsAiEvent } from "./sources/ai-source";
 import type { DevtoolsMode, DevtoolsRole } from "./production/contracts";
 
 export type * from "./production/contracts";
+export type { DevtoolsAiOptions } from "./ai/types";
 
 /**
  * The records the devtools collector keeps and the dashboard API returns.
@@ -66,6 +68,15 @@ export type DevtoolsOptions = {
    * @default []
    */
   panels?: readonly DevtoolsPanelEntry[];
+  /**
+   * The AI section (Reports, Models and Errors pages): hourly totals of runs,
+   * tokens, estimated cost, errors and latency, kept in the app database in
+   * production (table `devtools_ai_rollups`, in `devtoolsMigrations`) and in
+   * JSON files under the storage folder in development.
+   *
+   * @default { reports: true, retentionDays: 30 (development) or 90 (production), flushIntervalMs: 60000 }
+   */
+  ai?: DevtoolsAiOptions;
   /**
    * The production monitor: a signed-in dashboard at a secret path. Off
    * unless `enabled` is `true`; read only when the app runs in production
@@ -267,7 +278,7 @@ export type DevtoolsProductionOptions = {
 export type ResolvedDevtoolsOptions = Required<
   Pick<DevtoolsOptions, "path" | "maxRequests" | "nPlusOneThreshold">
 > &
-  Pick<DevtoolsOptions, "allowedHosts" | "allowProxied" | "panels" | "production">;
+  Pick<DevtoolsOptions, "allowedHosts" | "allowProxied" | "panels" | "production" | "ai">;
 
 /** HTTP methods a panel data route may answer. */
 export type DevtoolsPanelMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";

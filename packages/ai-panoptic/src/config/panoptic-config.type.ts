@@ -1,4 +1,5 @@
 import type { ExporterContract } from "../contracts/exporter.contract";
+import type { EvaluateConfig } from "../evaluate/evaluate.type";
 import type { DashboardOptions } from "../dashboard/dashboard.type";
 import type { CacheDriverInput } from "../store/cache-trace-store";
 
@@ -53,6 +54,13 @@ export type PanopticConfig = {
    * and registers when none was supplied.
    */
   dashboard?: boolean | DashboardOptions;
+  /**
+   * Settings for grading a system prompt with a judge model. Read through
+   * `getEvaluateConfig()` by the devtools Evaluate page, so grading works
+   * while the standalone dashboard stays off inside a Warlock app. When
+   * omitted, `dashboard.evaluate` is used.
+   */
+  evaluate?: EvaluateConfig;
   /**
    * How many traces the store panoptic creates for the dashboard keeps (the
    * in-memory store, or the cache-backed one when {@link cache} is set).

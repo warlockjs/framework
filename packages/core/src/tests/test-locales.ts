@@ -4,7 +4,21 @@ import { resolve } from "node:path";
 import { moduleOfLocaleJson } from "../localization/module-locale-paths";
 import { registerLocaleDictionary } from "../localization/register-locale-dictionary";
 
-/** Register data-only module dictionaries in the calling worker, without app side effects. */
+/**
+ * Register every module's `utils/locales.json` and `utils/locales/*.json` dictionaries in
+ * the calling worker, without booting the app. Resolves to a function that removes them again.
+ *
+ * `setupTest()` calls it for you, in integration and in unit mode. Call it yourself from a
+ * setup file that does not use `setupTest()`, such as an email preview harness or a custom
+ * unit-project `setupFiles` entry.
+ *
+ * @example
+ * import { loadTestLocales } from "@warlock.js/core/tests";
+ *
+ * const unload = await loadTestLocales();
+ * // ...render translated text...
+ * unload();
+ */
 export async function loadTestLocales(root = process.cwd()): Promise<() => void> {
   const cleanups: Array<() => void> = [];
   const cleanup = () => {

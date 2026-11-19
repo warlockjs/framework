@@ -306,6 +306,11 @@ export type ModelResponse = {
    * verbatim. See {@link ProviderContentBlock}.
    */
   blocks?: ProviderContentBlock[];
+  /**
+   * How many earlier models of a `fallbackModel()` chain failed before this
+   * answer; absent when the first model answered.
+   */
+  fallbackAttempts?: number;
 };
 
 /**
@@ -397,6 +402,11 @@ export type ModelStreamChunk =
       usage: Usage;
       /** The turn's raw provider blocks — see `ModelResponse.blocks`. */
       blocks?: ProviderContentBlock[];
+      /**
+       * How many earlier models of a `fallbackModel()` chain failed before this
+       * answer; absent when the first model answered.
+       */
+      fallbackAttempts?: number;
     };
 
 /**

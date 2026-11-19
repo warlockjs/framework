@@ -323,4 +323,53 @@ describe("shell chrome", () => {
     await userEvent.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
+
+  it('lists the six AI pages in order under AI and titles them "AI · <page>"', async () => {
+    window.location.hash = "#ai-errors/range=7d";
+    mockApi({
+      "api/auth/session": { body: developmentSession },
+      "api/panels": {
+        body: [
+          { id: "errors", title: "Errors", type: "built-in", shareable: false },
+          ...["ai-evaluate", "ai-errors", "ai-models", "agents", "ai", "ai-reports"].map(
+            (id, index) => ({
+              id,
+              title: ["Evaluate", "Errors", "Models", "Agents", "Runs", "Reports"][index],
+              type: "built-in",
+              shareable: false,
+            }),
+          ),
+        ],
+      },
+    });
+    render(<App />);
+
+    const nav = await screen.findByRole("navigation", { name: "Dashboard tabs" });
+
+    expect(
+      await screen.findByText("tab:ai-errors route:range=7d instance:all"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("AI · Errors");
+
+    const links = within(nav)
+      .getAllByRole("link")
+      .map((link) => link.textContent);
+
+    expect(links.slice(-6)).toEqual(["Reports", "Runs", "Agents", "Models", "Errors", "Evaluate"]);
+    expect(within(nav).getByText("AI")).toBeInTheDocument();
+  });
+
+  it("keeps the plain title on a Monitor tab", async () => {
+    window.location.hash = "#errors";
+    mockApi({
+      "api/auth/session": { body: developmentSession },
+      "api/panels": {
+        body: [{ id: "errors", title: "Errors", type: "built-in", shareable: false }],
+      },
+    });
+    render(<App />);
+
+    await screen.findByText("tab:errors route: instance:all");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/^Errors$/);
+  });
 });

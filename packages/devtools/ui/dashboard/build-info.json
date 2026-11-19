@@ -1,5 +1,5 @@
 {
-  "sourceHash": "65bda82402cb64d9bb45ff6586bc8e2fb0d6c96581ee405f79b96a17e067cd90",
+  "sourceHash": "64a8dff1d77b2161ea0ab96ed2b28400a1c717ec6154443354f28b23247042db",
   "budgetGzipBytes": 307200,
   "files": {
     "index.html": {
@@ -8,14 +8,14 @@
       "sha256": "c3f1725dc0a8d8fcf95ea3773de64d90d84780f56f49c702f0ce7eac1ad1d55b"
     },
     "assets/app.js": {
-      "bytes": 468133,
-      "gzipBytes": 145664,
-      "sha256": "c5353dd7f672287a29b9abdd022e7cb87fbcec47301127aea497c4e28a75be1b"
+      "bytes": 512678,
+      "gzipBytes": 157117,
+      "sha256": "878253932a373fa81e644e18df57c2251c1804285a93cdc5f159c8cce648bde5"
     },
     "assets/app.css": {
-      "bytes": 56109,
-      "gzipBytes": 10090,
-      "sha256": "446c49115d8bae23ff6c881031d7a2ad50c44bdc3920f741620825d074af890e"
+      "bytes": 58275,
+      "gzipBytes": 10463,
+      "sha256": "e7d14484229e3c2e3f1fa9eab9f39916fb164c51a90d014905768c17531bdb6b"
     }
   }
 }

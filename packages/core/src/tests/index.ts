@@ -7,6 +7,7 @@ export * from "./start-http-development-server";
 export * from "./test-helpers";
 export * from "./authenticated-test-client";
 export * from "./vitest-setup";
+export { loadTestLocales } from "./test-locales";
 export * from "./fakes";
 export * from "./factories";
 export * from "./test-http-server";

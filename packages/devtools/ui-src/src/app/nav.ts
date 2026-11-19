@@ -4,7 +4,10 @@ import {
   BookMarkedIcon,
   BookOpenIcon,
   BotIcon,
+  BoxesIcon,
   BugIcon,
+  ChartColumnIcon,
+  ClipboardCheckIcon,
   CpuIcon,
   DatabaseIcon,
   GaugeIcon,
@@ -15,6 +18,7 @@ import {
   RouteIcon,
   ScrollTextIcon,
   SparklesIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 
 export type NavIcon = ComponentType<{ className?: string }>;
@@ -30,8 +34,12 @@ const ICONS: Record<string, NavIcon> = {
   logs: ScrollTextIcon,
   jobs: ListChecksIcon,
   mail: MailIcon,
+  "ai-reports": ChartColumnIcon,
   ai: SparklesIcon,
   agents: BotIcon,
+  "ai-models": BoxesIcon,
+  "ai-errors": TriangleAlertIcon,
+  "ai-evaluate": ClipboardCheckIcon,
   api: BookOpenIcon,
   processes: CpuIcon,
   grimoire: BookMarkedIcon,
@@ -58,9 +66,18 @@ const SECTIONS: Record<string, NavGroup> = {
   jobs: "Application",
   mail: "Application",
   api: "Application",
+  "ai-reports": "AI",
   ai: "AI",
   agents: "AI",
+  "ai-models": "AI",
+  "ai-errors": "AI",
+  "ai-evaluate": "AI",
 };
+
+/** Whether a tab id sits in the AI sidebar group. */
+export function isAiTab(id: string | null): boolean {
+  return id !== null && SECTIONS[id] === "AI";
+}
 
 const ORDER = Object.keys(SECTIONS);
 

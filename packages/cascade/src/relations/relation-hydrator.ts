@@ -40,6 +40,8 @@ export type SerializedRelation = null | ModelSnapshot | ModelSnapshot[];
  */
 export type ModelSnapshot = {
   data: Record<string, unknown>;
+  /** Keys of `data` that were Dates (stored as ISO strings), restored as Dates. */
+  dates?: string[];
   relations: Record<string, SerializedRelation>;
 };
 

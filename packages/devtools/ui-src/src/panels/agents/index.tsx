@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import type { DevtoolsAiReportView } from "@contracts";
 import { useApi, useStream } from "@/api/hooks";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
@@ -12,6 +13,7 @@ import {
 } from "@/components/listing";
 import {
   DASH,
+  SectionTitle,
   formatCost,
   formatNumber,
   Json,
@@ -19,6 +21,7 @@ import {
   TextField,
 } from "@/components/ui/panel-kit";
 import { runTone } from "@/panels/ai";
+import { BreakdownTable } from "@/panels/ai-shared/BreakdownTable";
 import type { DevtoolsPanelProps } from "@/panels/types";
 import type {
   AgentRun,
@@ -176,6 +179,37 @@ function RunDetail({
   );
 }
 
+/** The browser's UTC offset in minutes east, read once so rendering stays pure. */
+const BROWSER_UTC_OFFSET_MINUTES = -new Date().getTimezoneOffset();
+
+/** The last 24 hours per agent, from the hourly report; hidden when reports are not available. */
+function AgentsLast24Hours() {
+  const { data, error, reload } = useApi<DevtoolsAiReportView>(
+    `api/ai/reports?range=24h&tz=${BROWSER_UTC_OFFSET_MINUTES}`,
+    { refreshMs: 60_000 },
+  );
+
+  if (error) {
+    return (
+      <ErrorMessage
+        error={error}
+        title="Could not load the agents of the last 24 hours"
+        onRetry={reload}
+        className="mb-4"
+      />
+    );
+  }
+
+  if (!data?.available || !data.topAgents.length) return null;
+
+  return (
+    <section aria-label="Agents in the last 24 hours" className="mb-5">
+      <SectionTitle>Agents in the last 24 hours</SectionTitle>
+      <BreakdownTable label="Agents in the last 24 hours" heading="Agent" rows={data.topAgents} />
+    </section>
+  );
+}
+
 /** The Agents tab: agent run traces with prompt, tools, turns, calls and refusals. */
 export function AgentsPanel({ route, navigate }: DevtoolsPanelProps) {
   const [requestId, setRequestId] = useState("");
@@ -202,6 +236,7 @@ export function AgentsPanel({ route, navigate }: DevtoolsPanelProps) {
         title="Agent runs"
         description="Each agent run with its prompt, tools, turns, tool calls and refusals."
       />
+      <AgentsLast24Hours />
       <FilterBar
         label="Agent run filters"
         onSubmit={() => {

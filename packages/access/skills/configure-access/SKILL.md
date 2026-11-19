@@ -80,7 +80,7 @@ public resolveTenant(user: Auth): string | undefined {
 
 ## Caching
 
-The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles changed out of band? Call `access.flush(user, tenant)`. The cache is **best-effort**: an outage degrades to the resolver, it never denies.
+The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles changed out of band? Call `access.flush(user, tenant)`. The expiry is fixed from load time (reads never extend it, even on a sliding cache driver), so a bulk change such as a migration shows up within one `ttl`; to apply it at once, clear the `access.perms.*` / `access.roles.*` cache keys (`cache.removeNamespace("access")`), in every process for a per-process memory driver. The cache is **best-effort**: an outage degrades to the resolver, it never denies.
 
 ## See also
 

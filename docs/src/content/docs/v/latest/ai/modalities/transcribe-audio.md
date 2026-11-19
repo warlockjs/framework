@@ -121,6 +121,8 @@ const { data, usage } = await ai.transcribe({ model: whisper, audio });
 - **Per-minute** (`whisper-1`): `{ perMinute }` × `(durationSeconds / 60)` → `cost.input`. If the provider didn't report a duration, cost stays **`undefined`** — no guessing.
 - **Token-metered** (`gpt-4o-transcribe`): `{ input, output }` USD-per-1M-tokens against the returned token usage.
 
+For `gpt-4o-transcribe`, when OpenAI reports how the input splits between audio and text, `usage.audioInputTokens` and `usage.textInputTokens` carry that split (both are subsets of `usage.input`, so cost is unchanged). They are absent when the provider reports no split.
+
 Per-minute wins when both are set; an unpriced model leaves `usage.cost` **`undefined`** — an honest "cost unknown", never a false zero.
 
 ## Real-world — inbound voice-message webhook

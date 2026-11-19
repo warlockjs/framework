@@ -60,6 +60,12 @@ export type DashboardOptions = {
    * every other route.
    */
   evaluate?: EvaluateConfig;
+  /**
+   * Start the dashboard even inside a Warlock app. By default Panoptic does
+   * not start it there (the devtools AI section shows the same traces) and
+   * logs one notice instead. Default `false`; ignored outside a Warlock app.
+   */
+  standalone?: boolean;
 };
 
 /**

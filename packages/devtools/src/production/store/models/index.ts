@@ -1,4 +1,6 @@
 export { DevtoolsRowModel } from "./base";
+export { DevtoolsAiRollupsMigration } from "./ai-rollup.migration";
+export { DevtoolsAiRollupRow } from "./ai-rollup.model";
 export { DevtoolsAccountsMigration } from "./account.migration";
 export { DevtoolsAccountRow } from "./account.model";
 export { DevtoolsAuditMigration } from "./audit.migration";

@@ -85,10 +85,19 @@ export function useRequest<UserType extends Model = Model>() {
 }
 
 /**
- * The authenticated user of the current request. Outside a request (scheduler
- * jobs, seeds, queue workers) there is no request store and this returns
- * `undefined`, even though the declared type is not narrowed to include it.
- * `currentUser()` from `@warlock.js/auth` is the typed alternative.
+ * The authenticated user of the current request.
+ *
+ * **It is `undefined` outside a request** (scheduler jobs, seeds, queue workers, code that
+ * runs before the auth middleware), and for an anonymous request, even though the declared
+ * return type is `UserType` and does not say so. Keeping the type is deliberate: changing it
+ * to `UserType | undefined` would break existing callers' compiles, so it waits for the next
+ * major. Until then, check the value before using it, or call `currentUser()` from
+ * `@warlock.js/auth`, which has the same behaviour and is typed `UserType | undefined`.
+ *
+ * @example
+ * const user = useCurrentUser<User>() as User | undefined;
+ *
+ * if (!user) return; // off-request or anonymous
  */
 export function useCurrentUser<UserType extends Model = Model>() {
   // `getUser()` returns `unknown` — core has no type for `request.locals.user`

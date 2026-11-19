@@ -1,6 +1,7 @@
 import type { FastifyError, FastifyInstance } from "fastify";
 import { checkDevtoolsPanels } from "../panels";
 import { processesDevtoolsPanel } from "../process-panel";
+import { registerAiReportRoutes } from "./ai-report-routes";
 import { registerAiRoutes } from "./ai-routes";
 import { registerBackgroundRoutes } from "./background-routes";
 import { registerExplainRoute, registerShapeExplainRoute } from "./explain-route";
@@ -45,6 +46,7 @@ export function mountDevtoolsRoutes(server: FastifyInstance, deps: MountDevtools
       registerSessionRoutes(instance, deps, panels);
       registerRequestsRoutes(instance, deps);
       registerAiRoutes(instance, deps);
+      registerAiReportRoutes(instance, deps);
       registerBackgroundRoutes(instance, deps);
       registerMailRoutes(instance, deps);
       registerLogRoutes(instance, deps);

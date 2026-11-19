@@ -112,17 +112,15 @@ export class DevAgentTooling {
 
   private async startAgentsMd(): Promise<void> {
     try {
-      const [{ createAgentsMdRefresher }, { inspectApp }] = await Promise.all([
-        import("../tooling/agents-md"),
-        import("../tooling/inspect/inspect-app"),
-      ]);
+      const { createAgentsMdRefresher, collectAgentsMdReport, collectDevModelModules } =
+        await import("../tooling/agents-md");
 
       this.refresher = createAgentsMdRefresher({
         cwd: this.cwd,
-        // The in-process report has no model modules (only the boot pass reads them), so
-        // never replace a Models list written by `warlock agents-md --write` with nothing.
-        keepExistingModels: true,
-        collect: () => inspectApp({ sections: ["routes", "models", "packages"] }),
+        // The same collector `warlock agents-md --write` uses, fed the model modules the
+        // dev server has loaded, so both commands write the same bytes.
+        collect: () =>
+          collectAgentsMdReport({ cwd: this.cwd, modelModules: collectDevModelModules() }),
         onWrite: (result) => {
           if (result.status === "created" || result.status === "updated") {
             devLogInfo(`AGENTS.md generated section ${result.status}`);

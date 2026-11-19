@@ -76,7 +76,9 @@ The app path is **declarative**: `src/config/notifications.ts` exports a `Notifi
 - `NotificationChannels` — the declaration-merge channel→payload registry.
 - `NotificationColumnMap` — `{ recipient?; tenant?; readAt?; isRead? }`, the model's `columnMap` shape.
 - `ChannelName`, `MailPayload`, `DatabasePayload`, `NotificationInput`.
-- `SendOptions` — `{ delay?; locale?; meta?; idempotencyKey?; force?; type? }`.
+- `SendOptions` — `{ delay?; locale?; meta?; idempotencyKey?; force?; type?; throwOnFailure? }`.
+- `NotificationSendResult` — what `defineNotification(...).send()` / `.queue()` resolve with: `{ results: ChannelDispatchResult[]; delivered; failed; skipped; allFailed }`. A `ChannelDispatchResult` is `{ channel, notifiable, status: "sent" | "queued" | "failed" | "skipped", error? }`.
+- `NotificationDeliveryError` — rejection raised when `throwOnFailure` matches; carries `.result`.
 - `RenderContext` — `{ locale?; meta? }` (the renderer's 3rd arg).
 - `NotificationEvents` — `{ sending; sent; failed; skipped }` payloads. Every event carries `dispatchId` (shared by `sending` and its terminal `sent`/`failed`) + `notifiable?`; `sent`/`failed` also carry `durationMs`.
 

@@ -147,6 +147,15 @@ export type PostgresTransactionOptions = {
    * `transaction(fn, { settings: { "app.tenant_id": id } })`.
    */
   readonly settings?: Record<string, string | number | boolean>;
+  /**
+   * Only for a `transaction()` call made while another transaction is active.
+   * Instead of joining it flat, the inner block runs inside a savepoint: when
+   * it throws, only its own statements roll back and the outer transaction
+   * stays usable, so the caller can catch the error and carry on or retry.
+   * Ignored by an outermost `transaction()` (it opens a real transaction).
+   * @default false
+   */
+  readonly savepoint?: boolean;
 };
 
 /**

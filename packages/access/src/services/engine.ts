@@ -1,5 +1,5 @@
 import type { Auth } from "@warlock.js/auth";
-import { cache } from "@warlock.js/cache";
+import { cache, parseTtl } from "@warlock.js/cache";
 import { log } from "@warlock.js/logger";
 import type { AccessContext } from "../contracts/types";
 import { AccessConfigError } from "../utils/access-config-error";
@@ -36,20 +36,45 @@ function cacheKey(prefix: string, user: Auth, tenant?: string): string {
 }
 
 /**
+ * What the cache stores: the list plus an ABSOLUTE expiry the engine owns.
+ *
+ * Some cache drivers (the sliding `memoryExtended` one) push an entry's
+ * expiration forward on every read, so a user who keeps making requests would
+ * never see a role change made without `flush`. The engine therefore checks
+ * its own `expiresAt` on read: past it, the entry is a miss and is reloaded,
+ * whatever the driver does with its own TTL.
+ */
+type CachedSet = { values: string[]; expiresAt: number };
+
+function isLiveSet(hit: unknown): hit is CachedSet {
+  return (
+    typeof hit === "object" &&
+    hit !== null &&
+    Array.isArray((hit as CachedSet).values) &&
+    typeof (hit as CachedSet).expiresAt === "number" &&
+    (hit as CachedSet).expiresAt > Date.now()
+  );
+}
+
+/**
  * Read a list through the cache, falling back to the loader.
  *
  * The cache is **best-effort**: a cache failure degrades to the loader (the
  * source of truth) and is logged, never denied. A loader failure propagates —
  * so the DECISION fails closed in {@link check}.
+ *
+ * The expiry is FIXED from the moment the set was loaded (`cache.ttl`): reads
+ * never extend it. Entries written by an older version (a bare array) count as
+ * a miss and are reloaded once.
  */
 async function cached(key: string, loader: () => Promise<string[]>): Promise<string[]> {
   // A resolver that opts out is the source of truth on every check.
   if (accessConfig.resolver().cacheable === false) return loader();
 
   try {
-    const hit = await cache.get<string[]>(key);
+    const hit = await cache.get<CachedSet>(key);
 
-    if (hit) return hit;
+    if (isLiveSet(hit)) return hit.values;
   } catch (error) {
     log.error("access", "cache", error);
   }
@@ -57,7 +82,14 @@ async function cached(key: string, loader: () => Promise<string[]>): Promise<str
   const value = await loader();
 
   try {
-    await cache.set(key, value, { ttl: accessConfig.cacheTtl() });
+    const ttl = accessConfig.cacheTtl();
+    const seconds = parseTtl(ttl);
+    const stored: CachedSet = {
+      values: value,
+      expiresAt: Number.isFinite(seconds) ? Date.now() + seconds * 1000 : Number.MAX_SAFE_INTEGER, // JSON-safe for Infinity
+    };
+
+    await cache.set(key, stored, { ttl });
   } catch (error) {
     log.error("access", "cache", error);
   }

@@ -114,6 +114,11 @@ export type AgentReport = BaseReport & {
    */
   promptVersion?: string;
   /**
+   * How many trips were answered after at least one earlier model of a
+   * `fallbackModel()` chain failed. Present only when greater than zero.
+   */
+  fallbackTrips?: number;
+  /**
    * The full assembled multi-turn conversation — every role
    * (system / user / assistant / tool), every trip — captured as a
    * {@link CapturedMessage}[]. Present ONLY when the agent's

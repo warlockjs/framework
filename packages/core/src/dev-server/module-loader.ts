@@ -58,6 +58,15 @@ export const SPECIAL_TYPES: readonly SpecialFileType[] = [
 export class ModuleLoader {
   private readonly loadedModules = new Map<string, unknown>();
 
+  /** The loaded namespace of a file, or `undefined` when it is not loaded. Read-only view for tooling. */
+  public getLoadedModule(absolutePath: string): Record<string, unknown> | undefined {
+    const module = this.loadedModules.get(absolutePath);
+
+    return typeof module === "object" && module !== null
+      ? (module as Record<string, unknown>)
+      : undefined;
+  }
+
   public constructor(private readonly specialFilesCollector: SpecialFilesCollector) {
     // Web creates its Vite bridge after Core's development orchestration has
     // constructed ModuleLoader. Create the carrier now so a zero-model app can

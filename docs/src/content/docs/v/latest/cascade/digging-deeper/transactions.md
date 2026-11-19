@@ -73,7 +73,28 @@ try {
 
 **Postgres just works.** No setup needed beyond a regular connection.
 
-**A nested `transaction()` joins the outer one.** A `transaction()` called inside another `transaction()` does not throw and does not open a savepoint: it runs flat in the outer transaction, and nothing is committed until the outer one commits. Code placed after the inner `transaction()` therefore still runs before the outer COMMIT. When something must run only after the data is committed (an email, a cache clear), queue it with [`afterCommit()`](#aftercommitfn). If you need savepoint semantics, drop to the manual form (`beginTransaction`) and use the driver's native savepoint API.
+**A nested `transaction()` joins the outer one.** A `transaction()` called inside another `transaction()` does not throw and, by default, does not open a savepoint: it runs flat in the outer transaction, and nothing is committed until the outer one commits. Code placed after the inner `transaction()` therefore still runs before the outer COMMIT. When something must run only after the data is committed (an email, a cache clear), queue it with [`afterCommit()`](#aftercommitfn): it runs after the outermost COMMIT and is dropped when the transaction rolls back.
+
+**Savepoints (PostgreSQL, opt-in).** PostgreSQL aborts the whole transaction on the first failed statement, so a nested block that catches its own error and retries cannot recover on a flat join. Pass `{ savepoint: true }` to the nested call and the block runs inside a savepoint instead: when it throws, only its own statements roll back, the `afterCommit()` callbacks it queued are dropped, the error propagates to the caller, and the outer transaction stays usable.
+
+```ts
+await transaction(async () => {
+  await Order.create({ ... });
+
+  try {
+    await transaction(async () => {
+      await Coupon.create({ code }); // may hit a unique violation
+    }, { savepoint: true });
+  } catch {
+    // Only the coupon insert was rolled back; the order is still pending.
+    await Coupon.create({ code: nextCode });
+  }
+});
+```
+
+Only the `afterCommit()` callbacks queued inside the failed block (and inside blocks nested in it) are dropped; callbacks queued by other code of the same transaction meanwhile are kept. Savepoint blocks started at the same time on one transaction, for example under `Promise.all`, run one after another, because they share one connection; a savepoint block started inside another one runs at once as a child savepoint.
+
+The option is ignored by an outermost `transaction()`. On MongoDB a nested call always joins flat: MongoDB has no savepoints, and the option has no effect there.
 
 ## The manual pattern (rare)
 
@@ -205,6 +226,21 @@ await transaction(async (ctx) => {
 ```
 
 For large bulk imports, consider chunking the transactions — one giant transaction holding a million inserts will tie up locks and replication far longer than ten smaller transactions of 100k each.
+
+### Locking a row you are about to change
+
+Use `lockForUpdate()` on a query to hold a row lock until the transaction ends (PostgreSQL: `SELECT ... FOR UPDATE`). `findOneAndUpdate()` is for a single atomic update, not a lock: it changes the row in the same statement.
+
+```ts
+await transaction(async () => {
+  const account = await Account.query().where("id", id).lockForUpdate().first();
+
+  // No other transaction can change or lock this row until we finish.
+  await account!.merge({ balance: account!.get("balance") - amount }).save();
+});
+```
+
+`lockForUpdate({ skipLocked: true })` skips rows another transaction holds (queue claims), and `lockForUpdate({ noWait: true })` fails at once when a row is locked. Outside a transaction the lock is released immediately. MongoDB has no row locks: `lockForUpdate()` throws `UnsupportedLockForUpdateError`; use a conditional atomic update instead.
 
 ### Reading-then-writing safely
 

@@ -191,7 +191,7 @@ await Mail.to("u@e.com")
   .send();
 ```
 
-Returning `false` from `beforeSending` cancels the send and resolves with `success: false`.
+Returning `false` from `beforeSending` (per-mail hook, global `mailEvents.onBeforeSending`, or `mailEvents.onMailBeforeSending`; sync or async) cancels the send and resolves with `success: false`.
 
 ## The functional API — `sendMail`
 

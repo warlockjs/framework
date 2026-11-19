@@ -17,7 +17,7 @@ ai.config({
   panoptic: {
     dashboard: {
       evaluate: {
-        model: openai.model("gpt-4o-mini"),
+        model: openai.model({ name: "gpt-4o-mini" }),
         instructions: "Must address the user by name. Never invent prices.",
       },
     },
@@ -35,6 +35,22 @@ Absent `evaluate` ⇒ the drawer never renders the button and a `POST` to its ro
 | -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model`        | yes      | A `ModelContract`, or a `() => ModelContract \| Promise<ModelContract>` factory — mirrors `panoptic.cache`'s literal-or-factory ergonomics. Resolved fresh on every evaluate click (a deliberate, infrequent, human-triggered action — not the collector's hot path — so no memoization, unlike the cache store's driver).                                        |
 | `instructions` | no       | Default grading rubric/criteria, verbatim — the same shape `ai.prompts().validate({ criteria })` accepts. Seeds the dashboard's editable textarea (baked into the served page at boot, so the operator sees and can extend the actual default, not a blank box); the built-in prompt-quality rubric is used when neither this nor a per-run override is supplied. |
+
+## Top-level `panoptic.evaluate` and the devtools Evaluate page
+
+`PanopticConfig.evaluate` takes the same `EvaluateConfig` as `dashboard.evaluate`. `getEvaluateConfig()` returns `panoptic.evaluate`, else `panoptic.dashboard.evaluate`, else `undefined`. The devtools **Evaluate** page (development only) reads it, so prompts can be graded while the standalone dashboard stays off inside a Warlock app:
+
+```ts
+ai.config({
+  panoptic: {
+    observeAll: true,
+    evaluate: {
+      model: openai.model({ name: "gpt-4o-mini" }),
+      instructions: "Must state what the agent may never do.",
+    },
+  },
+});
+```
 
 ## The UI
 

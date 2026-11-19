@@ -51,7 +51,7 @@ ai.config({
   panoptic: {
     dashboard: {
       evaluate: {
-        model: openai.model("gpt-4o-mini"),
+        model: openai.model({ name: "gpt-4o-mini" }),
         instructions: "Must address the user by name. Never invent prices.",
       },
     },
@@ -69,6 +69,22 @@ Absent `evaluate` ⇒ the drawer never renders the button and a `POST` to its ro
 | -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model`        | yes      | A `ModelContract`, or a `() => ModelContract \| Promise<ModelContract>` factory — mirrors `panoptic.cache`'s literal-or-factory ergonomics. Resolved fresh on every evaluate click (a deliberate, infrequent, human-triggered action — not the collector's hot path — so no memoization, unlike the cache store's driver).                                        |
 | `instructions` | no       | Default grading rubric/criteria, verbatim — the same shape `ai.prompts().validate({ criteria })` accepts. Seeds the dashboard's editable textarea (baked into the served page at boot, so the operator sees and can extend the actual default, not a blank box); the built-in prompt-quality rubric is used when neither this nor a per-run override is supplied. |
+
+## Top-level `panoptic.evaluate` and the devtools Evaluate page
+
+`PanopticConfig.evaluate` takes the same `EvaluateConfig` as `dashboard.evaluate`. `getEvaluateConfig()` returns `panoptic.evaluate`, else `panoptic.dashboard.evaluate`, else `undefined`. The devtools **Evaluate** page (development only) reads it, so prompts can be graded while the standalone dashboard stays off inside a Warlock app:
+
+```ts
+ai.config({
+  panoptic: {
+    observeAll: true,
+    evaluate: {
+      model: openai.model({ name: "gpt-4o-mini" }),
+      instructions: "Must state what the agent may never do.",
+    },
+  },
+});
+```
 
 ## The UI
 
@@ -836,6 +852,10 @@ So `dashboard: true` with no exporters Just Works — you get a store for free. 
 
 **Idempotent.** Applying the config is safe on every `ai.config(...)` merge: the collector is registered as a core `Observer` exactly once and the dashboard is started at most once. Repeat calls only refresh the `observeAll` flag (latest config wins). `panoptic` undefined in the config is a no-op.
 
+## Inside a Warlock app it does not start
+
+When the process is a Warlock app (devtools mounted, `WARLOCK_BOOT_SIGNAL` set by `warlock start`, or a `warlock.config.ts`/`.js`/`.mjs`/`.cjs` in the working directory), `dashboard` is skipped: no store, no port, and one `log.info("ai-panoptic", "dashboard", …)` notice per process pointing at the devtools **AI** section. `dashboard: { standalone: true }` starts it anyway; outside a Warlock app `standalone` is ignored and nothing changes. Exporters, `observeAll` and content capture are unaffected. `isInsideWarlockApp()`, `devtoolsPathHint()` (the devtools path the notice names: the mounted path, else `/__warlock`) and `getEvaluateConfig()` are exported from `@warlock.js/ai-panoptic`.
+
 ## What the UI shows
 
 The page is one self-contained, dependency-free vanilla-JS file (no bundler, no framework, works offline). It polls the JSON API every 2s and renders:
@@ -939,6 +959,8 @@ await handle.close();
 The store is the same object the collector writes to — wire the collector to it (pass it as an exporter to `panoptic({ exporters: [store] })` or via `ai.config`) and the dashboard reflects new traces on its next poll.
 
 ### `DashboardOptions`
+
+`standalone?: boolean` (default `false`) starts the dashboard even inside a Warlock app.
 
 Every field optional, every default safe:
 

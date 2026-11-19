@@ -21,6 +21,12 @@ import { emit } from "./notifications-event-bus";
 
 export type DispatchMode = "send" | "queue";
 
+/**
+ * What one `dispatchChannel` call did: `sent` (channel transport accepted it),
+ * `queued` (handed to the queue dispatcher) or `skipped` (rate limiter refused).
+ */
+export type DispatchOutcome = "sent" | "queued" | "skipped";
+
 export type DispatchChannelArgs = {
   channelName: string;
   payload: unknown;
@@ -43,7 +49,7 @@ export type DispatchChannelArgs = {
  * configuration/data errors that should surface loudly. Transport failures
  * (channel.send throwing) are emitted as `failed` AND rethrown.
  */
-export async function dispatchChannel(args: DispatchChannelArgs): Promise<void> {
+export async function dispatchChannel(args: DispatchChannelArgs): Promise<DispatchOutcome> {
   const config = getNotificationConfig();
   const channel = config.channels[args.channelName as ChannelName];
 
@@ -77,7 +83,7 @@ export async function dispatchChannel(args: DispatchChannelArgs): Promise<void> 
         reason: "rate-limit",
         options: args.options,
       });
-      return;
+      return "skipped";
     }
   }
 
@@ -135,6 +141,8 @@ export async function dispatchChannel(args: DispatchChannelArgs): Promise<void> 
       options: args.options,
       durationMs: Date.now() - startedAt,
     });
+
+    return args.mode === "queue" ? "queued" : "sent";
   } catch (error) {
     await emit("failed", {
       dispatchId,

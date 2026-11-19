@@ -476,4 +476,11 @@ export type RepositoryConfigurations = {
    * @default false
    */
   allowClientUnpaginated?: boolean;
+
+  /**
+   * Master switch for repository caching (`listCached`, `getCached`, …) across
+   * every repository. A repository's own `isCacheable` property wins.
+   * @default true
+   */
+  isCacheable?: boolean;
 };

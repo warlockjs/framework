@@ -128,7 +128,7 @@ Rollbacks run **newest-first** — the exact inverse of the order the migrations
 Before 4.9.2, rollback ran `down()` in _apply_ order, so a batch containing more than one migration could drop a table before dropping the column added to it and fail with `relation "…" does not exist`. Batches holding a single migration were unaffected — one item has no order to get wrong.
 :::
 
-`migrate:export-sql` writes phase-ordered `.up.sql` and `.down.sql` files to `<cwd>/database/sql/` — useful for code review, reproducing schema changes in another environment, or feeding into a DBA workflow:
+`migrate:export-sql` writes `.up.sql` and `.down.sql` files to `<cwd>/database/sql/`, in the order `migrate` runs the migrations (the down file in reverse) — useful for code review, reproducing schema changes in another environment, or feeding into a DBA workflow:
 
 ```bash
 npx cascade migrate:export-sql

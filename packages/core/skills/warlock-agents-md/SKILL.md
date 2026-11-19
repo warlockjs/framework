@@ -1,6 +1,6 @@
 ---
 name: warlock-agents-md
-description: 'Generate the app-specific section of AGENTS.md from the booted app with `warlock agents-md [--write] [--json]` — modules, a routes summary with unguarded writes flagged, models, the conventions `warlock check` enforces, the installed skills and the verify commands — between `<!-- warlock:generated:start -->` / `<!-- warlock:generated:end -->` markers so hand-written content is never touched; `warlock dev` refreshes it (opt out with `devServer.agentsMd: false`). Triggers: `warlock agents-md`, `AGENTS.md`, `warlock:generated:start`, `renderAgentsMdSection`, `writeAgentsMd`, `upsertGeneratedSection`, `listInstalledSkills`, `createAgentsMdRefresher`, `devServer.agentsMd`, `WL7501`; "give agents the app facts", "keep AGENTS.md up to date", "which skills apply to this app". Skip: the full machine-readable report — the `warlock-inspect` topic; verifying a change — the `warlock-check` topic.'
+description: 'Generate the app-specific section of AGENTS.md from the booted app with `warlock agents-md [--write] [--json]` — modules, a routes summary with unguarded writes flagged, models, the conventions `warlock check` enforces, the installed skills and the verify commands — between `<!-- warlock:generated:start -->` / `<!-- warlock:generated:end -->` markers so hand-written content is never touched; `warlock dev` refreshes it (opt out with `devServer.agentsMd: false`). Triggers: `warlock agents-md`, `AGENTS.md`, `warlock:generated:start`, `renderAgentsMdSection`, `writeAgentsMd`, `upsertGeneratedSection`, `listInstalledSkills`, `createAgentsMdRefresher`, `collectAgentsMdReport`, `devServer.agentsMd`, `WL7501`; "give agents the app facts", "keep AGENTS.md up to date", "which skills apply to this app". Skip: the full machine-readable report — the `warlock-inspect` topic; verifying a change — the `warlock-check` topic.'
 ---
 
 # Warlock — `warlock agents-md`
@@ -48,6 +48,8 @@ Sections: app + `@warlock.js/*` versions, modules (`src/app/*`, routes/models pe
 - Put your own notes outside the markers; anything inside is replaced on the next refresh.
 
 ## `warlock dev` keeps it fresh
+
+The dev refresh and `warlock agents-md --write` share one collector (`collectAgentsMdReport`) and one renderer, so they write byte-identical output: versions line, modules with route and model counts, models with their module, skills index. `warlock check` never writes `AGENTS.md`; a change during a check comes from a running `warlock dev`.
 
 On boot and after reloads that change routes or modules (debounced). Opt out:
 

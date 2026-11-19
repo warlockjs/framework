@@ -407,11 +407,23 @@ await orderShipped.queue(user, { order }, { delay: "10m" });
 | `meta`           | Passed to renderers + included in every observability event.                                                                                                                |
 | `idempotencyKey` | Injected into the database payload (dedupe via unique index).                                                                                                               |
 | `force`          | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`.                                                                                                                 |
+| `throwOnFailure` | Opt in to rejection on transport failure: `"all"` (every attempt failed), `"any"`, or a channel name / array. Rejects with `NotificationDeliveryError` (`.result`).         |
 | `type`           | Ignored by `defineNotification` — see `send-ad-hoc` for ad-hoc gating.                                                                                                      |
 
 ## Failure isolation
 
-Per-recipient: each recipient gets an independent `Promise.allSettled`. Per-channel: each channel within a recipient gets an independent `allSettled`. A throw becomes a `failed` event on the event bus AND re-throws within its own slot — never aborts siblings.
+Per-recipient: each recipient gets an independent `Promise.allSettled`. Per-channel: each channel within a recipient gets an independent `allSettled`. A throw becomes a `failed` event on the event bus AND a `failed` entry in the result — never aborts siblings.
+
+## Send result
+
+`.send()` / `.queue()` resolve with `{ results, delivered, failed, skipped, allFailed }`; each `results` entry is `{ channel, notifiable, status: "sent" | "queued" | "failed" | "skipped", error? }`. A transport failure does NOT reject by default, so check the result when the caller reports delivery (for example "invitation sent"):
+
+```ts
+const { results } = await invite.send(user, data);
+const mailFailed = results.some((r) => r.channel === "mail" && r.status === "failed");
+```
+
+Or opt in to a rejection: `{ throwOnFailure: "mail" }` (named channel(s)), `"all"` or `"any"`; it throws `NotificationDeliveryError` whose `.result` has the full outcome. `queued` only means the job was enqueued.
 
 ## See also
 

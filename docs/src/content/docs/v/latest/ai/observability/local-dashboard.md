@@ -34,6 +34,32 @@ Set `dashboard: true` to take every default, or pass a `DashboardOptions` object
 
 > **The dashboard needs a queryable store.** If you set `dashboard` without any store among `exporters`, Panoptic creates and registers one for you. If you want to also `query()` / `aggregate()` that same store from code, pass your own `createInMemoryTraceStore()` in `exporters` and it'll back the dashboard too.
 
+## Inside a Warlock app
+
+In a Warlock app, [devtools](/v/latest/devtools/ai-panel/) already shows these traces (and more) under its **AI**
+section, so Panoptic does not start a second server there. With `dashboard` set, Panoptic skips the store and the port
+for the dashboard and logs one notice per process:
+
+```text
+Panoptic's dashboard does not start inside a Warlock app. Its views are in devtools under AI at /__warlock
+(install devtools with `warlock add devtools`). Set panoptic.dashboard.standalone to true to start it anyway.
+```
+
+Panoptic counts a process as a Warlock app when devtools has mounted, when `warlock start` set its boot signal, or when a
+`warlock.config.ts` (`.js`, `.mjs`, `.cjs`) sits in the working directory. Exporters you pass, `observeAll` and content
+capture are not affected. To keep the standalone dashboard anyway, for example on its own port with a token:
+
+```ts
+ai.config({
+  panoptic: {
+    observeAll: true,
+    dashboard: { port: 4319, standalone: true },
+  },
+});
+```
+
+Outside a Warlock app nothing changes: `dashboard` starts the server as described below, and `standalone` is ignored.
+
 ## `DashboardOptions`
 
 Every field is optional with a safe default:
@@ -47,6 +73,8 @@ type DashboardOptions = {
   title?: string; // default "Panoptic" — shown in the page header
   authToken?: string; // require `Authorization: Bearer <token>` (page route also accepts `?token=`) — REQUIRED off-loopback
   allowedHosts?: string[]; // Host-header allowlist (DNS-rebind guard) — defaults to the loopback names
+  evaluate?: EvaluateConfig; // enable the drawer's "Evaluate system prompt" action
+  standalone?: boolean; // start even inside a Warlock app (default false)
 };
 ```
 
@@ -58,6 +86,7 @@ type DashboardOptions = {
 | `open`         | `false`        | Best-effort browser launch via the platform opener; a launch failure never rejects the start.                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `title`        | `"Panoptic"`   | Baked into the served page header at start time.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `authToken`    | _unset_        | When set, every request must present `Authorization: Bearer <token>` or gets `401`; `?token=<token>` is accepted **only on the HTML page route** — the JSON API routes are header-only, since the page load is the one request that structurally can't carry a header. The comparison uses `crypto.timingSafeEqual` (constant-time, length-checked first), not `===`, so a network-reachable dashboard can't leak the token to a timing attack. **Required** when `host` is non-loopback — starting off-loopback without one rejects at `dashboard()`. |
+| `standalone`   | `false`        | Start the dashboard even inside a Warlock app (see above). Ignored elsewhere.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `allowedHosts` | loopback names | `Host`-header allowlist defending against DNS-rebinding; a request whose `Host` isn't listed gets `403`. Defaults to `localhost` / `127.0.0.1` / `[::1]` for a loopback bind — list your expected host(s) for a non-loopback one.                                                                                                                                                                                                                                                                                                                      |
 
 ## The low-level `dashboard(store, options)`

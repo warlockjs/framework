@@ -13,8 +13,12 @@ const ALL_TABS = [
   "logs",
   "jobs",
   "mail",
+  "ai-reports",
   "ai",
   "agents",
+  "ai-models",
+  "ai-errors",
+  "ai-evaluate",
   "api",
 ];
 
@@ -236,10 +240,49 @@ describe("createAccessLookup", () => {
   });
 });
 
+describe("AI report routes in production", () => {
+  const rules = productionRouteAccess([]);
+  const roleOf = (method: string, url: string) =>
+    rules.find((rule) => rule.method === method && rule.url === url)?.access.type;
+
+  it("lets viewers read the report routes and keeps evaluate to admins", () => {
+    for (const url of [
+      "/api/ai/reports",
+      "/api/ai/models",
+      "/api/ai/errors",
+      "/api/ai/runs",
+      "/api/ai/evaluate",
+    ]) {
+      expect(roleOf("GET", url)).toBe("viewer");
+    }
+
+    expect(roleOf("POST", "/api/ai/evaluate")).toBe("admin");
+  });
+
+  it("answers the uniform 404 for POST evaluate and for a report tab that is off", async () => {
+    const on = await createApp({ builtInPanels: ["ai-reports"] });
+    const session = await on.signIn("viewer-ai@example.com", "viewer");
+
+    expect((await on.send("GET", "/api/ai/reports", { session })).statusCode).toBe(200);
+    expect((await on.send("GET", "/api/ai/models", { session })).statusCode).toBe(404);
+
+    const admin = await on.signIn("admin-ai@example.com", "admin");
+
+    expect(
+      (await on.send("POST", "/api/ai/evaluate", { session: admin, body: { systemPrompt: "x" } }))
+        .statusCode,
+    ).toBe(404);
+  });
+});
+
 describe("the access table at the gate", () => {
   const rules = productionRouteAccess(["test-panel"]).filter(
     (rule) =>
-      !rule.url.endsWith("/*") && rule.url !== "/api/test-panel" && rule.url !== "/api/stream",
+      !rule.url.endsWith("/*") &&
+      rule.url !== "/api/test-panel" &&
+      rule.url !== "/api/stream" &&
+      // Evaluate spends a model call: its POST is never registered in production (the rule stays as a fail-safe).
+      !(rule.method === "POST" && rule.url === "/api/ai/evaluate"),
   );
   const destructive = (rule: DevtoolsRouteAccessRule) =>
     rule.url.includes("logout") || rule.url.includes("/sessions");

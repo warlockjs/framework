@@ -138,9 +138,9 @@ export class SQLGrammar {
   /**
    * Sort an array of tagged SQL statements by phase, then creation date, then migration name.
    *
-   * This is the sort that decides **execution order** — it runs across every
-   * pending migration's statements at once, after the migration list itself
-   * has been ordered, so whatever it decides is final.
+   * A standalone helper. The migration runner no longer uses it: migrations run,
+   * and are exported, in migration order with each migration's statements in the
+   * order it queued them.
    *
    * The creation date must go through {@link compareCreatedAt}. Parsing these
    * stamps with `new Date()` returns `Invalid Date` for the framework's own

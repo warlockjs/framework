@@ -71,6 +71,31 @@ export const mailEvents = {
   },
 
   /**
+   * Trigger a global mail event, await every handler and return all their results.
+   *
+   * Unlike {@link mailEvents.trigger}, a handler returning `false` does not stop the
+   * others and async handlers are awaited, so a returned `false` can be read by the caller.
+   */
+  collect: async (eventName: keyof typeof MAIL_EVENTS, ...args: any[]): Promise<any[]> => {
+    const output = await events.triggerAllAsync(MAIL_EVENTS[eventName], ...args);
+
+    return output.results;
+  },
+
+  /**
+   * Same as {@link mailEvents.collect} for the events of one mail (by mail ID).
+   */
+  collectForMail: async (
+    mailId: string,
+    event: "beforeSending" | "sent" | "success" | "error",
+    ...args: any[]
+  ): Promise<any[]> => {
+    const output = await events.triggerAllAsync(getMailEventName(mailId, event), ...args);
+
+    return output.results;
+  },
+
+  /**
    * Trigger a specific mail event (by mail ID)
    */
   triggerForMail: (

@@ -923,7 +923,7 @@ export class MigrationRunner {
   }
 
   /**
-   * Export migrations as phase-ordered SQL files in database/sql/ directory.
+   * Export migrations as SQL files in database/sql/, in migration order.
    * By default, it exports all registered migrations. Use `pendingOnly: true` to export only pending ones.
    */
   public async exportSQL(
@@ -936,9 +936,13 @@ export class MigrationRunner {
       );
     }
 
-    const migrationsToExport = options.pendingOnly
-      ? await this.getPendingMigrations({ readOnly: true })
-      : this.migrations;
+    // Same order the runner applies migrations in, so the exported file matches
+    // what `migrate` would execute.
+    const migrationsToExport = (
+      options.pendingOnly ? await this.getPendingMigrations({ readOnly: true }) : this.migrations
+    )
+      .slice()
+      .sort(sortMigrations);
 
     if (migrationsToExport.length === 0) {
       log.warn("database", "migration", "No migrations to export.");
@@ -954,9 +958,9 @@ export class MigrationRunner {
     const upStatements: TaggedSQL[] = [];
     // Down SQL is grouped per migration so only the migration order is reversed,
     // never the statements inside one migration's down().
-    const downGroups: { createdAt?: string; index: number; statements: TaggedSQL[] }[] = [];
+    const downGroups: { MigrationClass: MigrationClass; statements: TaggedSQL[] }[] = [];
 
-    for (const [index, MigrationClass] of migrationsToExport.entries()) {
+    for (const MigrationClass of migrationsToExport) {
       const migration = this.createMigrationInstance(MigrationClass);
       const name = MigrationClass.migrationName;
 
@@ -987,18 +991,17 @@ export class MigrationRunner {
           migrationName: name,
         });
       }
-      downGroups.push({ createdAt: MigrationClass.createdAt, index, statements });
+      downGroups.push({ MigrationClass, statements });
     }
 
-    const sortedUp = SQLGrammar.sort(upStatements);
-    // Down SQL: newest migration first (chronological, registration order breaks
-    // ties), each migration's own down() statements keep their order.
+    // Up SQL keeps the migration order (each migration's own statements in the
+    // order it queued them): a later migration's data step never runs before an
+    // earlier migration's, whatever kind of SQL each one holds.
+    const sortedUp = upStatements;
+    // Down SQL: the exact inverse of the up order; each migration's own down()
+    // statements keep their order.
     const sortedDown = downGroups
-      .sort((a, b) => {
-        const byDate = (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
-        return byDate !== 0 ? byDate : a.index - b.index;
-      })
-      .reverse()
+      .sort((a, b) => sortMigrationsForRollback(a.MigrationClass, b.MigrationClass))
       .flatMap((group) => group.statements);
 
     const upSQLString = this.formatSQLForExport(sortedUp, options.compact);
@@ -1532,24 +1535,21 @@ export class MigrationRunner {
       return lines.join("\n");
     }
 
-    // Group statements by their phase and migration name
-    const grouped = new Map<string, string[]>();
+    // Group only consecutive statements of the same phase and migration, so the
+    // file keeps the order the statements run in (a migration may go data →
+    // DDL → data, and merging its two data steps would move one past the DDL).
+    let currentKey: string | undefined;
 
     for (const stmt of statements) {
       const groupKey = `Phase ${stmt.phase} [${stmt.migrationName}]`;
-      if (!grouped.has(groupKey)) {
-        grouped.set(groupKey, []);
-      }
-      grouped.get(groupKey)!.push(stmt.sql);
-    }
 
-    // Format each group
-    for (const [groupKey, sqls] of grouped.entries()) {
-      if (lines.length > 0) lines.push(""); // blank line between groups
-      lines.push(`/* ${groupKey} */`);
-      for (const sql of sqls) {
-        lines.push(`${sql};`);
+      if (groupKey !== currentKey) {
+        if (lines.length > 0) lines.push(""); // blank line between groups
+        lines.push(`/* ${groupKey} */`);
+        currentKey = groupKey;
       }
+
+      lines.push(`${stmt.sql};`);
     }
 
     return lines.join("\n");

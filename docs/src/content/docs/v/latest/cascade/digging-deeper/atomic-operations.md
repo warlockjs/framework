@@ -179,6 +179,8 @@ The two writes are not one atomic step: the id has to come from an asynchronous 
 
 `Model.findAndUpdate(filter, ops, { upsert: true })` updates every row the filter matches, and inserts only when none matches.
 
+To lock a row inside a transaction before changing it (rather than updating it atomically), use `Model.query().where(...).lockForUpdate().first()`; see [Transactions](./transactions.md).
+
 `Model.findAndUpdate`'s options omit `trustedFilter` (it always sanitizes its filter); `atomic` and `findOneAndUpdate` accept it.
 
 ### `trustedFilter` — conditional reservations

@@ -1,15 +1,23 @@
 import { SparklesIcon } from "lucide-react";
 import { CopyButton } from "@/components/common/CopyButton";
-import type { AiAnswer } from "./types";
 
-/** Why the AI tab is empty: a short title, one line, and a copyable command or detail. */
-export function AiUnavailable({ answer }: { answer: AiAnswer }) {
+/** Why an AI page is empty: a short title, one line, and a copyable command or detail. */
+export function AiUnavailable({
+  answer,
+}: {
+  answer: {
+    title?: string | null;
+    message?: string | null;
+    command?: string | null;
+    detail?: string | null;
+  };
+}) {
   return (
     <div className="flex flex-col items-center rounded-xl border border-dashed bg-card/50 px-6 py-10 text-center">
       <span className="mb-3 grid size-10 place-items-center rounded-full bg-brand/10 text-brand">
         <SparklesIcon className="size-5" aria-hidden="true" />
       </span>
-      <p className="text-sm font-semibold">{answer.title ?? "AI runs are not available"}</p>
+      <p className="text-sm font-semibold">{answer.title ?? "AI data is not available"}</p>
       {answer.message ? (
         <p className="mt-1 max-w-md text-sm text-muted-foreground">{answer.message}</p>
       ) : null}

@@ -1,3 +1,4 @@
+import { resolveDevtoolsAiOptions } from "./ai/options";
 import type { DevtoolsOptions, ResolvedDevtoolsOptions } from "./types";
 
 /** Resolves dashboard options and rejects invalid capacity or URL-prefix values. */
@@ -18,6 +19,9 @@ export function resolveDevtoolsOptions(options: DevtoolsOptions = {}): ResolvedD
     throw new Error('Devtools option "nPlusOneThreshold" must be at least 2.');
   }
 
+  // Validates the AI options; the mode defaults are applied where the mode is known.
+  if (options.ai !== undefined) resolveDevtoolsAiOptions(options.ai, "development");
+
   return {
     path,
     maxRequests,
@@ -25,6 +29,7 @@ export function resolveDevtoolsOptions(options: DevtoolsOptions = {}): ResolvedD
     allowedHosts: options.allowedHosts ?? [],
     allowProxied: options.allowProxied ?? false,
     panels: options.panels ?? [],
+    ...(options.ai === undefined ? {} : { ai: options.ai }),
     ...(options.production === undefined ? {} : { production: options.production }),
   };
 }

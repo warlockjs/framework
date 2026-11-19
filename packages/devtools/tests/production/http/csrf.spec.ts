@@ -42,6 +42,8 @@ describe("CSRF and origin checks", () => {
         rule.access.type !== "public" &&
         rule.access.type !== "pending" &&
         !rule.url.endsWith("/*") &&
+        // Not registered in production (it spends a model call), so no signed-in user can reach it.
+        !(rule.method === "POST" && rule.url === "/api/ai/evaluate") &&
         !(rule.url === "/api/test-panel" && rule.method !== "POST"),
     );
 

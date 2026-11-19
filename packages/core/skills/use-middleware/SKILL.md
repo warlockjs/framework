@@ -69,7 +69,7 @@ Lifecycle:
 
 1. **Method not eligible** (GET / HEAD) → pass through.
 2. **No `Idempotency-Key` header** → pass through (the primitive is opt-in by the client).
-3. **Key already in flight** (concurrent duplicate) → 409 with `Retry-After`. The key is reserved create-only before the handler runs (`reservationTtl`, default 60s, or `http.idempotency.reservationTtl`). A 5xx frees the reservation; if the cache is down it fails open. Use a shared cache (redis/pg) across servers.
+3. **Key already in flight** (concurrent duplicate) → 409 with `Retry-After`. The key is reserved create-only before the handler runs (`reservationTtl`, default 60s, or `http.idempotency.reservationTtl`). A 5xx frees the reservation; if the cache is down it fails open. The final response is written after it is sent (a crash in between leaves only the reservation until it expires); every status below 500 is replayed. Records live in the app cache, which is per process with the default memory driver: use a shared cache across servers, or pass `store` (`{ get, reserve, set, remove }`, `reserve` atomic) for a durable one. `scope: (request) => string` narrows the key beyond user + route (for example a tenant).
    3b. **Key + same body within TTL** (default 24h) → replays the cached response with `Idempotent-Replay: true`. Handler does NOT re-run.
 4. **Key + different body** → 422 `IdempotencyKeyConflict`. Client bug — same key must mean same intent.
 5. **Cache miss** → runs handler; on response sent, caches `{ status, body, bodyHash }` for TTL.

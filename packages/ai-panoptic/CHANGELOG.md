@@ -4,6 +4,16 @@ All notable changes to `@warlock.js/ai-panoptic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.60.0 - 2026-11-19
+
+### Added
+
+- `panoptic.evaluate`, `getEvaluateConfig()` and `isInsideWarlockApp()`; spans carry `agent.fallbackTrips` and `agent.refusals`.
+
+### Changed
+
+- The Panoptic dashboard no longer starts inside a Warlock app (one notice points at the devtools AI pages), also when the app has no devtools and in a test run from the app folder. To keep it after upgrading, set `panoptic.dashboard.standalone: true`.
+
 ## 5.54.0 - 2026-11-16
 
 ### Added

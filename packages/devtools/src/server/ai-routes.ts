@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
+import { listAiRuns, type DevtoolsAiRunsQuery } from "../ai/reports/runs";
+import { DevtoolsApiError } from "../production/errors";
 import { AGENT_TRACE_INSTALL_GUIDANCE } from "../sources/agent-trace-source";
-import { describeAiUnavailable } from "../sources/ai-source";
+import { describeAiUnavailable, toAiUnavailableView } from "../sources/ai-source";
 import type { MountDevtoolsRoutesDeps } from "./types";
 
 /** Read-only AI metadata, inside the same development/loopback guard as every panel. */
@@ -29,6 +31,37 @@ export function registerAiRoutes(server: FastifyInstance, deps: MountDevtoolsRou
       runs,
       aggregate: source.store.aggregate(filter),
     };
+  });
+
+  // The filtered, grouped and summarised run list the Runs page reads. Production keeps no run details.
+  server.get<{ Querystring: DevtoolsAiRunsQuery }>("/api/ai/runs", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const source = deps.ai;
+
+    if (!source) {
+      return toAiUnavailableView(
+        describeAiUnavailable(deps.mode === "production" ? "not-collected" : "ai-missing"),
+      );
+    }
+
+    if (!source.available) {
+      const { dispose: _dispose, ...unavailable } = source;
+
+      return toAiUnavailableView(unavailable);
+    }
+
+    try {
+      return listAiRuns(source.store.query(), request.query, {
+        totalCost: source.totalCost,
+        capacity: deps.options.maxRequests,
+        helpers: source.helpers,
+      });
+    } catch (error) {
+      if (error instanceof DevtoolsApiError)
+        return reply.code(error.statusCode).send(error.toBody());
+
+      throw error;
+    }
   });
 
   // Per-turn agent traces recorded by `@warlock.js/ai` itself (system prompt,

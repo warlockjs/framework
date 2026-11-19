@@ -69,6 +69,10 @@ The plugin runs `enforce: "pre"`, so it executes **ahead of** Vite's core transf
 
 It's the **same esbuild transform the production `tsx`/build path uses**, so a file lowered in tests behaves identically in dev and prod. Two cheap gates keep the fast path fast: files in `node_modules`, non-TypeScript files, and files with no `@decorator` are skipped entirely and never pay esbuild's cost.
 
+**JSX settings are kept.** The esbuild call carries the project's own `jsx`, `jsxImportSource`, `jsxFactory` and `jsxFragmentFactory`, read from the nearest `tsconfig.json` above the file (following relative `extends`). A project that sets none gets the automatic runtime (`react-jsx`), so a decorated `.tsx` never needs `React` in scope.
+
+**The `@` check ignores text.** Comments, string literals and template-literal text are blanked before the check, so a CSS `@media` / `@font-face` line inside a template string, or `@param` in a doc comment, does not send the file through esbuild. Code inside a template's `${...}` is still checked.
+
 ## Things NOT to do
 
 - **Don't reach for `oxc: { target: "es2022" }`** — it's insufficient. oxc can only lower _legacy_ decorators, and the breakage is the SSR rewrite, not the transpile target. Legacy lowering would also mangle the Stage-3 `(value, context)` signature.

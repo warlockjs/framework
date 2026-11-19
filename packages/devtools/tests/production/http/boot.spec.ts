@@ -3,6 +3,19 @@ import { DevtoolsProductionConfigError } from "../../../src/production/errors";
 
 const h = vi.hoisted(() => {
   const calls: string[] = [];
+  const aiDispose = vi.fn(async () => undefined);
+  const unavailable = {
+    unavailable: {
+      available: false,
+      reason: "panoptic-missing",
+      title: "t",
+      message: "m",
+      command: null,
+      detail: null,
+    },
+  };
+  const loadAiFeed = vi.fn(async (): Promise<unknown> => unavailable);
+  const attachAiReports = vi.fn(async () => ({ available: true, dispose: aiDispose }));
   const stops = {
     attach: vi.fn(),
     resources: vi.fn(),
@@ -35,6 +48,10 @@ const h = vi.hoisted(() => {
   };
 
   return {
+    aiDispose,
+    unavailable,
+    loadAiFeed,
+    attachAiReports,
     calls,
     stops,
     store,
@@ -73,8 +90,10 @@ vi.mock("@warlock.js/core", () => h.core);
 vi.mock("@warlock.js/cascade", () => ({}));
 vi.mock("@warlock.js/cache", () => ({}));
 vi.mock("../../../src/server", () => ({ mountDevtoolsRoutes: vi.fn() }));
-vi.mock("../../../src/sources/ai-source", () => ({
-  attachAiSource: async () => ({ available: false, message: "", dispose: () => undefined }),
+vi.mock("../../../src/ai/attach", () => ({
+  DEVTOOLS_MOUNTED_KEY: Symbol.for("@warlock.js/devtools.mounted"),
+  loadAiFeed: h.loadAiFeed,
+  attachAiReports: h.attachAiReports,
 }));
 vi.mock("../../../src/production/store", () => ({ createCascadeStore: h.createStore }));
 vi.mock("../../../src/production/auth", () => ({
@@ -146,9 +165,12 @@ beforeEach(() => {
     h.mount,
     h.capture.attach,
     h.core.excludeFromRequestLog,
+    h.aiDispose,
+    h.attachAiReports,
   ]) {
     mock.mockClear();
   }
+  h.loadAiFeed.mockImplementation(async () => h.unavailable);
   h.core.config.get = vi.fn((key: string) => configured[key]);
   h.core.Application.runtimeStrategy = "production";
 });
@@ -241,6 +263,86 @@ describe("bootProductionDevtools", () => {
     for (const line of [...log.warn.mock.calls, ...log.error.mock.calls]) {
       expect(String(line)).not.toContain("7f3k2q9x");
     }
+  });
+
+  it("lists the AI report tabs only when the AI feed loads, unless the project turned them on", async () => {
+    await bootProductionDevtools(input());
+    const without = h.mount.mock.calls[0]?.[1] as { builtInPanels: string[] };
+
+    expect(without.builtInPanels).not.toContain("ai-reports");
+    expect(without.builtInPanels).not.toContain("ai-models");
+    expect(without.builtInPanels).not.toContain("ai-errors");
+    expect(h.attachAiReports).not.toHaveBeenCalled();
+
+    h.mount.mockClear();
+    await bootProductionDevtools(
+      input({
+        options: resolveDevtoolsOptions({
+          production: { enabled: true, panels: { "ai-models": true } },
+        }),
+      }),
+    );
+    const forced = h.mount.mock.calls[0]?.[1] as { builtInPanels: string[] };
+
+    expect(forced.builtInPanels).toContain("ai-models");
+    expect(forced.builtInPanels).not.toContain("ai-reports");
+
+    h.mount.mockClear();
+    h.loadAiFeed.mockImplementation(async () => ({ feed: { f: 1 }, helpers: {} }));
+    await bootProductionDevtools(input());
+    const withFeed = h.mount.mock.calls[0]?.[1] as {
+      builtInPanels: string[];
+      routes: { aiReports: { available: boolean } };
+    };
+
+    expect(withFeed.builtInPanels).toEqual(
+      expect.arrayContaining(["ai-reports", "ai-models", "ai-errors"]),
+    );
+    expect(withFeed.builtInPanels).not.toContain("ai-evaluate");
+    expect(withFeed.routes.aiReports.available).toBe(true);
+    expect(h.attachAiReports.mock.calls[0]?.[0]).toMatchObject({
+      options: { mode: "production", retentionDays: 90 },
+    });
+  });
+
+  it("writes no AI totals when the project turned every AI report tab off", async () => {
+    h.loadAiFeed.mockClear();
+    h.loadAiFeed.mockImplementation(async () => ({ feed: {}, helpers: {} }));
+    await bootProductionDevtools(
+      input({
+        options: resolveDevtoolsOptions({
+          production: {
+            enabled: true,
+            panels: { "ai-reports": false, "ai-models": false, "ai-errors": false },
+          },
+        }),
+      }),
+    );
+    const mounted = h.mount.mock.calls[0]?.[1] as {
+      builtInPanels: string[];
+      routes: { aiReports: { available: boolean; reason?: string } };
+    };
+
+    expect(h.loadAiFeed).not.toHaveBeenCalled();
+    expect(h.attachAiReports).not.toHaveBeenCalled();
+    expect(mounted.routes.aiReports).toMatchObject({ available: false, reason: "reports-off" });
+  });
+
+  it("stops the AI reports at shutdown and publishes the mounted marker meanwhile", async () => {
+    const key = Symbol.for("@warlock.js/devtools.mounted");
+
+    h.loadAiFeed.mockImplementation(async () => ({ feed: {}, helpers: {} }));
+    const dispose = await bootProductionDevtools(input());
+
+    expect((globalThis as Record<symbol, unknown>)[key]).toEqual({
+      path: SECRET_PATH,
+      mode: "production",
+    });
+
+    await dispose();
+
+    expect(h.aiDispose).toHaveBeenCalled();
+    expect((globalThis as Record<symbol, unknown>)[key]).toBeUndefined();
   });
 
   it("masks every kind of path", () => {

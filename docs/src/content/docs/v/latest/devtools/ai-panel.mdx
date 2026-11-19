@@ -1,14 +1,25 @@
 ---
-title: AI panel
-description: Inspect Panoptic AI runs alongside the HTTP requests that triggered them in the development dashboard.
+title: AI section
+description: Reports, runs, agents, models, errors and prompt evaluation for your AI features in the devtools dashboard, with hourly totals that survive restarts and, in production, are shared by every process.
 ---
 
-The **AI** tab at `/__warlock` shows completed Panoptic traces, including failed,
-cancelled and incomplete runs. Request details also list their AI runs, with a
-link to the full run tree. A run's **Open HTTP request** button returns to its
-request record while that record is retained.
+The **AI** group in the devtools sidebar has six pages. Three of them read **hourly totals** that are saved, so they keep
+their numbers across restarts and, in production, add up every process. The other three read the runs held in memory
+and exist in development only.
 
-## Enable collection
+| Page         | Reads                                   | Development | Production (default)          |
+| ------------ | --------------------------------------- | ----------- | ----------------------------- |
+| **Reports**  | Hourly totals                           | Yes         | On when Panoptic is installed |
+| **Runs**     | Panoptic traces in memory               | Yes         | Off                           |
+| **Agents**   | `@warlock.js/ai` agent traces in memory | Yes         | Off                           |
+| **Models**   | Hourly totals                           | Yes         | On when Panoptic is installed |
+| **Errors**   | Hourly totals (and recent failed runs)  | Yes         | On when Panoptic is installed |
+| **Evaluate** | Grades a system prompt with a judge     | Yes         | Off                           |
+
+Runs, Agents and Evaluate show prompts, tool data and run details, so they stay in development. See
+[Devtools in production](/v/latest/devtools/production/#ai-reports) for the production setup.
+
+## Turn observation on
 
 Install devtools as usual, then add Panoptic if your app does not already use it:
 
@@ -27,25 +38,160 @@ ai.config({ panoptic: { observeAll: true } });
 ```
 
 Restart `warlock dev`, make a request that executes an AI flow, and open
-`http://localhost:<port>/__warlock`. No additional dashboard server or
-`dashboard: true` option is needed. Existing `panoptic().attach(...)`,
-`panoptic().middleware()`, flow-local observers and `collector.collect(...)`
-also feed the panel when they use Panoptic's built-in collector. Custom
-collectors need to delegate collection to that pipeline.
+`http://localhost:<port>/__warlock`. No additional dashboard server or `dashboard: true` option is needed. Inside a
+Warlock app Panoptic's own standalone dashboard does not start; it logs one notice that points at this section (see
+[the local dashboard](/v/latest/ai/observability/local-dashboard/#inside-a-warlock-app)).
 
-Installing Panoptic alone does not enable observation. Use `observeAll: true`,
-`observe: true` on individual flows, or the explicit subscriber APIs. If Panoptic
-cannot be loaded or does not provide the trace-subscription API, the AI tab shows
-install/restart guidance; the other panels continue to work.
+Installing Panoptic alone does not enable observation. Use `observeAll: true`, `observe: true` on individual flows, or
+the explicit subscriber APIs (`panoptic().attach(...)`, `panoptic().middleware()`, flow-local observers and
+`collector.collect(...)` all feed these pages when they use Panoptic's built-in collector; a custom collector must
+delegate to that pipeline). If Panoptic cannot be loaded, the pages show install or restart guidance and the other
+panels keep working.
 
-When the tab is empty it says which case applies: `@warlock.js/ai` is not installed
-(`warlock add ai`), Panoptic is not installed (`warlock add ai-panoptic`), Panoptic is
-installed but failed to load (the load error, with file paths replaced, and both versions are shown), or
-observation is off (add `ai.config({ panoptic: { observeAll: true } })` to
-`src/config/ai.ts`). In the production dashboard the tab says that AI runs are not collected
-there; open it in development to see them.
+When a page has nothing to show it says which case applies: `@warlock.js/ai` is not installed (`warlock add ai`),
+Panoptic is not installed (`warlock add ai-panoptic`), Panoptic failed to load (the load error, with file paths
+replaced, and both versions), observation is off (add `ai.config({ panoptic: { observeAll: true } })` to
+`src/config/ai.ts`; old totals still show under a banner), the totals table is missing (run `warlock migrate`), or
+reports are turned off (`devtools.ai.reports`).
 
-## What appears
+## Filters shared by Reports, Models and Errors
+
+Every report page has one filter row: a range (**24h**, **7d**, **30d** or **Custom**), then **Agent**, **Model** and
+**Provider**. Filters scope every tile, chart and table on the page. The filters live in the address
+(`#ai-reports/range=7d&agent=checkout`), so a view can be bookmarked, and the last range is remembered so moving between
+Reports, Models and Errors keeps it. Pages refresh every minute.
+
+- 24h shows 24 hourly columns, 7d shows 28 six-hour columns, 30d shows 30 daily columns ending at your next local
+  midnight. A custom range uses hourly columns up to 48 hours, six-hour columns up to 8 days, and daily columns beyond;
+  daily columns always run from your local midnight to the next, so a custom range in days is widened to whole days.
+- Every figure is compared with the period of the same length right before it (for example "up 12% vs previous 7 days").
+  A rising error rate or p95 uses the warning tone; the others stay neutral. When part of that earlier period is older
+  than the kept history (the 30-day range with the 30-day development default, for example), the change reads
+  **No earlier data** instead of a misleading figure.
+- A custom range cannot start before the retention cut-off (see [Retention](#retention-and-options)).
+
+## Reports
+
+Tiles: **Estimated cost**, **Tokens** (input, output and cached), **Agent runs**, **Error rate** and **p95 latency**,
+each with its change against the previous period. Charts: **Estimated cost by model** (top five models plus Other),
+**Tokens** (uncached input, cached input, output) and **Error rate** (a gap where an hour had no runs). Two tables list
+the top agents and the top models by estimated cost: runs, tokens, cost with a share bar, error rate and p95. Clicking a
+model opens Models for it; clicking an agent opens Agents. Every chart has a **Table** toggle that shows the same numbers
+as a table.
+
+### Cost is an estimate
+
+Cost is always labelled **Estimated from model pricing**. It is the `usage.cost` the model reported, from the pricing
+you set on the model, the SDK registry or the adapter's list prices. A run whose model has no pricing is **unpriced**:
+its tokens are counted but it adds nothing to the cost, and the page shows the number of unpriced runs next to every
+cost. A model priced as free (pricing set to 0, for example a local model) counts as priced at $0, not as unpriced. When models have no pricing, a banner names how many ("3 models have no pricing; their runs are not in the
+cost"). Set `pricing` on the model to include them.
+
+### What counts as a run
+
+A run is one model-bearing step of a trace: an agent, or an image, speech or transcription call. An agent used as a tool
+inside another agent counts once, as itself, and its usage and cost are taken out of the caller's own totals so nothing is
+added twice. Tokens are normalised so "input" is the whole prompt on every provider. Failed and incomplete runs count as
+errors; cancelled runs do not. Errors are grouped by their error type into **Rate limit**, **Timeout**, **Refusal**,
+**Provider error** (authentication, invalid request, context too long), **Budget**, **Tool failed**, **Invalid output**
+(schema validation), **Incomplete** (incomplete runs and runs that hit their trip limit) and **Other**.
+
+## Runs
+
+The development page for single runs, as before, with filters and grouping added. Filter by text (run name or session),
+status, type and exact HTTP request id, and group by **Session**, **Prompt** or **Type**. Tiles show the runs, failed
+runs, estimated cost (with the number of unpriced runs when there are any), p50 and p95 of the filtered set. Opening a run shows the span tree with a cost tint on each span (stronger for the costlier spans; the number
+is always shown). `#ai/<traceId>` links keep working, and a run's **Open HTTP request** button returns to its request
+record while that record is retained.
+
+Runs are the Panoptic traces collected after devtools attached, bounded by `maxRequests` (200 by default) and
+independent of request retention. **Clear**, shutdown and restart discard them. Use the hourly totals for anything that
+must outlive them.
+
+## Agents
+
+Unchanged: the per-turn traces `@warlock.js/ai` records for its own agents (system prompt, tools offered, tool calls,
+retries, usage and cost, and a comparison with the previous run). Above the list, **Agents in the last 24 hours** shows
+the top agents from the Reports data when that is available. It does not need Panoptic. See
+[agent traces](/v/latest/ai/observability/agent-trace/).
+
+## Models
+
+Tiles: models used, estimated cost, models without pricing and the **fallback rate** (runs where an earlier model of a
+`fallbackModel()` chain failed first). A chart shows **Runs by model**. The table has one row per provider and model:
+runs, tokens in and out, estimated cost, cost per priced run, a pricing pill (**Pricing set**, **No pricing**,
+**Partly priced**, or **No tokens used** when every run failed before using tokens), fallback rate, error rate, p50 and p95, and the agents that use it.
+
+## Errors
+
+Tiles: failed runs, error rate with its change, **refusals** (runs where the model declined) and cancelled runs. A chart
+shows **Failed runs by category** over time. The table groups failures by category with the count, a share bar, the change
+against the previous period, and the top models and agents. In development, **Recent failed runs** lists the latest 50
+failed runs inside the chosen range and filters (agents, and image, speech and transcription calls) with their message (cut to 300 characters) and a link to the run. In production run details are not kept, and the page
+says so.
+
+## Evaluate
+
+Grades a system prompt with a judge model, from a page instead of code. It is development only because it spends a model
+call. When no judge is configured the page shows the setup:
+
+```ts title="src/config/ai.ts"
+import { ai } from "@warlock.js/ai";
+import { openai } from "@warlock.js/ai-openai";
+import "@warlock.js/ai-panoptic";
+
+ai.config({
+  panoptic: {
+    observeAll: true,
+    evaluate: {
+      model: openai.model({ name: "gpt-4o-mini" }),
+      instructions: "The prompt must say which tone to use and what the agent must never do.",
+    },
+  },
+});
+```
+
+With it, the page lists recent system prompts (the agents using them, when last seen, a preview and the length) and lets
+you paste one. Pick a prompt, adjust the instructions (they default to the configured ones; left empty, the configured ones are used, or the
+built-in rubric when none are set) and press **Run evaluation**. The result
+card shows a score as a percentage, the issues found, the judge and the time. Errors appear in the card next to the button.
+The prompt is capped at 100,000 characters and the instructions at 4,000. `panoptic.evaluate` takes the same settings as the standalone dashboard's `dashboard.evaluate`; see [Configuring Panoptic](/v/latest/ai/observability/configuring-panoptic/#evaluate).
+
+## Hourly totals
+
+Reports, Models and Errors read **hourly rollups**. Each row holds names and numbers only (agent, model, provider, runs,
+tokens, estimated cost, errors by category, a latency histogram, fallback and refusal counts); no prompts, completions,
+tool data or user ids.
+
+- Development keeps them in files under `storage/devtools/ai-rollups`.
+- Production keeps them in the `devtools_ai_rollups` table of your app database, created by `devtoolsMigrations`. Every
+  process that boots the devtools connector adds to the same table, so the pages add up all instances and workers, including
+  queue workers that run the app. Run `warlock migrate` after upgrading.
+- Totals are saved every minute (a run shows on the page at once in the process that served it; other processes' runs
+  appear within the interval). On a clean shutdown the last totals are written.
+- Latency percentiles come from a histogram, so they answer the upper bound of a bucket rather than an exact value.
+
+## Retention and options
+
+```ts title="src/config/devtools.ts"
+export default {
+  ai: {
+    reports: true, // keep hourly totals (default true)
+    retentionDays: 30, // 1 to 400; default 30 in development, 90 in production
+    flushIntervalMs: 60_000, // at least 5000; default 60000
+  },
+};
+```
+
+| Option            | Default                           | Meaning                                                              |
+| ----------------- | --------------------------------- | -------------------------------------------------------------------- |
+| `reports`         | `true`                            | Keep hourly totals. `false` turns the writer off; the pages say so.  |
+| `retentionDays`   | `30` development, `90` production | Hours older than this are removed every 10 minutes by every process. |
+| `flushIntervalMs` | `60000`                           | How often unsaved totals are written (5000 or more).                 |
+
+An invalid value stops the boot and names the option. Raw run traces keep their own retention (the in-memory limit above).
+
+## What a run shows
 
 | Field      | Meaning                                                                                                                                                                                                                                              |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -79,7 +225,7 @@ when present; otherwise the run appears as **Background / no request id**.
 HTTP request id. Reports collected later outside their original context cannot
 be linked retroactively.
 
-The AI tab accepts an exact HTTP request id filter. Request details use that
+The Runs page accepts an exact HTTP request id filter (`requestId`). Request details use that
 same filter, so late AI runs remain discoverable while their trace is retained.
 Updates arrive through the dashboard's existing event stream when collection
 finishes; this is a completed-run view, not token streaming.
@@ -95,45 +241,27 @@ persistent history.
 
 ## JSON API
 
-All paths are relative to the configured devtools prefix:
+All paths are relative to the configured devtools prefix, answer with `Cache-Control: no-store`, and use the same
+guard as the rest of the dashboard (loopback in development; session, role and CSRF in production).
 
-- `GET /__warlock/api/ai` — `{ available, runs, aggregate }`; when unavailable,
-  `{ available: false, message, runs: [] }` contains install guidance.
-- `GET /__warlock/api/ai?requestId=<encoded-id>` — the same response scoped to
-  one HTTP request, including its usage aggregate.
-- `GET /__warlock/api/ai/runs/<encoded-trace-id>` — the content-free trace tree,
-  or `404` for an unavailable/evicted run.
-- `GET /__warlock/api/stream` adds `ai` events carrying `{ traceId, requestId? }`.
-  `DELETE /__warlock/api/requests` clears the AI view with the other panels.
+| Route                                     | Answer                                 | Notes                                                                                     |
+| ----------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `GET /api/ai/reports`                     | Totals, charts data, top agents/models | `range`, `from`, `to`, `tz`, `agent`, `model`, `provider`. Production: viewer.            |
+| `GET /api/ai/models`                      | One row per provider and model         | Same query. Production: viewer.                                                           |
+| `GET /api/ai/errors`                      | Groups by category, over time, recent  | Same query. `recent` is `null` in production.                                             |
+| `GET /api/ai/runs`                        | Filtered, grouped runs                 | `q`, `status`, `type`, `session`, `requestId`, `prompt`, `groupBy`, `limit`. Development. |
+| `GET /api/ai/evaluate`                    | Whether a judge is set, recent prompts | Development.                                                                              |
+| `POST /api/ai/evaluate`                   | Score, issues, judge, time             | Body `{ runId }` or `{ systemPrompt }`, plus `instructions?`. Development only.           |
+| `GET /api/ai`                             | `{ available, runs, aggregate }`       | Unchanged. `?requestId=<id>` scopes it to one HTTP request.                               |
+| `GET /api/ai/runs/<trace-id>`             | The content-free trace tree, or `404`  | Unchanged.                                                                                |
+| `GET /api/ai/agent-runs[?requestId=<id>]` | Recent agent runs                      | Unchanged. `available: false` with guidance until a trace store exists.                   |
+| `GET /api/ai/agent-runs/<run-id>`         | The full agent trace, or `404`         | Unchanged.                                                                                |
 
-`DevtoolsAiRun` and `DevtoolsAiEvent` are exported as types from
-`@warlock.js/devtools`; `DevtoolsStreamEvent` includes the new `ai` event.
+`range` is `24h`, `7d`, `30d` or `custom` (default `24h`); `tz` is minutes east of UTC. A bad query answers
+`ai.range-invalid` (400); a bad Runs query or evaluate body answers `input.invalid` (422). Evaluate failures carry `ai.evaluate-unavailable`, `ai.prompt-not-found` or
+`ai.evaluate-failed`, each with a message saying what to do. `GET /api/stream` adds `ai` events carrying
+`{ traceId, requestId? }` and `agent-trace` events carrying `{ runId, status, requestId? }`; `DELETE /api/requests`
+clears the in-memory views. `DevtoolsAiRun` and `DevtoolsAiEvent` are exported as types from `@warlock.js/devtools`.
 
-Responses disable HTTP caching. The connector attaches the AI source only in
-development, and every AI endpoint uses the existing development and
-socket-loopback guard. Nothing is mounted in production. The view omits span
-input/output, prompts, tool arguments/results and compaction summaries, even if
-Panoptic's other exporters capture content. Names, usage, diagnostic metadata
-and normalized error type/message remain development data.
-
-## Agents tab
-
-The **Agents** tab is separate from the Panoptic-backed AI tab and does not need
-Panoptic. It shows the per-turn traces `@warlock.js/ai` 5.38 or newer records for
-its own agents in development: the system prompt, the tools offered with schema
-hashes and token estimates, tool calls with results and refusals, retries and
-re-prompts, usage and cost, and a comparison with the previous run of the same
-agent. See [agent traces](/v/latest/ai/observability/agent-trace/).
-
-Unlike the Panoptic view, an agent trace holds prompt and tool content, so it
-exists for development only: the same guard applies, secret keys are redacted
-before a trace is stored, and nothing is mounted in production.
-
-- `GET /__warlock/api/ai/agent-runs[?requestId=<id>]` — recent runs, newest
-  first, or `available: false` with guidance until `@warlock.js/ai` has created
-  its trace store.
-- `GET /__warlock/api/ai/agent-runs/<run-id>` — the full trace, or `404`.
-- `GET /__warlock/api/stream` adds `agent-trace` events carrying
-  `{ runId, status, requestId? }`.
-
-`warlock ai trace` reads the same endpoints from the terminal.
+The run views omit span input and output, prompts, tool arguments and results and compaction summaries, even if
+Panoptic's other exporters capture content. `warlock ai trace` reads the agent endpoints from the terminal.

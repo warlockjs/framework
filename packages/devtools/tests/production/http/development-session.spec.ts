@@ -71,7 +71,7 @@ describe("the development dashboard's session and panel routes", () => {
     const response = await mount().inject({ url: "/__warlock/api/panels", ...local });
     const tabs = response.json<{ id: string; type: string }[]>();
 
-    expect(tabs.slice(0, 12).map((tab) => tab.id)).toEqual([
+    expect(tabs.slice(0, 16).map((tab) => tab.id)).toEqual([
       "requests",
       "queries",
       "routes",
@@ -81,11 +81,15 @@ describe("the development dashboard's session and panel routes", () => {
       "logs",
       "jobs",
       "mail",
+      "ai-reports",
       "ai",
       "agents",
+      "ai-models",
+      "ai-errors",
+      "ai-evaluate",
       "api",
     ]);
-    expect(tabs.slice(12)).toEqual([
+    expect(tabs.slice(16)).toEqual([
       { id: "processes", title: "Processes", type: "package", shareable: false },
       { id: "test-panel", title: "Test panel", type: "package", shareable: false },
     ]);

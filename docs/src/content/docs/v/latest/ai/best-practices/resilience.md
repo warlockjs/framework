@@ -155,6 +155,14 @@ for (const attempt of resilientModel.lastAttempts) {
 }
 ```
 
+**Count failovers from the report.** `lastAttempts` is overwritten by the next call, so it is only reliable when one call runs at a time. The report is per run: `result.report.fallbackTrips` is the number of trips an agent got answered after at least one earlier model of the chain failed, and it is absent when the first model answered every trip. At the model level, a `complete()` response and a stream's `done` chunk carry `fallbackAttempts`, the number of earlier models that failed before that answer (also absent when the first model answered), and this stays exact when one chain serves concurrent calls. Panoptic copies the report field to the `agent.fallbackTrips` span attribute, which the devtools Models page uses for its fallback rate.
+
+```ts
+if (result.report.fallbackTrips) {
+  metrics.increment("ai.provider.failover", { trips: result.report.fallbackTrips });
+}
+```
+
 **Avoid this — failing over on non-transient errors, or leaning on the fallback as a normal model.** A bad API key, an oversized prompt, or a content-filter block fails _identically_ on every downstream model, so failing over on them only burns the backup's budget on input that can't succeed. The default already excludes them — don't replace `retryOn` with a predicate that catches them.
 
 ```ts

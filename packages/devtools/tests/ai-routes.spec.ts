@@ -2,7 +2,13 @@ import http from "node:http";
 import {
   createCollector as createPanopticCollector,
   createInMemoryTraceStore,
+  filterTraces,
+  groupByPrompt,
+  groupBySession,
+  groupByType,
+  percentile,
   totalCostUsd,
+  tracePromptKey,
 } from "@warlock.js/ai-panoptic";
 import Fastify from "fastify";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -48,6 +54,15 @@ function fixture(development = true, path = "/__warlock") {
       available: true,
       store,
       summarize: (item) => summarizeAiTrace(item, totalCostUsd(item.usage)),
+      totalCost: (usage) => totalCostUsd(usage),
+      helpers: {
+        filterTraces,
+        groupBySession,
+        groupByPrompt,
+        groupByType,
+        percentile,
+        tracePromptKey,
+      },
       subscribe: (listener) => {
         listeners.add(listener);
         return () => {
@@ -77,6 +92,80 @@ describe("AI route in production", () => {
       available: false,
       reason: "not-collected",
       runs: [],
+    });
+  });
+});
+
+describe("Runs list API", () => {
+  it("lists, filters and groups the stored traces", async () => {
+    const { server } = fixture();
+    const all = await server.inject({ url: "/__warlock/api/ai/runs" });
+
+    expect(all.headers["cache-control"]).toBe("no-store");
+    expect(all.json()).toMatchObject({
+      available: true,
+      capacity: expect.any(Number),
+      groups: null,
+      stats: { count: 2, failed: 0 },
+    });
+    expect(all.json().runs[0]).toMatchObject({
+      name: "assistant",
+      type: "agent",
+      status: "incomplete",
+      incomplete: true,
+    });
+
+    const filtered = await server.inject({ url: "/__warlock/api/ai/runs?status=failed" });
+    expect(filtered.json().runs).toEqual([]);
+
+    const grouped = await server.inject({ url: "/__warlock/api/ai/runs?groupBy=type&limit=1" });
+    expect(grouped.json().runs).toHaveLength(1);
+    expect(grouped.json().groups[0]).toMatchObject({ key: "agent", runs: 2 });
+  });
+
+  it("answers input.invalid for a bad query", async () => {
+    const { server } = fixture();
+    const response = await server.inject({ url: "/__warlock/api/ai/runs?limit=0" });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ code: "input.invalid" });
+  });
+
+  it("answers an unavailable view with null command and detail", async () => {
+    const server = Fastify();
+    servers.push(server);
+    const options = resolveDevtoolsOptions({ path: "/__warlock" });
+    mountDevtoolsRoutes(server, {
+      collector: createCollector(options),
+      options,
+      isDevelopment: () => true,
+      ai: { available: false, reason: "ai-missing", title: "t", message: "m", dispose() {} },
+    });
+
+    expect((await server.inject({ url: "/__warlock/api/ai/runs" })).json()).toEqual({
+      available: false,
+      reason: "ai-missing",
+      title: "t",
+      message: "m",
+      command: null,
+      detail: null,
+    });
+  });
+
+  it("answers not-collected in production", async () => {
+    const server = Fastify();
+    servers.push(server);
+    const options = resolveDevtoolsOptions();
+    registerAiRoutes(server, {
+      collector: createCollector(options),
+      options,
+      isDevelopment: () => false,
+      mode: "production",
+    });
+
+    expect((await server.inject({ url: "/api/ai/runs" })).json()).toMatchObject({
+      available: false,
+      reason: "not-collected",
     });
   });
 });

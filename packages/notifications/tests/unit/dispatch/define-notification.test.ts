@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   defineNotification,
   MissingRendererError,
+  NotificationDeliveryError,
   notifications,
   resetNotificationConfig,
   setNotificationConfig,
@@ -138,12 +139,122 @@ describe("defineNotification", () => {
       database: () => ({ title: "x" }),
     });
 
-    await expect(note.send(makeNotifiable(), {})).resolves.toBeUndefined();
+    await expect(note.send(makeNotifiable(), {})).resolves.toBeDefined();
 
     expect(databaseSend).toHaveBeenCalledTimes(1);
     expect(failed).toHaveBeenCalledWith(expect.objectContaining({ channel: "mail" }));
 
     off();
+  });
+
+  describe("send result", () => {
+    const mailAndDatabase = () =>
+      defineNotification<{}>({
+        type: "result",
+        via: ["mail", "database"],
+        mail: () => ({ subject: "x", html: "<p>x</p>" }) as MailPayload,
+        database: () => ({ title: "x" }),
+      });
+
+    it("resolves with one entry per channel, carrying the transport error", async () => {
+      const error = new Error("smtp down");
+      mailSend.mockRejectedValueOnce(error);
+      const to = makeNotifiable();
+
+      const result = await mailAndDatabase().send(to, {});
+
+      expect(result.delivered).toBe(1);
+      expect(result.failed).toBe(1);
+      expect(result.allFailed).toBe(false);
+      expect(result.results).toEqual([
+        { channel: "mail", notifiable: to, status: "failed", error },
+        { channel: "database", notifiable: to, status: "sent" },
+      ]);
+    });
+
+    it("reports queued dispatches as queued", async () => {
+      const dispatch = vi.fn().mockResolvedValue(undefined);
+      configure({ queue: { dispatch } });
+
+      const result = await mailAndDatabase().queue(makeNotifiable(), {});
+
+      expect(result.results.map((r) => r.status)).toEqual(["queued", "queued"]);
+      expect(result.delivered).toBe(2);
+    });
+
+    it("reports preference-skipped channels as skipped", async () => {
+      configure({
+        preferences: {
+          resolveChannels: (_n: unknown, _t: unknown, req: string[]) =>
+            req.filter((c) => c !== "mail"),
+        },
+      });
+
+      const result = await mailAndDatabase().send(makeNotifiable(), {});
+
+      expect(result.skipped).toBe(1);
+      expect(result.results.find((r) => r.channel === "mail")?.status).toBe("skipped");
+      expect(result.allFailed).toBe(false);
+    });
+
+    it("reports a renderer that throws as a failed entry and still runs the other channels", async () => {
+      const error = new Error("template missing");
+      const notification = defineNotification<{}>({
+        type: "render-fails",
+        via: ["mail", "database"],
+        mail: () => {
+          throw error;
+        },
+        database: () => ({ title: "x" }),
+      });
+      const to = makeNotifiable();
+
+      const result = await notification.send(to, {});
+
+      expect(result.results).toEqual([
+        { channel: "mail", notifiable: to, status: "failed", error },
+        { channel: "database", notifiable: to, status: "sent" },
+      ]);
+      expect(mailSend).not.toHaveBeenCalled();
+      await expect(notification.send(to, {}, { throwOnFailure: "any" })).rejects.toBeInstanceOf(
+        NotificationDeliveryError,
+      );
+    });
+
+    it('throwOnFailure: "all" rejects only when every channel failed', async () => {
+      mailSend.mockRejectedValueOnce(new Error("smtp down"));
+      await expect(
+        mailAndDatabase().send(makeNotifiable(), {}, { throwOnFailure: "all" }),
+      ).resolves.toMatchObject({ failed: 1 });
+
+      mailSend.mockRejectedValueOnce(new Error("smtp down"));
+      databaseSend.mockRejectedValueOnce(new Error("db down"));
+      const rejected = mailAndDatabase().send(makeNotifiable(), {}, { throwOnFailure: "all" });
+
+      await expect(rejected).rejects.toBeInstanceOf(NotificationDeliveryError);
+      await expect(rejected).rejects.toMatchObject({ result: { allFailed: true } });
+    });
+
+    it('throwOnFailure: "any" rejects when one channel failed', async () => {
+      mailSend.mockRejectedValueOnce(new Error("smtp down"));
+
+      await expect(
+        mailAndDatabase().send(makeNotifiable(), {}, { throwOnFailure: "any" }),
+      ).rejects.toBeInstanceOf(NotificationDeliveryError);
+      expect(databaseSend).toHaveBeenCalledTimes(1); // siblings still ran
+    });
+
+    it("throwOnFailure with a channel name rejects only for that channel", async () => {
+      databaseSend.mockRejectedValueOnce(new Error("db down"));
+      await expect(
+        mailAndDatabase().send(makeNotifiable(), {}, { throwOnFailure: "mail" }),
+      ).resolves.toMatchObject({ failed: 1 });
+
+      mailSend.mockRejectedValueOnce(new Error("smtp down"));
+      await expect(
+        mailAndDatabase().send(makeNotifiable(), {}, { throwOnFailure: ["mail"] }),
+      ).rejects.toThrow(/failed on: mail/);
+    });
   });
 
   it("PreferenceProvider drops channels → `skipped` event", async () => {

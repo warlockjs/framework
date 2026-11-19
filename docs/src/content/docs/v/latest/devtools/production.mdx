@@ -56,8 +56,8 @@ npx warlock migrate
 ```
 
 The accounts, sessions, audit log, request samples and instance reports live in your app's database through Cascade
-(MongoDB or SQL). They use seven tables or collections: `devtools_accounts`, `devtools_sessions`, `devtools_invites`,
-`devtools_audit`, `devtools_state`, `devtools_samples` and `devtools_reports`. The audit time is stored in `occurred_at`, and
+(MongoDB or SQL). They use nine tables or collections: `devtools_accounts`, `devtools_sessions`, `devtools_invites`,
+`devtools_audit`, `devtools_state`, `devtools_samples`, `devtools_reports`, `devtools_shares` (share links, see below) and `devtools_ai_rollups` (hourly AI totals, see [AI reports](#ai-reports)). The audit time is stored in `occurred_at`, and
 the detail of a request sample and each instance report are stored as JSON text. No cache driver is needed. The monitor needs `encryption.key` (64 hex characters) in
 `src/config/encryption.ts`, because two-factor secrets are stored encrypted with it.
 
@@ -276,7 +276,8 @@ the query calls from writing. Every run is audited.
 | Tab                                                              | In production                                                             |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | Requests, Queries, Routes, Resources, Health, Errors, Logs, Jobs | On                                                                        |
-| Mail, AI, Agents, API, Processes                                 | Off unless `panels` sets the id to `true`                                 |
+| AI Reports, Models, Errors                                       | On when Panoptic is installed; see [AI reports](#ai-reports)              |
+| Mail, AI Runs, Agents, AI Evaluate, API, Processes               | Off unless `panels` sets the id to `true`                                 |
 | A package panel (such as Grimoire)                               | On when it declares `production: true`, or `panels` sets its id to `true` |
 
 The API tab builds its OpenAPI document from the routes the process registered. Under `warlock start` there are no
@@ -285,6 +286,40 @@ source files to read, so response resources are named `Resource1`, `Resource2`, 
 `panels: { mail: false }` turns any tab off. In a package panel, GET routes need a signed-in user; every other method
 needs an admin, the CSRF header, and is audited. The Grimoire tab is read-only in production. See
 [Registering a panel](/v/latest/devtools/panels/).
+
+## AI reports
+
+With `@warlock.js/ai` and `@warlock.js/ai-panoptic` installed and observation on (`ai.config({ panoptic: { observeAll: true } })`),
+the **AI** group of the sidebar shows three pages in production: **Reports**, **Models** and **Errors**. They show hourly
+totals of agent runs, tokens, estimated cost, errors by category, latency, fallbacks and refusals. See
+[AI section](/v/latest/devtools/ai-panel/) for what each page shows.
+
+- **Migration.** The totals live in the `devtools_ai_rollups` table, part of `devtoolsMigrations`. After upgrading, run
+  `warlock migrate` and restart. Until then the process logs one warning and the pages show "AI reports need their table"
+  with the command; nothing else is affected, and the monitor still starts.
+- **Default tabs.** `ai-reports`, `ai-models` and `ai-errors` are on by default, but only when Panoptic is installed and
+  loads. Without it they are not listed. Set `production.panels` to turn any of them on or off by id:
+  `panels: { "ai-reports": false }`, or `panels: { "ai-reports": true }` to keep a tab listed so it can explain what is
+  missing.
+- **Every process contributes.** Each process that boots the devtools connector (workers, cluster members, queue worker
+  processes running the app) adds its runs to the same table, so the pages add up all of them. A run from another process
+  shows within a minute.
+- **Retention.** Totals are kept 90 days by default (`devtools.ai.retentionDays`, 1 to 400); every process prunes older
+  hours. `devtools.ai.reports: false` turns the writer off, and so does turning off all three report tabs with
+  `panels`.
+- **What stays in development.** **Runs**, **Agents** and **Evaluate** show prompts, tool data and single-run details,
+  and Evaluate spends a model call, so they stay off in production unless `panels` turns them on. Even then production
+  keeps no run details (the Runs list explains this), and Evaluate never grades in production: its page explains where
+  to run it, and `POST /api/ai/evaluate` does not exist there. The totals hold names and numbers only: no prompts, completions, tool data or user ids.
+- **Access.** The three report pages need a signed-in user (viewer or above); a tab turned off answers the same empty 404
+  as an unknown path. Cost is always an estimate from model pricing; runs of unpriced models are counted separately.
+
+```ts title="src/config/devtools.ts"
+export default {
+  ai: { retentionDays: 90 },
+  production: { enabled: true, panels: { "ai-errors": false } },
+};
+```
 
 ## Behind a proxy
 

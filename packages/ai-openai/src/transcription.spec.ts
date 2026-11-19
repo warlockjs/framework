@@ -72,6 +72,32 @@ describe("OpenAITranscriptionModel", () => {
     expect(result.usage).toEqual({ input: 100, output: 20, total: 120 });
   });
 
+  it("keeps the audio / text input split when OpenAI reports it", async () => {
+    const { client } = makeFakeClient({
+      response: {
+        text: "hi",
+        usage: {
+          type: "tokens",
+          input_tokens: 100,
+          output_tokens: 20,
+          total_tokens: 120,
+          input_token_details: { audio_tokens: 90, text_tokens: 10 },
+        },
+      },
+    });
+    const model = new OpenAITranscriptionModel(client, { name: "gpt-4o-transcribe" });
+
+    const result = await model.transcribe(AUDIO);
+
+    expect(result.usage).toEqual({
+      input: 100,
+      output: 20,
+      total: 120,
+      audioInputTokens: 90,
+      textInputTokens: 10,
+    });
+  });
+
   it("wraps provider errors into the typed AIError hierarchy", async () => {
     const { client } = makeFakeClient({ error: { status: 429, message: "rate limited" } });
     const model = new OpenAITranscriptionModel(client, { name: "whisper-1" });

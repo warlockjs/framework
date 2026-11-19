@@ -550,6 +550,18 @@ HTTP test teardown awaits these cleanup functions and reports failures after
 attempting every module's cleanup. Avoid leaving module-owned handles running
 outside this lifecycle.
 
+## Module dictionaries in unit tests and setup files
+
+`setupTest()` registers every module's `utils/locales.json` (and `utils/locales/*.json`) dictionaries, in integration mode and in `setupTest({ mode: "unit", importModule })`, so `t("orders.title")` renders text instead of the bare key. A setup that does not call `setupTest()`, such as a custom `setupFiles` entry for a unit project or an email preview harness, registers them with the exported `loadTestLocales()`. It resolves to a function that removes them again.
+
+```ts title="src/test-unit-setup.ts"
+import { loadTestLocales } from "@warlock.js/core/tests";
+
+await loadTestLocales(); // optional root, defaults to process.cwd()
+```
+
+`guardUnitProject()` is a transform plugin that only checks spec imports, so it does not register dictionaries itself.
+
 ## Runtime lifetime, unit projects and setup profiling
 
 `warlock add test` (also used by `create-warlock --features=test`) generates two

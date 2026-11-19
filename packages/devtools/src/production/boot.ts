@@ -1,10 +1,18 @@
 import type { FastifyInstance } from "fastify";
+import {
+  attachAiReports,
+  DEVTOOLS_MOUNTED_KEY,
+  type DevtoolsAiReports,
+  loadAiFeed,
+} from "../ai/attach";
+import { resolveDevtoolsAiOptions } from "../ai/options";
 import { type MountedDevtoolsPanel, productionPanels } from "../panels";
 import type { MountDevtoolsRoutesDeps } from "../server/types";
-import type { DevtoolsDisposer, ResolvedDevtoolsOptions } from "../types";
+import type { ResolvedDevtoolsOptions } from "../types";
 import { DevtoolsProductionConfigError } from "./errors";
 import type { DevtoolsInsights } from "./insights/types";
 import { resolveProductionOptions } from "./options";
+import { describeAiUnavailable, toAiUnavailableView } from "../sources/ai-source";
 
 /** What the connector hands production boot. */
 export type BootProductionDevtoolsInput = {
@@ -25,6 +33,51 @@ export type BootProductionDevtoolsInput = {
     error(module: string, action: string, message: string): unknown;
   };
 };
+
+const AI_REPORT_TABS: readonly string[] = ["ai-reports", "ai-models", "ai-errors"];
+
+/** Tells other packages (Panoptic) that devtools is mounted here and where. */
+function publishMounted(path: string): void {
+  (globalThis as Record<symbol, unknown>)[DEVTOOLS_MOUNTED_KEY] = { path, mode: "production" };
+}
+
+function clearMounted(): void {
+  delete (globalThis as Record<symbol, unknown>)[DEVTOOLS_MOUNTED_KEY];
+}
+
+/**
+ * Loads the AI feed and starts this process's rollup writer (every process of
+ * a deployment adds into the same table). Never throws: a failure leaves the
+ * AI report tabs answering their unavailable view.
+ */
+async function attachProductionAi(
+  options: ResolvedDevtoolsOptions,
+  warn: (message: string) => void,
+): Promise<{ feedAvailable: boolean; reports: DevtoolsAiReports }> {
+  const loaded = await loadAiFeed();
+
+  if ("unavailable" in loaded) {
+    return { feedAvailable: false, reports: { ...loaded.unavailable, async dispose() {} } };
+  }
+
+  try {
+    return {
+      feedAvailable: true,
+      reports: await attachAiReports({
+        feed: loaded.feed,
+        options: resolveDevtoolsAiOptions(options.ai, "production"),
+        warn,
+      }),
+    };
+  } catch (error) {
+    warn(`AI reports could not start: ${error instanceof Error ? error.message : String(error)}`);
+
+    return {
+      feedAvailable: true,
+      reports: { ...toAiUnavailableView(describeAiUnavailable("reports-off")), async dispose() {} },
+    };
+  }
+}
 
 /** `/ops-…`: the first part of the path, enough to recognise it and not enough to use it. */
 export function maskDashboardPath(path: string): string {
@@ -52,7 +105,7 @@ function hasEncryptionKey(value: unknown): boolean {
  */
 export async function bootProductionDevtools(
   input: BootProductionDevtoolsInput,
-): Promise<DevtoolsDisposer> {
+): Promise<() => Promise<void>> {
   const { options, env, server, log } = input;
   const production = resolveProductionOptions(options.production, env);
   const core = await import("@warlock.js/core");
@@ -148,7 +201,24 @@ export async function bootProductionDevtools(
     input.onInsights?.(insights);
 
     const state = httpModule.createDashboardState(store, production.path);
-    const { builtIn, panels } = productionPanels(input.panels, production.panels);
+    const { builtIn: shownTabs, panels } = productionPanels(input.panels, production.panels);
+
+    // The AI report tabs are listed only when the app has the AI feed (Panoptic), unless the project turned one on.
+    // With every report tab turned off, no totals are written (and no missing-table warning is logged).
+    const aiWiring = shownTabs.some((tab) => AI_REPORT_TABS.includes(tab))
+      ? await attachProductionAi(options, warn)
+      : {
+          feedAvailable: false,
+          reports: {
+            ...toAiUnavailableView(describeAiUnavailable("reports-off")),
+            async dispose() {},
+          },
+        };
+    const builtIn = aiWiring.feedAvailable
+      ? shownTabs
+      : shownTabs.filter((tab) => !AI_REPORT_TABS.includes(tab) || production.panels[tab] === true);
+
+    stops.push(() => aiWiring.reports.dispose());
 
     // The dashboard's own requests are not worth a line in the request log, and its sign-in bodies must not reach it.
     if (typeof core.excludeFromRequestLog === "function") {
@@ -165,6 +235,7 @@ export async function bootProductionDevtools(
     httpModule.mountProductionDevtools(server, {
       routes: {
         ...input.routes,
+        aiReports: aiWiring.reports,
         collector: capture.collector,
         options,
         isDevelopment: () => false,
@@ -181,6 +252,9 @@ export async function bootProductionDevtools(
       warn,
       hmac: (value) => crypto.hmac(value),
     });
+
+    publishMounted(production.path);
+    stops.push(clearMounted);
 
     log.info(
       "devtools",
@@ -201,15 +275,20 @@ export async function bootProductionDevtools(
     throw error;
   }
 
+  // Returns the promise of the stops so the connector can wait for the final AI totals flush.
   return () => {
+    const finished: Promise<unknown>[] = [];
+
     for (const stop of stops.splice(0).reverse()) {
       try {
-        void Promise.resolve(stop()).catch(() => undefined);
+        finished.push(Promise.resolve(stop()).catch(() => undefined));
       } catch {
         // Shutdown continues past a failing step.
       }
     }
 
-    void capture.dispose().catch(() => undefined);
+    finished.push(capture.dispose().catch(() => undefined));
+
+    return Promise.all(finished).then(() => undefined);
   };
 }

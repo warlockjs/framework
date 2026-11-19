@@ -70,7 +70,9 @@ Postgres has no such requirement — transactions work out of the box.
 
 `transaction(fn)` **flat-nests**: calling it inside an already-open transaction JOINS the outer one instead of opening a second, independent transaction. The inner block runs on the **same** session — so it sees the outer's uncommitted writes — and the **outermost** `transaction()` owns commit/rollback. A service that opens its own `transaction()` for standalone atomicity therefore also works unchanged when called inside a larger transaction — e.g. a seeder that creates a row, then calls a service that opens a transaction to insert a child referencing it (an independent inner transaction couldn't see the parent's uncommitted row, and the child insert would fail its foreign key).
 
-A throw anywhere inside unwinds the **whole** outer transaction — Postgres aborts a transaction on the first error, so there is no automatic per-block savepoint. For independent partial rollback of an inner block, drop to the manual API (`driver.beginTransaction()`) and use savepoints explicitly.
+A throw anywhere inside unwinds the **whole** outer transaction by default: Postgres aborts a transaction on the first failed statement. Code right after an inner `transaction()` also runs **before** the outer COMMIT, so side effects that must follow the commit go in `afterCommit(fn)` (see below), which runs after the outermost COMMIT and is dropped on rollback.
+
+For partial rollback pass `{ savepoint: true }` (PostgreSQL) to the nested call: `transaction(fn, { savepoint: true })` runs the block inside a savepoint. When it throws, only its own statements roll back, the `afterCommit` callbacks it queued are dropped (other code's callbacks stay), the error propagates, and the outer transaction stays usable, so the caller can catch it and retry. Savepoint blocks started at the same time on one transaction (`Promise.all`) run one after another; a block inside another block runs at once as a child savepoint. Ignored by an outermost `transaction()`. MongoDB has no savepoints: a nested call always joins flat and the option does nothing.
 
 ### Manual `beginTransaction()`
 

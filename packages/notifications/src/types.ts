@@ -113,6 +113,22 @@ export type SendOptions = {
   force?: boolean;
   /** Notification type for ad-hoc gating (unused by `defineNotification`). */
   type?: string;
+  /**
+   * Opt in to a rejecting `.send()` / `.queue()` on transport failure. By
+   * default a failed channel never rejects: inspect the resolved result
+   * instead.
+   *
+   * - `"all"` rejects when at least one dispatch was attempted and every
+   *   attempted dispatch failed.
+   * - `"any"` rejects when any dispatch failed.
+   * - a channel name, or a list of them, rejects when a dispatch on one of
+   *   those channels failed (use it when one channel, e.g. `"mail"`, must
+   *   not fail silently).
+   *
+   * The rejection is a `NotificationDeliveryError` carrying the full result.
+   * Only `defineNotification` sends read this option.
+   */
+  throwOnFailure?: "all" | "any" | ChannelName | ChannelName[];
 };
 
 /** What a renderer receives as its 3rd arg — i18n + meta passthrough only. */

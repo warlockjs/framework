@@ -578,7 +578,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `docs/src/content/docs/v/latest/core/the-basics/validation.md` - Validation - Validation in Warlock — authoring seal schemas, attaching them to controllers, the reques…
 - `docs/src/content/docs/v/latest/core/upgrade-to-v5.mdx` - Upgrade to v5 - The breaking changes between Warlock v4 and v5, with the exact edits an existing applicat…
 - `docs/src/content/docs/v/latest/create-warlock/index.mdx` - Create Warlock - The official project scaffolder — one command spins up a complete, configured Warlock app…
-- `docs/src/content/docs/v/latest/devtools/ai-panel.mdx` - AI panel - Inspect Panoptic AI runs alongside the HTTP requests that triggered them in the developme…
+- `docs/src/content/docs/v/latest/devtools/ai-panel.mdx` - AI section - Reports, runs, agents, models, errors and prompt evaluation for your AI features in the d…
 - `docs/src/content/docs/v/latest/devtools/index.mdx` - Devtools - A React dashboard for request timing, database queries, N+1 warnings, resources, health, …
 - `docs/src/content/docs/v/latest/devtools/panels.mdx` - Registering a panel - Add your own tab to the devtools dashboard, with data routes behind the devtools guard an…
 - `docs/src/content/docs/v/latest/devtools/production.mdx` - Devtools in production - Run the devtools monitor in production at a secret path, behind accounts with two-factor …
@@ -782,7 +782,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/access/src/services/access-config.ts` - setAccessConfig, resetAccessConfig, accessConfig
 - `packages/access/src/services/access.ts` - services/access.ts, can, cannot, canAll, canAny, forbidden, authorize, authorizeAll
 - `packages/access/src/services/default-resolver.ts` - DefaultAccessResolver, toRoleList
-- `packages/access/src/services/engine.ts` - services/engine.ts, warnedUnpolicedPermissions, resetUnpolicedWarnings, tenantFor, cacheKey, cached, permissionsFor, rolesFor
+- `packages/access/src/services/engine.ts` - CachedSet, services/engine.ts, warnedUnpolicedPermissions, resetUnpolicedWarnings, tenantFor, cacheKey, isLiveSet, cached
 - `packages/access/src/services/index.ts` - access/src/services/index.ts
 - `packages/access/src/services/matcher.ts` - services/matcher.ts, matchesPermission
 - `packages/access/src/services/policies.ts` - policies, definePolicy, getPolicy, clearPolicies
@@ -792,7 +792,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/access/src/utils/index.ts` - access/src/utils/index.ts
 - `packages/access/vitest.config.ts` - access/vitest.config.ts
 
-## packages/ai (234 test files not listed)
+## packages/ai (235 test files not listed)
 
 - `packages/ai/README.md`
 - `packages/ai/scripts/generate-llms.mjs` - ai/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -1413,7 +1413,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-cli/src/index.ts` - ai-cli/src/index.ts
 - `packages/ai-cli/src/model/cli-model.ts` - CliModelConfig, messageText, renderPrompt, toUsage, abortError, cliModel
 - `packages/ai-cli/src/probe/probe.ts` - CaptureInput, ProbeInput, PROBE_TIMEOUT_MS, escapeRegExp, helpLists, parseVersion, missingFlags, capture
-- `packages/ai-cli/src/session/aggregate.ts` - ResultAggregator, sum, addUsage
+- `packages/ai-cli/src/session/aggregate.ts` - ResultAggregator, session/aggregate.ts, sum, addUsage
 - `packages/ai-cli/src/session/environment.ts` - BuildEnvironmentInput, session/environment.ts, MINIMAL_ENV, buildEnvironment, warnInheritedEnvironment, resetInheritedEnvironmentWarning
 - `packages/ai-cli/src/session/run-directory.ts` - RunDirectories, createRunDirectories, writeLaunchFiles
 - `packages/ai-cli/src/session/session.ts` - StartSessionInput, session/session.ts, startSession, cancelledSession
@@ -1561,7 +1561,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-openai/src/utils/wrap-openai-error.ts` - OpenAIErrorShape, SPENT_CREDIT_CODES, isSpentCredit, wrapOpenAIError, toShape, isTimeout, buildContext, readRequestId
 - `packages/ai-openai/vitest.config.ts` - ai-openai/vitest.config.ts
 
-## packages/ai-panoptic (32 test files not listed)
+## packages/ai-panoptic (35 test files not listed)
 
 - `packages/ai-panoptic/README.md`
 - `packages/ai-panoptic/scripts/generate-llms.mjs` - ai-panoptic/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -1582,6 +1582,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-panoptic/src/config/apply-panoptic-config.ts` - AppliedState, DEFAULT_DASHBOARD_STORE_CAPACITY, applyPanopticConfig, resetAppliedPanopticConfig, getActiveDashboardHandle, toObserver, findStore, startDashboard
 - `packages/ai-panoptic/src/config/index.ts` - ai-panoptic/src/config/index.ts
 - `packages/ai-panoptic/src/config/panoptic-config.type.ts` - PanopticConfig, AIConfig, @warlock.js/ai
+- `packages/ai-panoptic/src/config/warlock-app.ts` - WarlockAppProbe, DEVTOOLS_MOUNTED_KEY, CONFIG_FILES, isInsideWarlockApp, devtoolsPathHint
 - `packages/ai-panoptic/src/contracts/collector.contract.ts` - CollectorContract
 - `packages/ai-panoptic/src/contracts/exporter.contract.ts` - ExporterContract
 - `packages/ai-panoptic/src/contracts/index.ts` - ai-panoptic/src/contracts/index.ts
@@ -1599,6 +1600,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-panoptic/src/evaluate/evaluate.type.ts` - EvaluateConfig, EvaluateVerdict
 - `packages/ai-panoptic/src/evaluate/extract-last-system-prompt.ts` - extractLastSystemPrompt
 - `packages/ai-panoptic/src/evaluate/find-span-by-id.ts` - findSpanById
+- `packages/ai-panoptic/src/evaluate/get-evaluate-config.ts` - getEvaluateConfig
 - `packages/ai-panoptic/src/evaluate/index.ts` - evaluate/index.ts
 - `packages/ai-panoptic/src/exporters/console/console-exporter.ts` - consoleExporter, writeTrace, writeSpan, writeAtSeverity, spanDepth
 - `packages/ai-panoptic/src/exporters/console/console-exporter.type.ts` - ConsoleLike, ConsoleExporterOptions
@@ -1971,7 +1973,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/cache/src/utils.ts` - CACHE_FOR, cache/src/utils.ts, escapeCacheKeySegment, escapeKeyObject, parseCacheKey, parseTtl, expiresAtToTtl, normalizeToOptions
 - `packages/cache/vitest.config.ts` - cache/vitest.config.ts
 
-## packages/cascade (150 test files not listed)
+## packages/cascade (154 test files not listed)
 
 - `packages/cascade/README.md`
 - `packages/cascade/bin/cascade.js`
@@ -2029,7 +2031,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/cascade/src/cli/setup-logger.ts` - SetLoggerConfigOptions, setLoggerConfig
 - `packages/cascade/src/cli/with-cli-connection.ts` - withCliConnection
 - `packages/cascade/src/context/database-data-source-context.ts` - DataSourceContextValue, DataSourceContextStore, DatabaseDataSourceContext, databaseDataSourceContext
-- `packages/cascade/src/context/database-transaction-context.ts` - TransactionContextStore, DatabaseTransactionContext, databaseTransactionContext
+- `packages/cascade/src/context/database-transaction-context.ts` - SavepointScope, TransactionContextStore, DatabaseTransactionContext, savepointScopes, databaseTransactionContext
 - `packages/cascade/src/contracts/database-driver.contract.ts` - DriverEvent, DriverEventListener, QueryEvent, DriverTransactionContract, TransactionContext, InsertResult, UpdateResult, RawQueryResult
 - `packages/cascade/src/contracts/database-id-generator.contract.ts` - GenerateIdOptions, IdGeneratorContract
 - `packages/cascade/src/contracts/database-remover.contract.ts` - RemoverContract, RemoverOptions, RemoverResult
@@ -2107,7 +2109,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/cascade/src/model/methods/delete-methods.ts` - destroyModel, deleteRecords, deleteAllRecords, deleteOneRecord
 - `packages/cascade/src/model/methods/dirty-methods.ts` - checkHasChanges, checkIsDirty, getDirtyColumnsWithValues, getRemovedColumns, getDirtyColumns
 - `packages/cascade/src/model/methods/guarded-columns.ts` - rawInputObjects, warnedGuardedColumns, warnedRawInputModels, markRawInput, isRawInput, isGuardedKey, stripGuardedColumns, warnGuardedColumns
-- `packages/cascade/src/model/methods/hydration-methods.ts` - declaredDateKeys, getDeclaredDateKeys, mayBecomeDate, takeHydrationDriver, hydrateModel, modelFromSnapshot, modelToSnapshot, serializeModel
+- `packages/cascade/src/model/methods/hydration-methods.ts` - declaredDateKeys, getDeclaredDateKeys, declaredJsonKeys, getDeclaredJsonKeys, mayBecomeDate, takeHydrationDriver, hydrateModel, modelFromSnapshot
 - `packages/cascade/src/model/methods/instance-event-methods.ts` - emitModelEvent, onModelEvent, onceModelEvent, offModelEvent
 - `packages/cascade/src/model/methods/meta-methods.ts` - isExplicitStatic, applyDefaultsToModel, generateModelNextId, performAtomicUpdate, applyLocalDelta, performAtomicIncrement, performAtomicDecrement
 - `packages/cascade/src/model/methods/pivot-methods.ts` - pivotRelation, attachPivotRelation, detachPivotRelation
@@ -2210,7 +2212,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/context/src/shared-storage.ts` - ContextFrame, ContextStorage, ContextSlot, sharedStorage, NO_SCOPE, currentContextScope, runWithSlots, withSlots
 - `packages/context/vitest.config.ts` - context/vitest.config.ts
 
-## packages/core (676 test files not listed)
+## packages/core (681 test files not listed)
 
 - `packages/core/README.md`
 - `packages/core/TODO.md`
@@ -2330,7 +2332,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/cli/commands-loader.ts` - CLICommandsLoader, commandFiles, cliCommandsLoader
 - `packages/core/src/cli/commands/add.command.ts` - addCommand
 - `packages/core/src/cli/commands/agents-md.command.ts` - agentsMdCommand
-- `packages/core/src/cli/commands/agents-md/agents-md-command.action.ts` - AGENTS_MD_SECTIONS, formatWriteStatus, agentsMdCommandAction
+- `packages/core/src/cli/commands/agents-md/agents-md-command.action.ts` - formatWriteStatus, agentsMdCommandAction
 - `packages/core/src/cli/commands/ai.command.ts` - aiCommand
 - `packages/core/src/cli/commands/ai/ai-command.action.ts` - ModuleExports, MeasureModule, ModuleLoader, SDKConstructor, AiCommandDependencies, loadMeasureModule, object, isMeasureModule
 - `packages/core/src/cli/commands/ai/ai-tools.action.ts` - ToolTarget, DescribeModule, TARGETS, isDescribeModule, parseTargets, aiToolsAction
@@ -2699,7 +2701,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/http/list-endpoint.ts` - ListQuery, ListEndpointOptions, ListEndpointRepositoryOptions, ListEndpointBody, validated, listEndpoint
 - `packages/core/src/http/middleware/cache-response-middleware.ts` - CachedResponsePayload, CacheMiddlewareOptions, ParsedCacheOptions, defaultCacheOptions, warnUndeclaredLocalesOnce, resolveCacheTags, parseCacheOptions, cacheMiddleware
 - `packages/core/src/http/middleware/concurrency-limit.middleware.ts` - ConcurrencyLimitOptions, counters, release, concurrencyLimitMiddleware
-- `packages/core/src/http/middleware/idempotency.middleware.ts` - IdempotencyOptions, CachedResponse, InFlightReservation, DEFAULT_METHODS, idempotencyMiddleware
+- `packages/core/src/http/middleware/idempotency.middleware.ts` - IdempotencyOptions, IdempotencyStore, CacheLike, CachedResponse, InFlightReservation, storeFromCache, DEFAULT_METHODS, idempotencyMiddleware
 - `packages/core/src/http/middleware/index.ts` - http/middleware/index.ts
 - `packages/core/src/http/middleware/inject-request-context.ts` - stampRequestIdHeader, createRequestStore, resolveRequestErrorStatus, logRequestError, reportReturnedServerError, developmentRequestId, handleRequestError, t
 - `packages/core/src/http/middleware/ip-filter.middleware.ts` - IpFilterOptions, ipFilterMiddleware
@@ -2817,7 +2819,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/mail/mail.ts` - Mail, mail/mail.ts
 - `packages/core/src/mail/mailer-pool.ts` - NODEMAILER_INSTALL_INSTRUCTIONS, loadNodemailerModule, SES_INSTALL_INSTRUCTIONS, loadSesModule, isSesConfig, getSesMailer, mailerPool, createConfigHash
 - `packages/core/src/mail/react-mail.ts` - createHtmlPage, renderReactMail
-- `packages/core/src/mail/send-mail.ts` - normalizeRecipients, mapPriority, normalizeMail, resolveAttachment, buildNodemailerOptions, detectErrorCode, runMailEvent, triggerEvents
+- `packages/core/src/mail/send-mail.ts` - normalizeRecipients, mapPriority, normalizeMail, resolveAttachment, buildNodemailerOptions, detectErrorCode, runMailEvent, collectSafely
 - `packages/core/src/mail/test-mailbox.ts` - testMailbox, captureMail, getTestMailbox, getLastMail, findMailsTo, findMailsBySubject, wasMailSentTo, wasMailSentWithSubject
 - `packages/core/src/mail/types.ts` - SESConfigurations, MailConfigurations, MailMode, MailPriority, MailAddress, MailAttachment, SMTPConfigurations, MailersConfig
 - `packages/core/src/manifest/README.md`
@@ -3014,6 +3016,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tests/vitest-setup.ts` - TestRuntimeConfiguration, TestSetupOptions, TestLifecycleError, SetupBound, IMPORT_MODULE_WARNED_KEY, warnMissingImportModule, setupTest, teardownTest
 - `packages/core/src/tooling/agents-md/agents-md-markers.ts` - AGENTS_MD_FILE, AGENTS_MD_START, AGENTS_MD_END, occurrences, lineBreakOf, upsertGeneratedSection
 - `packages/core/src/tooling/agents-md/agents-md-refresher.ts` - AgentsMdRefresherOptions, AgentsMdRefresher, createAgentsMdRefresher
+- `packages/core/src/tooling/agents-md/collect-agents-md-report.ts` - CollectAgentsMdReportOptions, AGENTS_MD_SECTIONS, collectAgentsMdReport, collectDevModelModules
 - `packages/core/src/tooling/agents-md/index.ts` - agents-md/index.ts
 - `packages/core/src/tooling/agents-md/installed-skills.ts` - InstalledSkill, directories, frontMatterValue, parseSkillFrontMatter, shortSkillLine, readSkill, listInstalledSkills
 - `packages/core/src/tooling/agents-md/render-agents-md.ts` - RenderAgentsMdOptions, MUTATING_METHODS, METHOD_ORDER, listAppModules, moduleOf, compare, isUnguardedWrite, routeLine
@@ -3189,7 +3192,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/validation/validators/index.ts` - validation/validators/index.ts
 - `packages/core/src/vite/guard-unit-project.ts` - UnitProjectGuardPlugin, GuardUnitProjectOptions, UnitGuardViolation, APP_EXPORTS, APP_TEST_EXPORTS, stripComments, callArguments, importedNames
 - `packages/core/src/vite/index.ts` - core/src/vite/index.ts
-- `packages/core/src/vite/lower-stage3-decorators.ts` - DecoratorLoweringPlugin, nextPluginName, lowerStage3Decorators
+- `packages/core/src/vite/lower-stage3-decorators.ts` - DecoratorLoweringPlugin, JsxCompilerOptions, readTsconfig, jsxOptionsOf, jsxOptionsByDirectory, resolveJsxOptions, stripNonCode, nextPluginName
 - `packages/core/src/vite/test-setup-reporter.ts` - TestSetupReporterOptions, TestSetupReporter, readFileLabel
 - `packages/core/src/vite/test-workers.ts` - cpuQuotaWorkers, recommendedTestWorkers
 - `packages/core/src/warlock-config/README.md`
@@ -3502,7 +3505,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/tests/acceptance/starter-browser-gate.mjs` - Cdp, file, checkout, requireFromCheckout, options, candidate, state, output
 - `packages/create-warlock/vitest.config.ts` - create-warlock/vitest.config.ts
 
-## packages/devtools (95 test files not listed)
+## packages/devtools (120 test files not listed)
 
 - `packages/devtools/README.md`
 - `packages/devtools/bench/production-overhead.ts` - production, instance, body, noop, noopHooks, startServer, load, median
@@ -3511,6 +3514,25 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/scripts/test.mjs` - devtools/scripts/test.mjs
 - `packages/devtools/scripts/typecheck.mjs` - devtools/scripts/typecheck.mjs
 - `packages/devtools/skills/SKILL.md` - warlock-js-devtools - Dev dashboard and opt-in production monitor for Warlock apps via `devtoolsConnector`: req…
+- `packages/devtools/src/ai/attach.ts` - DevtoolsAiReports, DevtoolsMountedMarker, loadAiFeed, attachAiReports, DEVTOOLS_MOUNTED_KEY
+- `packages/devtools/src/ai/options.ts` - ai/options.ts, DEVTOOLS_AI_RETENTION_DAYS, DEVTOOLS_AI_FLUSH_INTERVAL_MS, resolveDevtoolsAiOptions
+- `packages/devtools/src/ai/reports/aggregate.ts` - SeriesEntry, reports/aggregate.ts, modelKey, totalsOf, bucketOf, bucketStarts, buildSeries, seriesBy
+- `packages/devtools/src/ai/reports/evaluate.ts` - EvaluateModule, ModelLike, EvaluateConfigLike, DevtoolsAiEvaluator, judgeLabel, createAiEvaluator, panoptic
+- `packages/devtools/src/ai/reports/index.ts` - reports/index.ts
+- `packages/devtools/src/ai/reports/range.ts` - DevtoolsAiRangeQuery, DevtoolsAiReportQuery, PRESETS, parseAiReportQuery, parseOffset, parseEpoch, parseFilter
+- `packages/devtools/src/ai/reports/runs.ts` - DevtoolsAiRunHelpers, DevtoolsAiRunsQuery, DevtoolsAiRecentFailuresFilter, STATUSES, TYPES, modelOf, spanCost, toAiRunRow
+- `packages/devtools/src/ai/reports/service.ts` - DevtoolsAiReportServiceInput, DevtoolsAiReportService, reports/service.ts, createAiReportService, load, answer
+- `packages/devtools/src/ai/rollup/cascade-store.ts` - RowQuery, rollup/cascade-store.ts, createCascadeAiRollupStore
+- `packages/devtools/src/ai/rollup/categories.ts` - DEVTOOLS_AI_ERROR_LABELS, emptyErrorCounts, CODE_CATEGORIES, classifyAiError
+- `packages/devtools/src/ai/rollup/extract.ts` - Span, RollupKey, Tokens, MODEL_SPAN_TYPES, count, normalise, subtract, isAiModelSpan
+- `packages/devtools/src/ai/rollup/file-store.ts` - FileAiRollupStoreOptions, dayName, dayStart, createFileAiRollupStore, readDay, writeDay
+- `packages/devtools/src/ai/rollup/histogram.ts` - rollup/histogram.ts, emptyAiLatency, aiLatencyBucket, addAiLatency, aiLatencyQuantile
+- `packages/devtools/src/ai/rollup/increment-error.ts` - DevtoolsAiRollupIncrementError
+- `packages/devtools/src/ai/rollup/index.ts` - rollup/index.ts
+- `packages/devtools/src/ai/rollup/mapping.ts` - DevtoolsAiRollupRow, rollup/mapping.ts, COUNTER_COLUMNS, errorColumn, number, allCounters, deltaToIncrements, recordToRow
+- `packages/devtools/src/ai/rollup/memory-store.ts` - rollup/memory-store.ts, matchesAiRollupFilter, applyAiRollupDelta, createMemoryAiRollupStore
+- `packages/devtools/src/ai/rollup/writer.ts` - rollup/writer.ts, startAiRollupWriter
+- `packages/devtools/src/ai/types.ts` - DevtoolsAiOptions, ResolvedDevtoolsAiOptions, DevtoolsAiRollupKey, DevtoolsAiErrorCounts, DevtoolsAiRollupCounters, DevtoolsAiRollupDelta, DevtoolsAiRollupRecord, DevtoolsAiRollupFilter
 - `packages/devtools/src/app-versions.ts` - DevtoolsAppInfo, Versions, versionIn, installedVersion, readAppInfo, readVersions, resetVersionsCache
 - `packages/devtools/src/caller-location.ts` - packageDirectory, captureCallerLocation, parseFrame, normalizePath, shouldSkip
 - `packages/devtools/src/collector.ts` - src/collector.ts, createCollector, summary, mailSummary, copyRequest
@@ -3528,9 +3550,9 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/production/auth/helpers.ts` - auth/helpers.ts, MIN_PASSWORD_LENGTH, checkPasswordPolicy, generateToken, hashToken, generateTemporaryPassword, safeEqual, normalizeEmail
 - `packages/devtools/src/production/auth/index.ts` - auth/index.ts
 - `packages/devtools/src/production/auth/passkeys.ts` - Options, SimpleWebAuthnServer, production/auth/passkeys.ts, loadDevtoolsPasskeys
-- `packages/devtools/src/production/auth/service.ts` - Stage, AuditDetail, hasFactor, fail, cut, createDevtoolsAuth, withSlot, dummyHash
+- `packages/devtools/src/production/auth/service.ts` - Stage, AuditDetail, auth/service.ts, hasFactor, fail, cut, createDevtoolsAuth, withSlot
 - `packages/devtools/src/production/auth/types.ts` - DevtoolsRequestMeta, DevtoolsAuthenticated, DevtoolsAuthStep, DevtoolsCrypto, DevtoolsPasskeys, DevtoolsAuthDeps, DevtoolsAuthService, auth/types.ts
-- `packages/devtools/src/production/boot.ts` - BootProductionDevtoolsInput, maskDashboardPath, hasEncryptionKey, bootProductionDevtools
+- `packages/devtools/src/production/boot.ts` - BootProductionDevtoolsInput, AI_REPORT_TABS, publishMounted, clearMounted, attachProductionAi, maskDashboardPath, hasEncryptionKey, bootProductionDevtools
 - `packages/devtools/src/production/capture/dev-stats.ts` - attachDevelopmentStats
 - `packages/devtools/src/production/capture/engine.ts` - DevtoolsQueryEvent, DevtoolsTracedRequest, RequestState, DevtoolsCaptureHooks, DevtoolsCaptureEngine, capture/engine.ts, stripQuery, errorMessage
 - `packages/devtools/src/production/capture/explain.ts` - ExplainStatement, ExplainRunner, ReadOnlyTransaction, isIdentifierCharacter, commentEnd, maskSql, withoutLeadingNoise, isOneRead
@@ -3553,7 +3575,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/production/http/headers.ts` - DASHBOARD_HEADERS, DASHBOARD_CSP, DOCS_CSP
 - `packages/devtools/src/production/http/index.ts` - production/http/index.ts
 - `packages/devtools/src/production/http/ip.ts` - http/ip.ts, PRIVATE_V4, PRIVATE_V6, normalizeIp, parseCidr, isValidNetworkEntry, compiled, compile
-- `packages/devtools/src/production/http/mount.ts` - SAFE_METHODS, DOCS_PATTERNS, TAB_OF_ROUTE, tabOf, tokenHash, uniformNotFound, originAllowed, hasBody
+- `packages/devtools/src/production/http/mount.ts` - SAFE_METHODS, DOCS_PATTERNS, TAB_OF_ROUTE, AI_REPORT_TABS, tabOf, tokenHash, uniformNotFound, originAllowed
 - `packages/devtools/src/production/http/share-session.ts` - DevtoolsShareGrant, DevtoolsShareRefusal, DevtoolsShareSessions, SHARE_CACHE_MS, createShareSessions, record, grantFor
 - `packages/devtools/src/production/http/share.ts` - Notfound, DevtoolsShareMount, matchSharePath, bodyOf, viewOf, openAnswer, createDevtoolsShare, overLimit
 - `packages/devtools/src/production/http/state.ts` - http/state.ts, hashDashboardPath, createDashboardState
@@ -3572,16 +3594,18 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/production/insights/writer.ts` - insights/writer.ts, startReportWriter, fail, write, housekeeping, enqueue
 - `packages/devtools/src/production/openapi.ts` - Core, createProductionOpenApi, readAppPackage
 - `packages/devtools/src/production/options.ts` - ResolvedDevtoolsProductionOptions, production/options.ts, DEVTOOLS_PRODUCTION_DEFAULTS, DEVTOOLS_ENV, LOG_LEVELS, invalid, present, integerAtLeastOne
-- `packages/devtools/src/production/stats/histogram.ts` - createHistogram, bucketIndex, recordDuration, mergeHistograms, histogramQuantile, histogramMean, shortId
+- `packages/devtools/src/production/stats/histogram.ts` - stats/histogram.ts, createHistogram, bucketIndex, recordDuration, mergeHistograms, histogramQuantile, histogramMean, shortId
 - `packages/devtools/src/production/stats/index.ts` - stats/index.ts
 - `packages/devtools/src/production/stats/merge.ts` - slower, mergeQueryShapeStats, mergePhases, mergeRouteStats, mergeErrorGroups
-- `packages/devtools/src/production/store/cascade-store.ts` - ModelsModule, RowQuery, RowClass, CascadeStoreOptions, rows, query, byId, insert
+- `packages/devtools/src/production/store/cascade-store.ts` - ModelsModule, RowQuery, RowClass, CascadeStoreOptions, store/cascade-store.ts, rows, query, byId
 - `packages/devtools/src/production/store/index.ts` - production/store/index.ts
-- `packages/devtools/src/production/store/mapping.ts` - Row, toNumber, toNumberOrNull, toStringOrNull, toBoolean, parseJson, toArray, ACCOUNT_COLUMNS
+- `packages/devtools/src/production/store/mapping.ts` - Row, store/mapping.ts, toNumber, toNumberOrNull, toStringOrNull, toBoolean, parseJson, toArray
 - `packages/devtools/src/production/store/memory-store.ts` - store/memory-store.ts, copy, defaultStateRecord, sampleStatusMatches, sampleMatches, createMemoryStore
 - `packages/devtools/src/production/store/migrations.ts` - store/migrations.ts, devtoolsMigrations
 - `packages/devtools/src/production/store/models/account.migration.ts` - DevtoolsAccountsMigration
 - `packages/devtools/src/production/store/models/account.model.ts` - DevtoolsAccountRow
+- `packages/devtools/src/production/store/models/ai-rollup.migration.ts` - DevtoolsAiRollupsMigration
+- `packages/devtools/src/production/store/models/ai-rollup.model.ts` - DevtoolsAiRollupRow
 - `packages/devtools/src/production/store/models/audit.migration.ts` - DevtoolsAuditMigration
 - `packages/devtools/src/production/store/models/audit.model.ts` - DevtoolsAuditRow
 - `packages/devtools/src/production/store/models/base.ts` - DevtoolsRowModel
@@ -3602,6 +3626,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/query-shape.ts` - QueryShapeInput, src/query-shape.ts, postgresShapes, queryShape, normalizeMongoValue, isMongoLeaf
 - `packages/devtools/src/request-history.ts` - summaryToRow, rowToSummary, mergeRequestHistory, FILTER_KEYS, filterFromQuery, hasFilter, toLogLevel, recordToDetail
 - `packages/devtools/src/safe-value.ts` - toSafeValue, snapshot, constructorName
+- `packages/devtools/src/server/ai-report-routes.ts` - notCollected, sendKnown, registerAiReportRoutes
 - `packages/devtools/src/server/ai-routes.ts` - registerAiRoutes
 - `packages/devtools/src/server/background-routes.ts` - registerBackgroundRoutes
 - `packages/devtools/src/server/explain-route.ts` - isExplainableSql, registerExplainRoute, registerShapeExplainRoute
@@ -3620,7 +3645,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/server/types.ts` - DevtoolsRouteRow, DevtoolsRequestLogSource, DevtoolsStreamSession, MountDevtoolsRoutesDeps, server/types.ts
 - `packages/devtools/src/server/ui-assets.ts` - UiAsset, uiFile, UI_ASSETS, sendFile, registerUiAssets
 - `packages/devtools/src/sources/agent-trace-source.ts` - DevtoolsAgentTrace, DevtoolsAgentTraceStore, DevtoolsAgentTraceEvent, DevtoolsAgentRun, DevtoolsAgentTraceSource, AGENT_TRACES_KEY, AGENT_TRACE_INSTALL_GUIDANCE, summarizeAgentTrace
-- `packages/devtools/src/sources/ai-source.ts` - DevtoolsAiUnavailableReason, DevtoolsAiUnavailable, AiSourceDeps, DevtoolsAiEvent, DevtoolsAiSource, DevtoolsAiRun, redactPaths, describeAiUnavailable
+- `packages/devtools/src/sources/ai-source.ts` - DevtoolsAiUnavailableReason, DevtoolsAiUnavailable, AiSourceDeps, DevtoolsAiEvent, DevtoolsAiSource, DevtoolsAiRun, PanopticModule, AiCoreModule
 - `packages/devtools/src/sources/cache-source.ts` - CacheEventData, EVENT_TYPES, attachCacheSource
 - `packages/devtools/src/sources/log-source.ts` - DevtoolsLogChannel, toDevtoolsLevel, messageText, attachLogSource
 - `packages/devtools/src/sources/mail-source.ts` - addressToString, attachmentSize, toDevtoolsAttachment, attachMailSource
@@ -3628,6 +3653,9 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/sources/tracing-source.ts` - attachTracingSource
 - `packages/devtools/src/types.ts` - DevtoolsOptions, DevtoolsProductionOptions, ResolvedDevtoolsOptions, DevtoolsPanelMethod, DevtoolsPanelRequest, DevtoolsPanelRoute, DevtoolsPanel, DevtoolsPanelFiles
 - `packages/devtools/src/ui-root.ts` - isPackageRoot, resolveUiRoot
+- `packages/devtools/tests/ai/reports/fixtures.ts` - reports/fixtures.ts, H, row
+- `packages/devtools/tests/ai/rollup/helpers.ts` - Span, Usage, rollup/helpers.ts, HOUR, T0, HOUR_START, span, agentSpan
+- `packages/devtools/tests/ai/rollup/store-contract.ts` - rollup/store-contract.ts, DAY, ALL_TIME, deltaFor, describeAiRollupStoreContract
 - `packages/devtools/tests/fixtures/test-panel/graph.js` - drawBars
 - `packages/devtools/tests/fixtures/test-panel/panel.ts` - devtoolsPanel
 - `packages/devtools/tests/fixtures/test-panel/view.js` - renderTestPanel
@@ -3638,7 +3666,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/tests/production/http/mock-registrars.ts`
 - `packages/devtools/tests/production/http/stubs.ts` - Module, http/stubs.ts, requestsRoutes, insightsRoutes, logRoutes, explainRoute, uiAssets
 - `packages/devtools/tests/production/insights/helpers.ts` - insights/helpers.ts, instance, point, snapshot, histogramOf, shape, route, errorGroup
-- `packages/devtools/tests/production/store/store-contract.ts` - StoreUnderTest, MakeStore, newShare, newAccount, newSession, newInvite, auditEntry, sample
+- `packages/devtools/tests/production/store/store-contract.ts` - StoreUnderTest, MakeStore, store/store-contract.ts, newShare, newAccount, newSession, newInvite, auditEntry
 - `packages/devtools/ui-src/README.md`
 - `packages/devtools/ui-src/scripts/source-hash.d.mts` - DASHBOARD_BUILD_DEPENDENCIES
 - `packages/devtools/ui-src/scripts/source-hash.mjs` - DASHBOARD_BUILD_DEPENDENCIES, EXCLUDED_UI_DIRECTORIES, EXCLUDED_UI_FILES, listFiles, isBuildInput, dashboardSourceHash
@@ -3663,7 +3691,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/app/Shell.tsx` - Shell
 - `packages/devtools/ui-src/src/app/Sidebar.tsx` - SidebarProps, Sidebar
 - `packages/devtools/ui-src/src/app/ThemeToggle.tsx` - NEXT, NAME, ICON, ThemeToggle
-- `packages/devtools/ui-src/src/app/nav.ts` - NavIcon, NavGroup, NavEntry, ICONS, iconFor, NAV_GROUPS, SECTIONS, ORDER
+- `packages/devtools/ui-src/src/app/nav.ts` - NavIcon, NavGroup, NavEntry, ICONS, iconFor, NAV_GROUPS, SECTIONS, isAiTab
 - `packages/devtools/ui-src/src/app/session.tsx` - SessionContextValue, SessionContext, useSession
 - `packages/devtools/ui-src/src/app/useColorScheme.ts` - ThemeChoice, THEME_STORAGE_KEY, THEME_CHOICES, readThemeChoice, systemPrefersDark, applyTheme, applyStoredTheme, listeners
 - `packages/devtools/ui-src/src/app/useHashRoute.ts` - useHashRoute
@@ -3678,11 +3706,20 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/auth/SetupScreen.tsx` - SetupScreenProps, SetupScreen
 - `packages/devtools/ui-src/src/auth/TotpEnrolment.tsx` - TotpEnrolmentProps, TotpEnrolment
 - `packages/devtools/ui-src/src/auth/passkeys.ts` - RegistrationOptions, AuthenticationOptions, src/auth/passkeys.ts, passkeyFailure, registerPasskey, authenticateWithPasskey
+- `packages/devtools/ui-src/src/components/charts/ChartFrame.tsx` - ChartFrame
+- `packages/devtools/ui-src/src/components/charts/ChartLegend.tsx` - LegendItem, ChartLegend
+- `packages/devtools/ui-src/src/components/charts/ChartTooltip.tsx` - TooltipRow, ChartTooltip
 - `packages/devtools/ui-src/src/components/charts/Histogram.tsx` - bucketLabel, HistogramBars
+- `packages/devtools/ui-src/src/components/charts/KpiDelta.tsx` - deltaText, KpiDelta
 - `packages/devtools/ui-src/src/components/charts/LineChart.tsx` - LineSeries, LineChart
 - `packages/devtools/ui-src/src/components/charts/PercentileBar.tsx` - PercentileBar
+- `packages/devtools/ui-src/src/components/charts/ShareBar.tsx` - ShareBar
 - `packages/devtools/ui-src/src/components/charts/Sparkline.tsx` - Sparkline
+- `packages/devtools/ui-src/src/components/charts/StackedColumnChart.tsx` - StackedColumnChartProps, roundedTop, StackedColumnChart
+- `packages/devtools/ui-src/src/components/charts/TimeLineChart.tsx` - TimeLineChartProps, TimeLineChart
+- `packages/devtools/ui-src/src/components/charts/buckets.ts` - time, weekday, monthDay, clock, bucketLabel, bucketTitle, niceCeil
 - `packages/devtools/ui-src/src/components/charts/index.ts` - charts/index.ts
+- `packages/devtools/ui-src/src/components/charts/series.ts` - SeriesNamespace, SeriesSlots, SERIES_SLOTS, slotColor, OTHER_COLOR, TOKEN_SERIES_COLORS, SERIES_STORAGE_KEY, seriesStorageKey
 - `packages/devtools/ui-src/src/components/common/BrandMark.tsx` - BrandMark
 - `packages/devtools/ui-src/src/components/common/Bytes.tsx`
 - `packages/devtools/ui-src/src/components/common/ConfirmDialog.tsx` - ConfirmDialogProps, ConfirmDialog
@@ -3725,11 +3762,24 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/panel-host/dom.ts` - Attrs, fill, el, svg, empty, panelApiUrl, panelHref
 - `packages/devtools/ui-src/src/panel-host/modules.ts` - PanelModuleLoader, defaultLoader, modules, setPanelModuleLoader, loadPanelModule
 - `packages/devtools/ui-src/src/panel-host/types.ts` - LegacyPanelContext, LegacyPanelModule, panel-host/types.ts
-- `packages/devtools/ui-src/src/panels/agents/index.tsx` - agents/index.tsx, value, AgentRunSummary, ToolCall, Turn, agentDiffText, RunDetail, AgentsPanel
+- `packages/devtools/ui-src/src/panels/agents/index.tsx` - agents/index.tsx, value, AgentRunSummary, ToolCall, Turn, agentDiffText, RunDetail, AgentsLast24Hours
 - `packages/devtools/ui-src/src/panels/agents/types.ts` - AgentRun, AgentRunsAnswer, AgentToolCall, AgentTurn, AgentTraceDetail, agents/types.ts
-- `packages/devtools/ui-src/src/panels/ai/AiUnavailable.tsx` - AiUnavailable
-- `packages/devtools/ui-src/src/panels/ai/index.tsx` - ai/index.tsx, runTone, value, aiUsageText, AiRunSummary, AiSpan, RunDetail, AiPanel
-- `packages/devtools/ui-src/src/panels/ai/types.ts` - AiUsage, AiRun, AiAnswer, AiSpanNode, AiTrace, ai/types.ts
+- `packages/devtools/ui-src/src/panels/ai-errors/index.tsx` - Errors, ai-errors/index.tsx, top, ErrorsBody, AiErrorsPanel
+- `packages/devtools/ui-src/src/panels/ai-evaluate/index.tsx` - Available, ai-evaluate/index.tsx, EVALUATE_SETUP_SNIPPET, scoreTone, ResultCard, PromptRow, Evaluator, AiEvaluatePanel
+- `packages/devtools/ui-src/src/panels/ai-models/index.tsx` - Models, ai-models/index.tsx, ModelsBody, AiModelsPanel
+- `packages/devtools/ui-src/src/panels/ai-reports/index.tsx` - Report, ai-reports/index.tsx, ReportBody, AiReportsPanel
+- `packages/devtools/ui-src/src/panels/ai-shared/AiData.tsx` - AvailableOf, KpiTile, AiData, AiBanner, OBSERVATION_OFF_TEXT, KpiTiles
+- `packages/devtools/ui-src/src/panels/ai-shared/AiFilterRow.tsx` - PRESETS, toLocalInput, FilterSelect, AiFilterRow
+- `packages/devtools/ui-src/src/panels/ai-shared/AiUnavailable.tsx` - AiUnavailable
+- `packages/devtools/ui-src/src/panels/ai-shared/BreakdownTable.tsx` - BreakdownTable
+- `packages/devtools/ui-src/src/panels/ai-shared/format-ai.ts` - formatUsd, formatTokens, formatRatio, formatLatency, previousLabel
+- `packages/devtools/ui-src/src/panels/ai-shared/pills.tsx` - NoPricingPill, PricingPill
+- `packages/devtools/ui-src/src/panels/ai-shared/route.ts` - AiRouteState, ai-shared/route.ts, RANGE_STORAGE_KEY, DEFAULT_RANGE, isPreset, readStoredRange, storeRange, parseAiRoute
+- `packages/devtools/ui-src/src/panels/ai-shared/useAiApi.ts` - AI_REFRESH_MS, useAiApi
+- `packages/devtools/ui-src/src/panels/ai-shared/useAiFilters.ts` - useAiFilters
+- `packages/devtools/ui-src/src/panels/ai/cost-heat.ts` - sumCost, spanCostUsd, maxSpanCost, heatBackground
+- `packages/devtools/ui-src/src/panels/ai/index.tsx` - Filters, ai/index.tsx, runTone, value, aiUsageText, AiRunSummary, AiSpan, RunDetail
+- `packages/devtools/ui-src/src/panels/ai/types.ts` - AiUsage, AiSpanNode, AiTrace, panels/ai/types.ts
 - `packages/devtools/ui-src/src/panels/api/index.tsx` - api/index.tsx, VIEWERS, DOCS_VIEWER_KEY, savedViewer, saveViewer, ApiPanel
 - `packages/devtools/ui-src/src/panels/errors/index.tsx` - Group, errors/index.tsx, SOURCES, ErrorsPanel, GroupRows
 - `packages/devtools/ui-src/src/panels/health/index.tsx` - health/index.tsx, statusPill, HistoryStrip, HealthPanel
@@ -3752,11 +3802,12 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/src/share/ShareScreen.tsx` - State, ShareScreen
 - `packages/devtools/ui-src/tests/helpers/api.ts` - MockRequest, MockAnswer, MockHandler, mockApi, instanceInfo, account, sessionView, signedOut
 - `packages/devtools/ui-src/tests/helpers/fake-panels.tsx` - fakeRegistry, noop
-- `packages/devtools/ui-src/tests/panels/fixtures.ts` - histogram
+- `packages/devtools/ui-src/tests/panels/ai-fixtures.ts` - FROM, totals, buckets, seriesSet, range, filters, reportView, modelsView
+- `packages/devtools/ui-src/tests/panels/fixtures.ts` - panels/fixtures.ts, histogram
 - `packages/devtools/ui-src/tests/panels/helpers.tsx` - Answer, Route, ApiCall, FakeEventSource, instanceA, instanceB, session, devSession
 - `packages/devtools/ui-src/tests/setup.ts` - tests/setup.ts
 - `packages/devtools/ui-src/vite.config.ts` - ui-src/vite.config.ts, devBase, proxied
-- `packages/devtools/ui/dashboard/assets/app.js` - be, ve, xe, ye, i, le, me, C
+- `packages/devtools/ui/dashboard/assets/app.js` - be, C, ce, me, ve, xe, ye, ae
 - `packages/devtools/ui/docs-swagger.js`
 - `packages/devtools/ui/panels/processes.js` - renderProcesses
 - `packages/devtools/vitest.config.ts` - devtools/vitest.config.ts
@@ -4111,13 +4162,13 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/notifications/src/contracts/queue-dispatcher.contract.ts` - QueueDispatcher
 - `packages/notifications/src/contracts/rate-limiter.contract.ts` - RateLimiter
 - `packages/notifications/src/dispatch/define-channel.ts` - defineChannel
-- `packages/notifications/src/dispatch/define-notification.ts` - RendererReturn, Renderer, NotificationDef, DefinedNotification, isConfigError, defineNotification, dispatchAll, dispatchToRecipient
+- `packages/notifications/src/dispatch/define-notification.ts` - RendererReturn, Renderer, NotificationDef, ChannelDispatchResult, NotificationSendResult, DefinedNotification, isConfigError, defineNotification
 - `packages/notifications/src/dispatch/dispatch-id.ts` - newDispatchId
-- `packages/notifications/src/dispatch/dispatcher.ts` - DispatchMode, DispatchChannelArgs, dispatchChannel, resolveRoute
+- `packages/notifications/src/dispatch/dispatcher.ts` - DispatchMode, DispatchOutcome, DispatchChannelArgs, dispatchChannel, resolveRoute
 - `packages/notifications/src/dispatch/index.ts` - dispatch/index.ts
 - `packages/notifications/src/dispatch/notifications-event-bus.ts` - EventName, Handler, handlers, notifications, emit
 - `packages/notifications/src/dispatch/notify.ts` - Notify, dispatch/notify.ts, notifyImpl, notify
-- `packages/notifications/src/errors.ts` - NotificationsNotConfiguredError, ChannelNotFoundError, NoQueueDispatcherError, MissingRendererError, UnresolvableRouteError, RecipientTypeRequiredError, notifications/src/errors.ts, captureStack
+- `packages/notifications/src/errors.ts` - NotificationsNotConfiguredError, ChannelNotFoundError, NoQueueDispatcherError, MissingRendererError, UnresolvableRouteError, RecipientTypeRequiredError, NotificationDeliveryError, notifications/src/errors.ts
 - `packages/notifications/src/in-app/base-notifications-repository.ts` - NotificationsFilter, NotificationModelClass, BaseNotificationsRepository
 - `packages/notifications/src/in-app/column-map.ts` - NotificationColumnMap, ResolvedNotificationColumnMap, NotificationColumnMapHost, resolveColumnMap
 - `packages/notifications/src/in-app/database-notification.ts` - DatabaseNotification

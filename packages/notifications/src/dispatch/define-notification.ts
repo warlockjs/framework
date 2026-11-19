@@ -14,7 +14,9 @@
  *   `via` with a missing renderer throws at definition time). Consistent with
  *   `notify`, which rejects `ChannelNotFoundError`.
  * - **Transport errors** (a channel's `send` throwing) stay ISOLATED — emitted
- *   as a `failed` event, never aborting sibling channels/recipients.
+ *   as a `failed` event, never aborting sibling channels/recipients. They show
+ *   up as `status: "failed"` entries in the resolved `NotificationSendResult`;
+ *   `options.throwOnFailure` opts in to a rejection instead.
  * - **`via()` / preferences throws** for one recipient are logged and that
  *   recipient is dropped (the rest of a fan-out still go).
  *
@@ -31,7 +33,12 @@
  */
 import { log } from "@warlock.js/logger";
 import { getNotificationConfig } from "../config";
-import { ChannelNotFoundError, MissingRendererError, NoQueueDispatcherError } from "../errors";
+import {
+  ChannelNotFoundError,
+  MissingRendererError,
+  NoQueueDispatcherError,
+  NotificationDeliveryError,
+} from "../errors";
 import type {
   ChannelName,
   Notifiable,
@@ -64,9 +71,42 @@ export type NotificationDef<Data> = {
   [C in ChannelName]?: Renderer<Data, C>;
 };
 
+/** Outcome of one (recipient, channel) dispatch. */
+export type ChannelDispatchResult = {
+  channel: ChannelName;
+  /** The recipient this dispatch addressed. */
+  notifiable: Notifiable;
+  /**
+   * `sent` (transport accepted it), `queued` (handed to the queue), `failed`
+   * (transport threw, see `error`) or `skipped` (preference or rate limit).
+   */
+  status: "sent" | "queued" | "failed" | "skipped";
+  /** The thrown error when `status` is `failed`. */
+  error?: Error;
+};
+
+/** What `.send()` / `.queue()` resolve with: one entry per (recipient, channel). */
+export type NotificationSendResult = {
+  results: ChannelDispatchResult[];
+  /** Dispatches whose transport accepted the notification (`sent` or `queued`). */
+  delivered: number;
+  failed: number;
+  skipped: number;
+  /** `true` when at least one dispatch was attempted and every attempt failed. */
+  allFailed: boolean;
+};
+
 export interface DefinedNotification<Data> {
-  send(to: Notifiable | Notifiable[], data: Data, options?: SendOptions): Promise<void>;
-  queue(to: Notifiable | Notifiable[], data: Data, options?: SendOptions): Promise<void>;
+  send(
+    to: Notifiable | Notifiable[],
+    data: Data,
+    options?: SendOptions,
+  ): Promise<NotificationSendResult>;
+  queue(
+    to: Notifiable | Notifiable[],
+    data: Data,
+    options?: SendOptions,
+  ): Promise<NotificationSendResult>;
   only(...channels: ChannelName[]): DefinedNotification<Data>;
 }
 
@@ -120,16 +160,62 @@ async function dispatchAll<Data>(
   options: SendOptions,
   mode: DispatchMode,
   restrict?: ChannelName[],
-): Promise<void> {
+): Promise<NotificationSendResult> {
   const recipients = Array.isArray(to) ? to : [to];
 
-  const results = await Promise.allSettled(
+  const settled = await Promise.allSettled(
     recipients.map((recipient) =>
       dispatchToRecipient(def, recipient, data, options, mode, restrict),
     ),
   );
 
-  rethrowConfigErrors(results);
+  rethrowConfigErrors(settled);
+
+  const results = settled.flatMap((entry) => (entry.status === "fulfilled" ? entry.value : []));
+  const result = summarize(results);
+
+  const reason = deliveryFailure(result, options.throwOnFailure);
+
+  if (reason) {
+    throw new NotificationDeliveryError(result, `Notification "${def.type}" ${reason}`);
+  }
+
+  return result;
+}
+
+function summarize(results: ChannelDispatchResult[]): NotificationSendResult {
+  const failed = results.filter((r) => r.status === "failed").length;
+  const skipped = results.filter((r) => r.status === "skipped").length;
+  const delivered = results.length - failed - skipped;
+
+  return { results, delivered, failed, skipped, allFailed: failed > 0 && delivered === 0 };
+}
+
+/** The rejection message when `throwOnFailure` matched, otherwise undefined. */
+function deliveryFailure(
+  result: NotificationSendResult,
+  rule: SendOptions["throwOnFailure"],
+): string | undefined {
+  if (!rule || result.failed === 0) {
+    return undefined;
+  }
+
+  const failedChannels = [
+    ...new Set(result.results.filter((r) => r.status === "failed").map((r) => r.channel)),
+  ];
+
+  if (rule === "all") {
+    return result.allFailed ? `failed on every channel (${failedChannels.join(", ")})` : undefined;
+  }
+
+  if (rule === "any") {
+    return `failed on: ${failedChannels.join(", ")}`;
+  }
+
+  const named = Array.isArray(rule) ? rule : [rule];
+  const hit = failedChannels.filter((channel) => named.includes(channel));
+
+  return hit.length > 0 ? `failed on: ${hit.join(", ")}` : undefined;
 }
 
 async function dispatchToRecipient<Data>(
@@ -139,12 +225,13 @@ async function dispatchToRecipient<Data>(
   options: SendOptions,
   mode: DispatchMode,
   restrict?: ChannelName[],
-): Promise<void> {
+): Promise<ChannelDispatchResult[]> {
   const config = getNotificationConfig();
 
   // Resolve channels (via + preferences). A throw here drops THIS recipient
   // with a log — it's a per-recipient data problem, not a config error.
   let channels: ChannelName[];
+  const preferenceSkipped: ChannelDispatchResult[] = [];
   try {
     channels = typeof def.via === "function" ? def.via(data, to) : [...def.via];
 
@@ -162,25 +249,35 @@ async function dispatchToRecipient<Data>(
           reason: "preference",
           options,
         });
+        preferenceSkipped.push({ channel, notifiable: to, status: "skipped" });
       }
       channels = channels.filter((c) => allowed.includes(c));
     }
   } catch (error) {
     log.error("notifications", `resolve.${def.type}`, error as Error);
-    return;
+    return [];
   }
 
   const renderCtx: RenderContext = { locale: options.locale, meta: options.meta };
 
   const results = await Promise.allSettled(
-    channels.map((name) => {
+    // `async`, so a renderer that throws becomes a `failed` entry for its channel
+    // instead of dropping the whole recipient from the result.
+    channels.map(async (name) => {
       const renderer = def[name] as Renderer<Data, ChannelName> | undefined;
       if (!renderer) {
         // Dynamic via chose a channel with no renderer — surface it.
-        return Promise.reject(new MissingRendererError(def.type, name));
+        throw new MissingRendererError(def.type, name);
       }
 
-      let payload: unknown = renderer(data, to, renderCtx);
+      let payload: unknown;
+
+      try {
+        payload = renderer(data, to, renderCtx);
+      } catch (error) {
+        log.error("notifications", `render.${def.type}.${name}`, error as Error);
+        throw error;
+      }
 
       // Default the database channel's `type` from `def.type` when omitted.
       if (name === "database" && payload && typeof payload === "object" && !("type" in payload)) {
@@ -199,6 +296,24 @@ async function dispatchToRecipient<Data>(
   );
 
   rethrowConfigErrors(results);
+
+  return [
+    ...preferenceSkipped,
+    ...results.map((entry, index): ChannelDispatchResult => {
+      const channel = channels[index] as (typeof channels)[number];
+
+      if (entry.status === "fulfilled") {
+        return { channel, notifiable: to, status: entry.value };
+      }
+
+      return {
+        channel,
+        notifiable: to,
+        status: "failed",
+        error: entry.reason instanceof Error ? entry.reason : new Error(String(entry.reason)),
+      };
+    }),
+  ];
 }
 
 /** Collect config-class rejections and rethrow (single or AggregateError). */

@@ -1,4 +1,22 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { Context, contextManager } from "@warlock.js/context";
+
+/**
+ * One running savepoint block (PostgreSQL `transaction(fn, { savepoint: true })`).
+ * `added` holds the `afterCommit()` callbacks queued inside the block (and
+ * inside blocks nested in it), so a rollback drops exactly those. `children`
+ * chains the savepoint blocks started directly inside this one, so siblings
+ * started at the same time run one after another and their SAVEPOINT/RELEASE
+ * statements never interleave on the shared connection.
+ */
+export type SavepointScope = {
+  parent?: SavepointScope;
+  session: unknown;
+  added: Set<() => void | Promise<void>>;
+  children: Promise<void>;
+};
+
+const savepointScopes = new AsyncLocalStorage<SavepointScope>();
 
 export interface TransactionContextStore {
   session?: unknown;
@@ -60,6 +78,33 @@ class DatabaseTransactionContext extends Context<TransactionContextStore> {
     queue.push(fn);
 
     this.set("afterCommit", queue);
+
+    // Remember the callback in every enclosing savepoint block, so rolling one back drops it.
+    for (let scope = savepointScopes.getStore(); scope; scope = scope.parent) {
+      scope.added.add(fn);
+    }
+  }
+
+  /** The savepoint block the current code runs in, if any. */
+  public currentSavepointScope(): SavepointScope | undefined {
+    return savepointScopes.getStore();
+  }
+
+  /** Runs `fn` as the body of a savepoint block (see {@link SavepointScope}). */
+  public runInSavepointScope<T>(scope: SavepointScope, fn: () => Promise<T>): Promise<T> {
+    return savepointScopes.run(scope, fn);
+  }
+
+  /** Removes the given callbacks from the queue (a savepoint block rolled back). */
+  public dropAfterCommit(callbacks: ReadonlySet<() => void | Promise<void>>): void {
+    const queue = this.get("afterCommit");
+
+    if (!queue || callbacks.size === 0) return;
+
+    this.set(
+      "afterCommit",
+      queue.filter((callback) => !callbacks.has(callback)),
+    );
   }
 
   /**

@@ -1,4 +1,6 @@
 import { transform } from "esbuild";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 /**
  * The Vite/Vitest plugin object returned by {@link lowerStage3Decorators}.
@@ -11,6 +13,166 @@ export interface DecoratorLoweringPlugin {
   name: string;
   enforce: "pre";
   transform(code: string, id: string): Promise<{ code: string; map: string } | null>;
+}
+
+type JsxCompilerOptions = {
+  jsx?: string;
+  jsxImportSource?: string;
+  jsxFactory?: string;
+  jsxFragmentFactory?: string;
+};
+
+/** Parse a tsconfig file's JSON, tolerating comments and trailing commas. */
+function readTsconfig(file: string): Record<string, any> | undefined {
+  try {
+    const text = readFileSync(file, "utf8")
+      .replace(/("(?:[^"\\]|\\.)*")|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (_, string) => string ?? "")
+      .replace(/,(\s*[}\]])/g, "$1");
+
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/** The JSX options of a tsconfig, following relative `extends` chains. */
+function jsxOptionsOf(file: string, depth = 0): JsxCompilerOptions {
+  const config = readTsconfig(file);
+
+  if (!config) return {};
+
+  let inherited: JsxCompilerOptions = {};
+
+  if (typeof config.extends === "string" && config.extends.startsWith(".") && depth < 5) {
+    const parent = resolve(dirname(file), config.extends);
+    const parentFile = existsSync(parent) ? parent : `${parent}.json`;
+
+    inherited = jsxOptionsOf(parentFile, depth + 1);
+  }
+
+  const own = config.compilerOptions ?? {};
+  const picked: JsxCompilerOptions = {};
+
+  for (const key of ["jsx", "jsxImportSource", "jsxFactory", "jsxFragmentFactory"] as const) {
+    if (typeof own[key] === "string") picked[key] = own[key];
+  }
+
+  return { ...inherited, ...picked };
+}
+
+const jsxOptionsByDirectory = new Map<string, JsxCompilerOptions>();
+
+/**
+ * The JSX settings of the project a file belongs to: the nearest `tsconfig.json` upward from
+ * the file, with its `extends` chain. A project without any `jsx` setting gets the automatic
+ * runtime, so a component never needs `React` in scope.
+ */
+export function resolveJsxOptions(filepath: string): JsxCompilerOptions {
+  const directory = dirname(filepath);
+  const cached = jsxOptionsByDirectory.get(directory);
+
+  if (cached) return cached;
+
+  let current = directory;
+  let found: JsxCompilerOptions = {};
+
+  for (;;) {
+    const candidate = resolve(current, "tsconfig.json");
+
+    if (existsSync(candidate)) {
+      found = jsxOptionsOf(candidate);
+      break;
+    }
+
+    const parent = dirname(current);
+
+    if (parent === current) break;
+
+    current = parent;
+  }
+
+  const resolved = { jsx: "react-jsx", ...found };
+
+  jsxOptionsByDirectory.set(directory, resolved);
+
+  return resolved;
+}
+
+/**
+ * Remove comments and string / template text from source, keeping the code inside
+ * template `${...}` expressions, so a decorator check never matches an `@` that is
+ * only text (a CSS `@media` rule in a template string, `@param` in a comment).
+ */
+export function stripNonCode(code: string): string {
+  let output = "";
+  // for every open template literal, the brace depth at which its `${` was opened
+  const templates: number[] = [];
+  let depth = 0;
+  let index = 0;
+
+  while (index < code.length) {
+    const char = code[index]!;
+    const next = code[index + 1];
+    const inTemplateText = templates.length > 0 && templates[templates.length - 1] === -1;
+
+    if (inTemplateText) {
+      if (char === "\\") index += 2;
+      else if (char === "`") {
+        templates.pop();
+        index += 1;
+      } else if (char === "$" && next === "{") {
+        templates[templates.length - 1] = depth;
+        depth += 1;
+        index += 2;
+      } else index += 1;
+
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      while (index < code.length && code[index] !== "\n") index += 1;
+    } else if (char === "/" && next === "*") {
+      const end = code.indexOf("*/", index + 2);
+
+      output += " ";
+      index = end === -1 ? code.length : end + 2;
+    } else if (char === '"' || char === "'") {
+      index += 1;
+
+      while (index < code.length && code[index] !== char && code[index] !== "\n") {
+        index += code[index] === "\\" ? 2 : 1;
+      }
+
+      // Skip the closing quote, but keep a newline that ended an unclosed one (an
+      // apostrophe in JSX text, a quote in a regex) so the next line still starts a line.
+      if (code[index] === char) index += 1;
+      output += '""';
+    } else if (char === "`") {
+      templates.push(-1);
+      output += '""';
+      index += 1;
+    } else {
+      if (char === "{") depth += 1;
+
+      if (char === "}") {
+        depth -= 1;
+
+        if (templates.length > 0 && templates[templates.length - 1] === depth) {
+          // back to the template text after a `${...}`
+          templates[templates.length - 1] = -1;
+          index += 1;
+          continue;
+        }
+      }
+
+      output += char;
+      index += 1;
+    }
+  }
+
+  // An unterminated template means the scan lost its place (a stray backtick in JSX text,
+  // for instance). Stay on the safe side and let the file be checked as written.
+  return templates.length > 0 ? code : output;
 }
 
 const PLUGIN_NAME = "warlock:lower-stage3-decorators";
@@ -92,7 +254,9 @@ export function lowerStage3Decorators(): DecoratorLoweringPlugin {
       }
 
       // Cheap gate: only files that actually carry a decorator pay esbuild's cost.
-      if (!/(^|\n)\s*@[A-Za-z_$]/.test(code)) {
+      // Strings, template text and comments are blanked first: a CSS `@media` line in a
+      // template string is not a decorator.
+      if (!/(^|\n)\s*@[A-Za-z_$]/.test(stripNonCode(code))) {
         return null;
       }
 
@@ -104,7 +268,11 @@ export function lowerStage3Decorators(): DecoratorLoweringPlugin {
         sourcefile: filepath,
         // Force native (Stage-3) semantics regardless of any ambient tsconfig
         // esbuild might otherwise honor.
-        tsconfigRaw: { compilerOptions: { experimentalDecorators: false } },
+        // The project's own JSX settings ride along: this transform replaces the one that
+        // would otherwise read them, and esbuild's default is the classic runtime.
+        tsconfigRaw: {
+          compilerOptions: { ...resolveJsxOptions(filepath), experimentalDecorators: false },
+        } as never,
       });
 
       return { code: result.code, map: result.map };

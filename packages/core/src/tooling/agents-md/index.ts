@@ -10,6 +10,12 @@ export {
   createAgentsMdRefresher,
 } from "./agents-md-refresher";
 export {
+  AGENTS_MD_SECTIONS,
+  collectAgentsMdReport,
+  collectDevModelModules,
+  type CollectAgentsMdReportOptions,
+} from "./collect-agents-md-report";
+export {
   type InstalledSkill,
   listInstalledSkills,
   parseSkillFrontMatter,

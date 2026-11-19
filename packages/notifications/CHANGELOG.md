@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/notifications` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.60.0 - 2026-11-19
+
+### Added
+
+- `defineNotification(...).send()` and `.queue()` resolve with a per-channel result (`sent`, `queued`, `failed` with the error, `skipped`) plus `delivered`, `failed`, `skipped` and `allFailed`, instead of nothing. A renderer that throws is reported as a `failed` entry for its channel while the other channels still run. A hand-written fake or wrapper typed as `DefinedNotification` must now return a result from `send()` and `queue()`.
+- `throwOnFailure` (`"all"`, `"any"`, a channel or a list of channels) rejects with the new `NotificationDeliveryError` when those channels failed.
+
 ## 5.46.0 - 2026-11-06
 
 ### Upgrading

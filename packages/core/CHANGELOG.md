@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.60.0 - 2026-11-19
+
+### Added
+
+- `collectAgentsMdReport()` and `collectDevModelModules()` on `@warlock.js/core/tooling`: one collector behind every AGENTS.md writer.
+- `middleware.idempotency()` accepts `store` (a durable store with get, reserve, set and remove) and `scope` (narrows the key, for example per tenant). Defaults are unchanged and the guarantees are documented.
+- `loadTestLocales()` is exported from `@warlock.js/core/tests`, and `setupTest({ mode: "unit" })` registers module dictionaries.
+- `isCacheable` is typed on `RepositoryConfigurations`.
+
+### Fixed
+
+- The `warlock dev` AGENTS.md refresh writes the same generated section as `warlock agents-md --write`, with models listed per module; running one after the other leaves `AGENTS.md` byte-identical.
+- A global `mailEvents.onBeforeSending` handler that returns `false` (sync or async) cancels the send, like the per-mail hook.
+- `sendMail()` waits for its `success`, `sent` and `error` handlers; a handler that throws or rejects is logged and the other handlers still run.
+- The Vitest decorator-lowering plugin keeps the project's JSX settings and ignores `@` inside strings, template text and comments.
+- Repository cached reads on PostgreSQL return object and array columns as objects and arrays.
+- `useCurrentUser()` docs state that it is `undefined` outside a request; use `currentUser()` from `@warlock.js/auth` for the typed form.
+- `warlock check` never writes `AGENTS.md`; a change during a check comes from a running `warlock dev`.
+
 ## 5.59.0 - 2026-11-19
 
 ### Added

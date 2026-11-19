@@ -80,6 +80,12 @@ User.events().onDeleted(async (user, ctx) => {
 });
 ```
 
+### Events and tests
+
+Listeners live on the model class, in the module graph that registered them. A test that writes through a model (`Session.create()`, `.save()`) only fires the listeners registered in **its own** module graph. A Vitest worker is a separate graph from an app server started for the test, so if the worker never imported the files that register the listeners (`events/*`, `main.ts`), `Model.events().listeners` is empty there and the handlers do not run for writes the test makes. Writes made by an HTTP request to the test server do fire them, because the server loaded the app.
+
+Fix it by loading the app's modules in the worker: pass `importModule: (file) => import(file)` to `setupTest()` or `createTestHttpServer({ loadAppModules: true, importModule })` (see [Testing](../../core/testing/testing.md)). Or drive the behaviour through the HTTP route, or call the service the listener calls. In a unit test of one listener, register it yourself in the test.
+
 ### Unsubscribing
 
 `on*` returns an unsubscribe function. Useful in tests and per-request listeners:

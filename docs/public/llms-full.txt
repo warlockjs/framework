@@ -3574,6 +3574,10 @@ The plugin runs `enforce: "pre"`, so it executes **ahead of** Vite's core transf
 
 It's the **same esbuild transform the production `tsx`/build path uses**, so a file lowered in tests behaves identically in dev and prod. Two cheap gates keep the fast path fast: files in `node_modules`, non-TypeScript files, and files with no `@decorator` are skipped entirely and never pay esbuild's cost.
 
+**JSX settings are kept.** The esbuild call carries the project's own `jsx`, `jsxImportSource`, `jsxFactory` and `jsxFragmentFactory`, read from the nearest `tsconfig.json` above the file (following relative `extends`). A project that sets none gets the automatic runtime (`react-jsx`), so a decorated `.tsx` never needs `React` in scope.
+
+**The `@` check ignores text.** Comments, string literals and template-literal text are blanked before the check, so a CSS `@media` / `@font-face` line inside a template string, or `@param` in a doc comment, does not send the file through esbuild. Code inside a template's `${...}` is still checked.
+
 ## Things NOT to do
 
 - **Don't reach for `oxc: { target: "es2022" }`** — it's insufficient. oxc can only lower _legacy_ decorators, and the breakage is the SSR rewrite, not the transpile target. Legacy lowering would also mangle the Stage-3 `(value, context)` signature.
@@ -6202,7 +6206,7 @@ await Mail.to("u@e.com")
   .send();
 ```
 
-Returning `false` from `beforeSending` cancels the send and resolves with `success: false`.
+Returning `false` from `beforeSending` (per-mail hook, global `mailEvents.onBeforeSending`, or `mailEvents.onMailBeforeSending`; sync or async) cancels the send and resolves with `success: false`.
 
 ## The functional API — `sendMail`
 
@@ -9150,7 +9154,109 @@ const name = process.env.VITEST ? workerDatabaseName("app_test") : "app";
   in the worker for tests that read the same database the assertions use.
 - `isolate: false` shares module state between files of a worker: singletons,
   `vi.mock()` of app modules and module-level caches survive. Restore mocks in
-  `afterEach`, and clear module state in `resetBetweenFiles`.
+  `afterEach`, and clear module state in `resetBetweenFiles`, or use
+  the experimental `lifetime: "worker-isolated"` (next section) for a fresh module graph per file.
+
+### Worker lifetime with a fresh module graph per file (experimental)
+
+**Experimental.** `lifetime: "worker-isolated"` is experimental in this release. Its behaviour and options may
+change in a patch release. Measured on one real app: about 16% faster than file lifetime,
+setup share 29% to 3%. Keep `lifetime: "worker"` or `"file"` where you need a stable contract.
+
+`lifetime: "worker"` shares modules between files. When your specs use `vi.mock()` on
+application modules, `vi.spyOn`, stubbed environment variables, fake timers, or app modules
+that keep caches at module level, set `lifetime: "worker-isolated"` instead. The worker
+still boots the framework once and keeps its connectors (database, cache, queue) open for
+every file, and each file additionally starts from a fresh module graph and clean Vitest state.
+
+```ts title="src/config/tests.ts"
+export default {
+  lifetime: "worker-isolated",
+  resetDatabase: true,
+  // Optional. Caches the app keeps OUTSIDE its own modules.
+  resetAppCaches: async () => {
+    await flushSharedRedisNamespace();
+  },
+};
+```
+
+Vitest configuration it needs. Every Vitest project that boots the app (`setupTest()`) needs
+the same three settings, as for `"worker"`: `pool: "forks"`, `isolate: false`, and the
+Warlock runner (`runner: "./src/test-runner.ts"`). Projects with different `maxWorkers`
+need distinct `sequence.groupOrder` values, otherwise Vitest 5 refuses the configuration.
+
+```ts title="vitest.config.ts"
+export default defineConfig({
+  test: {
+    projects: [
+      {
+        test: {
+          name: "integration",
+          pool: "forks",
+          isolate: false,
+          runner: "./src/test-runner.ts",
+          setupFiles: ["./src/test-setup.ts"],
+          sequence: { groupOrder: 1 },
+        },
+      },
+      {
+        // another project that boots the app, with its own worker count
+        test: {
+          name: "http",
+          pool: "forks",
+          isolate: false,
+          maxWorkers: 2,
+          runner: "./src/test-runner.ts",
+          setupFiles: ["./src/test-setup.ts"],
+          sequence: { groupOrder: 2 },
+        },
+      },
+    ],
+  },
+});
+```
+
+Opting in is the `lifetime` value in `src/config/tests.ts` plus the Vitest settings above;
+an app already on `"worker"` has the settings and changes only the value.
+
+Before each file, in this order: modules the previous file loaded with
+`createTestHttpServer({ loadAppModules: true })` are disposed (use cases and models
+unregister, listeners unsubscribe, their routes go); real timers come back and spies, stubbed
+environment variables and stubbed globals are restored; the module registry is reset
+(`vi.resetModules()`); then the same reset as `"worker"` (servers, request context, routes,
+fakes, database, `resetBetweenFiles`); then `resetAppCaches`. At the end of every file the fake
+clock and spies are cleared again, so setup of the next file never waits on a fake clock.
+
+`createTestHttpServer({ loadAppModules: true, importModule })` imports the app's route and
+module files again, once per file, through that file's module graph. Route handlers
+therefore use the file's own `vi.mock` of application modules (a use case behind
+`GET /health/live`, a service). The cost is one load of the app's modules per file that
+creates such a server (the `appModules` step of the setup profile), which file lifetime also
+pays; files that never load app modules pay nothing. Re-registration warnings ("Model ...
+already registered", "Use case ... already registered") are counted instead of logged when the name was registered by an earlier file (the fresh module graph registers it again by design); the same name registered twice inside one file still warns, so a real duplicate is not hidden. This covers specs
+that import models or use cases themselves; with `WARLOCK_TEST_PROFILE=1` one debug line per
+file says how many. If a route must stay fixed
+across files, register it in the spec with the `routes` option of `createTestHttpServer`;
+those routes are removed again by `close()`.
+
+What stays shared on purpose: `@warlock.js/*` packages and every other dependency Vitest
+loads from `node_modules` (connections, the connectors manager, fakes), the process, and the
+database (reset by `resetDatabase`). Keep `@warlock.js/*` out of `server.deps.inline`: if
+the framework itself is re-evaluated, the file is refused with a message naming the setting,
+because the open connections would be out of reach.
+
+What this does not isolate: `globalThis` properties a file assigns by hand survive into later
+files (use `vi.stubGlobal`, which is restored), as do objects the app stores on `globalThis`
+and state held inside a dependency (a global registry in an npm package). Clear those in
+`resetAppCaches`. Application modules the setup file imported before `setupTest()` are
+imported again by the spec, so models registered at boot are registered by the booted copy
+only: import models inside specs, after `setupTest()`.
+
+Measured on a small fixture (Vitest 5.0.3, one fork, five files that each mock the same
+module differently, stub env and globals, use fake timers and spy): the connector opened
+once, and no file saw another file's mock, spy, stub, timer or module cache, in shuffled file
+order across several seeds. A second fixture with four files and `loadAppModules: true`
+gave each file its own mock of the use case behind a route.
 
 ### Measure and size CI workers
 
@@ -11167,6 +11273,16 @@ This produces `account.title` and `account.actions.save`. Keep every leaf comple
 
 When a route-locales snapshot applies, `t()` (through the request binding) and `request.transFrom(locale, key, placeholders?)` resolve through it; without one, they retain the existing global-registry behavior. The underlying `transFromKeywords(locale, keywords, key, placeholders?, converter?)` is supplied by `@mongez/localization` 3.5.0. Error pages rebind to their own snapshot, while framework fallback uses the app/root snapshot. Development HMR add/edit/delete publishes a new snapshot, and the snapshot revision keeps page-cache entries from reusing old JSON. Generated `.warlock` typings contain the flattened route keys; do not maintain a second handwritten key union.
 
+## Module dictionaries in tests and setup files
+
+`setupTest()` registers every module's `utils/locales.json` and `utils/locales/*.json` for integration tests, and, since 5.60, for `setupTest({ mode: "unit", importModule })` too, so translated text renders instead of bare keys. A setup that does not call `setupTest()` (a custom unit-project `setupFiles` entry, an email preview harness) registers them itself with `loadTestLocales()` from `@warlock.js/core/tests`; it resolves to a function that removes them again:
+
+```ts
+import { loadTestLocales } from "@warlock.js/core/tests";
+
+const unload = await loadTestLocales(); // optional root, defaults to process.cwd()
+```
+
 ## Worker dictionaries and owned runtime resources
 
 The generated `src/test-setup.ts` calls:
@@ -11268,7 +11384,7 @@ Lifecycle:
 
 1. **Method not eligible** (GET / HEAD) → pass through.
 2. **No `Idempotency-Key` header** → pass through (the primitive is opt-in by the client).
-3. **Key already in flight** (concurrent duplicate) → 409 with `Retry-After`. The key is reserved create-only before the handler runs (`reservationTtl`, default 60s, or `http.idempotency.reservationTtl`). A 5xx frees the reservation; if the cache is down it fails open. Use a shared cache (redis/pg) across servers.
+3. **Key already in flight** (concurrent duplicate) → 409 with `Retry-After`. The key is reserved create-only before the handler runs (`reservationTtl`, default 60s, or `http.idempotency.reservationTtl`). A 5xx frees the reservation; if the cache is down it fails open. The final response is written after it is sent (a crash in between leaves only the reservation until it expires); every status below 500 is replayed. Records live in the app cache, which is per process with the default memory driver: use a shared cache across servers, or pass `store` (`{ get, reserve, set, remove }`, `reserve` atomic) for a durable one. `scope: (request) => string` narrows the key beyond user + route (for example a tenant).
    3b. **Key + same body within TTL** (default 24h) → replays the cached response with `Idempotent-Replay: true`. Handler does NOT re-run.
 4. **Key + different body** → 422 `IdempotencyKeyConflict`. Client bug — same key must mean same intent.
 5. **Cache miss** → runs handler; on response sent, caches `{ status, body, bodyHash }` for TTL.
@@ -11984,6 +12100,8 @@ await repo.cacheModel(model); // manual cache write
 ## Cached vs uncached
 
 `listCached` / `firstCached` / `getCached` etc. hit the cache layer (`@warlock.js/cache`) first; on miss, they execute and cache. Cache invalidation is automatic on `create`/`update`/`delete` events that the adapter listens to.
+
+A cache hit returns models equal to the uncached ones: entries are plain snapshots (`toSnapshot()` / `Model.fromSnapshot()`), so object and array columns stay objects and arrays on PostgreSQL and MongoDB, and dates come back as `Date`s. `isCacheable` is the master switch: a repository property, or app-wide through `repository.isCacheable` in the repository config (typed on `RepositoryConfigurations`).
 
 Use cached methods by default. Drop to uncached when:
 
@@ -12716,7 +12834,7 @@ updateProductController.validation = {
 
 ---
 name: warlock-agents-md
-description: 'Generate the app-specific section of AGENTS.md from the booted app with `warlock agents-md [--write] [--json]` — modules, a routes summary with unguarded writes flagged, models, the conventions `warlock check` enforces, the installed skills and the verify commands — between `<!-- warlock:generated:start -->` / `<!-- warlock:generated:end -->` markers so hand-written content is never touched; `warlock dev` refreshes it (opt out with `devServer.agentsMd: false`). Triggers: `warlock agents-md`, `AGENTS.md`, `warlock:generated:start`, `renderAgentsMdSection`, `writeAgentsMd`, `upsertGeneratedSection`, `listInstalledSkills`, `createAgentsMdRefresher`, `devServer.agentsMd`, `WL7501`; "give agents the app facts", "keep AGENTS.md up to date", "which skills apply to this app". Skip: the full machine-readable report — the `warlock-inspect` topic; verifying a change — the `warlock-check` topic.'
+description: 'Generate the app-specific section of AGENTS.md from the booted app with `warlock agents-md [--write] [--json]` — modules, a routes summary with unguarded writes flagged, models, the conventions `warlock check` enforces, the installed skills and the verify commands — between `<!-- warlock:generated:start -->` / `<!-- warlock:generated:end -->` markers so hand-written content is never touched; `warlock dev` refreshes it (opt out with `devServer.agentsMd: false`). Triggers: `warlock agents-md`, `AGENTS.md`, `warlock:generated:start`, `renderAgentsMdSection`, `writeAgentsMd`, `upsertGeneratedSection`, `listInstalledSkills`, `createAgentsMdRefresher`, `collectAgentsMdReport`, `devServer.agentsMd`, `WL7501`; "give agents the app facts", "keep AGENTS.md up to date", "which skills apply to this app". Skip: the full machine-readable report — the `warlock-inspect` topic; verifying a change — the `warlock-check` topic.'
 ---
 
 # Warlock — `warlock agents-md`
@@ -12764,6 +12882,8 @@ Sections: app + `@warlock.js/*` versions, modules (`src/app/*`, routes/models pe
 - Put your own notes outside the markers; anything inside is replaced on the next refresh.
 
 ## `warlock dev` keeps it fresh
+
+The dev refresh and `warlock agents-md --write` share one collector (`collectAgentsMdReport`) and one renderer, so they write byte-identical output: versions line, modules with route and model counts, models with their module, skills index. `warlock check` never writes `AGENTS.md`; a change during a check comes from a running `warlock dev`.
 
 On boot and after reloads that change routes or modules (debounced). Opt out:
 
@@ -13071,7 +13191,8 @@ const types = runTypecheck({ files: ["src/app/posts/services/publish.service.ts"
 - `check` boots nothing — no config, no connection, no port — so it runs the same with or without services; only tests that need them fail, and those report `WL8003`/`WL8004`.
 - Lint defaults to Oxlint (an app-root config + the app-installed package). No Oxlint config skips lint. A missing package reports `WL8002`. ESLint support was removed in 5.34.0; see `upgrade-from-5-29`.
 - Tests use the app's own vitest (`vitest run`, or `vitest related <files> --run` with `--changed`). Test files without vitest installed → `WL8002`.
-- A vitest run longer than 10 minutes is stopped and reported as `WL8007` (`The tests timed out after 600 s`); raise the limit with `--test-timeout <seconds>` or `WARLOCK_CHECK_TEST_TIMEOUT` (`0` = no limit). Exit 143 without that message means something outside `check` (a memory-capped wrapper) sent SIGTERM.
+- A vitest run longer than the limit is stopped and reported as `WL8007` (`The tests timed out after 600 s ... (ran 600 s)`; the message always names the elapsed time). The default limit is 10 minutes, or 1.5 times the last recorded full run when that is longer; raise it with `--test-timeout <seconds>` or `WARLOCK_CHECK_TEST_TIMEOUT` (`0` = no limit). Exit 143 without that message means something outside `check` (a memory-capped wrapper) sent SIGTERM.
+- A full check (no `--changed`/`--base`) reuses a recorded passing result for the same tree instead of running the suite again, and prints when it was recorded. The tree hash covers every tracked and untracked-not-ignored file (lockfile included) by content, the root `.env*` files, and each linked (symlinked) package outside the app (real path, `package.json`, top-level entry names/sizes/mtimes). A recorded failure for the same tree always reruns. Sources: the record a previous `warlock check` wrote (`node_modules/.cache/warlock/check-tests.json`), or a vitest JSON report the app wrote (`vitest run --reporter=json --outputFile=node_modules/.cache/warlock/vitest-report.json`, or `--test-report <file>` / `WARLOCK_CHECK_TEST_REPORT`) that passed, is newer than every file and folder of the tree (deletions count), and lists every spec file of the tree (a partial run does not count). Force a run with `--rerun-tests`.
 - The typecheck runs in a child `warlock typecheck` process; running out of memory is reported as `WL8007` instead of ending the run.
 - The convention checks are the framework's own and run the same with Oxlint or no linter. A deliberate exception gets `// warlock-check-ignore WL9006 -- why` on the problem's line or the line above (no code = every code on that line).
 
@@ -17744,7 +17865,9 @@ Postgres has no such requirement — transactions work out of the box.
 
 `transaction(fn)` **flat-nests**: calling it inside an already-open transaction JOINS the outer one instead of opening a second, independent transaction. The inner block runs on the **same** session — so it sees the outer's uncommitted writes — and the **outermost** `transaction()` owns commit/rollback. A service that opens its own `transaction()` for standalone atomicity therefore also works unchanged when called inside a larger transaction — e.g. a seeder that creates a row, then calls a service that opens a transaction to insert a child referencing it (an independent inner transaction couldn't see the parent's uncommitted row, and the child insert would fail its foreign key).
 
-A throw anywhere inside unwinds the **whole** outer transaction — Postgres aborts a transaction on the first error, so there is no automatic per-block savepoint. For independent partial rollback of an inner block, drop to the manual API (`driver.beginTransaction()`) and use savepoints explicitly.
+A throw anywhere inside unwinds the **whole** outer transaction by default: Postgres aborts a transaction on the first failed statement. Code right after an inner `transaction()` also runs **before** the outer COMMIT, so side effects that must follow the commit go in `afterCommit(fn)` (see below), which runs after the outermost COMMIT and is dropped on rollback.
+
+For partial rollback pass `{ savepoint: true }` (PostgreSQL) to the nested call: `transaction(fn, { savepoint: true })` runs the block inside a savepoint. When it throws, only its own statements roll back, the `afterCommit` callbacks it queued are dropped (other code's callbacks stay), the error propagates, and the outer transaction stays usable, so the caller can catch it and retry. Savepoint blocks started at the same time on one transaction (`Promise.all`) run one after another; a block inside another block runs at once as a child savepoint. Ignored by an outermost `transaction()`. MongoDB has no savepoints: a nested call always joins flat and the option does nothing.
 
 ### Manual `beginTransaction()`
 
@@ -18198,17 +18321,18 @@ for (const user of targets) {
 
 ## When to reach for what
 
-| Task                                            | Reach for                                                     |
-| ----------------------------------------------- | ------------------------------------------------------------- |
-| Increment a counter                             | `Model.increase(filter, field, n)`                            |
-| Atomically change multiple fields on one record | `Model.atomic(filter, ops)`                                   |
-| Insert N records                                | `Model.createMany(rows)`                                      |
-| Insert a large batch fast (no per-row events)   | `Model.createMany(rows, { bulk: true, batchSize })`           |
-| Update many rows with operators                 | `Model.findAndUpdate(filter, { $set: {...} })`                |
-| Update one record by id                         | `Model.update(id, data)`                                      |
-| Delete many rows (raw)                          | `Model.delete(filter)`                                        |
-| Multi-row read-modify-write                     | Wrap in a transaction (see the `manage-transactions` topic)   |
-| Need lifecycle events / delete strategy per row | `Model.where(...).get()` + iterate + `.save()` / `.destroy()` |
+| Task                                            | Reach for                                                                                                                    |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Increment a counter                             | `Model.increase(filter, field, n)`                                                                                           |
+| Atomically change multiple fields on one record | `Model.atomic(filter, ops)`                                                                                                  |
+| Insert N records                                | `Model.createMany(rows)`                                                                                                     |
+| Insert a large batch fast (no per-row events)   | `Model.createMany(rows, { bulk: true, batchSize })`                                                                          |
+| Update many rows with operators                 | `Model.findAndUpdate(filter, { $set: {...} })`                                                                               |
+| Update one record by id                         | `Model.update(id, data)`                                                                                                     |
+| Delete many rows (raw)                          | `Model.delete(filter)`                                                                                                       |
+| Multi-row read-modify-write                     | Wrap in a transaction (see the `manage-transactions` topic)                                                                  |
+| Lock a row before changing it (Postgres)        | `Model.query().where(...).lockForUpdate().first()` in a transaction; `findOneAndUpdate` updates atomically, it is not a lock |
+| Need lifecycle events / delete strategy per row | `Model.where(...).get()` + iterate + `.save()` / `.destroy()`                                                                |
 
 ## Things NOT to do
 
@@ -18847,6 +18971,10 @@ See the `use-cache-tags` topic of the `warlock-js-cache` skill.
 ### Side effects that must only fire after commit
 
 For external side effects (queues, emails) that must only fire if a surrounding transaction commits, don't run them in the `saved` handler — write to an outbox table and dispatch from a worker after commit.
+
+## Events in tests
+
+Listeners are class-level, registered in the module graph that imported the file holding them. A Vitest worker that never imported the app's `events/*` or `main.ts` has empty `Model.events().listeners`, so `Model.create()` / `.save()` called from the test fires nothing, while writes made through the HTTP test server do fire (the server loaded the app). Pass `importModule: (file) => import(file)` to `setupTest()` / `createTestHttpServer({ loadAppModules: true, importModule })`, or register the listener in the test, or go through the route / the service the listener calls.
 
 ## Things NOT to do
 
@@ -30282,7 +30410,7 @@ public resolveTenant(user: Auth): string | undefined {
 
 ## Caching
 
-The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles changed out of band? Call `access.flush(user, tenant)`. The cache is **best-effort**: an outage degrades to the resolver, it never denies.
+The engine caches each user's resolved set (`cache.ttl`, default `10m`). Roles changed out of band? Call `access.flush(user, tenant)`. The expiry is fixed from load time (reads never extend it, even on a sliding cache driver), so a bulk change such as a migration shows up within one `ttl`; to apply it at once, clear the `access.perms.*` / `access.roles.*` cache keys (`cache.removeNamespace("access")`), in every process for a per-process memory driver. The cache is **best-effort**: an outage degrades to the resolver, it never denies.
 
 ## See also
 
@@ -32177,11 +32305,23 @@ await orderShipped.queue(user, { order }, { delay: "10m" });
 | `meta`           | Passed to renderers + included in every observability event.                                                                                                                |
 | `idempotencyKey` | Injected into the database payload (dedupe via unique index).                                                                                                               |
 | `force`          | Bypass `PreferenceProvider`. Does NOT bypass `RateLimiter`.                                                                                                                 |
+| `throwOnFailure` | Opt in to rejection on transport failure: `"all"` (every attempt failed), `"any"`, or a channel name / array. Rejects with `NotificationDeliveryError` (`.result`).         |
 | `type`           | Ignored by `defineNotification` — see `send-ad-hoc` for ad-hoc gating.                                                                                                      |
 
 ## Failure isolation
 
-Per-recipient: each recipient gets an independent `Promise.allSettled`. Per-channel: each channel within a recipient gets an independent `allSettled`. A throw becomes a `failed` event on the event bus AND re-throws within its own slot — never aborts siblings.
+Per-recipient: each recipient gets an independent `Promise.allSettled`. Per-channel: each channel within a recipient gets an independent `allSettled`. A throw becomes a `failed` event on the event bus AND a `failed` entry in the result — never aborts siblings.
+
+## Send result
+
+`.send()` / `.queue()` resolve with `{ results, delivered, failed, skipped, allFailed }`; each `results` entry is `{ channel, notifiable, status: "sent" | "queued" | "failed" | "skipped", error? }`. A transport failure does NOT reject by default, so check the result when the caller reports delivery (for example "invitation sent"):
+
+```ts
+const { results } = await invite.send(user, data);
+const mailFailed = results.some((r) => r.channel === "mail" && r.status === "failed");
+```
+
+Or opt in to a rejection: `{ throwOnFailure: "mail" }` (named channel(s)), `"all"` or `"any"`; it throws `NotificationDeliveryError` whose `.result` has the full outcome. `queued` only means the job was enqueued.
 
 ## See also
 
@@ -42440,6 +42580,10 @@ async function runWithFallbacks(input: string) {
 }
 ```
 
+## Counting failovers
+
+`ai.fallbackModel`'s `lastAttempts` is overwritten by the next call. For a count per run, read `result.report.fallbackTrips` (trips answered after at least one earlier model of the chain failed; absent when the first model answered every trip). A model-level `complete()` response and a stream's `done` chunk carry `fallbackAttempts` (earlier models that failed before that answer; absent when the first model answered), exact under concurrent use of one chain. Panoptic copies the report field to the `agent.fallbackTrips` span attribute and counts trips with `finishReason: "refusal"` as `agent.refusals`.
+
 ## See also
 
 - The `run-ai-agent` topic — `AgentResult.error`
@@ -46368,6 +46512,7 @@ The adapter wraps the base64 bytes in an uploadable via the SDK's `toFile`, usin
 `ai.transcribe` fills `usage.cost` so STT spend folds into the **same** `Usage.cost` rollup as text:
 
 - **Per-minute** (`whisper-1`): `{ perMinute }` × `(durationSeconds / 60)` → `cost.input`. If the provider didn't report a duration, cost stays **`undefined`** (no guessing).
+- `usage.audioInputTokens` and `usage.textInputTokens` (optional) split a token-metered model's input into its audio and text parts when the provider reports it; absent otherwise.
 - **Token-metered** (`gpt-4o-transcribe`): `{ input, output }` USD-per-1M-tokens → standard `computeCost` against the returned token usage.
 
 Per-minute wins when both are set; an unpriced model leaves `usage.cost` **`undefined`** (honest "cost unknown", never a false zero).
@@ -51504,7 +51649,7 @@ ai.config({
   panoptic: {
     dashboard: {
       evaluate: {
-        model: openai.model("gpt-4o-mini"),
+        model: openai.model({ name: "gpt-4o-mini" }),
         instructions: "Must address the user by name. Never invent prices.",
       },
     },
@@ -51522,6 +51667,22 @@ Absent `evaluate` ⇒ the drawer never renders the button and a `POST` to its ro
 | -------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model`        | yes      | A `ModelContract`, or a `() => ModelContract \| Promise<ModelContract>` factory — mirrors `panoptic.cache`'s literal-or-factory ergonomics. Resolved fresh on every evaluate click (a deliberate, infrequent, human-triggered action — not the collector's hot path — so no memoization, unlike the cache store's driver).                                        |
 | `instructions` | no       | Default grading rubric/criteria, verbatim — the same shape `ai.prompts().validate({ criteria })` accepts. Seeds the dashboard's editable textarea (baked into the served page at boot, so the operator sees and can extend the actual default, not a blank box); the built-in prompt-quality rubric is used when neither this nor a per-run override is supplied. |
+
+## Top-level `panoptic.evaluate` and the devtools Evaluate page
+
+`PanopticConfig.evaluate` takes the same `EvaluateConfig` as `dashboard.evaluate`. `getEvaluateConfig()` returns `panoptic.evaluate`, else `panoptic.dashboard.evaluate`, else `undefined`. The devtools **Evaluate** page (development only) reads it, so prompts can be graded while the standalone dashboard stays off inside a Warlock app:
+
+```ts
+ai.config({
+  panoptic: {
+    observeAll: true,
+    evaluate: {
+      model: openai.model({ name: "gpt-4o-mini" }),
+      instructions: "Must state what the agent may never do.",
+    },
+  },
+});
+```
 
 ## The UI
 
@@ -52289,6 +52450,10 @@ So `dashboard: true` with no exporters Just Works — you get a store for free. 
 
 **Idempotent.** Applying the config is safe on every `ai.config(...)` merge: the collector is registered as a core `Observer` exactly once and the dashboard is started at most once. Repeat calls only refresh the `observeAll` flag (latest config wins). `panoptic` undefined in the config is a no-op.
 
+## Inside a Warlock app it does not start
+
+When the process is a Warlock app (devtools mounted, `WARLOCK_BOOT_SIGNAL` set by `warlock start`, or a `warlock.config.ts`/`.js`/`.mjs`/`.cjs` in the working directory), `dashboard` is skipped: no store, no port, and one `log.info("ai-panoptic", "dashboard", …)` notice per process pointing at the devtools **AI** section. `dashboard: { standalone: true }` starts it anyway; outside a Warlock app `standalone` is ignored and nothing changes. Exporters, `observeAll` and content capture are unaffected. `isInsideWarlockApp()`, `devtoolsPathHint()` (the devtools path the notice names: the mounted path, else `/__warlock`) and `getEvaluateConfig()` are exported from `@warlock.js/ai-panoptic`.
+
 ## What the UI shows
 
 The page is one self-contained, dependency-free vanilla-JS file (no bundler, no framework, works offline). It polls the JSON API every 2s and renders:
@@ -52392,6 +52557,8 @@ await handle.close();
 The store is the same object the collector writes to — wire the collector to it (pass it as an exporter to `panoptic({ exporters: [store] })` or via `ai.config`) and the dashboard reflects new traces on its next poll.
 
 ### `DashboardOptions`
+
+`standalone?: boolean` (default `false`) starts the dashboard even inside a Warlock app.
 
 Every field optional, every default safe:
 
@@ -53018,6 +53185,8 @@ npx warlock grimoire check
 | A README `updated` older than its newest changelog entry            | Reshape the README                                    |
 | A changelog version that does not fit the word (`added` with `2.1`) | Fix the version                                       |
 
+Migrations, seeds, commands, the main file, layouts, roots and test helpers only specs import are never reported (`GR3006`); a route step reaches the middleware its route names. Do not try to describe those in a flow.
+
 **Recording results.** The check and the devtools tab read test results from
 `grimoire/book/test-results.json`, written by the Grimoire Vitest reporter when the tests run. That
 folder is not committed, so run the tests with the reporter in CI and ship the results file with the
@@ -53144,7 +53313,7 @@ npx warlock scry --flow catalog/new-arrivals                        # one flow, 
 
 Add `--json` for machine-readable output. `--impact` lists API routes, pages, flows and features,
 including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`
-prints every line. `--search` ranks exact matches first. Read the flows it names and run their tests after
+prints every line. `--search` also reads a flow's summary, story, cases and criteria (`AC-5` works), ranks features and flows above files, and groups hits by type; a hit found by written text shows the part that matched in brackets. Read the flows it names and run their tests after
 your change.
 
 A file's entry is also at a fixed path: `src/app/auth/controllers/login.controller.ts` is described
@@ -53152,13 +53321,14 @@ in `grimoire/book/app/auth/controllers/login.controller.json`.
 
 ## Commands
 
-| Command                                     | Does                                                                                                          |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `warlock grimoire build`                    | Builds or refreshes the book. `scry` and `check` do it when it is stale                                       |
-| `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`)                                          |
-| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error; `--all` lists every warning |
-| `warlock grimoire release <release>`        | Writes the collected list into `grimoire/releases/<release>.md`                                               |
-| `warlock explain GR2001`                    | Explains a finding code                                                                                       |
+| Command                                     | Does                                                                                                                                   |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `warlock grimoire build`                    | Builds or refreshes the book. `scry` and `check` do it when it is stale                                                                |
+| `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`); skipped when the folder is already current (`--force` writes it) |
+| `warlock grimoire build --site --product`   | Writes the business export: the Product map only, no file paths, test names or per-file answers                                        |
+| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error; `--all` lists every warning                          |
+| `warlock grimoire release <release>`        | Writes the collected list into `grimoire/releases/<release>.md`                                                                        |
+| `warlock explain GR2001`                    | Explains a finding code                                                                                                                |
 
 Every finding has a code (`GR2001`) and a fix hint. A finding marked `(expected)` belongs to work
 that is still `proposed`; it does not fail the check.
@@ -53166,6 +53336,8 @@ that is still `proposed`; it does not fail the check.
 ## What to trust
 
 - **Exports, imports, importers, routes, middleware, pages:** read from the code. Trust them.
+- **Route middleware:** a route step also reaches the middleware files the matched route names (not the routes file's other imports). Roles that run by being present (migration, seed, command, main, layout, root) and spec-only helpers are not listed as unreached.
+- **Without route facts** (`routes: missing`): route, mail, notification, job and event steps are `found: null` (not checked), not resolved and not failed; `GR5008` skips mail and notification entries.
 - **Files behind a route:** every file the handler can reach through imports. It is not the exact
   call path; open the handler to see which ones it really uses.
 - **Reached from:** only links and redirects written as plain values. `unknown` means look.
@@ -53214,8 +53386,26 @@ From `@warlock.js/grimoire` (no dependency on core or web):
 
 From `@warlock.js/grimoire/warlock` (needs `@warlock.js/core`): `registerGrimoireCommands` returns
 the `grimoire` and `scry` commands for `cli.commands` in `warlock.config.ts`;
-`createWarlockAdapter` builds the adapter that feeds the book from the inspect report;
+`createWarlockAdapter` builds the adapter that feeds the book from the inspect report (it also supplies the
+optional `host()` described below);
 `collectMobileFacts` lists mobile screens from Expo Router file names.
+
+A custom `BookAdapter` may add `host(root)`, returning `{ name, version, logo, app }` (the framework's name,
+installed version and a small `data:` logo, and the app's own `{ name, version }`), or `null`. The tab shows the
+framework logo and version in its header and the app name and version at the bottom, in the static export and
+in the shared Product map too; an adapter without `host()` shows nothing. The summary and product answers carry it
+as `host` (`null` when absent); the feature answer's `flows` also carry `steps`, `cases`, `criteria`, `tested` and
+`findings` counts.
+
+The devtools feature route (`/features/:feature`) adds three fields for the tabbed page: `map` (the feature map:
+`columns` are each site and mobile app the flows touch, titled by the app's heading, then `api`, then `background`;
+`rows` has one entry per flow with `cells` keyed by column id, each cell a list of chips `{ step, type, label, found,
+app, page, method, path, file }` taken from the steps the book already resolved), `fileGroups` (the own files by module)
+and `proofs` (each flow's criteria with their tests). Each product map feature card carries `strip`: `flows`
+`{ total, shipped }`, `criteria` `{ total, proven, failing, measured }` (`measured` is `false` when tagged tests have no
+recorded results), `screenshots` `{ places, present }` and `findings` `{ errors, warnings }`. The feature and flow pages
+have tabs with their own hash routes: `feature/<id>[/flows|files|findings|tests]` and
+`flow/<feature>/<flow>[/proof|files|findings]`.
 
 From `@warlock.js/grimoire/vitest`: `grimoireReporter` records the last result of every test marked
 `// @proves` into `grimoire/book/test-results.json`. Add it to the Vitest `reporters` list.
@@ -53844,21 +54034,23 @@ export default {
 
 ## What each panel shows
 
-| Panel         | What you see                                                                                                                                                                                                                                      | Where it comes from                          |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| **Requests**  | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis. | core `registerTracingHooks()`                |
-| **Queries**   | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`)                                                                                            | cascade `dataSourceRegistry.on("query")`     |
-| **N+1**       | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal                                                                                                    | same query shape ≥ 5 times in one request    |
-| **Mail**      | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                              | core `mailEvents.onCaptured()`               |
-| **Logs**      | Log entries per request, filterable by level and module                                                                                                                                                                                           | a logger channel                             |
-| **Cache**     | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                   | cache `cache.on(...)`                        |
-| **Resources** | Memory, CPU, event-loop delay and garbage collection, with a 10-minute history                                                                                                                                                                    | the process                                  |
-| **Health**    | Readiness checks over time                                                                                                                                                                                                                        | core `health.readiness()`                    |
-| **Errors**    | Failed requests grouped by cause with counts                                                                                                                                                                                                      | tracing and logger                           |
-| **Jobs**      | Registered scheduled jobs with schedule, last and next run (no run history, duration or error yet); queue counts only when the queue driver reports them (not available today)                                                                    | `@warlock.js/scheduler`, `@warlock.js/queue` |
-| **Agents**    | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                      | `@warlock.js/ai` `agentTraces` store         |
-| **Routes**    | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                                  |
-| **API**       | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`       |
+| Panel                          | What you see                                                                                                                                                                                                                                      | Where it comes from                                           |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Requests**                   | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis. | core `registerTracingHooks()`                                 |
+| **Queries**                    | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`)                                                                                            | cascade `dataSourceRegistry.on("query")`                      |
+| **N+1**                        | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal                                                                                                    | same query shape ≥ 5 times in one request                     |
+| **Mail**                       | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                              | core `mailEvents.onCaptured()`                                |
+| **Logs**                       | Log entries per request, filterable by level and module                                                                                                                                                                                           | a logger channel                                              |
+| **Cache**                      | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                   | cache `cache.on(...)`                                         |
+| **Resources**                  | Memory, CPU, event-loop delay and garbage collection, with a 10-minute history                                                                                                                                                                    | the process                                                   |
+| **Health**                     | Readiness checks over time                                                                                                                                                                                                                        | core `health.readiness()`                                     |
+| **Errors**                     | Failed requests grouped by cause with counts                                                                                                                                                                                                      | tracing and logger                                            |
+| **Jobs**                       | Registered scheduled jobs with schedule, last and next run (no run history, duration or error yet); queue counts only when the queue driver reports them (not available today)                                                                    | `@warlock.js/scheduler`, `@warlock.js/queue`                  |
+| **AI Reports, Models, Errors** | Hourly totals of agent runs, tokens, estimated cost (from model pricing; unpriced models flagged), errors by category, latency, fallbacks and refusals, with 24h / 7d / 30d / custom ranges and Agent, Model, Provider filters. Production too    | `@warlock.js/ai-panoptic` trace feed, saved as hourly rollups |
+| **AI Runs, Evaluate**          | Single runs with filters, grouping and a cost tint; grade a system prompt with a judge model. Development only                                                                                                                                    | Panoptic traces in memory; `panoptic.evaluate`                |
+| **Agents**                     | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                      | `@warlock.js/ai` `agentTraces` store                          |
+| **Routes**                     | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                                                   |
+| **API**                        | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`                        |
 
 Work outside a request (boot, scheduler ticks, queue jobs) goes to a separate
 background list, so it never clutters a request's timeline.
@@ -53883,11 +54075,51 @@ without duplicates by id (saved-only rows are marked **saved**).
 
 An older core without the request log leaves the panel in-memory only.
 
+## AI section: Reports, Runs, Agents, Models, Errors, Evaluate
+
+The **AI** sidebar group has six pages. Reports (`ai-reports`), Models (`ai-models`) and Errors (`ai-errors`) read
+**hourly rollups** (names and numbers only: agent, model, provider, runs, tokens, estimated cost, errors by category,
+latency histogram, fallback and refusal counts). Runs (`ai`, id unchanged), Agents (`agents`) and Evaluate
+(`ai-evaluate`) read in-memory data and exist in development only. Cost is always "Estimated from model pricing"; runs of
+models without pricing are counted as unpriced and shown next to every cost (a model priced at 0 counts as priced).
+Runs filters by text, status, type and exact HTTP request id (`GET api/ai/runs?requestId=`). A comparison whose
+previous period is older than the kept history reads "No earlier data". Custom ranges longer than 8 days use daily
+columns from local midnight to midnight.
+
+Options in `src/config/devtools.ts`:
+
+```ts
+export default {
+  ai: {
+    reports: true, // keep hourly totals; false turns the writer off (pages say so)
+    retentionDays: 30, // 1 to 400; default 30 in development, 90 in production
+    flushIntervalMs: 60_000, // at least 5000
+  },
+};
+```
+
+- Storage: development files under `storage/devtools/ai-rollups`; production table `devtools_ai_rollups`, part of
+  `devtoolsMigrations`. After upgrading run `warlock migrate`; without it one warning is logged and the pages answer
+  `table-missing` ("AI reports need their table", command `warlock migrate`).
+- Production tabs: Reports, Models and Errors are on by default when Panoptic is installed and loads; Runs, Agents and
+  Evaluate stay off. `production.panels` overrides by id (`{ "ai-reports": false }`). Every process that boots the
+  connector writes to the same table, so totals add up all instances and workers.
+- Needs Panoptic and observation (`ai.config({ panoptic: { observeAll: true } })`). Evaluate also needs
+  `ai.config({ panoptic: { evaluate: { model, instructions? } } })`; without it the page shows the setup.
+- Routes: `GET /api/ai/reports`, `/api/ai/models`, `/api/ai/errors` (query `range=24h|7d|30d|custom`, `from`, `to`, `tz`,
+  `agent`, `model`, `provider`), `GET /api/ai/runs` (`q`, `status`, `type`, `session`, `prompt`, `groupBy`, `limit`),
+  `GET` and `POST /api/ai/evaluate`; `GET /api/ai`, `/api/ai/runs/:id` and `/api/ai/agent-runs*` keep their shapes. Error
+  codes: `ai.range-invalid`, `ai.evaluate-unavailable`, `ai.prompt-not-found`, `ai.evaluate-failed`.
+- Inside a Warlock app Panoptic's standalone dashboard does not start (one notice points here); the AI section replaces it.
+
 ## AI runs alongside HTTP requests
 
 The **AI** tab and each request's **AI runs** section display completed traces
-from optional `@warlock.js/ai-panoptic`. If it cannot be imported, the tab shows
-install/restart guidance and the other panels keep working.
+from optional `@warlock.js/ai-panoptic`. If the tab is empty it says why
+(`/api/ai` answers `reason`: `ai-missing`, `panoptic-missing`, `panoptic-failed` with the load
+error (absolute paths replaced) and versions, `observation-off`, or `table-missing`, `reports-off`, or `not-collected` in the
+production dashboard, which keeps hourly totals but not single runs) with a title, one line and a copyable command; the
+other panels keep working.
 
 ```bash
 warlock add devtools
@@ -54063,7 +54295,7 @@ Environment variables:
 
 The accounts live in the app's database through Cascade. Roles are `viewer`
 and `admin`. Admins invite users with a 24-hour single-use link. Two-factor is
-required for admins by default (`twoFactor: "admins"`; or `"everyone"`): an
+required for admins by default (`twoFactor: "admins"`; or `"everyone"`, or `"off"` for nobody, which logs a boot warning; an account that has a factor is always asked for it): an
 authenticator app, or passkeys when `@simplewebauthn/server` is installed, plus
 10 recovery codes. Every closed case answers the app's own 404.
 
@@ -54073,7 +54305,7 @@ Options under `production` (all optional, defaults in brackets):
 `requestRetentionHours` [24], `maxStoredSamplesPerMinute` [120],
 `reportIntervalMs` [10000], `trustedProxies` [[]], `requireHttps` [true],
 `allowedIps` [[]], `origin`, `session.idleMinutes` [30], `session.maxHours` [8],
-`twoFactor` ["admins"], `rateLimits.windowMinutes` [15], `rateLimits.account`
+`twoFactor` ["admins"], `passwords.minLength` [8, from 8 to 72], `passwords.rejectCommon` [true], `rateLimits.windowMinutes` [15], `rateLimits.account`
 [5], `rateLimits.ip` [20], `rateLimits.global` [100], `rateLimits.lockMinutes`
 [15], `explain.executing` [false], `panels` [{}], `logLevels` [warn, error],
 `auditRetentionDays` [90], `passkeys.rpName`, `passkeys.rpId`.
@@ -54136,18 +54368,18 @@ Options under `production` (all optional, defaults in brackets):
 The app refuses to boot with a `DevtoolsProductionConfigError`
 (`DEVTOOLS_CONFIG_CODES` holds the messages):
 
-| Code    | Fix                                                                                                                         |
-| ------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `DT001` | Set `DEVTOOLS_PATH` or `production.path`.                                                                                   |
-| `DT002` | Use a path of 8+ characters starting with `/`, with letters, digits and `- _ . ~ /` only; not `/__warlock`.                 |
-| `DT003` | No admin: set `DEVTOOLS_ADMIN_EMAIL` plus a password or setup token, or run `warlock devtools:reset-admin --email <email>`. |
-| `DT004` | The env password breaks the rules (8+ characters, at most 72 bytes, not common, not the email).                             |
-| `DT005` | Install `@warlock.js/cascade` and configure a database.                                                                     |
-| `DT006` | Set `encryption.key` (64 hex characters).                                                                                   |
-| `DT007` | An option is invalid (`share.maxDays` must be 1 to 365); the message names it.                                              |
-| `DT008` | Add `devtoolsMigrations` to `database.migrations` and run `warlock migrate` (`devtools_shares` when sharing is on).         |
-| `DT009` | Set the password or the setup token, not both.                                                                              |
-| `DT010` | The setup token needs 32+ characters (`openssl rand -base64 32`).                                                           |
+| Code    | Fix                                                                                                                                                |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DT001` | Set `DEVTOOLS_PATH` or `production.path`.                                                                                                          |
+| `DT002` | Use a path of 8+ characters starting with `/`, with letters, digits and `- _ . ~ /` only; not `/__warlock`.                                        |
+| `DT003` | No admin: set `DEVTOOLS_ADMIN_EMAIL` plus a password or setup token, or run `warlock devtools:reset-admin --email <email>`.                        |
+| `DT004` | The env password breaks the rules (`passwords.minLength`+ characters, at most 72 bytes, not common unless `rejectCommon` is false, not the email). |
+| `DT005` | Install `@warlock.js/cascade` and configure a database.                                                                                            |
+| `DT006` | Set `encryption.key` (64 hex characters).                                                                                                          |
+| `DT007` | An option is invalid (`share.maxDays` must be 1 to 365); the message names it.                                                                     |
+| `DT008` | Add `devtoolsMigrations` to `database.migrations` and run `warlock migrate` (`devtools_shares` when sharing is on).                                |
+| `DT009` | Set the password or the setup token, not both.                                                                                                     |
+| `DT010` | The setup token needs 32+ characters (`openssl rand -base64 32`).                                                                                  |
 
 Every dashboard URL gives a 404: check that `production.enabled` is true, the
 dashboard is not disabled or locked (`warlock devtools:enable`), the request is
@@ -54238,7 +54470,12 @@ Panel styling: a package panel's CSS may use only the dashboard's variables (`DE
 `@warlock.js/devtools`: `--background --foreground --card --muted --muted-foreground --accent --border --brand
 --success --warning --info --destructive --chart-1..5` and the other shadcn names) plus variables it defines itself.
 Never use another name (such as `--text` or `--surface`): the dashboard does not define it, and text can become
-unreadable. The text tokens meet 4.5:1 contrast on `--background` and `--card` in both themes.
+unreadable. The text tokens meet 4.5:1 contrast on `--background` and `--card` in both themes. In the light theme `--primary` is the
+gold fill (dark `--primary-foreground` on it) and `--brand` is the deep amber for text; in the dark theme both are gold.
+
+The dashboard shows the Warlock logo and installed core version at the top of the sidebar and the app's own
+`package.json` name and version at the bottom. They come from `GET api/auth/session` (`warlockVersion`, `app`), read once
+on the server, signed-in only, `null` when unknown.
 
 
 ================================================================================

@@ -4,6 +4,23 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.60.0 - 2026-11-19
+
+### Added
+
+- An AI sidebar group with six pages: Reports, Runs, Agents, Models, Errors and Evaluate. Reports, Models and Errors show estimated cost, tokens, error rate and latency over 24 hours, 7 days, 30 days or a custom range, with accessible charts (keyboard tooltips, table view) that keep each model's colour while filters change. Cost is an estimate from model pricing: runs of models without pricing are counted next to every cost (a model priced at 0 counts as priced), a model whose runs used no tokens shows "No tokens used", and a comparison whose previous period is older than the kept history reads "No earlier data". Custom ranges longer than 8 days use daily columns from local midnight to midnight.
+- Runs gains search, status, type, exact HTTP request id and group-by filters, summary tiles (the estimated cost says how many unpriced runs it leaves out) and a cost tint on the span tree by each span's own cost; Errors lists recent failed runs inside the chosen range and filters; Agents shows the last 24 hours per agent; Evaluate grades a system prompt with the configured judge model and shows the score, issues and judge.
+- AI report API: `GET /api/ai/reports`, `/models`, `/errors` (range, timezone, agent, model and provider filters, previous-period comparison, 15 s cache), `GET /api/ai/runs` (filter, `requestId`, group, stats) and `GET`/`POST /api/ai/evaluate`.
+- Hourly AI rollups per hour, agent, model and provider (runs, tokens, estimated cost, errors by category, latency histogram), stored in the app database (`devtools_ai_rollups`, part of `devtoolsMigrations`), in JSON files in development and in memory in specs. A write that fails part-way retries only the totals it did not save, so nothing is counted twice.
+- `devtools.ai` options: `reports`, `retentionDays` (30 in development, 90 in production, 1 to 400) and `flushIntervalMs` (default 60000, minimum 5000).
+- Specific error codes for AI routes: `ai.range-invalid`, `ai.evaluate-unavailable`, `ai.prompt-not-found` and `ai.evaluate-failed`.
+- Devtools publishes where it is mounted so other packages can point to it. In production, Reports, Models and Errors are listed only when Panoptic is installed.
+
+### Changed
+
+- Upgrade note: in production, the Reports, Models and Errors tabs are on by default once Panoptic loads. Run `warlock migrate` to create `devtools_ai_rollups`; until then each process logs one warning at boot and the pages show "AI reports need their table". Turning all three tabs off with `production.panels` also stops the totals from being written.
+- The `ai` tab keeps its id (and `production.panels.ai`) and is titled "Runs", inside the AI sidebar group.
+
 ## 5.59.0 - 2026-11-19
 
 ### Added

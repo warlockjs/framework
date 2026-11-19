@@ -80,7 +80,12 @@ export type { CompletedEventPayload, Panoptic, PanopticOptions, PanopticTarget }
 
 // Evaluate — grade a trace's captured system prompt via the dashboard's
 // "Evaluate system prompt" drawer action (config-gated; see DashboardOptions.evaluate).
-export { evaluateSystemPrompt, extractLastSystemPrompt, findSpanById } from "./evaluate";
+export {
+  evaluateSystemPrompt,
+  extractLastSystemPrompt,
+  findSpanById,
+  getEvaluateConfig,
+} from "./evaluate";
 export type { EvaluateConfig, EvaluateVerdict } from "./evaluate";
 
 // Dashboard — zero-dependency local server over a trace store.
@@ -120,7 +125,7 @@ export type {
 // Config — declarative `ai.config({ panoptic })`. Exporting the type
 // also loads the `declare module "@warlock.js/ai"` augmentation that
 // attaches the typed `panoptic` slot onto core's `AIConfig`.
-export { applyPanopticConfig } from "./config";
+export { applyPanopticConfig, devtoolsPathHint, isInsideWarlockApp } from "./config";
 export type { PanopticConfig } from "./config";
 
 // Side-effect wiring — subscribes panoptic to the core config seam so a

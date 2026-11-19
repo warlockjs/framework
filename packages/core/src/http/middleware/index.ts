@@ -5,7 +5,7 @@ export { middleware } from "./middleware-list";
 // wrappers / re-exports without reaching into deep paths.
 export type { CacheMiddlewareOptions } from "./cache-response-middleware";
 export type { ConcurrencyLimitOptions } from "./concurrency-limit.middleware";
-export type { IdempotencyOptions } from "./idempotency.middleware";
+export type { IdempotencyOptions, IdempotencyStore } from "./idempotency.middleware";
 export type { IpFilterOptions } from "./ip-filter.middleware";
 export type { MaintenanceOptions } from "./maintenance.middleware";
 export type { RateLimitOptions } from "./rate-limit.middleware";

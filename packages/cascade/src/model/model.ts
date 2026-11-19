@@ -2870,7 +2870,8 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   /**
    * Produce a plain-object snapshot of this model suitable for cache storage.
    *
-   * - `data`: The model's own fields, serialized via the driver (handles Dates, BigInt, ObjectId).
+   * - `data`: The model's own fields as plain JS values (objects and arrays stay objects and
+   *   arrays; Dates become ISO strings and are listed in `dates`; BigInt and ObjectId become strings).
    * - `relations`: Each entry in `loadedRelations` recursively snapshotted via `toSnapshot`.
    *   A relation that was loaded but resolved to `null` is stored as `null` (not omitted),
    *   so that `fromSnapshot` can distinguish "loaded + null" from "never loaded".
@@ -2889,7 +2890,8 @@ export abstract class Model<out TSchema extends ModelSchema = ModelSchema> {
   /**
    * Reconstruct a model instance (with relations) from a cache snapshot.
    *
-   * Counterpart to `toSnapshot`. Applies driver deserialization (e.g. ISO string → Date)
+   * Counterpart to `toSnapshot`. Applies driver deserialization, restores Dates, parses object and array columns that an
+   * older snapshot stored as JSON text,
    * and recursively hydrates any nested relation snapshots via `RelationHydrator`.
    *
    * @example

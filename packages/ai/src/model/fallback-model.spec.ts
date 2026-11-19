@@ -473,3 +473,46 @@ describe("fallbackModel — caller cancellation", () => {
     expect(backup.callCount).toBe(0);
   });
 });
+
+describe("fallbackModel — fallbackAttempts", () => {
+  const rateLimit = () => new ProviderRateLimitError("429");
+
+  it("counts the failed models on a complete() answered by a later one", async () => {
+    const model = fallbackModel([
+      failingModel("a", rateLimit()),
+      failingModel("b", rateLimit()),
+      okModel("c"),
+    ]);
+
+    const response = await model.complete(userMessage);
+
+    expect(response.fallbackAttempts).toBe(2);
+  });
+
+  it("leaves the field off when the primary answers", async () => {
+    const model = fallbackModel([okModel("a"), okModel("b")]);
+
+    const response = await model.complete(userMessage);
+
+    expect("fallbackAttempts" in response).toBe(false);
+  });
+
+  it("puts the count on the stream's done chunk", async () => {
+    const model = fallbackModel([failingModel("a", rateLimit()), okModel("b")]);
+
+    const chunks = await collect(model.stream(userMessage));
+    const done = chunks.find((chunk) => chunk.type === "done");
+
+    expect(done).toMatchObject({ type: "done", fallbackAttempts: 1 });
+  });
+
+  it("leaves the done chunk without the field when the primary streams", async () => {
+    const model = fallbackModel([okModel("a"), okModel("b")]);
+
+    const chunks = await collect(model.stream(userMessage));
+    const done = chunks.find((chunk) => chunk.type === "done");
+
+    expect(done).toBeDefined();
+    expect(done && "fallbackAttempts" in done).toBe(false);
+  });
+});

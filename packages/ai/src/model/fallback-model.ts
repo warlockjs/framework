@@ -250,7 +250,11 @@ class FallbackRun {
 
         aggregateUsage(this.usage, response.usage);
 
-        return { ...response, usage: this.usage };
+        return {
+          ...response,
+          usage: this.usage,
+          ...(this.attempts.length > 0 ? { fallbackAttempts: this.attempts.length } : {}),
+        };
       } catch (error) {
         if (isLast || isCallerCancel(error, options) || !this.shouldRetry(error)) {
           throw error;
@@ -293,7 +297,11 @@ class FallbackRun {
             if (chunk.type === "done") {
               aggregateUsage(this.usage, chunk.usage);
 
-              yield { ...chunk, usage: this.usage };
+              yield {
+                ...chunk,
+                usage: this.usage,
+                ...(this.attempts.length > 0 ? { fallbackAttempts: this.attempts.length } : {}),
+              };
               return;
             }
 

@@ -88,6 +88,14 @@ export const DEVTOOLS_ERROR_MESSAGES: Record<DevtoolsErrorCode, string> = {
   "share.not-found": "This share link no longer exists or is already revoked. Reload the list.",
   "stream.too-many":
     "Too many live views are open for this session. Close another dashboard tab and reload.",
+  "ai.range-invalid":
+    "The date range is not valid. Pick 24 hours, 7 days or 30 days, or a custom range of at least one hour inside the kept history.",
+  "ai.evaluate-unavailable":
+    "Evaluate is not set up. Add panoptic.evaluate with a judge model to src/config/ai.ts, then restart.",
+  "ai.prompt-not-found":
+    "This run's system prompt is no longer kept. Pick a newer run or paste the prompt.",
+  "ai.evaluate-failed":
+    "The judge model could not grade this prompt. Check its API key and quota; the reference is in the server log.",
   "input.invalid": "Some fields are missing or not valid. Check the form and try again.",
   "server.error":
     "The dashboard could not complete this action. Try again; if it keeps failing, give your admin the reference shown.",
@@ -123,6 +131,10 @@ export const DEVTOOLS_ERROR_STATUS: Record<DevtoolsErrorCode, number> = {
   "request.invalid-filter": 400,
   "share.not-found": 404,
   "stream.too-many": 429,
+  "ai.range-invalid": 400,
+  "ai.evaluate-unavailable": 409,
+  "ai.prompt-not-found": 404,
+  "ai.evaluate-failed": 502,
   "input.invalid": 422,
   "server.error": 500,
 };

@@ -636,6 +636,8 @@ class Execution<TOutput> {
   private promptName?: string;
   /** Registry version label paired with {@link Execution.promptName}. */
   private promptVersion?: string;
+  /** Trips answered after at least one `fallbackModel()` failover. */
+  private fallbackTrips = 0;
   private readonly maxTrips: number;
   private readonly startedAt: Date;
   private readonly start = performance.now();
@@ -1248,6 +1250,10 @@ class Execution<TOutput> {
 
     this.trips.push(trip);
 
+    if ((response.fallbackAttempts ?? 0) > 0) {
+      this.fallbackTrips += 1;
+    }
+
     this.recorder?.endTurn(trip);
 
     this.emit("agent.trip.completed", { trip });
@@ -1843,6 +1849,7 @@ class Execution<TOutput> {
 
     let content = "";
     let finishReason: FinishReason = "stop";
+    let fallbackAttempts: number | undefined;
     let usage: Usage = { input: 0, output: 0, total: 0 };
     let blocks: ProviderContentBlock[] | undefined;
     let providerMetadata: ModelResponse["providerMetadata"];
@@ -1939,6 +1946,7 @@ class Execution<TOutput> {
         blocks = chunk.blocks;
         providerMetadata = chunk.providerMetadata;
         serverToolCalls = chunk.serverToolCalls;
+        fallbackAttempts = chunk.fallbackAttempts;
       }
     }
 
@@ -1970,6 +1978,7 @@ class Execution<TOutput> {
       finishReason: resolvedFinishReason,
       ...(providerMetadata ? { providerMetadata } : {}),
       ...(serverToolCalls ? { serverToolCalls } : {}),
+      ...(fallbackAttempts ? { fallbackAttempts } : {}),
       usage,
       toolCalls: mergedToolCalls.length > 0 ? mergedToolCalls : undefined,
       // Recovered (guard-synthesized) calls have no provider block, so a
@@ -2617,6 +2626,9 @@ class Execution<TOutput> {
       ...(this.promptName
         ? { promptName: this.promptName, promptVersion: this.promptVersion }
         : {}),
+      // Failover count, only when a `fallbackModel()` chain answered a trip
+      // after an earlier model failed.
+      ...(this.fallbackTrips > 0 ? { fallbackTrips: this.fallbackTrips } : {}),
       // Opt-in full-history capture (F2). When `captureMessages` is set,
       // normalize the real assembled turn array (assistant turns with
       // toolCalls + tool-result turns) onto the report. Off ⇒ field

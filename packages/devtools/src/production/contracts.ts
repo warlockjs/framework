@@ -430,6 +430,12 @@ export type DevtoolsPanelInfo = {
 /**
  * The built-in tabs, in display order, with whether production shows them
  * when the project says nothing (`production.panels` overrides per id).
+ *
+ * The AI section (`ai-reports`, `ai`, `agents`, `ai-models`, `ai-errors`,
+ * `ai-evaluate`) sits under "AI" in the sidebar. `ai` keeps its id (it is the
+ * Runs page) so existing links and `production.panels.ai` keep working. In
+ * production the three report tabs show only when the AI feed is available
+ * (Panoptic loads), unless `production.panels` turns one on explicitly.
  */
 export const DEVTOOLS_BUILT_IN_PANELS = [
   { id: "requests", title: "Requests", production: true },
@@ -441,8 +447,12 @@ export const DEVTOOLS_BUILT_IN_PANELS = [
   { id: "logs", title: "Logs", production: true },
   { id: "jobs", title: "Jobs", production: true },
   { id: "mail", title: "Mail", production: false },
-  { id: "ai", title: "AI", production: false },
+  { id: "ai-reports", title: "Reports", production: true },
+  { id: "ai", title: "Runs", production: false },
   { id: "agents", title: "Agents", production: false },
+  { id: "ai-models", title: "Models", production: true },
+  { id: "ai-errors", title: "Errors", production: true },
+  { id: "ai-evaluate", title: "Evaluate", production: false },
   { id: "api", title: "API", production: false },
 ] as const;
 
@@ -707,6 +717,10 @@ export type DevtoolsErrorCode =
   | "request.invalid-filter"
   | "share.not-found"
   | "stream.too-many"
+  | "ai.range-invalid"
+  | "ai.evaluate-unavailable"
+  | "ai.prompt-not-found"
+  | "ai.evaluate-failed"
   | "input.invalid"
   | "server.error";
 
@@ -719,4 +733,414 @@ export type DevtoolsApiErrorBody = {
   ref?: string;
   /** The instance that answered, when it matters (`explain.elsewhere`). */
   instance?: string;
+};
+
+// ---------------------------------------------------------------------------
+// AI section: reports, runs, models, errors, evaluate
+// ---------------------------------------------------------------------------
+
+/**
+ * Upper bounds (inclusive, ms) of the latency buckets of the AI rollups.
+ * Model calls take seconds, so these differ from `DEVTOOLS_LATENCY_BUCKETS_MS`.
+ * A histogram has one more count than this list: the last counts everything
+ * above five minutes. Fixed bounds make rollups from several processes add up
+ * exactly. Changing them is a breaking change of the stored rollups.
+ */
+export const DEVTOOLS_AI_LATENCY_BUCKETS_MS = [
+  250, 500, 1000, 2000, 3000, 5000, 7500, 10000, 15000, 20000, 30000, 45000, 60000, 120000, 300000,
+] as const;
+
+/** The date-range presets of the Reports, Models and Errors pages. */
+export type DevtoolsAiRangePreset = "24h" | "7d" | "30d";
+
+/** The range a report covers, after the server aligned it to its buckets. */
+export type DevtoolsAiResolvedRange = {
+  preset: DevtoolsAiRangePreset | "custom";
+  /** Inclusive start, on an hour boundary. */
+  from: number;
+  /** Exclusive end, on an hour boundary. */
+  to: number;
+  /** Bucket width of the charts: 1 hour, 6 hours or 1 day. */
+  stepMs: number;
+  /** The browser's offset from UTC (minutes east), used to align day buckets. */
+  utcOffsetMinutes: number;
+};
+
+/** Why an AI page has nothing to show; `title`, `message` and `command` are written for the page. */
+export type DevtoolsAiUnavailableReasonView =
+  | "ai-missing"
+  | "panoptic-missing"
+  | "panoptic-failed"
+  | "observation-off"
+  | "not-collected"
+  | "table-missing"
+  | "reports-off";
+
+/** The answer of any AI route that cannot serve its data. */
+export type DevtoolsAiUnavailableView = {
+  available: false;
+  reason: DevtoolsAiUnavailableReasonView;
+  title: string;
+  message: string;
+  /** A command or config line to copy; `null` when there is none. */
+  command: string | null;
+  /** The load error and versions for `panoptic-failed`; otherwise `null`. */
+  detail: string | null;
+};
+
+/** Token counts. `input` is the whole prompt (cache reads and writes included) on every provider. */
+export type DevtoolsAiTokenTotals = {
+  input: number;
+  output: number;
+  /** Prompt tokens read from the provider's cache (part of `input`). */
+  cached: number;
+  /** Prompt tokens written to the provider's cache (part of `input`). */
+  cacheWrite: number;
+  /** Reasoning tokens (part of `output`). */
+  reasoning: number;
+};
+
+/**
+ * Estimated cost. `estimatedUsd` sums only runs whose model has pricing; runs
+ * that used tokens on a model without pricing are counted in `unpricedRuns`
+ * and `unpricedTokens`, never as zero cost.
+ */
+export type DevtoolsAiCostTotals = {
+  estimatedUsd: number;
+  pricedRuns: number;
+  unpricedRuns: number;
+  unpricedTokens: number;
+};
+
+/** Latency from the bucketed histogram: each figure is a bucket's upper bound (`null` with no runs). */
+export type DevtoolsAiLatencyTotals = {
+  p50Ms: number | null;
+  p95Ms: number | null;
+  meanMs: number | null;
+};
+
+/** Totals over a range (or one row of a breakdown). */
+export type DevtoolsAiTotals = {
+  runs: number;
+  completed: number;
+  failed: number;
+  /** Runs that stopped early: `incomplete` and `max-iterations`. */
+  incomplete: number;
+  cancelled: number;
+  /** `(failed + incomplete) / runs`, from 0 to 1; 0 with no runs. Cancelled runs are not errors. */
+  errorRate: number;
+  tokens: DevtoolsAiTokenTotals;
+  cost: DevtoolsAiCostTotals;
+  latency: DevtoolsAiLatencyTotals;
+  /** Runs where a `fallbackModel()` chain answered from a later model at least once. */
+  fallbackRuns: number;
+  /** Runs where the provider refused at least once (finish reason `refusal` or a content filter). */
+  refusals: number;
+};
+
+/**
+ * Time series for a stacked chart: `values[i]` belongs to `buckets[i]`. At
+ * most five named series; the rest are summed into one `other` series.
+ */
+export type DevtoolsAiSeriesSet = {
+  /** Bucket starts, oldest first. */
+  buckets: number[];
+  series: {
+    /** Stable identity (`provider/model`, an agent name, a category); the UI keys colours on it. */
+    key: string;
+    label: string;
+    values: number[];
+    /** `true` for the summed "Other" series. */
+    other: boolean;
+  }[];
+};
+
+/** One bucket of the error-rate line. */
+export type DevtoolsAiRatePoint = {
+  at: number;
+  runs: number;
+  /** Failed plus incomplete runs. */
+  errors: number;
+  /** `errors / runs`; `null` for a bucket without runs (the line has a gap there). */
+  rate: number | null;
+};
+
+/** A row of the top agents or top models table. */
+export type DevtoolsAiBreakdownRow = {
+  /** The agent name, or `provider/model`. */
+  key: string;
+  label: string;
+  /** The provider for a model row; `null` for an agent row. */
+  provider: string | null;
+  totals: DevtoolsAiTotals;
+  /** Share of the range's estimated cost, 0 to 1 (share of runs when nothing was priced). */
+  share: number;
+};
+
+/** The filter values present in a range, for the filter row. */
+export type DevtoolsAiFilterOptions = {
+  agents: string[];
+  /** `provider/model` keys. */
+  models: string[];
+  providers: string[];
+};
+
+/** `GET api/ai/reports`. */
+export type DevtoolsAiReportView =
+  | DevtoolsAiUnavailableView
+  | {
+      available: true;
+      range: DevtoolsAiResolvedRange;
+      /** The period of the same length just before `range`. */
+      previousRange: { from: number; to: number };
+      /** `false` when part of the previous period is older than the kept history: its totals are partial. */
+      previousComplete: boolean;
+      totals: DevtoolsAiTotals;
+      previous: DevtoolsAiTotals;
+      /** Estimated USD per bucket, by model (top five plus Other). */
+      costByModel: DevtoolsAiSeriesSet;
+      /** Tokens per bucket: series `uncached`, `cached`, `output`. */
+      tokens: DevtoolsAiSeriesSet;
+      errorRate: DevtoolsAiRatePoint[];
+      /** Up to 10 rows, highest estimated cost first (most runs when nothing was priced). */
+      topAgents: DevtoolsAiBreakdownRow[];
+      topModels: DevtoolsAiBreakdownRow[];
+      /** `provider/model` keys that used tokens without pricing in the range. */
+      unpricedModels: string[];
+      filters: DevtoolsAiFilterOptions;
+      /** `true` when `@warlock.js/ai` observes nothing, so new runs are not counted. */
+      observationOff: boolean;
+      generatedAt: number;
+    };
+
+/** Whether a model's runs carried pricing in the range; `no-tokens` when no run used tokens. */
+export type DevtoolsAiPricingState = "set" | "missing" | "partial" | "no-tokens";
+
+/** One row of the Models page. */
+export type DevtoolsAiModelRow = {
+  /** `provider/model`. */
+  key: string;
+  model: string;
+  provider: string;
+  totals: DevtoolsAiTotals;
+  pricing: DevtoolsAiPricingState;
+  /** Estimated USD per priced run; `null` when no run was priced. */
+  costPerRunUsd: number | null;
+  /** `fallbackRuns / runs`, 0 to 1. */
+  fallbackRate: number;
+  /** Agents that used the model, most runs first (at most 5). */
+  agents: string[];
+  /** Start of the last hour with a run. */
+  lastSeenAt: number;
+};
+
+/** `GET api/ai/models`. */
+export type DevtoolsAiModelsView =
+  | DevtoolsAiUnavailableView
+  | {
+      available: true;
+      range: DevtoolsAiResolvedRange;
+      totals: DevtoolsAiTotals;
+      /** Most runs first. */
+      models: DevtoolsAiModelRow[];
+      /** Runs per bucket by model (top five plus Other). */
+      runsByModel: DevtoolsAiSeriesSet;
+      filters: DevtoolsAiFilterOptions;
+      observationOff: boolean;
+      generatedAt: number;
+    };
+
+/** How failed runs are grouped on the Errors page. */
+export type DevtoolsAiErrorCategory =
+  | "rate-limit"
+  | "timeout"
+  | "refusal"
+  | "provider"
+  | "budget"
+  | "tool"
+  | "schema"
+  | "incomplete"
+  | "other";
+
+/** Every category, in the order the Errors page lists them. */
+export const DEVTOOLS_AI_ERROR_CATEGORIES = [
+  "rate-limit",
+  "timeout",
+  "refusal",
+  "provider",
+  "budget",
+  "tool",
+  "schema",
+  "incomplete",
+  "other",
+] as const satisfies readonly DevtoolsAiErrorCategory[];
+
+/** One category of failed runs. */
+export type DevtoolsAiErrorGroup = {
+  category: DevtoolsAiErrorCategory;
+  /** "Rate limit", "Timeout", "Refusal", "Provider error", "Budget", "Tool failed", "Invalid output", "Incomplete", "Other". */
+  label: string;
+  count: number;
+  /** Share of all failed runs in the range, 0 to 1. */
+  share: number;
+  previousCount: number;
+  /** At most 5 each, most first. */
+  byModel: { key: string; count: number }[];
+  byAgent: { key: string; count: number }[];
+};
+
+/** A recent failed run (development only: production keeps no run details). */
+export type DevtoolsAiFailedRun = {
+  traceId: string;
+  /** The agent span that failed. */
+  agent: string;
+  /** `provider/model`, or `null` when unreported. */
+  model: string | null;
+  status: string;
+  category: DevtoolsAiErrorCategory;
+  /** The error code (`PROVIDER_RATE_LIMIT`) or error name. */
+  code: string | null;
+  /** The error message, secrets scrubbed, at most 300 characters. */
+  message: string | null;
+  endedAt: number;
+  requestId: string | null;
+};
+
+/** `GET api/ai/errors`. */
+export type DevtoolsAiErrorsView =
+  | DevtoolsAiUnavailableView
+  | {
+      available: true;
+      range: DevtoolsAiResolvedRange;
+      totals: DevtoolsAiTotals;
+      previous: DevtoolsAiTotals;
+      /** `false` when part of the previous period is older than the kept history: its totals are partial. */
+      previousComplete: boolean;
+      /** Categories with at least one failed run, most first. */
+      groups: DevtoolsAiErrorGroup[];
+      /** Failed runs per bucket by category (top five plus Other). */
+      overTime: DevtoolsAiSeriesSet;
+      /** Newest first, at most 50; `null` in production. */
+      recent: DevtoolsAiFailedRun[] | null;
+      filters: DevtoolsAiFilterOptions;
+      observationOff: boolean;
+      generatedAt: number;
+    };
+
+/** Usage of one run as the Runs page shows it. */
+export type DevtoolsAiUsageView = {
+  input: number;
+  output: number;
+  total: number;
+  cachedTokens: number | null;
+  cacheWriteTokens: number | null;
+  /** `false` when `input` excludes cache tokens (the provider reports them on top). */
+  inputIncludesCache: boolean | null;
+};
+
+/** One row of the Runs page (a Panoptic trace, content-free). */
+export type DevtoolsAiRunRow = {
+  traceId: string;
+  requestId: string | null;
+  sessionId: string | null;
+  name: string;
+  /** The root span type: `agent`, `workflow`, `supervisor`, … */
+  type: string;
+  status: string;
+  startedAt: string;
+  duration: number;
+  usage: DevtoolsAiUsageView;
+  /** Estimated USD; `null` when the run carried no pricing. */
+  cost: number | null;
+  models: string[];
+  /** `promptName@promptVersion` of the root agent, or `null`. */
+  promptKey: string | null;
+  toolCalls: number;
+  retries: number;
+  incomplete: boolean;
+};
+
+/** A group of the Runs page (`groupBy=session|prompt|type`). */
+export type DevtoolsAiRunGroup = {
+  key: string;
+  label: string;
+  runs: number;
+  failed: number;
+  estimatedCostUsd: number;
+  p95Ms: number | null;
+  /** Trace ids of the group, newest first (at most 50). */
+  traceIds: string[];
+};
+
+/** `GET api/ai/runs`. */
+export type DevtoolsAiRunsView =
+  | DevtoolsAiUnavailableView
+  | {
+      available: true;
+      /** Newest first, at most `limit` (default 200). */
+      runs: DevtoolsAiRunRow[];
+      /** `null` unless `groupBy` was given. */
+      groups: DevtoolsAiRunGroup[] | null;
+      stats: {
+        /** Runs matching the filter (before `limit`). */
+        count: number;
+        failed: number;
+        /** Priced runs only. */
+        estimatedCostUsd: number;
+        /** Runs that used tokens on a model without pricing (not in `estimatedCostUsd`). */
+        unpricedRuns: number;
+        p50Ms: number | null;
+        p95Ms: number | null;
+      };
+      /** How many traces the dashboard keeps (`maxRequests`). */
+      capacity: number;
+    };
+
+/** A distinct system prompt seen in recent agent runs (the Evaluate picker). */
+export type DevtoolsAiEvaluatePrompt = {
+  /** The prompt's hash from the agent trace. */
+  hash: string;
+  /** Agents that used it, most recent first. */
+  agents: string[];
+  /** The newest run that carried its text. */
+  runId: string;
+  lastSeenAt: string;
+  /** The first 200 characters. */
+  preview: string;
+  length: number;
+};
+
+/** `GET api/ai/evaluate`. */
+export type DevtoolsAiEvaluateView =
+  | DevtoolsAiUnavailableView
+  | {
+      available: true;
+      /** Whether `panoptic.evaluate` (or `panoptic.dashboard.evaluate`) has a judge model. */
+      configured: boolean;
+      /** The judge model as `provider/name`; `null` when not configured. */
+      judge: string | null;
+      /** The configured default grading instructions; `""` when none. */
+      instructions: string;
+      /** Newest first, at most 50. */
+      prompts: DevtoolsAiEvaluatePrompt[];
+    };
+
+/** `POST api/ai/evaluate` body: exactly one of `runId` and `systemPrompt`. */
+export type DevtoolsAiEvaluateRequest = {
+  /** An agent run whose system prompt text is kept. */
+  runId?: string;
+  /** A pasted prompt, 1 to 100,000 characters. */
+  systemPrompt?: string;
+  /** Overrides the configured instructions for this run; at most 4,000 characters. */
+  instructions?: string;
+};
+
+/** `POST api/ai/evaluate` answer. */
+export type DevtoolsAiEvaluateResult = {
+  /** 0 to 1; `null` when the judge returned no score. */
+  score: number | null;
+  issues: string[];
+  /** The judge model as `provider/name`. */
+  judge: string;
+  durationMs: number;
 };

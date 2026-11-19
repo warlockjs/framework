@@ -15,6 +15,7 @@ import { colors } from "@mongez/copper";
 import { log } from "@warlock.js/logger";
 import {
   databaseTransactionContext,
+  type SavepointScope,
   type TransactionContextStore,
 } from "../../context/database-transaction-context";
 import { flushAfterCommit } from "../../transactions/after-commit";
@@ -376,6 +377,12 @@ export class PostgresDriver implements DriverContract {
 
   /** Column types of the result being hydrated inside {@link withColumnTypes}. */
   private activeColumnTypes: PostgresColumnTypes | undefined;
+
+  /** Counter for unique savepoint names of nested `transaction()` blocks. */
+  private savepointCounter = 0;
+
+  /** Per transaction connection: the chain that runs its top-level savepoint blocks one at a time. */
+  private savepointRoots = new WeakMap<object, SavepointScope>();
 
   /** Unique keys per table, resolved from `pg_index` for upsert conflict targets. */
   private readonly _uniqueKeys = new Map<string, ReadonlyArray<UniqueKey>>();
@@ -1558,9 +1565,13 @@ export class PostgresDriver implements DriverContract {
     // seeder that creates a row, then calls a service that references it). The
     // outermost transaction owns BEGIN / COMMIT / ROLLBACK; the inner block
     // runs on the same session, and a throw still unwinds the whole outer
-    // transaction. (Savepoint-based partial rollback is a separate, explicit
-    // concern — use `beginTransaction()` directly for that.)
+    // transaction. Savepoint-based partial rollback is opt-in per call with
+    // `{ savepoint: true }`.
     if (this.canJoinActiveTransaction()) {
+      if ((options as PostgresTransactionOptions | undefined)?.savepoint) {
+        return this.runInSavepoint(fn, ctx);
+      }
+
       return fn(ctx);
     }
 
@@ -1634,6 +1645,83 @@ export class PostgresDriver implements DriverContract {
     await flushAfterCommit(committedCallbacks);
 
     return result;
+  }
+
+  /**
+   * Run a nested `transaction()` block inside a savepoint of the active
+   * transaction. A throw rolls back to the savepoint only (and drops the
+   * `afterCommit()` callbacks queued inside the block, nobody else's), then
+   * propagates so the caller can catch it; the outer transaction stays usable.
+   *
+   * Savepoint blocks started at the same time on one transaction (for example
+   * under `Promise.all`) run one after another: their SAVEPOINT and RELEASE
+   * statements share one connection and would otherwise interleave, and
+   * releasing an older savepoint also releases every newer one. A block nested
+   * inside another block runs at once, as a child savepoint.
+   */
+  private async runInSavepoint<T>(
+    fn: (ctx: TransactionContext) => Promise<T>,
+    ctx: TransactionContext,
+  ): Promise<T> {
+    const client = databaseTransactionContext.getSession<PgPoolClient>()!;
+    const current = databaseTransactionContext.currentSavepointScope();
+    const parent =
+      current && current.session === client ? current : this.rootSavepointScope(client);
+
+    // Wait for the sibling blocks started before this one.
+    const previous = parent.children;
+    let finished!: () => void;
+
+    parent.children = new Promise<void>((resolve) => {
+      finished = resolve;
+    });
+
+    await previous;
+
+    const name = `wl_sp_${++this.savepointCounter}`;
+    const scope = {
+      ...(current && current.session === client ? { parent: current } : {}),
+      session: client,
+      added: new Set<() => void | Promise<void>>(),
+      children: Promise.resolve(),
+    };
+
+    try {
+      await client.query(`SAVEPOINT ${name}`);
+
+      try {
+        const result = await databaseTransactionContext.runInSavepointScope(scope, () => fn(ctx));
+
+        await client.query(`RELEASE SAVEPOINT ${name}`);
+
+        return result;
+      } catch (error) {
+        databaseTransactionContext.dropAfterCommit(scope.added);
+
+        try {
+          await client.query(`ROLLBACK TO SAVEPOINT ${name}`);
+          await client.query(`RELEASE SAVEPOINT ${name}`);
+        } catch (savepointError) {
+          log.error(`database.postgress`, "transaction", savepointError);
+        }
+
+        throw error;
+      }
+    } finally {
+      finished();
+    }
+  }
+
+  /** The top-level chain of savepoint blocks of one transaction connection. */
+  private rootSavepointScope(client: PgPoolClient): SavepointScope {
+    let root = this.savepointRoots.get(client);
+
+    if (!root) {
+      root = { session: client, added: new Set(), children: Promise.resolve() };
+      this.savepointRoots.set(client, root);
+    }
+
+    return root;
   }
 
   /**

@@ -44,6 +44,10 @@ So `dashboard: true` with no exporters Just Works — you get a store for free. 
 
 **Idempotent.** Applying the config is safe on every `ai.config(...)` merge: the collector is registered as a core `Observer` exactly once and the dashboard is started at most once. Repeat calls only refresh the `observeAll` flag (latest config wins). `panoptic` undefined in the config is a no-op.
 
+## Inside a Warlock app it does not start
+
+When the process is a Warlock app (devtools mounted, `WARLOCK_BOOT_SIGNAL` set by `warlock start`, or a `warlock.config.ts`/`.js`/`.mjs`/`.cjs` in the working directory), `dashboard` is skipped: no store, no port, and one `log.info("ai-panoptic", "dashboard", …)` notice per process pointing at the devtools **AI** section. `dashboard: { standalone: true }` starts it anyway; outside a Warlock app `standalone` is ignored and nothing changes. Exporters, `observeAll` and content capture are unaffected. `isInsideWarlockApp()`, `devtoolsPathHint()` (the devtools path the notice names: the mounted path, else `/__warlock`) and `getEvaluateConfig()` are exported from `@warlock.js/ai-panoptic`.
+
 ## What the UI shows
 
 The page is one self-contained, dependency-free vanilla-JS file (no bundler, no framework, works offline). It polls the JSON API every 2s and renders:
@@ -147,6 +151,8 @@ await handle.close();
 The store is the same object the collector writes to — wire the collector to it (pass it as an exporter to `panoptic({ exporters: [store] })` or via `ai.config`) and the dashboard reflects new traces on its next poll.
 
 ### `DashboardOptions`
+
+`standalone?: boolean` (default `false`) starts the dashboard even inside a Warlock app.
 
 Every field optional, every default safe:
 

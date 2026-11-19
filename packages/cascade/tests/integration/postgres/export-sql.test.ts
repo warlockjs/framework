@@ -125,8 +125,8 @@ describe("Postgres integration — exportSQL() output shape", () => {
   /**
    * `CreateWidgetsTable` is chosen deliberately: it emits `CREATE TABLE`
    * (SQLGrammar phase 2) AND `CREATE [UNIQUE] INDEX` for `sku` / `quantity`
-   * (phase 4). Since headers are grouped by (phase, migration), that single
-   * migration necessarily produces two headers.
+   * (phase 4). Since a header starts each run of statements with the same
+   * (phase, migration), that single migration necessarily produces two headers.
    *
    * The phases are asserted explicitly rather than left implicit in a
    * `headers.length > names.size` comparison. A single-phase fixture would make
@@ -158,8 +158,11 @@ describe("Postgres integration — exportSQL() output shape", () => {
     // Exactly one migration is in the export...
     expect(names).toEqual(new Set(["create_mig_widgets"]));
 
-    // ...spread across the table-creation and index-creation phases.
-    expect(phases).toEqual(new Set(["2", "4"]));
+    // ...spread across at least the table-creation and index-creation phases
+    // (statements keep the order the migration queued them in, so the exact
+    // set of phases follows the migration's own statements).
+    expect(phases.has("2")).toBe(true);
+    expect(phases.has("4")).toBe(true);
 
     // Which is the operator-facing consequence: a naive `grep | wc -l` over the
     // headers reports 2 pending migrations when there is 1. Reading this file

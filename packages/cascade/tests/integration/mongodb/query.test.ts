@@ -294,17 +294,14 @@ describe("MongoDB integration — query execution", () => {
 
     it("groupBy with aggregates buckets documents per key", async () => {
       // The two-arg groupBy renames the `$group` `_id` back to the grouped field,
-      // so each result carries `status` plus the aggregate aliases (hydrated onto
-      // the model, read via .get()).
-      const rows = await QOrder.query()
+      // so each result carries `status` plus the aggregate aliases. groupBy
+      // returns plain rows (the model hydrator is cleared), not models.
+      const rows = (await QOrder.query()
         .groupBy("status", { total: { $sum: "$amount" }, orders: { $sum: 1 } })
-        .get();
+        .get()) as unknown as Record<string, unknown>[];
 
       const byStatus = Object.fromEntries(
-        rows.map((row) => [
-          row.get("status"),
-          { total: row.get("total"), orders: row.get("orders") },
-        ]),
+        rows.map((row) => [row.status as string, { total: row.total, orders: row.orders }]),
       );
 
       expect(byStatus.paid).toEqual({ total: 170, orders: 3 });

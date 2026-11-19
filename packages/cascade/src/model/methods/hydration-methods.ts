@@ -1,5 +1,11 @@
 import { clone } from "@mongez/reinforcements";
-import { DateValidator } from "@warlock.js/seal";
+import {
+  ArrayValidator,
+  DateValidator,
+  ObjectValidator,
+  RecordValidator,
+  TupleValidator,
+} from "@warlock.js/seal";
 import {
   RelationHydrator,
   type ModelSnapshot,
@@ -23,6 +29,33 @@ function getDeclaredDateKeys(ModelClass: ChildModel<Model>): ReadonlySet<string>
       ),
     );
     declaredDateKeys.set(ModelClass, keys);
+  }
+
+  return keys;
+}
+
+/** Column names a model class's schema declares as objects, arrays, records or tuples. */
+const declaredJsonKeys = new WeakMap<object, ReadonlySet<string>>();
+
+function getDeclaredJsonKeys(ModelClass: ChildModel<Model>): ReadonlySet<string> {
+  let keys = declaredJsonKeys.get(ModelClass);
+
+  if (!keys) {
+    const shape = (ModelClass.schema?.schema ?? {}) as Record<string, unknown>;
+
+    keys = new Set(
+      Object.keys(shape).filter((key) => {
+        const validator = shape[key];
+
+        return (
+          validator instanceof ObjectValidator ||
+          validator instanceof ArrayValidator ||
+          validator instanceof RecordValidator ||
+          validator instanceof TupleValidator
+        );
+      }),
+    );
+    declaredJsonKeys.set(ModelClass, keys);
   }
 
   return keys;
@@ -112,13 +145,47 @@ export function modelFromSnapshot<TModel extends Model>(
   ModelClass: ChildModel<TModel>,
   snapshot: ModelSnapshot,
 ): TModel {
-  const model = ModelClass.hydrate(snapshot.data) as TModel;
+  const data = { ...snapshot.data };
+
+  // Columns that were Dates when the snapshot was taken.
+  for (const key of snapshot.dates ?? []) {
+    const value = data[key];
+
+    if (typeof value === "string") {
+      const date = new Date(value);
+
+      if (!Number.isNaN(date.getTime())) data[key] = date;
+    }
+  }
+
+  // Snapshots written before values were kept as plain JS hold object and
+  // array columns as JSON text (PostgreSQL). A column the schema declares as
+  // an object or array can never legitimately hold a string, so parse it back.
+  const jsonKeys = getDeclaredJsonKeys(ModelClass);
+
+  for (const key of jsonKeys) {
+    const value = data[key];
+
+    if (typeof value !== "string") continue;
+
+    const first = value.charCodeAt(0);
+
+    // '{' = 123, '[' = 91
+    if (first !== 123 && first !== 91) continue;
+
+    try {
+      data[key] = JSON.parse(value);
+    } catch {
+      // Not JSON: leave the value as it was stored.
+    }
+  }
+
+  const model = ModelClass.hydrate(data) as TModel;
   RelationHydrator.hydrate(model, ModelClass.relations, snapshot.relations);
   return model;
 }
 
 export function modelToSnapshot(model: Model): ModelSnapshot {
-  const driver = (model.constructor as typeof Model).getDataSource().driver;
   const relations: Record<string, SerializedRelation> = {};
 
   for (const [name, related] of model.loadedRelations) {
@@ -133,10 +200,44 @@ export function modelToSnapshot(model: Model): ModelSnapshot {
     }
   }
 
-  return {
-    data: driver.serialize({ ...model.data }) as Record<string, unknown>,
-    relations,
-  };
+  // Snapshots keep plain JS values: the cache is not a database, so no driver
+  // encoding (JSON text for objects and arrays) belongs in it. Only values a
+  // cache cannot hold faithfully are converted: Dates become ISO strings (their
+  // keys are listed in `dates` so they come back as Dates), bigints and
+  // ObjectIds become strings.
+  const data: Record<string, unknown> = {};
+  const dates: string[] = [];
+
+  for (const [key, value] of Object.entries(model.data)) {
+    if (value === undefined) continue;
+
+    if (value instanceof Date) {
+      data[key] = value.toISOString();
+      dates.push(key);
+    } else if (typeof value === "bigint") {
+      data[key] = value.toString();
+    } else if (isObjectId(value)) {
+      data[key] = value.toString();
+    } else if (typeof value === "object" && value !== null) {
+      data[key] = clone(value);
+    } else {
+      data[key] = value;
+    }
+  }
+
+  const snapshot: ModelSnapshot = { data, relations };
+
+  if (dates.length > 0) snapshot.dates = dates;
+
+  return snapshot;
+}
+
+function isObjectId(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { _bsontype?: string })._bsontype === "ObjectId"
+  );
 }
 
 export function serializeModel(model: Model) {

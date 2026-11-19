@@ -31,6 +31,7 @@ type ReportExtensions = {
   tripIndex?: number;
   callId?: string;
   recoveredFrom?: string;
+  fallbackTrips?: number;
 };
 
 /**
@@ -134,6 +135,12 @@ function addAgentAttributes(
       0,
     );
     if (providerCompactions > 0) attributes["agent.providerCompactions"] = providerCompactions;
+    const refusals = extensions.trips.filter((trip) => trip.finishReason === "refusal").length;
+    if (refusals > 0) attributes["agent.refusals"] = refusals;
+  }
+
+  if (typeof extensions.fallbackTrips === "number") {
+    attributes["agent.fallbackTrips"] = extensions.fallbackTrips;
   }
 
   if (extensions.compactions?.length) {

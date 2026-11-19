@@ -1,5 +1,8 @@
 import type { Trace, TraceSpan, TraceStoreContract } from "@warlock.js/ai-panoptic";
 import { installedVersion } from "../app-versions";
+import type { DevtoolsAiRunHelpers } from "../ai/reports/runs";
+import type { DevtoolsAiTotalCost } from "../ai/types";
+import type { DevtoolsAiUnavailableView } from "../production/contracts";
 import { toSafeValue } from "../safe-value";
 import type { DevtoolsDisposer } from "../types";
 
@@ -8,7 +11,9 @@ export type DevtoolsAiUnavailableReason =
   | "panoptic-missing"
   | "panoptic-failed"
   | "observation-off"
-  | "not-collected";
+  | "not-collected"
+  | "table-missing"
+  | "reports-off";
 
 /** Why the AI tab is empty, as sent to the dashboard: a title, one line and an optional command. */
 export type DevtoolsAiUnavailable = {
@@ -69,7 +74,23 @@ export function describeAiUnavailable(
         reason,
         title: "AI runs are not collected here",
         message:
-          "The production dashboard does not collect AI runs. Open the AI tab in development (warlock dev) to see them.",
+          "Production keeps hourly AI totals, not run details. Open Reports, Models or Errors here, or the Runs tab in development (warlock dev).",
+      };
+    case "table-missing":
+      return {
+        available: false,
+        reason,
+        title: "AI reports need their table",
+        message: "Run the devtools migrations to create devtools_ai_rollups, then restart the app.",
+        command: "warlock migrate",
+      };
+    case "reports-off":
+      return {
+        available: false,
+        reason,
+        title: "AI reports are off",
+        message:
+          "Set devtools.ai.reports to true in src/config/devtools.ts to keep hourly AI totals.",
       };
     case "observation-off":
       return {
@@ -80,6 +101,18 @@ export function describeAiUnavailable(
         command: OBSERVATION_COMMAND,
       };
   }
+}
+
+/** The unavailable answer as the AI routes send it: `command` and `detail` are `null` when absent. */
+export function toAiUnavailableView(unavailable: DevtoolsAiUnavailable): DevtoolsAiUnavailableView {
+  return {
+    available: false,
+    reason: unavailable.reason,
+    title: unavailable.title,
+    message: unavailable.message,
+    command: unavailable.command ?? null,
+    detail: unavailable.detail ?? null,
+  };
 }
 
 /** Test seam: how packages are loaded and their versions read. */
@@ -97,6 +130,10 @@ export type DevtoolsAiSource =
       available: true;
       /** True when `@warlock.js/ai` has no `observeAll` and no registered observer (read per request). */
       observationOff?: () => boolean;
+      /** Totals a trace's priced usage (Panoptic's `totalCostUsd`). */
+      totalCost: DevtoolsAiTotalCost;
+      /** Panoptic's trace filter, grouping and percentile helpers for the Runs list. */
+      helpers: DevtoolsAiRunHelpers;
       store: TraceStoreContract;
       summarize: (trace: Trace) => DevtoolsAiRun;
       subscribe: (listener: (event: DevtoolsAiEvent) => void) => DevtoolsDisposer;
@@ -207,14 +244,20 @@ function snapshotSpan(span: TraceSpan): TraceSpan {
   };
 }
 
+type PanopticModule = typeof import("@warlock.js/ai-panoptic");
+type AiCoreModule = { isObserveAll?: () => boolean; getObservers?: () => readonly unknown[] };
+
 /**
- * Optional, lazy integration. Retains only traces collected after devtools boots,
- * using Panoptic's bounded query store; existing exporter/cache stores stay independent.
+ * Loads Panoptic (required) and `@warlock.js/ai` (for the observation check)
+ * lazily, or says why not. Shared by the development source and the AI
+ * reports wiring, so both answer the same unavailable reasons.
  */
-export async function attachAiSource(
-  capacity: number,
+export async function loadAiPackages(
   deps: AiSourceDeps = {},
-): Promise<DevtoolsAiSource> {
+): Promise<
+  | { panoptic: PanopticModule; observationOff: () => boolean }
+  | { unavailable: DevtoolsAiUnavailable }
+> {
   const aiPackage: string = "@warlock.js/ai"; // not a dependency of devtools: never resolved at build time
   const load =
     deps.load ??
@@ -222,32 +265,30 @@ export async function attachAiSource(
       name === "@warlock.js/ai-panoptic" ? import("@warlock.js/ai-panoptic") : import(aiPackage));
   const version =
     deps.version ?? ((name: string) => installedVersion(name, process.cwd(), import.meta.resolve));
-  let panoptic: typeof import("@warlock.js/ai-panoptic");
+  let panoptic: PanopticModule;
   try {
-    panoptic = (await load("@warlock.js/ai-panoptic")) as typeof panoptic;
+    panoptic = (await load("@warlock.js/ai-panoptic")) as PanopticModule;
     if (typeof panoptic.subscribeTraces !== "function")
       throw new Error("Trace subscription unavailable");
   } catch (error) {
     const aiVersion = version("@warlock.js/ai");
     const panopticVersion = version("@warlock.js/ai-panoptic");
-    if (aiVersion === null) return { ...describeAiUnavailable("ai-missing"), dispose() {} };
-    if (panopticVersion === null)
-      return { ...describeAiUnavailable("panoptic-missing"), dispose() {} };
+    if (aiVersion === null) return { unavailable: describeAiUnavailable("ai-missing") };
+    if (panopticVersion === null) return { unavailable: describeAiUnavailable("panoptic-missing") };
     const text = redactPaths(
       (error instanceof Error ? error.message : String(error)).split("\n")[0] ?? "",
     ).slice(0, 300);
     return {
-      ...describeAiUnavailable(
+      unavailable: describeAiUnavailable(
         "panoptic-failed",
         `${text} (@warlock.js/ai ${aiVersion}, @warlock.js/ai-panoptic ${panopticVersion})`,
       ),
-      dispose() {},
     };
   }
 
-  let core: { isObserveAll?: () => boolean; getObservers?: () => readonly unknown[] } | undefined;
+  let core: AiCoreModule | undefined;
   try {
-    core = (await load("@warlock.js/ai")) as typeof core;
+    core = (await load("@warlock.js/ai")) as AiCoreModule;
   } catch {
     core = undefined;
   }
@@ -256,6 +297,21 @@ export async function attachAiSource(
     typeof core.getObservers === "function" &&
     !core.isObserveAll() &&
     core.getObservers().length === 0;
+
+  return { panoptic, observationOff };
+}
+
+/**
+ * Optional, lazy integration. Retains only traces collected after devtools boots,
+ * using Panoptic's bounded query store; existing exporter/cache stores stay independent.
+ */
+export async function attachAiSource(
+  capacity: number,
+  deps: AiSourceDeps = {},
+): Promise<DevtoolsAiSource> {
+  const loaded = await loadAiPackages(deps);
+  if ("unavailable" in loaded) return { ...loaded.unavailable, dispose() {} };
+  const { panoptic, observationOff } = loaded;
 
   const { currentRequestId } = await import("../current-request-id");
   const store = panoptic.createInMemoryTraceStore({ capacity });
@@ -282,6 +338,15 @@ export async function attachAiSource(
   return {
     available: true,
     observationOff,
+    totalCost: (usage) => panoptic.totalCostUsd(usage),
+    helpers: {
+      filterTraces: panoptic.filterTraces,
+      groupBySession: panoptic.groupBySession,
+      groupByPrompt: panoptic.groupByPrompt,
+      groupByType: panoptic.groupByType,
+      percentile: panoptic.percentile,
+      tracePromptKey: panoptic.tracePromptKey,
+    },
     store,
     summarize: (trace) => summarizeAiTrace(trace, panoptic.totalCostUsd(trace.usage)),
     subscribe(listener) {

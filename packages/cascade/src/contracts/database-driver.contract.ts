@@ -462,7 +462,8 @@ export interface DriverContract {
    * - Returns the callback's return value
    *
    * **Limitations:**
-   * - A nested `transaction()` joins the outer transaction (flat, no savepoints): nothing is
+   * - A nested `transaction()` joins the outer transaction (flat, no savepoints unless PostgreSQL's
+   *   `{ savepoint: true }` option is passed; MongoDB always joins flat): nothing is
    *   committed until the outer one commits, so use `afterCommit()` for work that must follow the commit
    * - MongoDB: Requires replica set configuration
    *

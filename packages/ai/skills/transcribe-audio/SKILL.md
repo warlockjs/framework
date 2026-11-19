@@ -109,6 +109,7 @@ The adapter wraps the base64 bytes in an uploadable via the SDK's `toFile`, usin
 `ai.transcribe` fills `usage.cost` so STT spend folds into the **same** `Usage.cost` rollup as text:
 
 - **Per-minute** (`whisper-1`): `{ perMinute }` × `(durationSeconds / 60)` → `cost.input`. If the provider didn't report a duration, cost stays **`undefined`** (no guessing).
+- `usage.audioInputTokens` and `usage.textInputTokens` (optional) split a token-metered model's input into its audio and text parts when the provider reports it; absent otherwise.
 - **Token-metered** (`gpt-4o-transcribe`): `{ input, output }` USD-per-1M-tokens → standard `computeCost` against the returned token usage.
 
 Per-minute wins when both are set; an unpriced model leaves `usage.cost` **`undefined`** (honest "cost unknown", never a false zero).

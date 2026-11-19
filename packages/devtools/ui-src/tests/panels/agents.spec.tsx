@@ -1,7 +1,8 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AgentsPanel } from "@/panels/agents";
+import { reportView, unavailable } from "./ai-fixtures";
 import { failure, FakeEventSource, mockApi, renderPanel } from "./helpers";
 
 const row = (runId: string, overrides: Record<string, unknown> = {}) => ({
@@ -68,6 +69,49 @@ function trace(runId: string, promptHash = "p1", toolHash = "abcdef123456") {
 beforeEach(() => FakeEventSource.install());
 
 describe("Agents panel", () => {
+  it("shows the last 24 hours per agent from the hourly report", async () => {
+    const { calls } = mockApi([
+      [/^api\/ai\/reports\?/, reportView()],
+      ["api/ai/agent-runs", { available: true, runs: [] }],
+    ]);
+
+    renderPanel(AgentsPanel);
+
+    const table = await screen.findByRole("table", { name: "Agents in the last 24 hours" });
+
+    expect(within(table).getByText("checkout")).toBeInTheDocument();
+    expect(calls.some((call) => /^api\/ai\/reports\?range=24h&tz=-?\d+$/.test(call.url))).toBe(
+      true,
+    );
+  });
+
+  it("hides the 24 hour table when reports are not available", async () => {
+    mockApi([
+      [/^api\/ai\/reports\?/, unavailable("reports-off", "AI reports are off", "Turn them on.")],
+      ["api/ai/agent-runs", { available: true, runs: [] }],
+    ]);
+    renderPanel(AgentsPanel);
+
+    await screen.findByText(/No agent runs yet/);
+    expect(screen.queryByText("Agents in the last 24 hours")).toBeNull();
+  });
+
+  it("shows why the 24 hour table failed, with its reference", async () => {
+    mockApi([
+      [
+        /^api\/ai\/reports\?/,
+        failure(500, "The report could not be read. Check the server log.", { ref: "ag-1" }),
+      ],
+      ["api/ai/agent-runs", { available: true, runs: [] }],
+    ]);
+    renderPanel(AgentsPanel);
+
+    expect(
+      await screen.findByText("Could not load the agents of the last 24 hours"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Reference: ag-1")).toBeInTheDocument();
+  });
+
   it("renders install guidance and an empty state", async () => {
     mockApi([
       ["api/ai/agent-runs", { available: false, message: "Install @warlock.js/ai 5.38", runs: [] }],

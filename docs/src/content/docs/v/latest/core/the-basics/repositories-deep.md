@@ -660,6 +660,10 @@ This is explicit, runs reliably, and reads clearly — there's no hidden hook in
 
 `isCacheable` is the master switch. When it's `true` (the default), every `*Cached` method reads from / writes to the configured cache driver.
 
+### What a cache hit returns
+
+A cached model is stored as a plain snapshot (`model.toSnapshot()`) and rebuilt with `Model.fromSnapshot()`. Objects and arrays stay objects and arrays, and dates come back as `Date`s, so a model served from the cache has the same values as the one the database returned, on PostgreSQL and MongoDB alike. Entries written by an earlier version that hold object or array columns as JSON text are parsed back for columns the model's schema declares as objects or arrays.
+
 ### Invalidation cost: `"namespace"` or `"generation"`
 
 By default a write clears the repository's cache by removing every key under `repositories.<name>`; on Redis that scans the key space on each write. Set `repository.cacheInvalidation` to `"generation"` to make a write cost a constant number of round trips: entries are stored under a generation id (`repositories.<name>.g-<id>.…`), and a write replaces the id so the old entries become unreachable. Each cache read then does one extra read of the id.
@@ -814,6 +818,7 @@ type RepositoryConfigurations = {
   isActiveColumn?: string;
   isActiveValue?: any;
   allowClientUnpaginated?: boolean; // default false, see "Options from the request"
+  isCacheable?: boolean; // default true, master switch for the *Cached methods
 };
 ```
 

@@ -21,6 +21,8 @@ export type DevtoolsAgentTrace = {
   model: { name: string; provider: string };
   usage: { input: number; output: number; total: number };
   cost?: number;
+  /** The system prompt's hash; `text` is kept only when the agent records prompt text (development). */
+  systemPrompt?: { hash: string; text?: string };
   turns: Array<{ toolCalls: Array<{ refusal?: string }> }>;
 };
 

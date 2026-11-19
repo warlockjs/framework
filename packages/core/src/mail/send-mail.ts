@@ -201,6 +201,16 @@ async function runMailEvent<T extends (...args: any[]) => any>(
   }
 }
 
+/** Runs one group of mail event handlers; a throw or rejection is logged and yields no results. */
+async function collectSafely(run: () => Promise<any[]>): Promise<any[]> {
+  try {
+    return await run();
+  } catch (error) {
+    log.error("mail", "event", `Event handler error: ${error}`);
+    return [];
+  }
+}
+
 /**
  * Trigger both global and mail-specific events
  */
@@ -220,15 +230,19 @@ async function triggerEvents(
             ? "SUCCESS"
             : "ERROR";
 
-    const globalResults = await mailEvents.trigger(
-      globalEventName as keyof typeof MAIL_EVENTS,
-      ...args,
+    // `collect` awaits every handler (sync or async) and returns all results as an array,
+    // so a `beforeSending` handler returning `false` reaches the cancel check and a
+    // rejecting handler is logged here instead of becoming an unhandled rejection.
+    // The global handlers and the per-mail handlers are guarded separately, so a
+    // failing global handler never skips the per-mail ones.
+    const globalResults = await collectSafely(() =>
+      mailEvents.collect(globalEventName as keyof typeof MAIL_EVENTS, ...args),
+    );
+    const specificResults = await collectSafely(() =>
+      mailEvents.collectForMail(mailId, event, ...args),
     );
 
-    // Trigger mail-specific event (e.g., mail.$id.success)
-    const specificResults = await mailEvents.triggerForMail(mailId, event, ...args);
-
-    return [...(globalResults || []), ...(specificResults || [])];
+    return [...globalResults, ...specificResults];
   } catch (error) {
     log.error("mail", "event", `Event handler error: ${error}`);
     return [];

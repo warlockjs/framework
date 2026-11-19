@@ -138,17 +138,18 @@ for (const user of targets) {
 
 ## When to reach for what
 
-| Task                                            | Reach for                                                     |
-| ----------------------------------------------- | ------------------------------------------------------------- |
-| Increment a counter                             | `Model.increase(filter, field, n)`                            |
-| Atomically change multiple fields on one record | `Model.atomic(filter, ops)`                                   |
-| Insert N records                                | `Model.createMany(rows)`                                      |
-| Insert a large batch fast (no per-row events)   | `Model.createMany(rows, { bulk: true, batchSize })`           |
-| Update many rows with operators                 | `Model.findAndUpdate(filter, { $set: {...} })`                |
-| Update one record by id                         | `Model.update(id, data)`                                      |
-| Delete many rows (raw)                          | `Model.delete(filter)`                                        |
-| Multi-row read-modify-write                     | Wrap in a transaction (see the `manage-transactions` topic)   |
-| Need lifecycle events / delete strategy per row | `Model.where(...).get()` + iterate + `.save()` / `.destroy()` |
+| Task                                            | Reach for                                                                                                                    |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Increment a counter                             | `Model.increase(filter, field, n)`                                                                                           |
+| Atomically change multiple fields on one record | `Model.atomic(filter, ops)`                                                                                                  |
+| Insert N records                                | `Model.createMany(rows)`                                                                                                     |
+| Insert a large batch fast (no per-row events)   | `Model.createMany(rows, { bulk: true, batchSize })`                                                                          |
+| Update many rows with operators                 | `Model.findAndUpdate(filter, { $set: {...} })`                                                                               |
+| Update one record by id                         | `Model.update(id, data)`                                                                                                     |
+| Delete many rows (raw)                          | `Model.delete(filter)`                                                                                                       |
+| Multi-row read-modify-write                     | Wrap in a transaction (see the `manage-transactions` topic)                                                                  |
+| Lock a row before changing it (Postgres)        | `Model.query().where(...).lockForUpdate().first()` in a transaction; `findOneAndUpdate` updates atomically, it is not a lock |
+| Need lifecycle events / delete strategy per row | `Model.where(...).get()` + iterate + `.save()` / `.destroy()`                                                                |
 
 ## Things NOT to do
 

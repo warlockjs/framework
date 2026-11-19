@@ -55,21 +55,23 @@ export default {
 
 ## What each panel shows
 
-| Panel         | What you see                                                                                                                                                                                                                                      | Where it comes from                          |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| **Requests**  | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis. | core `registerTracingHooks()`                |
-| **Queries**   | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`)                                                                                            | cascade `dataSourceRegistry.on("query")`     |
-| **N+1**       | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal                                                                                                    | same query shape ≥ 5 times in one request    |
-| **Mail**      | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                              | core `mailEvents.onCaptured()`               |
-| **Logs**      | Log entries per request, filterable by level and module                                                                                                                                                                                           | a logger channel                             |
-| **Cache**     | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                   | cache `cache.on(...)`                        |
-| **Resources** | Memory, CPU, event-loop delay and garbage collection, with a 10-minute history                                                                                                                                                                    | the process                                  |
-| **Health**    | Readiness checks over time                                                                                                                                                                                                                        | core `health.readiness()`                    |
-| **Errors**    | Failed requests grouped by cause with counts                                                                                                                                                                                                      | tracing and logger                           |
-| **Jobs**      | Registered scheduled jobs with schedule, last and next run (no run history, duration or error yet); queue counts only when the queue driver reports them (not available today)                                                                    | `@warlock.js/scheduler`, `@warlock.js/queue` |
-| **Agents**    | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                      | `@warlock.js/ai` `agentTraces` store         |
-| **Routes**    | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                                  |
-| **API**       | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`       |
+| Panel                          | What you see                                                                                                                                                                                                                                      | Where it comes from                                           |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Requests**                   | Each request with its status, duration and query count. Click one for a waterfall: router middleware, `page.middleware`, loaders, `page.cache` hit/miss, `render.shell`, `defer.settle`, with queries and cache ops placed on the same time axis. | core `registerTracingHooks()`                                 |
+| **Queries**                    | SQL + bindings or the Mongo command, duration, rows, and an **Explain** button (Postgres `SELECT` only; runs `EXPLAIN (FORMAT JSON)`, never `ANALYZE`)                                                                                            | cascade `dataSourceRegistry.on("query")`                      |
+| **N+1**                        | `⚠ N+1: 12× "select … where post_id = $1" — src/app/posts/services/list-posts.service.ts:18`, shown on the request and printed in the terminal                                                                                                    | same query shape ≥ 5 times in one request                     |
+| **Mail**                       | Every mail sent in development: headers, HTML (sandboxed) and text, attachment names                                                                                                                                                              | core `mailEvents.onCaptured()`                                |
+| **Logs**                       | Log entries per request, filterable by level and module                                                                                                                                                                                           | a logger channel                                              |
+| **Cache**                      | hit / miss / set / removed / `invalidated` (tags, keys removed)                                                                                                                                                                                   | cache `cache.on(...)`                                         |
+| **Resources**                  | Memory, CPU, event-loop delay and garbage collection, with a 10-minute history                                                                                                                                                                    | the process                                                   |
+| **Health**                     | Readiness checks over time                                                                                                                                                                                                                        | core `health.readiness()`                                     |
+| **Errors**                     | Failed requests grouped by cause with counts                                                                                                                                                                                                      | tracing and logger                                            |
+| **Jobs**                       | Registered scheduled jobs with schedule, last and next run (no run history, duration or error yet); queue counts only when the queue driver reports them (not available today)                                                                    | `@warlock.js/scheduler`, `@warlock.js/queue`                  |
+| **AI Reports, Models, Errors** | Hourly totals of agent runs, tokens, estimated cost (from model pricing; unpriced models flagged), errors by category, latency, fallbacks and refusals, with 24h / 7d / 30d / custom ranges and Agent, Model, Provider filters. Production too    | `@warlock.js/ai-panoptic` trace feed, saved as hourly rollups |
+| **AI Runs, Evaluate**          | Single runs with filters, grouping and a cost tint; grade a system prompt with a judge model. Development only                                                                                                                                    | Panoptic traces in memory; `panoptic.evaluate`                |
+| **Agents**                     | Per-turn traces of `@warlock.js/ai` agents: system prompt, tools offered with schema hashes, tool calls, results and refusals, retries, usage and cost, plus a comparison with the previous run of the agent                                      | `@warlock.js/ai` `agentTraces` store                          |
+| **Routes**                     | Every HTTP route with its method, path, name and middleware                                                                                                                                                                                       | core router                                                   |
+| **API**                        | The app's API reference: every route with its parameters, request body, responses and auth                                                                                                                                                        | core `getDevelopmentOpenApiDocument()`                        |
 
 Work outside a request (boot, scheduler ticks, queue jobs) goes to a separate
 background list, so it never clutters a request's timeline.
@@ -94,13 +96,50 @@ without duplicates by id (saved-only rows are marked **saved**).
 
 An older core without the request log leaves the panel in-memory only.
 
+## AI section: Reports, Runs, Agents, Models, Errors, Evaluate
+
+The **AI** sidebar group has six pages. Reports (`ai-reports`), Models (`ai-models`) and Errors (`ai-errors`) read
+**hourly rollups** (names and numbers only: agent, model, provider, runs, tokens, estimated cost, errors by category,
+latency histogram, fallback and refusal counts). Runs (`ai`, id unchanged), Agents (`agents`) and Evaluate
+(`ai-evaluate`) read in-memory data and exist in development only. Cost is always "Estimated from model pricing"; runs of
+models without pricing are counted as unpriced and shown next to every cost (a model priced at 0 counts as priced).
+Runs filters by text, status, type and exact HTTP request id (`GET api/ai/runs?requestId=`). A comparison whose
+previous period is older than the kept history reads "No earlier data". Custom ranges longer than 8 days use daily
+columns from local midnight to midnight.
+
+Options in `src/config/devtools.ts`:
+
+```ts
+export default {
+  ai: {
+    reports: true, // keep hourly totals; false turns the writer off (pages say so)
+    retentionDays: 30, // 1 to 400; default 30 in development, 90 in production
+    flushIntervalMs: 60_000, // at least 5000
+  },
+};
+```
+
+- Storage: development files under `storage/devtools/ai-rollups`; production table `devtools_ai_rollups`, part of
+  `devtoolsMigrations`. After upgrading run `warlock migrate`; without it one warning is logged and the pages answer
+  `table-missing` ("AI reports need their table", command `warlock migrate`).
+- Production tabs: Reports, Models and Errors are on by default when Panoptic is installed and loads; Runs, Agents and
+  Evaluate stay off. `production.panels` overrides by id (`{ "ai-reports": false }`). Every process that boots the
+  connector writes to the same table, so totals add up all instances and workers.
+- Needs Panoptic and observation (`ai.config({ panoptic: { observeAll: true } })`). Evaluate also needs
+  `ai.config({ panoptic: { evaluate: { model, instructions? } } })`; without it the page shows the setup.
+- Routes: `GET /api/ai/reports`, `/api/ai/models`, `/api/ai/errors` (query `range=24h|7d|30d|custom`, `from`, `to`, `tz`,
+  `agent`, `model`, `provider`), `GET /api/ai/runs` (`q`, `status`, `type`, `session`, `prompt`, `groupBy`, `limit`),
+  `GET` and `POST /api/ai/evaluate`; `GET /api/ai`, `/api/ai/runs/:id` and `/api/ai/agent-runs*` keep their shapes. Error
+  codes: `ai.range-invalid`, `ai.evaluate-unavailable`, `ai.prompt-not-found`, `ai.evaluate-failed`.
+- Inside a Warlock app Panoptic's standalone dashboard does not start (one notice points here); the AI section replaces it.
+
 ## AI runs alongside HTTP requests
 
 The **AI** tab and each request's **AI runs** section display completed traces
 from optional `@warlock.js/ai-panoptic`. If the tab is empty it says why
 (`/api/ai` answers `reason`: `ai-missing`, `panoptic-missing`, `panoptic-failed` with the load
-error (absolute paths replaced) and versions, `observation-off`, or `not-collected` in the
-production dashboard, which never collects AI runs) with a title, one line and a copyable command; the
+error (absolute paths replaced) and versions, `observation-off`, or `table-missing`, `reports-off`, or `not-collected` in the
+production dashboard, which keeps hourly totals but not single runs) with a title, one line and a copyable command; the
 other panels keep working.
 
 ```bash

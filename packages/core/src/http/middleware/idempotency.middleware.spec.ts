@@ -123,3 +123,63 @@ describe("idempotencyMiddleware — reservation", () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("idempotencyMiddleware — store and scope", () => {
+  function memoryStore() {
+    const records = new Map<string, unknown>();
+
+    return {
+      records,
+      store: {
+        get: async (key: string) => records.get(key) ?? null,
+        reserve: async (key: string, value: unknown) => {
+          if (records.has(key)) return { wasSet: false, existing: records.get(key) };
+          records.set(key, value);
+          return { wasSet: true };
+        },
+        set: async (key: string, value: unknown) => void records.set(key, value),
+        remove: async (key: string) => void records.delete(key),
+      },
+    };
+  }
+
+  async function runWith(options: Parameters<typeof idempotencyMiddleware>[0]) {
+    const { response, send } = createResponse();
+    const short = await idempotencyMiddleware(options)({
+      request: createRequest(),
+      response,
+    } as any);
+    const handled =
+      short === undefined &&
+      (response.replay as any).mock.calls.length === 0 &&
+      (response.conflict as any).mock.calls.length === 0;
+
+    if (handled) await send(201);
+
+    return { response, handled };
+  }
+
+  it("keeps the records in a plugged store, not the cache", async () => {
+    const { store, records } = memoryStore();
+
+    await runWith({ store });
+    expect(records.size).toBe(1);
+
+    const replayed = await runWith({ store });
+    expect(replayed.handled).toBe(false);
+    expect(replayed.response.replay).toHaveBeenCalledWith(expect.objectContaining({ status: 201 }));
+  });
+
+  it("does not replay across scopes", async () => {
+    const { store, records } = memoryStore();
+
+    await runWith({ store, scope: () => "tenant-a" });
+    const other = await runWith({ store, scope: () => "tenant-b" });
+    const same = await runWith({ store, scope: () => "tenant-a" });
+
+    expect(other.handled).toBe(true);
+    expect(same.handled).toBe(false);
+    expect(records.size).toBe(2);
+    expect([...records.keys()].every((key) => key.includes(":s=tenant-"))).toBe(true);
+  });
+});

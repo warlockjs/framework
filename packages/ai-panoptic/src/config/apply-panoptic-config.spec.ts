@@ -1,4 +1,5 @@
 import { getObservers, isObserveAll, setAIConfig } from "@warlock.js/ai";
+import { log } from "@warlock.js/logger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // `clearObservers` is intentionally NOT on the core public barrel (it is
 // test-only isolation); import it from the core source for spec cleanup.
@@ -19,6 +20,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
   await resetAppliedPanopticConfig();
   clearObservers();
 });
@@ -101,6 +104,33 @@ describe("applyPanopticConfig", () => {
 
     const res = await fetch(`${handle.url}api/traces/seeded`);
     expect(res.status).toBe(200);
+  });
+
+  it("does not start the dashboard inside a Warlock app and logs one notice", async () => {
+    vi.stubEnv("WARLOCK_BOOT_SIGNAL", "1");
+    const info = vi.spyOn(log, "info").mockImplementation(() => undefined as never);
+
+    applyPanopticConfig({ dashboard: { port: 0 } });
+    applyPanopticConfig({ dashboard: { port: 0 } });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(getActiveDashboardHandle()).toBeUndefined();
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(info.mock.calls[0]?.[0]).toBe("ai-panoptic");
+    expect(String(info.mock.calls[0]?.[2])).toContain("standalone");
+    expect(getObservers()).toHaveLength(1);
+  });
+
+  it("starts the dashboard inside a Warlock app when standalone is true", async () => {
+    vi.stubEnv("WARLOCK_BOOT_SIGNAL", "1");
+    const info = vi.spyOn(log, "info").mockImplementation(() => undefined as never);
+
+    applyPanopticConfig({ dashboard: { port: 0, standalone: true } });
+
+    const handle = await waitForDashboard();
+
+    expect(handle.port).toBeGreaterThan(0);
+    expect(info).not.toHaveBeenCalled();
   });
 
   it("creates and registers a store when dashboard is set without one", async () => {

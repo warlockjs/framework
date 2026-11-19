@@ -41,6 +41,7 @@ type PanopticConfig = {
   dashboard?: boolean | DashboardOptions; // serve the local dashboard
   capacity?: number; // traces kept by the store panoptic creates (default 1000)
   observeAll?: boolean; // observe every flow by default
+  evaluate?: EvaluateConfig; // judge settings for grading a system prompt
 };
 ```
 
@@ -50,7 +51,27 @@ type PanopticConfig = {
 | `cache`      | _unset_ | A `@warlock.js/cache` `CacheDriver` (or a `() => CacheDriver \| Promise<CacheDriver>` factory) that backs a [persistent trace store](/v/latest/ai/observability/querying-traces/#persisting-traces-across-restarts). When set — and no store-shaped exporter was supplied — the dashboard reads a cache-backed store that **survives a process restart** instead of a fresh in-memory one. |
 | `capacity`   | `1000`  | How many traces the store panoptic creates for the dashboard keeps (in-memory or `cache`-backed). Past it the oldest trace is dropped. `0` keeps every trace. Ignored when you supply your own store in `exporters`.                                                                                                                                                                       |
 | `observeAll` | `false` | When `true`, every flow is observed unless it opts out. When `false`, only flows that set `observe: true` (or a flow-local observer) are collected.                                                                                                                                                                                                                                        |
+| `evaluate`   | _unset_ | Judge `model` and default `instructions` for grading a system prompt; see [Evaluate](#evaluate). Falls back to `dashboard.evaluate`.                                                                                                                                                                                                                                                       |
 | `dashboard`  | _unset_ | `true` uses the [dashboard defaults](/v/latest/ai/observability/local-dashboard/); an object overrides them. See [the local dashboard](/v/latest/ai/observability/local-dashboard/) for the full option set.                                                                                                                                                                               |
+
+### Evaluate
+
+`evaluate` holds the settings for grading a system prompt with a judge model: `model` (a model, or a function that returns
+one) and optional default `instructions`. The devtools **Evaluate** page reads it through `getEvaluateConfig()`, so grading
+works while the standalone dashboard stays off inside a Warlock app. `getEvaluateConfig()` returns `panoptic.evaluate`,
+else `panoptic.dashboard.evaluate`, else `undefined`.
+
+```ts
+ai.config({
+  panoptic: {
+    observeAll: true,
+    evaluate: {
+      model: openai.model({ name: "gpt-4o-mini" }),
+      instructions: "The prompt must say what the agent may never do.",
+    },
+  },
+});
+```
 
 ### Persisting traces across a restart
 
@@ -170,6 +191,7 @@ The two coexist. Use declarative config for the broad "observe my whole app" str
 
 - **The side-effect import is mandatory.** `ai.config({ panoptic })` alone does nothing — core just stores an opaque slot. You must import `@warlock.js/ai-panoptic` somewhere (a bare `import "@warlock.js/ai-panoptic"`, or any named import from it) for the wiring to activate.
 - **`observeAll: false` is the default** — declaring `exporters` without `observeAll` or per-flow `observe: true` captures nothing. This is deliberate: observability is opt-in.
+- **Inside a Warlock app the dashboard does not start.** Panoptic logs one notice pointing at the devtools AI section; set `dashboard: { standalone: true }` to start it anyway. See [the local dashboard](/v/latest/ai/observability/local-dashboard/#inside-a-warlock-app).
 - **The dashboard needs a queryable store.** If you set `dashboard` but pass no store among `exporters`, Panoptic creates an in-memory store and registers it for you. If you do pass one, it's reused — see [the local dashboard](/v/latest/ai/observability/local-dashboard/).
 - **One collector, one registration.** Because apply is idempotent, you can't register two different declarative collectors by calling `ai.config({ panoptic })` twice with different exporters — the first wins. Use the imperative `panoptic()` API (or a flow-local `observe` collector) when you genuinely need a second, independent pipeline.
 

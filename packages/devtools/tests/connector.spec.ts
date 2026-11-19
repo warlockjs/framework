@@ -7,7 +7,30 @@ const attachAiSource = vi.fn(async () => ({
   message: "Install Panoptic",
   dispose: disposeAi,
 }));
-vi.mock("../src/sources/ai-source", () => ({ attachAiSource }));
+vi.mock("../src/sources/ai-source", () => ({
+  attachAiSource,
+  describeAiUnavailable: () => ({
+    available: false,
+    reason: "reports-off",
+    title: "",
+    message: "",
+  }),
+  toAiUnavailableView: (view: object) => ({ command: null, detail: null, ...view }),
+}));
+vi.mock("../src/ai/attach", () => ({
+  DEVTOOLS_MOUNTED_KEY: Symbol.for("@warlock.js/devtools.mounted"),
+  loadAiFeed: async () => ({
+    unavailable: {
+      available: false,
+      reason: "panoptic-missing",
+      title: "",
+      message: "",
+      command: null,
+      detail: null,
+    },
+  }),
+  attachAiReports: vi.fn(),
+}));
 
 vi.mock("../src/server", () => ({ mountDevtoolsRoutes }));
 

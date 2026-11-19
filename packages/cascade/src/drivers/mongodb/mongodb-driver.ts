@@ -988,11 +988,22 @@ export class MongoDbDriver implements DriverContract {
     const collection = this.getDatabaseInstance().collection(table);
     const { returnDocument: _returnDocument, idOnInsert, ...updateOptions } = options ?? {};
     const mongoOptions = this.withSession<UpdateOptions>(updateOptions);
-    const result = await collection.updateMany(
-      filter,
-      toMongoUpdate(operations) as UpdateFilter<Record<string, unknown>>,
-      mongoOptions,
-    );
+    const update = toMongoUpdate(operations) as UpdateFilter<Record<string, unknown>>;
+    // Two concurrent upserts of one new key race on the unique index and the loser gets E11000;
+    // retried, it finds the document the winner inserted and updates it. Not inside a transaction,
+    // where the failed write has already aborted it.
+    const attempts = mongoOptions?.upsert && !mongoOptions.session ? 3 : 1;
+    let result: Awaited<ReturnType<typeof collection.updateMany>> | undefined;
+
+    for (let attempt = 1; result === undefined; attempt++) {
+      try {
+        result = await collection.updateMany(filter, update, mongoOptions);
+      } catch (error) {
+        const isDuplicateKey = (error as { code?: number } | null)?.code === 11000;
+
+        if (!isDuplicateKey || attempt >= attempts) throw error;
+      }
+    }
 
     if (idOnInsert && result.upsertedCount > 0 && result.upsertedId !== null) {
       await this.assignInsertedId(table, result.upsertedId, idOnInsert);

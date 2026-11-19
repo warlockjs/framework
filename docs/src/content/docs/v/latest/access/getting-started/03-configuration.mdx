@@ -38,6 +38,8 @@ Omitting `resolver` is a developer mistake, not a runtime denial — the framewo
 
 How long a user's resolved permission/role set is cached (default `"10m"`). The cache is **best-effort**: if it's down, the engine reads straight from the resolver — it never denies because the cache failed. After changing a user's roles out of band, call `access.flush(user, tenant)`.
 
+The expiry is **fixed**: a set is reloaded `cache.ttl` after it was loaded, even for a user who keeps making requests and even when the cache driver slides its own TTL on read (the `memoryExtended` driver does). Reads never extend it, so a role granted by a migration or script shows up within one `ttl` at most. To see it sooner, flush: `access.flush(user, tenant)` for one user, or, after a bulk change such as a migration, remove the `access.perms.*` and `access.roles.*` keys from the cache (`cache.removeNamespace("access")` clears them all; with a per-process memory driver run it in each process, or restart). Shorten `cache.ttl` if you need a tighter bound.
+
 Within one request, checks on the same user object share one resolved set: stacked `gate()`s, `canAll` / `canAny` and repeated `can()` calls read the cache once, not once per check. The shared set is reused for at most one second and dropped by `access.flush`.
 
 ```ts

@@ -10,6 +10,7 @@ const cacheRemove = vi.fn(async (key: string) => {
 });
 
 vi.mock("@warlock.js/cache", () => ({
+  parseTtl: (ttl: string | number) => (ttl === "10m" ? 600 : Number(ttl)),
   cache: {
     get: (...args: unknown[]) => cacheGet(...(args as [string])),
     set: (...args: unknown[]) => cacheSet(...(args as [string, unknown])),
@@ -63,9 +64,42 @@ describe("permissionsFor (caching)", () => {
 
     expect(cacheSet).toHaveBeenCalledWith(
       "access.perms.user.1.tenant-1",
-      ["orders.*"],
+      { values: ["orders.*"], expiresAt: expect.any(Number) },
       expect.anything(),
     );
+  });
+});
+
+describe("permissionsFor (fixed expiry)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reloads after cache.ttl even when the driver slides its own expiry on read", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    setAccessConfig({ resolver: { resolvePermissions, resolveRoles }, cache: { ttl: 600 } });
+
+    await permissionsFor(user);
+
+    // The (mock) driver keeps the entry alive forever, as a sliding driver would
+    // for an active user. Reads inside the window do not extend the engine's expiry.
+    vi.advanceTimersByTime(5 * 60 * 1000);
+    await permissionsFor(user);
+    expect(resolvePermissions).toHaveBeenCalledTimes(1);
+
+    resolvePermissions.mockResolvedValue(["orders.*", "reports.read"]);
+    vi.advanceTimersByTime(5 * 60 * 1000 + 1000);
+
+    expect(await permissionsFor(user)).toEqual(["orders.*", "reports.read"]);
+    expect(resolvePermissions).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats a legacy bare-array entry as a miss and rewrites it", async () => {
+    store.set("access.perms.user.1._", ["stale.*"]);
+
+    expect(await permissionsFor(user)).toEqual(["orders.*"]);
+    expect(resolvePermissions).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -263,7 +297,7 @@ describe("engine — ambient tenant + policy helpers", () => {
 
     expect(cacheSet).toHaveBeenCalledWith(
       "access.perms.user.1.ambient-t",
-      ["orders.*"],
+      { values: ["orders.*"], expiresAt: expect.any(Number) },
       expect.anything(),
     );
   });

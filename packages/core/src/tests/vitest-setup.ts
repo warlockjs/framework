@@ -73,6 +73,9 @@ import {
 } from "./test-setup-timeout";
 import type { TestTimeoutHandle } from "./test-setup-timeout";
 
+/** Undoes the module dictionaries a unit-mode `setupTest()` registered. */
+let unitLocalesCleanup: (() => void) | undefined;
+
 export type { TestConnectorsSelection } from "./test-connectors-selection";
 
 export type TestRuntimeConfiguration = {
@@ -237,6 +240,9 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
     });
     try {
       await scope.unitConfig;
+      // Module dictionaries are data only, so unit mode registers them too: translated text
+      // renders instead of bare keys. Undone by `teardownTest()`, registered again per file.
+      unitLocalesCleanup ??= await timeTestStep("locales", () => loadTestLocales());
     } catch (error) {
       scope.unitConfig = undefined;
       scope.profile = undefined;
@@ -346,6 +352,8 @@ export async function teardownTest(): Promise<void> {
   const scope = testRuntimeScope();
   if (scope.mode === "unit") {
     scope.fileOpen = false;
+    unitLocalesCleanup?.();
+    unitLocalesCleanup = undefined;
     await timeTestStep("teardown", () => Promise.resolve());
     finishTestProfile();
     return;

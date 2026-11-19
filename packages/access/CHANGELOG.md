@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/access` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.60.0 - 2026-11-19
+
+### Fixed
+
+- Cached roles and permissions expire a fixed `cache.ttl` after loading; reads no longer extend it on sliding cache drivers, so role changes show up within one ttl. Entries cached by older versions reload once.
+
 ## 5.54.0 - 2026-11-16
 
 ### Upgrading

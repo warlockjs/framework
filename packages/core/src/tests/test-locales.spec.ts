@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
+import { loadTestLocales as loadTestLocalesFromBarrel } from "./index";
 import { loadTestLocales } from "./test-locales";
 
 it("merges per-feature locale files into the module namespace in the calling worker", async () => {
@@ -60,4 +61,8 @@ it("registers module JSON translations in the calling worker and removes them on
     setCurrentLocaleCode(previous);
     await rm(root, { recursive: true, force: true });
   }
+});
+
+it("is exported from the tests barrel", () => {
+  expect(loadTestLocalesFromBarrel).toBe(loadTestLocales);
 });

@@ -57,7 +57,9 @@ More hand-written notes, also untouched.
 
 ## Kept fresh by `warlock dev`
 
-`warlock dev` refreshes the section once the server is up and again after a reload that changes routes or modules. Refreshes are debounced, so saving several files in a row writes once. The refresh creates `AGENTS.md` when it is missing and never touches content outside the markers.
+`warlock dev` refreshes the section once the server is up and again after a reload that changes routes or modules. Refreshes are debounced, so saving several files in a row writes once. The refresh creates `AGENTS.md` when it is missing and never touches content outside the markers. It renders from the same collector and renderer as `warlock agents-md --write` (the app's package versions, modules with route and model counts, models with their module, and the skills index), so running one after the other leaves the file byte-identical.
+
+`warlock check` (with or without `--changed`) never writes `AGENTS.md`. If the file changes while a check runs, a `warlock dev` running in the same folder refreshed it; commit the refreshed file, or set `devServer.agentsMd: false`.
 
 Turn it off in `warlock.config.ts`:
 
@@ -76,15 +78,19 @@ export default defineConfig({
 The pieces are on `@warlock.js/core/tooling`:
 
 ```ts
-import { inspectApp, renderAgentsMdSection, writeAgentsMd } from "@warlock.js/core/tooling";
+import {
+  collectAgentsMdReport,
+  renderAgentsMdSection,
+  writeAgentsMd,
+} from "@warlock.js/core/tooling";
 
-const report = await inspectApp({ sections: ["routes", "models", "packages"] });
+const report = await collectAgentsMdReport(); // pass `modelModules` to list models
 
 console.log(renderAgentsMdSection(report)); // the markdown, without markers
 const { status } = writeAgentsMd({ report }); // "created" | "updated" | "unchanged"
 ```
 
-`upsertGeneratedSection(existing, section)` is the pure marker logic, `listInstalledSkills(cwd)` lists the installed skills, and `createAgentsMdRefresher({ collect })` is the debounced refresher `warlock dev` uses.
+`upsertGeneratedSection(existing, section)` is the pure marker logic, `listInstalledSkills(cwd)` lists the installed skills, and `collectAgentsMdReport({ cwd, modelModules })` is the one collector both writers use, and `createAgentsMdRefresher({ collect })` is the debounced refresher `warlock dev` uses.
 
 ## See also
 

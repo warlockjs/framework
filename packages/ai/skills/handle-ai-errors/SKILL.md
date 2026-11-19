@@ -289,6 +289,10 @@ async function runWithFallbacks(input: string) {
 }
 ```
 
+## Counting failovers
+
+`ai.fallbackModel`'s `lastAttempts` is overwritten by the next call. For a count per run, read `result.report.fallbackTrips` (trips answered after at least one earlier model of the chain failed; absent when the first model answered every trip). A model-level `complete()` response and a stream's `done` chunk carry `fallbackAttempts` (earlier models that failed before that answer; absent when the first model answered), exact under concurrent use of one chain. Panoptic copies the report field to the `agent.fallbackTrips` span attribute and counts trips with `finishReason: "refusal"` as `agent.refusals`.
+
 ## See also
 
 - The `run-ai-agent` topic — `AgentResult.error`

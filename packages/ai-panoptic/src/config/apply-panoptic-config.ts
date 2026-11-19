@@ -11,6 +11,7 @@ import type { CacheTraceStoreHandle } from "../store/cache-trace-store";
 import { createInMemoryTraceStore } from "../store/in-memory-trace-store";
 import type { TraceStoreContract } from "../store/trace-store.contract";
 import type { PanopticConfig } from "./panoptic-config.type";
+import { devtoolsPathHint, isInsideWarlockApp } from "./warlock-app";
 
 /**
  * Module-level applied state. Applying panoptic config is idempotent:
@@ -26,6 +27,9 @@ type AppliedState = {
 };
 
 let applied: AppliedState | undefined;
+
+/** Whether the "dashboard does not start inside a Warlock app" notice was logged in this process. */
+let noticeLogged = false;
 
 /** Traces kept by the store panoptic creates for the dashboard, unless `capacity` says otherwise. */
 export const DEFAULT_DASHBOARD_STORE_CAPACITY = 1000;
@@ -59,6 +63,23 @@ export function applyPanopticConfig(config?: PanopticConfig): void {
   setObserveAll(Boolean(config.observeAll));
 
   if (applied === undefined) {
+    // Inside a Warlock app the devtools AI section replaces the standalone
+    // dashboard, unless `dashboard.standalone` asks for it.
+    let dashboardConfig = config.dashboard;
+
+    if (dashboardConfig && isInsideWarlockApp() && !isStandalone(dashboardConfig)) {
+      dashboardConfig = undefined;
+
+      if (!noticeLogged) {
+        noticeLogged = true;
+        log.info(
+          "ai-panoptic",
+          "dashboard",
+          `Panoptic's dashboard does not start inside a Warlock app. Its views are in devtools under AI at ${devtoolsPathHint()} (install devtools with \`warlock add devtools\`). Set panoptic.dashboard.standalone to true to start it anyway.`,
+        );
+      }
+    }
+
     const exporters = [...(config.exporters ?? [])];
     let store = findStore(exporters);
 
@@ -71,7 +92,7 @@ export function applyPanopticConfig(config?: PanopticConfig): void {
     // as an exporter so the collector fills it. A configured `cache` picks
     // the durable cache-backed store; otherwise fall back to in-memory so
     // the dashboard works with no cache configured.
-    if (store === undefined && config.dashboard) {
+    if (store === undefined && dashboardConfig) {
       const capacity = config.capacity ?? DEFAULT_DASHBOARD_STORE_CAPACITY;
 
       if (config.cache !== undefined) {
@@ -96,7 +117,7 @@ export function applyPanopticConfig(config?: PanopticConfig): void {
 
     applied = { panopticInstance };
 
-    if (config.dashboard && store !== undefined) {
+    if (dashboardConfig && store !== undefined) {
       const resolvedStore = store;
 
       // Hydrate the cache mirror (if any) before serving, so a restart
@@ -108,7 +129,7 @@ export function applyPanopticConfig(config?: PanopticConfig): void {
         .catch(() => {
           // Hydration is best-effort — never block the dashboard on it.
         })
-        .then(() => startDashboard(resolvedStore, config.dashboard ?? {}))
+        .then(() => startDashboard(resolvedStore, dashboardConfig ?? {}))
         .then((handle) => {
           if (applied !== undefined) {
             applied.dashboardHandle = handle;
@@ -128,6 +149,7 @@ export function applyPanopticConfig(config?: PanopticConfig): void {
 export async function resetAppliedPanopticConfig(): Promise<void> {
   const handle = applied?.dashboardHandle;
   applied = undefined;
+  noticeLogged = false;
 
   if (handle !== undefined) {
     await handle.close();
@@ -188,4 +210,9 @@ function startDashboard(
   const options: DashboardOptions = typeof dashboardConfig === "object" ? dashboardConfig : {};
 
   return dashboard(store, options);
+}
+
+/** Whether the dashboard options force the standalone server. */
+function isStandalone(dashboardConfig: boolean | DashboardOptions): boolean {
+  return typeof dashboardConfig === "object" && dashboardConfig.standalone === true;
 }

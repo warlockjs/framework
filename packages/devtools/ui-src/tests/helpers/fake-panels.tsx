@@ -16,8 +16,12 @@ export async function fakeRegistry() {
     "logs",
     "jobs",
     "mail",
+    "ai-reports",
     "ai",
     "agents",
+    "ai-models",
+    "ai-errors",
+    "ai-evaluate",
     "api",
     "broken",
   ];

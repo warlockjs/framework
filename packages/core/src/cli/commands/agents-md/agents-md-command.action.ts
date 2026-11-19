@@ -1,5 +1,9 @@
 import path from "node:path";
 import type { CommandActionData } from "../../../commands/types";
+import {
+  AGENTS_MD_SECTIONS,
+  collectAgentsMdReport,
+} from "../../../tooling/agents-md/collect-agents-md-report";
 import { AGENTS_MD_FILE } from "../../../tooling/agents-md/agents-md-markers";
 import { listInstalledSkills } from "../../../tooling/agents-md/installed-skills";
 import { listAppModules, renderAgentsMdSection } from "../../../tooling/agents-md/render-agents-md";
@@ -8,12 +12,9 @@ import {
   type WriteAgentsMdResult,
 } from "../../../tooling/agents-md/write-agents-md";
 import { bootForInspect, inspectOptionsFromBoot } from "../../../tooling/inspect/boot-for-inspect";
-import { inspectApp } from "../../../tooling/inspect/inspect-app";
-import type { InspectSection } from "../../../tooling/inspect/inspect-report.types";
 import { withConsoleOnStderr } from "../routes/with-console-on-stderr";
 
-/** The inspect sections the generated section reads. */
-export const AGENTS_MD_SECTIONS: readonly InspectSection[] = ["routes", "models", "packages"];
+export { AGENTS_MD_SECTIONS };
 
 /** The one line `warlock agents-md --write` prints. */
 export function formatWriteStatus(result: Pick<WriteAgentsMdResult, "file" | "status">): string {
@@ -44,10 +45,9 @@ export function formatWriteStatus(result: Pick<WriteAgentsMdResult, "file" | "st
 export async function agentsMdCommandAction({ options }: CommandActionData): Promise<void> {
   const cwd = process.cwd();
   const boot = await withConsoleOnStderr(() => bootForInspect(cwd));
-  const report = await inspectApp({
-    ...inspectOptionsFromBoot(boot),
+  const report = await collectAgentsMdReport({
     cwd,
-    sections: AGENTS_MD_SECTIONS,
+    modelModules: inspectOptionsFromBoot(boot).modelModules,
   });
 
   if (options.write === true) {

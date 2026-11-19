@@ -5,6 +5,7 @@ import {
   type TranscriptionModelPricing,
   type TranscriptionResponse,
   type TranscriptionSegment,
+  type Usage,
 } from "@warlock.js/ai";
 import { log, type Logger } from "@warlock.js/logger";
 import OpenAI, { toFile } from "openai";
@@ -25,6 +26,7 @@ type RawTranscription = {
     input_tokens?: number;
     output_tokens?: number;
     total_tokens?: number;
+    input_token_details?: { audio_tokens?: number; text_tokens?: number };
   };
 };
 
@@ -116,12 +118,18 @@ export class OpenAITranscriptionModel implements TranscriptionModelContract {
       response.duration ??
       (response.usage?.type === "duration" ? response.usage.seconds : undefined);
 
-    const usage =
+    const usage: Usage =
       response.usage?.type === "tokens"
         ? {
             input: response.usage.input_tokens ?? 0,
             output: response.usage.output_tokens ?? 0,
             total: response.usage.total_tokens ?? 0,
+            ...(response.usage.input_token_details?.audio_tokens !== undefined
+              ? { audioInputTokens: response.usage.input_token_details.audio_tokens }
+              : {}),
+            ...(response.usage.input_token_details?.text_tokens !== undefined
+              ? { textInputTokens: response.usage.input_token_details.text_tokens }
+              : {}),
           }
         : { input: 0, output: 0, total: 0 };
 

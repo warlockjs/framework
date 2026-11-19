@@ -135,6 +135,10 @@ See the `use-cache-tags` topic of the `warlock-js-cache` skill.
 
 For external side effects (queues, emails) that must only fire if a surrounding transaction commits, don't run them in the `saved` handler — write to an outbox table and dispatch from a worker after commit.
 
+## Events in tests
+
+Listeners are class-level, registered in the module graph that imported the file holding them. A Vitest worker that never imported the app's `events/*` or `main.ts` has empty `Model.events().listeners`, so `Model.create()` / `.save()` called from the test fires nothing, while writes made through the HTTP test server do fire (the server loaded the app). Pass `importModule: (file) => import(file)` to `setupTest()` / `createTestHttpServer({ loadAppModules: true, importModule })`, or register the listener in the test, or go through the route / the service the listener calls.
+
 ## Things NOT to do
 
 - Don't reach for `beforeSave` / `destroying` / `destroyed` — they don't exist. The hooks are `saving` (pre-save) and `deleting` / `deleted`.

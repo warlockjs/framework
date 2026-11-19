@@ -13,7 +13,7 @@ import { PanelHost } from "@/panel-host/PanelHost";
 import { BUILT_IN_PANELS, isBuiltInPanel } from "@/panels/registry";
 import { CommandPalette, type PaletteItem } from "./CommandPalette";
 import { Header } from "./Header";
-import { groupPanels, iconFor } from "./nav";
+import { groupPanels, iconFor, isAiTab } from "./nav";
 import { Sidebar } from "./Sidebar";
 import { useColorScheme } from "./useColorScheme";
 import { useSession } from "./session";
@@ -64,7 +64,9 @@ export function Shell() {
         ? `Admin: ${{ users: "Users and invites", audit: "Audit log", settings: "Settings", shares: "Share links" }[route.page]}`
         : viewName === "tab"
           ? "Dashboard"
-          : viewName;
+          : isAiTab(tabId)
+            ? `AI · ${viewName}`
+            : viewName;
 
   const closeDrawer = useCallback(() => {
     setDrawerOpen(false);

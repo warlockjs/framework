@@ -42,6 +42,13 @@
   --chart-3: #c2410c;
   --chart-4: #7c3aed;
   --chart-5: #e11d48;
+  --series-1: #c98500;
+  --series-2: #0d9488;
+  --series-3: #7c3aed;
+  --series-4: #eb6834;
+  --series-5: #2a78d6;
+  --series-6: #e11d48;
+  --series-other: #8a8577;
 }
 
 .dark {
@@ -74,6 +81,13 @@
   --chart-3: #2dd4bf;
   --chart-4: #a78bfa;
   --chart-5: #fb7185;
+  --series-1: #c98500;
+  --series-2: #14a08f;
+  --series-3: #9085e9;
+  --series-4: #d95926;
+  --series-5: #3987e5;
+  --series-6: #e05a7a;
+  --series-other: #6b6a63;
 }
 
 @theme inline {
@@ -115,6 +129,13 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-series-4: var(--series-4);
+  --color-series-5: var(--series-5);
+  --color-series-6: var(--series-6);
+  --color-series-other: var(--series-other);
   --animate-dt-fade: dt-fade 150ms ease-out;
   --animate-dt-drawer: dt-drawer 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
   --animate-dt-pop: dt-pop 150ms ease-out;

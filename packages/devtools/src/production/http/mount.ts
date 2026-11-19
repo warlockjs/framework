@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { listPanelInfos } from "../../panels";
+import { registerAiReportRoutes } from "../../server/ai-report-routes";
 import { registerAiRoutes } from "../../server/ai-routes";
 import { registerShapeExplainRoute } from "../../server/explain-route";
 import { registerInsightsRoutes } from "../../server/insights-routes";
@@ -57,11 +58,18 @@ const TAB_OF_ROUTE: readonly (readonly [prefix: string, tab: string])[] = [
   ["/api/requests", "requests"],
   ["/api/mails", "mail"],
   ["/api/ai/agent-runs", "agents"],
+  ["/api/ai/reports", "ai-reports"],
+  ["/api/ai/models", "ai-models"],
+  ["/api/ai/errors", "ai-errors"],
+  ["/api/ai/evaluate", "ai-evaluate"],
   ["/api/ai", "ai"],
   ["/api/openapi.json", "api"],
   ["/api/postman.json", "api"],
   ["/docs", "api"],
 ];
+
+/** The tabs the AI report routes serve; the routes register when any of them is on. */
+const AI_REPORT_TABS = ["ai-reports", "ai-models", "ai-errors", "ai-evaluate"] as const;
 
 function tabOf(pattern: string): string | undefined {
   return TAB_OF_ROUTE.find(
@@ -477,6 +485,8 @@ export function mountProductionDevtools(
 
       if (enabledTabs.has("mail")) registerMailRoutes(instance, routes);
       if (enabledTabs.has("ai") || enabledTabs.has("agents")) registerAiRoutes(instance, routes);
+      if (AI_REPORT_TABS.some((tab) => enabledTabs.has(tab)))
+        registerAiReportRoutes(instance, routes);
       if (enabledTabs.has("api")) registerOpenApiRoutes(instance, routes);
 
       registerStreamRoute(instance, routes);

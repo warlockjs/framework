@@ -37,6 +37,9 @@ describe("productionPanels", () => {
       "errors",
       "logs",
       "jobs",
+      "ai-reports",
+      "ai-models",
+      "ai-errors",
     ]);
     expect(builtIn).toEqual(
       DEVTOOLS_BUILT_IN_PANELS.filter((tab) => tab.production).map((tab) => tab.id),
@@ -55,6 +58,9 @@ describe("productionPanels", () => {
       "errors",
       "jobs",
       "mail",
+      "ai-reports",
+      "ai-models",
+      "ai-errors",
       "api",
     ]);
   });

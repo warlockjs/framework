@@ -61,11 +61,51 @@ await orderShipped.only("mail").send(user, { order }); // subset of channels
 | `meta`           | Passed to renderers + included in every observability event                                                                                 |
 | `idempotencyKey` | Dedupe the in-app row on retry                                                                                                              |
 | `force`          | Bypass preferences (NOT rate limits)                                                                                                        |
+| `throwOnFailure` | Opt in to a rejection on transport failure: `"all"`, `"any"`, or a channel name / list (see below)                                          |
 
 ## Failure semantics
 
-- **Transport failure** (a channel's `send` throws) → isolated: emitted as a `failed` event, never aborts sibling channels or recipients.
+- **Transport failure** (a channel's `send` throws) → isolated: emitted as a `failed` event, never aborts sibling channels or recipients, and reported as a `failed` entry in the resolved result. It does not reject unless you pass `throwOnFailure`.
 - **Config error** (missing renderer, no queue dispatcher) → rejects the `send()`/`queue()` promise. Misconfiguration is loud.
+
+## Knowing whether a channel failed
+
+`.send()` and `.queue()` resolve with a `NotificationSendResult`, one entry per (recipient, channel):
+
+```ts
+const result = await orderShipped.send(user, { order });
+
+result.delivered; // dispatches the transport accepted (`sent` or `queued`)
+result.failed; //    dispatches whose transport threw
+result.skipped; //   dropped by preferences or the rate limiter
+result.allFailed; // true when something was attempted and every attempt failed
+result.results; //   [{ channel: "mail", notifiable, status: "failed", error }, …]
+
+const mail = result.results.find((r) => r.channel === "mail");
+if (mail?.status === "failed") {
+  // tell the caller the email did not go out
+}
+```
+
+Existing callers that ignore the return value are unaffected. To get a rejection instead, opt in with `throwOnFailure`:
+
+| Value                 | Rejects when                                     |
+| --------------------- | ------------------------------------------------ |
+| `"all"`               | something was attempted and every attempt failed |
+| `"any"`               | any dispatch failed                              |
+| `"mail"` / `["mail"]` | a dispatch on one of the named channels failed   |
+
+```ts
+try {
+  await sendInvite.send(user, data, { throwOnFailure: "mail" });
+} catch (error) {
+  if (error instanceof NotificationDeliveryError) {
+    error.result.results; // the full per-channel outcome
+  }
+}
+```
+
+Sibling channels and recipients are still attempted before the rejection. A `queued` entry only means the job was enqueued; worker-side failures are reported through the `failed` event.
 
 ## Next
 

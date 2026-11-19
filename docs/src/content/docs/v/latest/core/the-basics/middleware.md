@@ -234,7 +234,25 @@ middleware.maxBodySize("2mb");
 | `middleware.ipFilter({ allow })`          | Allowlist / denylist by client IP, IPv4 and IPv6 CIDRs, fail-closed; a bad pattern throws at boot    | 403                                 |
 | `middleware.cache(opts)`                  | Cache + replay successful JSON responses; `tags` opts into `cache.tags([...]).invalidate()` eviction | n/a                                 |
 
-Idempotency reserves the key before your handler runs, so a concurrent duplicate gets **409 + `Retry-After`** instead of running twice. A record belongs to one concrete target: the same key on `/orders/1/cancel` and `/orders/2/cancel` (or with a different query) runs each request, it never replays one for the other. A 5xx frees the key; if the cache is down it fails open.
+Idempotency reserves the key before your handler runs, so a concurrent duplicate gets **409 + `Retry-After`** instead of running twice. The guarantees, precisely:
+
+- **Storage.** Records live in the app cache (the cache manager's default driver, or `driver`). With the default in-memory driver they are per process: lost on restart and not shared between servers. Use a shared cache such as Redis, or plug a durable store with `store`.
+- **Claim before the handler.** The key is reserved create-only before the handler runs and held for `reservationTtl` (default 60 seconds).
+- **Write timing.** The final response is stored after it is sent. A crash between the send and that write leaves only the reservation, so a retry after `reservationTtl` runs the handler again.
+- **Cache down.** The middleware fails open: the handler runs and the error is logged. For writes that move money, also claim the key inside the transaction.
+- **Statuses.** Every status below 500 is stored and replayed, 4xx included: a replay returns the answer the first request got, even if the data changed since. A 5xx frees the key so a retry can run.
+- **Scope.** The key is scoped by user type, user id (the IP when anonymous), method, route pattern and the concrete route params and query, so the same key on `/orders/1/cancel` and `/orders/2/cancel` never replays one for the other. Add `scope` to narrow it further.
+
+```ts
+middleware.idempotency({
+  // one namespace per tenant
+  scope: (request) => request.header("x-tenant"),
+  // keep records in your own durable storage
+  store: ordersIdempotencyStore, // { get, reserve, set, remove }
+});
+```
+
+`reserve(key, value, ttlSeconds)` must be atomic and resolve `{ wasSet: boolean, existing? }`: of two concurrent calls with the same key, exactly one gets `wasSet: true`.
 
 `middleware.cache()` keys each response by locale (`withLocale`, on by default). Without a declared `app.localeCodes`, a request for any locale other than the default is answered without the cache (a warning is logged once), so arbitrary `?locale=` values cannot fill the cache. Declare `app.localeCodes` to cache every supported locale. Tune the reservation with `middleware.idempotency({ reservationTtl })` (default 60 seconds). `middleware.rateLimit()` counters are per process — see [Running on multiple servers](../digging-deeper/multiple-servers.md).
 

@@ -1,4 +1,4 @@
-/** A run row of `GET api/ai` (the Panoptic feed). */
+/** Usage of a span in `GET api/ai/runs/:id`. `cost` is the span's priced cost (USD per channel) when its model had pricing. */
 export type AiUsage = {
   input: number;
   output: number;
@@ -6,43 +6,7 @@ export type AiUsage = {
   cachedTokens?: number;
   cacheWriteTokens?: number;
   inputIncludesCache?: boolean;
-};
-
-export type AiRun = {
-  traceId: string;
-  requestId?: string | undefined;
-  sessionId?: string;
-  name: string;
-  status: string;
-  startedAt: string;
-  duration: number;
-  usage: AiUsage;
-  cost?: number | undefined;
-  models: string[];
-  toolCalls: number;
-  retries: number;
-  cacheHits?: number | undefined;
-  incomplete: boolean;
-  truncatedTrips: number;
-  compactions: number;
-  skippedCompactions: number;
-  providerCompactions: number;
-};
-
-export type AiAnswer = {
-  available: boolean;
-  reason?:
-    | "ai-missing"
-    | "panoptic-missing"
-    | "panoptic-failed"
-    | "observation-off"
-    | "not-collected";
-  title?: string;
-  message?: string;
-  command?: string;
-  detail?: string;
-  runs: AiRun[];
-  aggregate?: { traces: number; usage: AiUsage };
+  cost?: unknown;
 };
 
 export type AiSpanNode = {

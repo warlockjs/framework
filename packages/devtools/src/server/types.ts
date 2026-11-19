@@ -8,6 +8,8 @@ import type {
   DevtoolsRole,
 } from "../production/contracts";
 import type { DevtoolsInsights } from "../production/insights/types";
+import type { DevtoolsAiReports } from "../ai/attach";
+import type { DevtoolsAiEvaluator } from "../ai/reports/evaluate";
 import type { DevtoolsAgentTraceSource } from "../sources/agent-trace-source";
 import type { DevtoolsAiSource } from "../sources/ai-source";
 import type { MountedDevtoolsPanel } from "../panels";
@@ -75,6 +77,10 @@ export type MountDevtoolsRoutesDeps = {
   ai?: DevtoolsAiSource;
   /** Per-turn agent traces from `@warlock.js/ai`, attached only in development. */
   agentTraces?: DevtoolsAgentTraceSource;
+  /** The AI reports of this process (Reports, Models, Errors): the report service, or why there is none. */
+  aiReports?: DevtoolsAiReports;
+  /** Grades a system prompt for the Evaluate page; development only. */
+  aiEvaluator?: DevtoolsAiEvaluator;
   options: ResolvedDevtoolsOptions;
   /** The persisted request log; absent when core is too old to have one. */
   requestLog?: DevtoolsRequestLogSource;

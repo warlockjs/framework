@@ -3565,6 +3565,10 @@ The plugin runs `enforce: "pre"`, so it executes **ahead of** Vite's core transf
 
 It's the **same esbuild transform the production `tsx`/build path uses**, so a file lowered in tests behaves identically in dev and prod. Two cheap gates keep the fast path fast: files in `node_modules`, non-TypeScript files, and files with no `@decorator` are skipped entirely and never pay esbuild's cost.
 
+**JSX settings are kept.** The esbuild call carries the project's own `jsx`, `jsxImportSource`, `jsxFactory` and `jsxFragmentFactory`, read from the nearest `tsconfig.json` above the file (following relative `extends`). A project that sets none gets the automatic runtime (`react-jsx`), so a decorated `.tsx` never needs `React` in scope.
+
+**The `@` check ignores text.** Comments, string literals and template-literal text are blanked before the check, so a CSS `@media` / `@font-face` line inside a template string, or `@param` in a doc comment, does not send the file through esbuild. Code inside a template's `${...}` is still checked.
+
 ## Things NOT to do
 
 - **Don't reach for `oxc: { target: "es2022" }`** — it's insufficient. oxc can only lower _legacy_ decorators, and the breakage is the SSR rewrite, not the transpile target. Legacy lowering would also mangle the Stage-3 `(value, context)` signature.
@@ -6193,7 +6197,7 @@ await Mail.to("u@e.com")
   .send();
 ```
 
-Returning `false` from `beforeSending` cancels the send and resolves with `success: false`.
+Returning `false` from `beforeSending` (per-mail hook, global `mailEvents.onBeforeSending`, or `mailEvents.onMailBeforeSending`; sync or async) cancels the send and resolves with `success: false`.
 
 ## The functional API — `sendMail`
 
@@ -11260,6 +11264,16 @@ This produces `account.title` and `account.actions.save`. Keep every leaf comple
 
 When a route-locales snapshot applies, `t()` (through the request binding) and `request.transFrom(locale, key, placeholders?)` resolve through it; without one, they retain the existing global-registry behavior. The underlying `transFromKeywords(locale, keywords, key, placeholders?, converter?)` is supplied by `@mongez/localization` 3.5.0. Error pages rebind to their own snapshot, while framework fallback uses the app/root snapshot. Development HMR add/edit/delete publishes a new snapshot, and the snapshot revision keeps page-cache entries from reusing old JSON. Generated `.warlock` typings contain the flattened route keys; do not maintain a second handwritten key union.
 
+## Module dictionaries in tests and setup files
+
+`setupTest()` registers every module's `utils/locales.json` and `utils/locales/*.json` for integration tests, and, since 5.60, for `setupTest({ mode: "unit", importModule })` too, so translated text renders instead of bare keys. A setup that does not call `setupTest()` (a custom unit-project `setupFiles` entry, an email preview harness) registers them itself with `loadTestLocales()` from `@warlock.js/core/tests`; it resolves to a function that removes them again:
+
+```ts
+import { loadTestLocales } from "@warlock.js/core/tests";
+
+const unload = await loadTestLocales(); // optional root, defaults to process.cwd()
+```
+
 ## Worker dictionaries and owned runtime resources
 
 The generated `src/test-setup.ts` calls:
@@ -11361,7 +11375,7 @@ Lifecycle:
 
 1. **Method not eligible** (GET / HEAD) → pass through.
 2. **No `Idempotency-Key` header** → pass through (the primitive is opt-in by the client).
-3. **Key already in flight** (concurrent duplicate) → 409 with `Retry-After`. The key is reserved create-only before the handler runs (`reservationTtl`, default 60s, or `http.idempotency.reservationTtl`). A 5xx frees the reservation; if the cache is down it fails open. Use a shared cache (redis/pg) across servers.
+3. **Key already in flight** (concurrent duplicate) → 409 with `Retry-After`. The key is reserved create-only before the handler runs (`reservationTtl`, default 60s, or `http.idempotency.reservationTtl`). A 5xx frees the reservation; if the cache is down it fails open. The final response is written after it is sent (a crash in between leaves only the reservation until it expires); every status below 500 is replayed. Records live in the app cache, which is per process with the default memory driver: use a shared cache across servers, or pass `store` (`{ get, reserve, set, remove }`, `reserve` atomic) for a durable one. `scope: (request) => string` narrows the key beyond user + route (for example a tenant).
    3b. **Key + same body within TTL** (default 24h) → replays the cached response with `Idempotent-Replay: true`. Handler does NOT re-run.
 4. **Key + different body** → 422 `IdempotencyKeyConflict`. Client bug — same key must mean same intent.
 5. **Cache miss** → runs handler; on response sent, caches `{ status, body, bodyHash }` for TTL.
@@ -12077,6 +12091,8 @@ await repo.cacheModel(model); // manual cache write
 ## Cached vs uncached
 
 `listCached` / `firstCached` / `getCached` etc. hit the cache layer (`@warlock.js/cache`) first; on miss, they execute and cache. Cache invalidation is automatic on `create`/`update`/`delete` events that the adapter listens to.
+
+A cache hit returns models equal to the uncached ones: entries are plain snapshots (`toSnapshot()` / `Model.fromSnapshot()`), so object and array columns stay objects and arrays on PostgreSQL and MongoDB, and dates come back as `Date`s. `isCacheable` is the master switch: a repository property, or app-wide through `repository.isCacheable` in the repository config (typed on `RepositoryConfigurations`).
 
 Use cached methods by default. Drop to uncached when:
 
@@ -12809,7 +12825,7 @@ updateProductController.validation = {
 
 ---
 name: warlock-agents-md
-description: 'Generate the app-specific section of AGENTS.md from the booted app with `warlock agents-md [--write] [--json]` — modules, a routes summary with unguarded writes flagged, models, the conventions `warlock check` enforces, the installed skills and the verify commands — between `<!-- warlock:generated:start -->` / `<!-- warlock:generated:end -->` markers so hand-written content is never touched; `warlock dev` refreshes it (opt out with `devServer.agentsMd: false`). Triggers: `warlock agents-md`, `AGENTS.md`, `warlock:generated:start`, `renderAgentsMdSection`, `writeAgentsMd`, `upsertGeneratedSection`, `listInstalledSkills`, `createAgentsMdRefresher`, `devServer.agentsMd`, `WL7501`; "give agents the app facts", "keep AGENTS.md up to date", "which skills apply to this app". Skip: the full machine-readable report — the `warlock-inspect` topic; verifying a change — the `warlock-check` topic.'
+description: 'Generate the app-specific section of AGENTS.md from the booted app with `warlock agents-md [--write] [--json]` — modules, a routes summary with unguarded writes flagged, models, the conventions `warlock check` enforces, the installed skills and the verify commands — between `<!-- warlock:generated:start -->` / `<!-- warlock:generated:end -->` markers so hand-written content is never touched; `warlock dev` refreshes it (opt out with `devServer.agentsMd: false`). Triggers: `warlock agents-md`, `AGENTS.md`, `warlock:generated:start`, `renderAgentsMdSection`, `writeAgentsMd`, `upsertGeneratedSection`, `listInstalledSkills`, `createAgentsMdRefresher`, `collectAgentsMdReport`, `devServer.agentsMd`, `WL7501`; "give agents the app facts", "keep AGENTS.md up to date", "which skills apply to this app". Skip: the full machine-readable report — the `warlock-inspect` topic; verifying a change — the `warlock-check` topic.'
 ---
 
 # Warlock — `warlock agents-md`
@@ -12857,6 +12873,8 @@ Sections: app + `@warlock.js/*` versions, modules (`src/app/*`, routes/models pe
 - Put your own notes outside the markers; anything inside is replaced on the next refresh.
 
 ## `warlock dev` keeps it fresh
+
+The dev refresh and `warlock agents-md --write` share one collector (`collectAgentsMdReport`) and one renderer, so they write byte-identical output: versions line, modules with route and model counts, models with their module, skills index. `warlock check` never writes `AGENTS.md`; a change during a check comes from a running `warlock dev`.
 
 On boot and after reloads that change routes or modules (debounced). Opt out:
 

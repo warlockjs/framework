@@ -91,6 +91,22 @@ export type Usage = {
    */
   reasoningTokens?: number;
   /**
+   * Subset of `input` that is audio, for speech-to-text models that meter
+   * audio and text input separately (OpenAI `gpt-4o-transcribe`
+   * `usage.input_token_details.audio_tokens`). Informational: the split
+   * does not change `input` or the computed cost. Optional — undefined
+   * when the provider reports no split.
+   *
+   * @example
+   * const usage: Usage = { input: 100, output: 20, total: 120, audioInputTokens: 90, textInputTokens: 10 };
+   */
+  audioInputTokens?: number;
+  /**
+   * Subset of `input` that is text (the transcription prompt), reported
+   * next to `audioInputTokens`. Optional — undefined when not reported.
+   */
+  textInputTokens?: number;
+  /**
    * Number of input tokens WRITTEN to the provider's prompt cache on
    * this call (Anthropic `cache_creation_input_tokens`, Bedrock
    * `cacheWriteInputTokens`). Distinct from `cachedTokens`, which counts

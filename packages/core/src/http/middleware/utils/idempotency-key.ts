@@ -70,7 +70,11 @@ function readUserId(user: unknown): string | number | undefined {
   return typeof id === "string" || typeof id === "number" ? id : undefined;
 }
 
-export function buildIdempotencyCacheKey(request: Request, idempotencyKey: string): string {
+export function buildIdempotencyCacheKey(
+  request: Request,
+  idempotencyKey: string,
+  scope?: string,
+): string {
   const userType = request.decodedAccessToken?.userType || "anonymous";
   const locals = request.locals as Record<string, unknown>;
   const userId = readUserId(locals.user) || request.detectIp() || "unknown";
@@ -84,7 +88,10 @@ export function buildIdempotencyCacheKey(request: Request, idempotencyKey: strin
   // share a route pattern, but one key must never answer both
   const target = hashRequestTarget(request.params, request.query);
 
-  return `idem:${userType}:${userId}:${method}:${routePath}${target ? `#${target}` : ""}:${idempotencyKey}`;
+  // an optional caller-defined scope (a tenant, an organisation...) narrows the key further
+  const scopePart = scope ? `:s=${scope}` : "";
+
+  return `idem:${userType}:${userId}${scopePart}:${method}:${routePath}${target ? `#${target}` : ""}:${idempotencyKey}`;
 }
 
 /**

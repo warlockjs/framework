@@ -8,31 +8,25 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 - T-158: product map usage analytics and member feedback: leave out, add a project extension point, or build first-party sources.
 - T-170: business fields in features and flows: a fixed set of fields, one `extra:` key, or leave out (strictness stays).
 
-## 5.59.0: Warlock branding in devtools and Grimoire, flow and change-log views
+## From the 5.60.0 release
 
-### T-177 [feature] AI section in devtools: every Panoptic view plus reports and charts (5.60.0)
+### T-180 [bug] `warlock dev` exits with 0xC0000409 on Windows while many files change
 
-- Source: owner, 2026-11-19, in session. Decision: all Panoptic views move into devtools; AI stays split into separate
-  sidebar pages (no merge), and gains reports and charts: cost, token usage and error rates by model, agent and date range.
-- Today: Panoptic serves its own dashboard (`packages/ai-panoptic/src/dashboard/serve.ts`, port 4319: traces, aggregate,
-  evaluate). Devtools has an AI tab (`packages/devtools/src/server/ai-routes.ts`: run list and span tree only) and an
-  Agents tab (agent traces from `@warlock.js/ai`). Traces live in an in-memory store (capacity 1000) unless Panoptic's
-  `cache` option is set, so date-range reports have no durable data today.
-- Pages under "AI" in the sidebar: Reports (KPIs: estimated cost, tokens in/out/cached, runs, error rate, p95 latency;
-  date range 24h/7d/30d/custom with the previous period for comparison; cost over time by model, tokens over time,
-  error rate over time, top agents and top models tables), Runs (Panoptic traces, span tree), Agents, Models (usage
-  per model, pricing set or missing, fallback rate), Errors (failed runs grouped by provider error, rate limit,
-  timeout, refusal), Evaluate.
-- Data: durable rollups per hour (agent, model, provider, status: runs, tokens, estimated cost, error types, latency
-  buckets) stored through the devtools store in the app database, so reports survive restarts and work in the
-  production monitor; raw traces keep their current retention. Worker processes contribute through the same store.
-  Cost is labelled "estimated from model pricing"; unpriced models are flagged, not counted as zero.
-- Panoptic's standalone dashboard stays for processes outside a Warlock app (supported use:
-  `docs/src/content/docs/v/latest/ai/getting-started/02-installation.mdx:3,72`); inside a Warlock app
-  `panoptic.dashboard` stays off and enabling it logs a notice pointing at `/__warlock`. Removal only in a major release.
-- Plan: its own release (5.60.0) after 5.59.0 ships, started in a fresh session with an architect pass (storage schema,
-  rollup writer, report API, chart components; follow the `dataviz` skill for charts).
-- Status: decided, not started.
+- Source: app findings page (T-179), seen on an old 4.5 version, not re-tested since.
+- What: the dev server sometimes exits with code 3221226505 (0xC0000409, a native fast-fail) during rapid edits.
+- Checked 2026-11-19 (5.60.0): file batches are serialised (`batchQueue`), file work is bounded, dev bootstrap logs
+  uncaught errors instead of exiting. Only gap seen: the chokidar `error` listener is commented out in
+  `packages/core/src/dev-server/files-watcher.ts`; not shown to kill the process.
+- Acceptance: a repro on a Windows machine (many files saved at once, e.g. a formatter over the project) before any fix.
+- Status: needs a Windows repro.
+
+### T-181 [chore] Testcontainers-based integration suites cannot start on this server
+
+- Source: 5.60.0 live PostgreSQL run, 2026-11-19. The 7 cascade PostgreSQL suites that start their own containers
+  fail with ECONNRESET here and left 21 idle `postgres:16-alpine` containers behind (removal needs the owner).
+- What: give the integration harness a way to use an existing database from env (`LOCAL_PG_*` / a Mongo URL) for every
+  suite, so live runs need one named `--network host` container and no testcontainers.
+- Status: open.
 
 ## From the 2026-11-19 app reviews
 
@@ -299,6 +293,8 @@ T-100 and later are checked against 5.53.1.
   naming the setting that restores the old behaviour.
 - Acceptance: each chosen flip ships with specs for the new default, docs, skills, changelog and upgrade notes; the
   scaffold no longer sets values that now equal the default.
+- Added 2026-11-19 (5.60.0): type `useCurrentUser<T>()` as `T | undefined` (it is undefined outside a request;
+  5.60.0 documents it and points at `currentUser()` from `@warlock.js/auth`).
 - Status: open (next major). 5.54.0 ships the warnings and docs that name the 6.0 change for all six items, and the scaffold sets the safe values explicitly (multipart `routes: "declared"`, `emailLock: "pair"`, a 32-byte JWT secret, `format: "jsonl"`; passkey `userVerification` is a comment because the template has no passkeys block). The default flips are planned for 6.0. The other permissive defaults named above (`attachmentPolicy.allowBareLocalPaths`, `web.tlsAskAllow`) were not changed.
 - Owner decision (2026-11-16): no default flips in 5.54. Each item keeps its old default with a one-time warning that names the setting; the flips are planned for 6.0.
 

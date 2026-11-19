@@ -92,3 +92,22 @@ export class RecipientTypeRequiredError extends Error {
     captureStack(this, RecipientTypeRequiredError);
   }
 }
+
+/**
+ * Rejection of `.send()` / `.queue()` when the opt-in `throwOnFailure` option
+ * matched. Carries the full per-channel `result` so the caller can still see
+ * which dispatches went out.
+ */
+export class NotificationDeliveryError extends Error {
+  public readonly result: import("./dispatch/define-notification").NotificationSendResult;
+
+  public constructor(
+    result: import("./dispatch/define-notification").NotificationSendResult,
+    message: string,
+  ) {
+    super(message);
+    this.name = "NotificationDeliveryError";
+    this.result = result;
+    captureStack(this, NotificationDeliveryError);
+  }
+}

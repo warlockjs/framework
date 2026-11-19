@@ -407,16 +407,17 @@ describe("Postgres integration — query execution", () => {
     });
 
     it("groupBy with aggregates buckets rows per key", async () => {
-      const rows = await QOrder.query()
+      // groupBy returns plain rows (the model hydrator is cleared), not models.
+      const rows = (await QOrder.query()
         .groupBy("status", { total: "SUM(amount)", orders: "COUNT(*)" })
         .orderBy("status")
-        .get();
+        .get()) as unknown as Record<string, unknown>[];
 
       expect(
         rows.map((row) => ({
-          status: row.get("status"),
-          total: Number(row.get("total")),
-          orders: Number(row.get("orders")),
+          status: row.status,
+          total: Number(row.total),
+          orders: Number(row.orders),
         })),
       ).toEqual([
         { status: "cancelled", total: 75, orders: 1 },
@@ -428,12 +429,12 @@ describe("Postgres integration — query execution", () => {
     it("having filters grouped buckets by aggregate value", async () => {
       // `having` references the aggregate by its alias; the builder rewrites the
       // alias to the underlying `SUM(amount) > ?` expression.
-      const rows = await QOrder.query()
+      const rows = (await QOrder.query()
         .groupBy("status", { total: "SUM(amount)" })
         .having("total", ">", 100)
-        .get();
+        .get()) as unknown as Record<string, unknown>[];
 
-      expect(rows.map((row) => row.get("status"))).toEqual(["paid"]);
+      expect(rows.map((row) => row.status)).toEqual(["paid"]);
     });
 
     it("exists / notExists reflect presence of matches", async () => {

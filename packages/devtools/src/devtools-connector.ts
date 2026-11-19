@@ -16,7 +16,11 @@ import { resolveDevtoolsOptions } from "./options";
 import { DEVTOOLS_PRODUCTION_DEFAULTS } from "./production/options";
 import type { DevtoolsRequestLogSource, DevtoolsRouteRow, MountDevtoolsRoutesDeps } from "./server";
 import { attachAgentTraceSource } from "./sources/agent-trace-source";
-import { attachAiSource } from "./sources/ai-source";
+import { attachAiReports, DEVTOOLS_MOUNTED_KEY, loadAiFeed } from "./ai/attach";
+import { resolveDevtoolsAiOptions } from "./ai/options";
+import { createAiEvaluator } from "./ai/reports/evaluate";
+import { recentAiFailures } from "./ai/reports/runs";
+import { attachAiSource, describeAiUnavailable, toAiUnavailableView } from "./sources/ai-source";
 import { attachCacheSource } from "./sources/cache-source";
 import { attachLogSource } from "./sources/log-source";
 import { attachMailSource } from "./sources/mail-source";
@@ -121,6 +125,12 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
       const agentTraces = await attachAgentTraceSource();
       disposers.push(agentTraces.dispose);
 
+      const aiWiring = await wireDevelopmentAiReports(ai, resolved, core, log, disposers);
+      const aiEvaluator = createAiEvaluator({
+        agentTraces,
+        warn: (message) => log.warn("devtools", "evaluate", message),
+      });
+
       const { mountDevtoolsRoutes } = await import("./server");
       const postmanBuilder = await findPostmanBuilder();
       const requestLog = await findRequestLogSource();
@@ -144,6 +154,8 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
         collector,
         ai,
         agentTraces,
+        aiReports: aiWiring,
+        aiEvaluator,
         ...(processPanel ? { processPanel } : {}),
         panels,
         options: resolved,
@@ -178,6 +190,14 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
         }),
       );
 
+      (globalThis as Record<symbol, unknown>)[DEVTOOLS_MOUNTED_KEY] = {
+        path: resolved.path,
+        mode: "development",
+      };
+      disposers.push(() => {
+        delete (globalThis as Record<symbol, unknown>)[DEVTOOLS_MOUNTED_KEY];
+      });
+
       active = true;
 
       log.info("devtools", "ready", `devtools ready at ${resolved.path}`);
@@ -188,7 +208,18 @@ export function devtoolsConnector(options: DevtoolsConnectorOptions = {}): Conne
       await connector.start();
     },
     async shutdown() {
-      for (const dispose of disposers.splice(0)) dispose();
+      // A disposer may return a promise (the AI totals' final flush): wait for it, never let one fail the rest.
+      const finished: Promise<unknown>[] = [];
+
+      for (const dispose of disposers.splice(0)) {
+        try {
+          finished.push(Promise.resolve(dispose()).catch(() => undefined));
+        } catch {
+          // The remaining disposers still run.
+        }
+      }
+
+      await Promise.all(finished);
       active = false;
     },
     shouldRestart: () => false,
@@ -308,6 +339,53 @@ async function wireDevelopmentInsights(
     );
 
     return {};
+  }
+}
+
+/**
+ * Starts this process's AI totals in development: loads the Panoptic feed and
+ * writes hourly rollups to `storage/devtools/ai-rollups`. Never throws; a
+ * failure leaves the Reports, Models and Errors pages answering why.
+ */
+async function wireDevelopmentAiReports(
+  ai: Awaited<ReturnType<typeof attachAiSource>>,
+  resolved: ReturnType<typeof resolveDevtoolsOptions>,
+  core: typeof import("@warlock.js/core"),
+  log: ConnectorLogger,
+  disposers: DevtoolsDisposer[],
+): Promise<NonNullable<MountDevtoolsRoutesDeps["aiReports"]>> {
+  const none = (reason: "ai-missing" | "reports-off") => ({
+    ...toAiUnavailableView(describeAiUnavailable(reason)),
+    async dispose() {},
+  });
+
+  try {
+    const loaded = await loadAiFeed();
+
+    if ("unavailable" in loaded) return { ...loaded.unavailable, async dispose() {} };
+
+    const reports = await attachAiReports({
+      feed: loaded.feed,
+      options: resolveDevtoolsAiOptions(resolved.ai, "development"),
+      ...(typeof core.storagePath === "function"
+        ? { directory: core.storagePath("devtools/ai-rollups") }
+        : {}),
+      recentFailures: (filter) =>
+        ai.available ? recentAiFailures(ai.store.query(), 50, filter) : [],
+      warn: (message) => log.warn("devtools", "ai-reports", message),
+    });
+
+    disposers.push(() => reports.dispose());
+
+    return reports;
+  } catch (error) {
+    log.warn(
+      "devtools",
+      "ai-reports",
+      `AI reports could not start: ${error instanceof Error ? error.message : String(error)}`,
+    );
+
+    return none("reports-off");
   }
 }
 

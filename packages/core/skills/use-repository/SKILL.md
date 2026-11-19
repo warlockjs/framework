@@ -251,6 +251,8 @@ await repo.cacheModel(model); // manual cache write
 
 `listCached` / `firstCached` / `getCached` etc. hit the cache layer (`@warlock.js/cache`) first; on miss, they execute and cache. Cache invalidation is automatic on `create`/`update`/`delete` events that the adapter listens to.
 
+A cache hit returns models equal to the uncached ones: entries are plain snapshots (`toSnapshot()` / `Model.fromSnapshot()`), so object and array columns stay objects and arrays on PostgreSQL and MongoDB, and dates come back as `Date`s. `isCacheable` is the master switch: a repository property, or app-wide through `repository.isCacheable` in the repository config (typed on `RepositoryConfigurations`).
+
 Use cached methods by default. Drop to uncached when:
 
 - The data changes too fast for the cache TTL to be useful.

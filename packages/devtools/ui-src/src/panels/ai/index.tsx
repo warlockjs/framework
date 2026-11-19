@@ -1,26 +1,35 @@
 import { useCallback, useState } from "react";
+import type {
+  DevtoolsAiRunGroup,
+  DevtoolsAiRunRow,
+  DevtoolsAiRunsView,
+  DevtoolsAiUsageView,
+} from "@contracts";
 import { useApi, useStream } from "@/api/hooks";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorMessage, LoadingRows } from "@/components/common";
 import {
   BackButton,
   FilterBar,
+  HEAD,
+  NUM_CELL,
   PageHeader,
   Pill,
+  rowOpen,
+  SearchField,
   StatTiles,
+  TableCard,
   type PillTone,
 } from "@/components/listing";
-import {
-  DASH,
-  formatCost,
-  formatNumber,
-  Json,
-  RowButton,
-  TextField,
-} from "@/components/ui/panel-kit";
+import { DASH, formatNumber, Json, RowButton, SelectField } from "@/components/ui/panel-kit";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import type { DevtoolsPanelProps } from "@/panels/types";
-import { AiUnavailable } from "./AiUnavailable";
-import type { AiAnswer, AiRun, AiSpanNode, AiTrace, AiUsage } from "./types";
+import { AiUnavailable } from "../ai-shared/AiUnavailable";
+import { formatLatency, formatUsd } from "../ai-shared/format-ai";
+import { NoPricingPill } from "../ai-shared/pills";
+import { heatBackground, maxSpanCost, spanCostUsd } from "./cost-heat";
+import type { AiSpanNode, AiTrace } from "./types";
 
 export function runTone(status: string): PillTone {
   if (status === "completed" || status === "ok") return "success";
@@ -32,21 +41,22 @@ export function runTone(status: string): PillTone {
 
 const value = (item: number | null | undefined) => (item == null ? DASH : String(item));
 
-export function aiUsageText(usage: AiUsage, cost: number | undefined): string {
+export function aiUsageText(usage: DevtoolsAiUsageView, cost: number | null | undefined): string {
   const semantics =
     usage.inputIncludesCache === false
       ? "input excludes cache tokens"
       : "input includes cache tokens";
 
-  return `${value(usage.input)} input · ${value(usage.output)} output · ${value(usage.cachedTokens)} cache read · ${value(usage.cacheWriteTokens)} cache write · ${formatCost(cost)} (${semantics})`;
+  return `${value(usage.input)} input · ${value(usage.output)} output · ${value(usage.cachedTokens)} cache read · ${value(usage.cacheWriteTokens)} cache write · ${cost == null ? "no pricing" : `${formatUsd(cost)} estimated`} (${semantics})`;
 }
 
-export function AiRunSummary({ run }: { run: AiRun }) {
+export function AiRunSummary({ run }: { run: DevtoolsAiRunRow }) {
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Pill tone={runTone(run.status)}>{run.status}</Pill>
         <span className="text-xs text-muted-foreground">{run.traceId.slice(0, 8)}</span>
+        {run.cost === null && run.usage.total > 0 ? <NoPricingPill /> : null}
       </div>
       <div className="font-medium break-words">
         {`${run.name} · ${run.status}${run.incomplete ? " · Incomplete / truncated" : ""} · ${run.duration} ms`}
@@ -56,7 +66,7 @@ export function AiRunSummary({ run }: { run: AiRun }) {
       </div>
       <p className="text-sm">{aiUsageText(run.usage, run.cost)}</p>
       <div className="text-xs text-muted-foreground">
-        {`${run.toolCalls} tool calls · ${run.retries} retries · ${value(run.cacheHits)} provider cache-hit trips · ${run.truncatedTrips} truncated trips · ${run.compactions} applied / ${run.skippedCompactions} skipped compactions · ${run.providerCompactions} provider compactions`}
+        {`${run.toolCalls} tool calls · ${run.retries} retries${run.promptKey ? ` · prompt ${run.promptKey}` : ""}`}
       </div>
       <div className="text-xs text-muted-foreground">
         {`${run.traceId} · ${run.requestId ? `Request ${run.requestId}` : "Background / no request id"}`}
@@ -65,22 +75,42 @@ export function AiRunSummary({ run }: { run: AiRun }) {
   );
 }
 
-function AiSpan({ span, rootStartedAt }: { span: AiSpanNode; rootStartedAt: string }) {
+function AiSpan({
+  span,
+  rootStartedAt,
+  maxCost,
+}: {
+  span: AiSpanNode;
+  rootStartedAt: string;
+  maxCost: number;
+}) {
   const incomplete =
     span.status === "incomplete" ||
     span.error?.type === "AgentIncompleteError" ||
     span.error?.type === "AGENT_INCOMPLETE";
   const start = Date.parse(span.startedAt) - Date.parse(rootStartedAt);
+  const cost = spanCostUsd(span);
 
   return (
     <details open className="ml-3 border-l-2 pl-2">
-      <summary className="cursor-pointer text-sm">
+      <summary
+        className="cursor-pointer rounded-sm px-1 text-sm"
+        style={{ background: heatBackground(cost, maxCost) }}
+      >
         {`${span.type} ${span.name} · ${span.status}${incomplete ? " · Incomplete / truncated" : ""} · +${start} ms · ${span.duration} ms`}
+        {cost !== null ? (
+          <span className="ml-2 tabular-nums text-muted-foreground">{`· ${formatUsd(cost)} estimated`}</span>
+        ) : null}
       </summary>
       <p className="text-xs text-muted-foreground">{`${span.startedAt} → ${span.endedAt}`}</p>
       <Json value={{ usage: span.usage, attributes: span.attributes, error: span.error }} />
       {span.children.map((child, index) => (
-        <AiSpan key={`${child.name}-${index}`} span={child} rootStartedAt={rootStartedAt} />
+        <AiSpan
+          key={`${child.name}-${index}`}
+          span={child}
+          rootStartedAt={rootStartedAt}
+          maxCost={maxCost}
+        />
       ))}
     </details>
   );
@@ -91,7 +121,7 @@ function RunDetail({
   traceId,
   onClose,
 }: {
-  run: AiRun | undefined;
+  run: DevtoolsAiRunRow | undefined;
   traceId: string;
   onClose: () => void;
 }) {
@@ -115,49 +145,131 @@ function RunDetail({
         <ErrorMessage error={error} title="Could not load this run's spans" onRetry={reload} />
       ) : null}
       {!data && loading ? <LoadingRows rows={3} /> : null}
-      {data ? <AiSpan span={data.root} rootStartedAt={data.startedAt} /> : null}
+      {data ? (
+        <AiSpan span={data.root} rootStartedAt={data.startedAt} maxCost={maxSpanCost(data.root)} />
+      ) : null}
     </section>
   );
 }
 
-/** The AI tab: Panoptic runs with usage, cost, retries, compaction and the span tree. */
+type Filters = {
+  q: string;
+  requestId: string;
+  status: string;
+  type: string;
+  session: string;
+  prompt: string;
+  groupBy: string;
+};
+
+const NO_FILTERS: Filters = {
+  q: "",
+  requestId: "",
+  status: "",
+  type: "",
+  session: "",
+  prompt: "",
+  groupBy: "",
+};
+
+function runsPath(filters: Filters): string {
+  const params = new URLSearchParams();
+
+  for (const [key, item] of Object.entries(filters)) if (item.trim()) params.set(key, item.trim());
+
+  const query = params.toString();
+
+  return `api/ai/runs${query ? `?${query}` : ""}`;
+}
+
+/** The filter a group row applies: its key becomes the session, prompt or type filter. */
+function groupFilter(groupBy: string, group: DevtoolsAiRunGroup): Partial<Filters> {
+  return groupBy === "session"
+    ? { session: group.key }
+    : groupBy === "prompt"
+      ? { prompt: group.key }
+      : { type: group.key };
+}
+
+/** The Runs page: Panoptic runs with usage, estimated cost, retries and the span tree. */
 export function AiPanel({ route, navigate }: DevtoolsPanelProps) {
-  const [requestId, setRequestId] = useState("");
-  const [applied, setApplied] = useState("");
-  const path = `api/ai${applied ? `?requestId=${encodeURIComponent(applied)}` : ""}`;
-  const { data, error, loading, reload } = useApi<AiAnswer>(path);
+  const [draft, setDraft] = useState<Filters>(NO_FILTERS);
+  const [applied, setApplied] = useState<Filters>(NO_FILTERS);
+  const { data, error, loading, reload } = useApi<DevtoolsAiRunsView>(runsPath(applied));
 
   useStream(
     ["ai"],
     useCallback(() => reload(), [reload]),
   );
 
-  const costs = data?.runs.filter((run) => run.cost != null) ?? [];
-  const selected = data?.runs.find((run) => run.traceId === route);
-
-  const runs = data?.runs ?? [];
+  const apply = (next: Filters) => {
+    setDraft(next);
+    setApplied(next);
+    navigate("");
+  };
+  const filtered = Object.values(applied).some(Boolean);
+  const runs = data?.available ? data.runs : [];
+  const selected = runs.find((run) => run.traceId === route);
 
   return (
     <div>
       <PageHeader
-        title="AI runs"
-        description="Every AI run your app made: tokens, cost, retries and the span tree of each one."
+        title="Runs"
+        description="Every AI run your app made: tokens, estimated cost, retries and the span tree of each one."
       />
       <FilterBar
         label="AI run filters"
-        onSubmit={() => {
-          setApplied(requestId.trim());
-          navigate("");
-          reload();
-        }}
+        onSubmit={() => apply(draft)}
+        trailing={
+          filtered ? (
+            <Button type="button" size="xs" variant="ghost" onClick={() => apply(NO_FILTERS)}>
+              Clear filters
+            </Button>
+          ) : undefined
+        }
       >
-        <TextField
-          placeholder="HTTP request id (empty for all runs)"
-          aria-label="Filter AI runs by HTTP request id"
-          className="w-72 max-w-full"
-          value={requestId}
-          onChange={(event) => setRequestId(event.target.value)}
+        <SearchField
+          label="Search AI runs"
+          placeholder="Search runs"
+          value={draft.q}
+          onChange={(event) => setDraft({ ...draft, q: event.target.value })}
         />
+        <SearchField
+          label="HTTP request id"
+          placeholder="Request id"
+          value={draft.requestId}
+          onChange={(event) => setDraft({ ...draft, requestId: event.target.value })}
+        />
+        <SelectField
+          aria-label="Status"
+          value={draft.status}
+          onChange={(event) => apply({ ...draft, status: event.target.value })}
+        >
+          <option value="">Any status</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+          <option value="incomplete,max-iterations">Incomplete</option>
+        </SelectField>
+        <SelectField
+          aria-label="Type"
+          value={draft.type}
+          onChange={(event) => apply({ ...draft, type: event.target.value })}
+        >
+          <option value="">Any type</option>
+          <option value="agent">Agent</option>
+          <option value="workflow">Workflow</option>
+          <option value="supervisor">Supervisor</option>
+        </SelectField>
+        <SelectField
+          aria-label="Group by"
+          value={draft.groupBy}
+          onChange={(event) => apply({ ...draft, groupBy: event.target.value })}
+        >
+          <option value="">Group by: None</option>
+          <option value="session">Group by: Session</option>
+          <option value="prompt">Group by: Prompt</option>
+          <option value="type">Group by: Type</option>
+        </SelectField>
         <Button type="submit" size="sm">
           Filter / refresh
         </Button>
@@ -170,40 +282,64 @@ export function AiPanel({ route, navigate }: DevtoolsPanelProps) {
       {data?.available && !data.runs.length ? (
         <EmptyState
           title="No AI runs yet. Enable Panoptic observation and execute a flow; runs appear when collection completes."
-          hint={
-            applied ? "This request id has no runs. Clear the filter to see all runs." : undefined
-          }
+          hint={filtered ? "No run matches these filters. Clear them to see all runs." : undefined}
         />
       ) : null}
       {data?.available && data.runs.length ? (
-        <>
+        <div className={cn("transition-opacity", loading && "opacity-60")}>
           <StatTiles
+            label="AI runs summary"
             items={[
-              { label: "Runs", value: formatNumber(runs.length) },
+              { label: "Runs", value: formatNumber(data.stats.count) },
               {
-                label: "Tool calls",
-                value: formatNumber(runs.reduce((sum, run) => sum + run.toolCalls, 0)),
+                label: "Failed",
+                value: formatNumber(data.stats.failed),
+                tone: data.stats.failed ? "warning" : "success",
               },
               {
-                label: "Retried attempts",
-                value: formatNumber(runs.reduce((sum, run) => sum + run.retries, 0)),
-                tone: runs.some((run) => run.retries) ? "warning" : "neutral",
+                label: "Estimated cost",
+                value: formatUsd(data.stats.estimatedCostUsd),
+                hint: data.stats.unpricedRuns
+                  ? `Estimated from model pricing · ${formatNumber(data.stats.unpricedRuns)} unpriced ${data.stats.unpricedRuns === 1 ? "run" : "runs"} not in the cost`
+                  : "Estimated from model pricing",
               },
-              {
-                label: "Incomplete runs",
-                value: formatNumber(runs.filter((run) => run.incomplete).length),
-                tone: runs.some((run) => run.incomplete) ? "warning" : "success",
-              },
+              { label: "p50", value: formatLatency(data.stats.p50Ms) },
+              { label: "p95", value: formatLatency(data.stats.p95Ms) },
             ]}
           />
-          {data.aggregate ? (
-            <p className="mb-3 text-sm text-muted-foreground">
-              {`${data.aggregate.traces} runs · ${data.aggregate.usage.input} input tokens · ${data.aggregate.usage.output} output tokens · ${
-                costs.length
-                  ? `$${costs.reduce((sum, run) => sum + (run.cost ?? 0), 0).toFixed(6)} USD (reported cost)`
-                  : "unpriced"
-              }`}
-            </p>
+          {data.groups ? (
+            <div className="mb-4">
+              <TableCard label="Run groups">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className={HEAD}>{`Group by ${applied.groupBy}`}</TableHead>
+                    <TableHead className={`${HEAD} ${NUM_CELL}`}>Runs</TableHead>
+                    <TableHead className={`${HEAD} ${NUM_CELL}`}>Failed</TableHead>
+                    <TableHead className={`${HEAD} ${NUM_CELL}`}>Estimated cost</TableHead>
+                    <TableHead className={`${HEAD} ${NUM_CELL}`}>p95</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.groups.map((group) => (
+                    <TableRow
+                      key={group.key}
+                      {...rowOpen(() =>
+                        apply({ ...applied, groupBy: "", ...groupFilter(applied.groupBy, group) }),
+                      )}
+                      aria-label={`Show runs of ${group.label}`}
+                    >
+                      <TableCell className="max-w-72 truncate font-medium">{group.label}</TableCell>
+                      <TableCell className={NUM_CELL}>{formatNumber(group.runs)}</TableCell>
+                      <TableCell className={NUM_CELL}>{formatNumber(group.failed)}</TableCell>
+                      <TableCell className={NUM_CELL}>
+                        {formatUsd(group.estimatedCostUsd)}
+                      </TableCell>
+                      <TableCell className={NUM_CELL}>{formatLatency(group.p95Ms)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </TableCard>
+            </div>
           ) : null}
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
             <div className="min-w-0 space-y-1.5">
@@ -234,7 +370,7 @@ export function AiPanel({ route, navigate }: DevtoolsPanelProps) {
               )}
             </div>
           </div>
-        </>
+        </div>
       ) : null}
     </div>
   );

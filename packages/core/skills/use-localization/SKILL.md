@@ -378,6 +378,16 @@ This produces `account.title` and `account.actions.save`. Keep every leaf comple
 
 When a route-locales snapshot applies, `t()` (through the request binding) and `request.transFrom(locale, key, placeholders?)` resolve through it; without one, they retain the existing global-registry behavior. The underlying `transFromKeywords(locale, keywords, key, placeholders?, converter?)` is supplied by `@mongez/localization` 3.5.0. Error pages rebind to their own snapshot, while framework fallback uses the app/root snapshot. Development HMR add/edit/delete publishes a new snapshot, and the snapshot revision keeps page-cache entries from reusing old JSON. Generated `.warlock` typings contain the flattened route keys; do not maintain a second handwritten key union.
 
+## Module dictionaries in tests and setup files
+
+`setupTest()` registers every module's `utils/locales.json` and `utils/locales/*.json` for integration tests, and, since 5.60, for `setupTest({ mode: "unit", importModule })` too, so translated text renders instead of bare keys. A setup that does not call `setupTest()` (a custom unit-project `setupFiles` entry, an email preview harness) registers them itself with `loadTestLocales()` from `@warlock.js/core/tests`; it resolves to a function that removes them again:
+
+```ts
+import { loadTestLocales } from "@warlock.js/core/tests";
+
+const unload = await loadTestLocales(); // optional root, defaults to process.cwd()
+```
+
 ## Worker dictionaries and owned runtime resources
 
 The generated `src/test-setup.ts` calls:

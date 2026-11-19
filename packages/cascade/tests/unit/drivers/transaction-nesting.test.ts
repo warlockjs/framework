@@ -85,6 +85,156 @@ describe("driver.transaction() — flat nesting", () => {
     });
   });
 
+  describe("PostgresDriver savepoints", () => {
+    const makeDriver = () => new PostgresDriver({ database: "test" });
+
+    it("releases the savepoint when the nested block succeeds", async () => {
+      const driver = makeDriver();
+      const query = vi.fn().mockResolvedValue({ rows: [] });
+
+      databaseTransactionContext.setSession({ query });
+
+      const result = await driver.transaction(async () => "ok", { savepoint: true });
+
+      expect(result).toBe("ok");
+      expect(query.mock.calls.map((call) => call[0])).toEqual([
+        "SAVEPOINT wl_sp_1",
+        "RELEASE SAVEPOINT wl_sp_1",
+      ]);
+    });
+
+    it("rolls back to the savepoint, keeps the outer usable and drops queued afterCommit work", async () => {
+      const driver = makeDriver();
+      const query = vi.fn().mockResolvedValue({ rows: [] });
+      const outerHook = vi.fn();
+      const innerHook = vi.fn();
+
+      databaseTransactionContext.setSession({ query });
+      databaseTransactionContext.addAfterCommit(outerHook);
+
+      await expect(
+        driver.transaction(
+          async () => {
+            databaseTransactionContext.addAfterCommit(innerHook);
+            throw new Error("inner failed");
+          },
+          { savepoint: true },
+        ),
+      ).rejects.toThrow("inner failed");
+
+      expect(query.mock.calls.map((call) => call[0])).toEqual([
+        "SAVEPOINT wl_sp_1",
+        "ROLLBACK TO SAVEPOINT wl_sp_1",
+        "RELEASE SAVEPOINT wl_sp_1",
+      ]);
+      expect(databaseTransactionContext.takeAfterCommit()).toEqual([outerHook]);
+    });
+
+    it("runs savepoint blocks started at the same time one after another", async () => {
+      const driver = makeDriver();
+      const query = vi.fn().mockResolvedValue({ rows: [] });
+      const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+      databaseTransactionContext.setSession({ query });
+
+      const results = await Promise.allSettled([
+        driver.transaction(
+          async () => {
+            await tick();
+            return "a";
+          },
+          { savepoint: true },
+        ),
+        driver.transaction(
+          async () => {
+            await tick();
+            throw new Error("b failed");
+          },
+          { savepoint: true },
+        ),
+        driver.transaction(async () => "c", { savepoint: true }),
+      ]);
+
+      expect(results.map((result) => result.status)).toEqual([
+        "fulfilled",
+        "rejected",
+        "fulfilled",
+      ]);
+      expect(query.mock.calls.map((call) => call[0])).toEqual([
+        "SAVEPOINT wl_sp_1",
+        "RELEASE SAVEPOINT wl_sp_1",
+        "SAVEPOINT wl_sp_2",
+        "ROLLBACK TO SAVEPOINT wl_sp_2",
+        "RELEASE SAVEPOINT wl_sp_2",
+        "SAVEPOINT wl_sp_3",
+        "RELEASE SAVEPOINT wl_sp_3",
+      ]);
+    });
+
+    it("runs a savepoint block nested in another one at once, as a child savepoint", async () => {
+      const driver = makeDriver();
+      const query = vi.fn().mockResolvedValue({ rows: [] });
+
+      databaseTransactionContext.setSession({ query });
+
+      const result = await driver.transaction(
+        async () => driver.transaction(async () => "inner", { savepoint: true }),
+        { savepoint: true },
+      );
+
+      expect(result).toBe("inner");
+      expect(query.mock.calls.map((call) => call[0])).toEqual([
+        "SAVEPOINT wl_sp_1",
+        "SAVEPOINT wl_sp_2",
+        "RELEASE SAVEPOINT wl_sp_2",
+        "RELEASE SAVEPOINT wl_sp_1",
+      ]);
+    });
+
+    it("keeps afterCommit work queued by sibling code while a rolled-back block ran", async () => {
+      const driver = makeDriver();
+      const query = vi.fn().mockResolvedValue({ rows: [] });
+      const innerHook = vi.fn();
+      const siblingHook = vi.fn();
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+
+      databaseTransactionContext.setSession({ query });
+
+      const block = driver.transaction(
+        async () => {
+          databaseTransactionContext.addAfterCommit(innerHook);
+          await gate;
+          throw new Error("inner failed");
+        },
+        { savepoint: true },
+      );
+      // Sibling code on the same transaction, outside the savepoint block.
+      const sibling = (async () => {
+        await Promise.resolve();
+        databaseTransactionContext.addAfterCommit(siblingHook);
+        release();
+      })();
+
+      await expect(block).rejects.toThrow("inner failed");
+      await sibling;
+
+      expect(databaseTransactionContext.takeAfterCommit()).toEqual([siblingHook]);
+    });
+
+    it("joins flat without a savepoint by default", async () => {
+      const driver = makeDriver();
+      const query = vi.fn().mockResolvedValue({ rows: [] });
+
+      databaseTransactionContext.setSession({ query });
+      await driver.transaction(async () => "ok");
+
+      expect(query).not.toHaveBeenCalled();
+    });
+  });
+
   describe("MongoDBDriver", () => {
     const makeDriver = () => new MongoDbDriver({ database: "test", uri: "mongodb://localhost" });
 

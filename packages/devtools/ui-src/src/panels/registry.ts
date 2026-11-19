@@ -13,6 +13,10 @@ import { MailPanel } from "./mail";
 import { AiPanel } from "./ai";
 import { AgentsPanel } from "./agents";
 import { ApiPanel } from "./api";
+import { AiReportsPanel } from "./ai-reports";
+import { AiModelsPanel } from "./ai-models";
+import { AiErrorsPanel } from "./ai-errors";
+import { AiEvaluatePanel } from "./ai-evaluate";
 
 /**
  * The React component of every built-in tab, by id. Which tabs show, and in
@@ -34,6 +38,10 @@ export const BUILT_IN_PANELS: Record<DevtoolsBuiltInPanelId, ComponentType<Devto
   ai: AiPanel,
   agents: AgentsPanel,
   api: ApiPanel,
+  "ai-reports": AiReportsPanel,
+  "ai-models": AiModelsPanel,
+  "ai-errors": AiErrorsPanel,
+  "ai-evaluate": AiEvaluatePanel,
 };
 
 /** Whether `id` is a built-in tab. */

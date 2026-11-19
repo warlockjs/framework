@@ -2,6 +2,72 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+## 5.60.0 (2026-11-19)
+
+### T-177 [feature] AI section in devtools: every Panoptic view plus reports and charts (5.60.0)
+
+- Source: owner, 2026-11-19, in session. Decision: all Panoptic views move into devtools; AI stays split into separate
+  sidebar pages (no merge), and gains reports and charts: cost, token usage and error rates by model, agent and date range.
+- Today: Panoptic serves its own dashboard (`packages/ai-panoptic/src/dashboard/serve.ts`, port 4319: traces, aggregate,
+  evaluate). Devtools has an AI tab (`packages/devtools/src/server/ai-routes.ts`: run list and span tree only) and an
+  Agents tab (agent traces from `@warlock.js/ai`). Traces live in an in-memory store (capacity 1000) unless Panoptic's
+  `cache` option is set, so date-range reports have no durable data today.
+- Pages under "AI" in the sidebar: Reports (KPIs: estimated cost, tokens in/out/cached, runs, error rate, p95 latency;
+  date range 24h/7d/30d/custom with the previous period for comparison; cost over time by model, tokens over time,
+  error rate over time, top agents and top models tables), Runs (Panoptic traces, span tree), Agents, Models (usage
+  per model, pricing set or missing, fallback rate), Errors (failed runs grouped by provider error, rate limit,
+  timeout, refusal), Evaluate.
+- Data: durable rollups per hour (agent, model, provider, status: runs, tokens, estimated cost, error types, latency
+  buckets) stored through the devtools store in the app database, so reports survive restarts and work in the
+  production monitor; raw traces keep their current retention. Worker processes contribute through the same store.
+  Cost is labelled "estimated from model pricing"; unpriced models are flagged, not counted as zero.
+- Panoptic's standalone dashboard stays for processes outside a Warlock app (supported use:
+  `docs/src/content/docs/v/latest/ai/getting-started/02-installation.mdx:3,72`); inside a Warlock app
+  `panoptic.dashboard` stays off and enabling it logs a notice pointing at `/__warlock`. Removal only in a major release.
+- Plan: its own release (5.60.0) after 5.59.0 ships, started in a fresh session with an architect pass (storage schema,
+  rollup writer, report API, chart components; follow the `dataviz` skill for charts).
+- Shipped: 5.60.0 (2026-11-19). Six AI pages under "AI" in devtools (Reports, Runs, Agents, Models, Errors,
+  Evaluate), hourly rollups (`devtools_ai_rollups` in production, daily JSON files in development), report API
+  `/api/ai/*`, `devtools.ai` options, Panoptic dashboard off inside a Warlock app (`dashboard.standalone`), fallback
+  counts in `@warlock.js/ai`. Design: `findings/5.60/ARCHITECTURE.md`.
+- Verified: family typecheck and full test suites green; review pass (26 findings, 25 fixed, one kept and documented);
+  rollup store 21/21 on live PostgreSQL 16 and MongoDB 7.
+
+### T-179 [bug] App findings re-checked on 5.59.0 (20 items in @warlock.js packages)
+
+- Source: owner, 2026-11-19, framework issue page https://claude.ai/artifact/Ag3fU7zpT786MDZJGzFrhU (an app's
+  register of library issues, re-checked after its 5.48 -> 5.59 upgrade). Extracted claims:
+  `findings/5.60/APP-FINDINGS.md` (F-00..F-20; private folder).
+- What: verify each `@warlock.js/*` item against `packages/*/src`, fix every confirmed one with specs, docs, skill and
+  changelog. Items: repository cache hit returns jsonb objects/arrays as JSON text (cascade + core, broke production
+  list pages); transcribe usage drops the audio/text token split (ai-openai); global mail BEFORE_SENDING cannot cancel;
+  idempotency middleware guarantees; `useCurrentUser()` typing; `warlock check --changed` rewrites AGENTS.md;
+  `warlock dev` vs `warlock agents-md` generated blocks differ; no exported way to load module dictionaries in unit
+  tests; decorator lowering drops the JSX runtime in `.tsx`; dev server crash on Windows during many changes;
+  notifications `.send()` drops transport failures; nested transactions without savepoints; `afterCommit` docs; model
+  events in the vitest worker; migration ordering by SQL kind; `json()` string array insert; `findOneAndUpdate` as a
+  row lock; list cache after hot reload; access permission cache sliding expiry; `v.boolean()` and `?flag=1`.
+- Out of scope here: the page's items in other libraries (`@mongez/*`, React Email, expo-router, NativeWind,
+  modern-screenshot, react-native-view-shot); they live outside this repository.
+- Acceptance: each item has a verdict with evidence; confirmed ones fixed with specs; changelog per package.
+- Verdicts (5.60.0):
+  - Fixed: repository cache hit jsonb/arrays (snapshots keep plain values, old ones still load; `isCacheable` typed);
+    transcribe usage split (`audioInputTokens`/`textInputTokens`); global BEFORE_SENDING cancel; idempotency `store`
+    and `scope` options plus documented guarantees; `loadTestLocales` exported and unit `setupTest` loads
+    dictionaries; decorator lowering keeps the JSX runtime and skips `@` in strings; `warlock dev` and
+    `warlock agents-md` write identical blocks; notifications `send()`/`queue()` resolve with per-channel results and
+    `throwOnFailure`; access cache uses a fixed expiry; opt-in nested savepoints; `migrate:export-sql` in migration
+    order; `lockForUpdate()` documented.
+  - Docs only: `useCurrentUser()` off-request (signature change moved to T-009, next major); `afterCommit`; model
+    events in the vitest worker.
+  - Not reproduced: `warlock check --changed` rewriting AGENTS.md (check never writes it; a concurrent `warlock dev`
+    with the old output explains it); `json()` string array insert and `findOneAndUpdate` (both pass on live
+    PostgreSQL); list cache after hot reload; Windows dev crash (T-180).
+  - Not a bug: `v.boolean()` is strict by design; `.coerce()` accepts "1"/"0".
+- Found on the way: concurrent MongoDB `atomic()` upserts of one new key failed with E11000 (fixed, retry outside
+  transactions).
+- Verified: unit specs per item; live PostgreSQL run for the cascade items; full verification green.
+
 ## 5.59.0 (2026-11-19)
 
 ### T-141 [feature] `warlock scry` takes about 2.7 s per call on a large app
