@@ -4,6 +4,21 @@ Newest first. Each entry records the release that shipped it and how it was veri
 
 ## Owner decisions (2026-11-19)
 
+### T-158 [decision] Product map: usage analytics and member feedback per feature
+
+- Source: owner, 2026-11-18, write-up https://claude.ai/artifact/CVZWgVr2qL8jEufUrQSXnx (measured on `@warlock.js/grimoire` 5.57.0 in a large app: 82 flows, 11,272 files).
+- What and why: the owner listed usage per feature (app analytics events) and member feedback per feature among the
+  wanted reports. The framework has no source for either: no analytics events and no feedback store exist in any
+  package, so 5.58.0 leaves them out instead of inventing data.
+- Evidence: `grep -rli "analytics\|feedback" packages/*/src` (2026-11-18) finds only the AI skills' own usage events
+  (`packages/ai/src/skills/skills.ts:50`), an example database name and agent tool-error feedback; no app analytics
+  events and no member feedback store. The product map answers in
+  `packages/grimoire/src/devtools/answers.ts` carry only release history, test health, planned work and error counts.
+- Decision needed: (a) leave them out; (b) add an extension point: a panel option naming a project module that returns
+  per-feature numbers (`usage(featureId)`, `feedback(featureId)`), shown only when present; or (c) build first-party
+  sources (an analytics event API in core and a feedback store) in a later release.
+- Decision (owner, 2026-11-19): leave them out. Revisit only if a second app asks (see T-171).
+
 ### T-170 [decision] Open content model for business fields in features and flows
 
 - Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0). The app wants owner, success measures (KPIs), support notes (FAQ), risks, links (designs, docs, tickets) and a glossary shown on the Product map.

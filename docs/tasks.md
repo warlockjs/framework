@@ -4,9 +4,18 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Owner decisions waiting
 
-- T-158: product map usage analytics and member feedback: leave out, add a project extension point, or build first-party sources.
-- T-142: read-only flows may skip the write-only case questions (`duplicate`, `double submit`).
-- T-143: check condition names in a block's "Changes with" column (only names written as code).
+- None. Next-major items (T-007, T-009, T-033) wait for 6.0.
+
+## Next release (5.61.0): ready to build
+
+Decided and self-contained; each entry below has its evidence and acceptance.
+
+- Grimoire checks: T-142 (read-only flows skip `duplicate` / `double submit`), T-143 (backticked names in
+  "Changes with").
+- Devtools and production monitor: T-151 (closed monitor paths answer the app's 404), T-149 (connector-only production
+  flag turns on query events), T-146 (scheduler run history, queue counts).
+- Grimoire speed: T-178 (route facts without a second boot), T-169 (faster first open).
+- Release flow: follow `skills/release-the-warlock-family/SKILL.md`; private notes go in `findings/5.61/`.
 
 ## From the 5.60.0 release
 
@@ -88,21 +97,6 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 ## 5.58.0: Grimoire flow pages, type-only reach and product map
 
 Design: `findings/5.58/ARCHITECTURE.md` (decisions D1–D28); work-package briefs in `findings/5.58/briefs/`.
-
-### T-158 [decision] Product map: usage analytics and member feedback per feature
-
-- Source: owner, 2026-11-18, write-up https://claude.ai/artifact/CVZWgVr2qL8jEufUrQSXnx (measured on `@warlock.js/grimoire` 5.57.0 in a large app: 82 flows, 11,272 files).
-- What and why: the owner listed usage per feature (app analytics events) and member feedback per feature among the
-  wanted reports. The framework has no source for either: no analytics events and no feedback store exist in any
-  package, so 5.58.0 leaves them out instead of inventing data.
-- Evidence: `grep -rli "analytics\|feedback" packages/*/src` (2026-11-18) finds only the AI skills' own usage events
-  (`packages/ai/src/skills/skills.ts:50`), an example database name and agent tool-error feedback; no app analytics
-  events and no member feedback store. The product map answers in
-  `packages/grimoire/src/devtools/answers.ts` carry only release history, test health, planned work and error counts.
-- Decision needed: (a) leave them out; (b) add an extension point: a panel option naming a project module that returns
-  per-feature numbers (`usage(featureId)`, `feedback(featureId)`), shown only when present; or (c) build first-party
-  sources (an analytics event API in core and a feedback store) in a later release.
-- Status: waiting for the owner.
 
 ## After 5.56.0: production monitor follow-ups
 
@@ -197,24 +191,34 @@ Design: `findings/5.58/ARCHITECTURE.md` (decisions D1–D28); work-package brief
   new file entries (or the skip list).
 - Status: open.
 
-### T-142 [decision] Read-only flows must answer all eight case questions
+### T-142 [feature] Read-only flows may skip the write-only case questions
 
 - Source: 5.55.0 build and pilot, 2026-11-16.
 - What and why: a read-only flow has to answer all eight case questions (`CASE_QUESTIONS`), most of them with "does not
-  apply". The pilot found this padding in the written flows. Decision to take: whether flows with no writes may skip the
-  write-only questions.
-- Evidence: `CASE_QUESTIONS` in `packages/grimoire/src/contracts/written.ts`; GR1012 in
-  `packages/grimoire/src/codes/codes.ts`.
-- Status: open.
+  apply". The pilot found this padding in the written flows.
+- Decision (owner, 2026-11-19): a flow with no writes may leave out `duplicate` and `double submit`; the other six
+  questions stay required. A read-only flow that still answers them is fine (no finding).
+- Evidence: `CASE_QUESTIONS` in `packages/grimoire/src/contracts/written.ts:164`; GR1012 in
+  `packages/grimoire/src/codes/codes.ts`. Find where GR1012 is raised and how the check knows a flow writes (its
+  steps / reach facts); if "has no writes" is not known at that point, decide it from the flow's resolved steps.
+- Acceptance: specs for a read-only flow missing both questions (no GR1012), a writing flow missing them (GR1012 as
+  today), a read-only flow missing `not found` (GR1012); the written-flow docs page, the Grimoire skill that teaches
+  `## Cases`, the GR1012 code description and a CHANGELOG entry.
+- Status: open, ready to build.
 
-### T-143 [decision] Block tables: check condition names in "Changes with" too
+### T-143 [feature] Block tables: check condition names written as code in "Changes with"
 
 - Source: 5.55.0 build and pilot, 2026-11-16.
 - What and why: a page's block table checks "Who sees it" against the app's conditions (GR5002), but "Changes with" is
-  free text. Decision to take: whether the condition names in "Changes with" are checked too, and how a name that is not
-  a condition is reported.
+  free text, so a renamed or removed condition named there goes unnoticed.
+- Decision (owner, 2026-11-19): check only names written as code (backticks) in "Changes with". A backticked name that
+  is not a known condition is a warning (a new GR50xx code, or GR5002 with its own message if that fits the code
+  table); plain text stays free and is never reported.
 - Evidence: `packages/grimoire/src/apps/check-apps.ts:99` (GR5002); the `describe-an-app` skill.
-- Status: open.
+- Acceptance: specs for a known backticked condition (no finding), an unknown backticked name (warning naming the
+  block and the name), plain text (no finding); code table entry, the app-description docs page, the
+  `describe-an-app` skill and a CHANGELOG entry.
+- Status: open, ready to build.
 
 ### T-144 [feature] Third measurement arm: the book alone
 
