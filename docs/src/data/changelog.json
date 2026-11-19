@@ -140,6 +140,277 @@
   ],
   "releases": [
     {
+      "version": "5.60.0",
+      "id": "v5-60-0",
+      "date": "November 19, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "An AI section in devtools with reports and charts, correct jsonb and array values on cached PostgreSQL reads, and delivery results from notifications.",
+      "highlights": [
+        "Devtools has an AI section: Reports (estimated cost, tokens, runs, error rate and p95 latency over 24h, 7d, 30d or a custom range, compared with the previous period), Runs, Agents, Models, Errors and Evaluate, backed by durable hourly totals.",
+        "Panoptic's own dashboard stays off inside a Warlock app and points at devtools; <code>dashboard.standalone: true</code> starts it anyway.",
+        "Repository cache hits on PostgreSQL return jsonb objects and arrays as values, not JSON text; snapshots cached by earlier versions still load.",
+        "<code>defineNotification(...).send()</code> and <code>.queue()</code> resolve with per-channel results, and <code>throwOnFailure</code> rejects when channels fail.",
+        "Opt-in savepoints for nested transactions on PostgreSQL, a fixed expiry for cached permissions, a global <code>beforeSending</code> hook that can cancel a mail, and one generator for every <code>AGENTS.md</code> writer."
+      ],
+      "upgradeNotes": [
+        "Production devtools: run migrations to create <code>devtools_ai_rollups</code>; the <code>ai</code> tab keeps its id and is titled Runs.",
+        "A hand-written fake typed as <code>DefinedNotification</code> must return a result from <code>send()</code> and <code>queue()</code>."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.60.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 11,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Fixed",
+              "n": 7
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>collectAgentsMdReport()</code> and <code>collectDevModelModules()</code> on <code>@warlock.js/core/tooling</code>: one collector behind every AGENTS.md writer."
+            },
+            {
+              "type": "Added",
+              "html": "<code>middleware.idempotency()</code> accepts <code>store</code> (a durable store with get, reserve, set and remove) and <code>scope</code> (narrows the key, for example per tenant). Defaults are unchanged and the guarantees are documented."
+            },
+            {
+              "type": "Added",
+              "html": "<code>loadTestLocales()</code> is exported from <code>@warlock.js/core/tests</code>, and <code>setupTest({ mode: \"unit\" })</code> registers module dictionaries."
+            },
+            {
+              "type": "Added",
+              "html": "<code>isCacheable</code> is typed on <code>RepositoryConfigurations</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "The <code>warlock dev</code> AGENTS.md refresh writes the same generated section as <code>warlock agents-md --write</code>, with models listed per module; running one after the other leaves <code>AGENTS.md</code> byte-identical."
+            },
+            {
+              "type": "Fixed",
+              "html": "A global <code>mailEvents.onBeforeSending</code> handler that returns <code>false</code> (sync or async) cancels the send, like the per-mail hook."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>sendMail()</code> waits for its <code>success</code>, <code>sent</code> and <code>error</code> handlers; a handler that throws or rejects is logged and the other handlers still run."
+            },
+            {
+              "type": "Fixed",
+              "html": "The Vitest decorator-lowering plugin keeps the project's JSX settings and ignores <code>@</code> inside strings, template text and comments."
+            },
+            {
+              "type": "Fixed",
+              "html": "Repository cached reads on PostgreSQL return object and array columns as objects and arrays."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>useCurrentUser()</code> docs state that it is <code>undefined</code> outside a request; use <code>currentUser()</code> from <code>@warlock.js/auth</code> for the typed form."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock check</code> never writes <code>AGENTS.md</code>; a change during a check comes from a running <code>warlock dev</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 9,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 7
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "An AI sidebar group with six pages: Reports, Runs, Agents, Models, Errors and Evaluate. Reports, Models and Errors show estimated cost, tokens, error rate and latency over 24 hours, 7 days, 30 days or a custom range, with accessible charts (keyboard tooltips, table view) that keep each model's colour while filters change. Cost is an estimate from model pricing: runs of models without pricing are counted next to every cost (a model priced at 0 counts as priced), a model whose runs used no tokens shows \"No tokens used\", and a comparison whose previous period is older than the kept history reads \"No earlier data\". Custom ranges longer than 8 days use daily columns from local midnight to midnight."
+            },
+            {
+              "type": "Added",
+              "html": "Runs gains search, status, type, exact HTTP request id and group-by filters, summary tiles (the estimated cost says how many unpriced runs it leaves out) and a cost tint on the span tree by each span's own cost; Errors lists recent failed runs inside the chosen range and filters; Agents shows the last 24 hours per agent; Evaluate grades a system prompt with the configured judge model and shows the score, issues and judge."
+            },
+            {
+              "type": "Added",
+              "html": "AI report API: <code>GET /api/ai/reports</code>, <code>/models</code>, <code>/errors</code> (range, timezone, agent, model and provider filters, previous-period comparison, 15 s cache), <code>GET /api/ai/runs</code> (filter, <code>requestId</code>, group, stats) and <code>GET</code>/<code>POST /api/ai/evaluate</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Hourly AI rollups per hour, agent, model and provider (runs, tokens, estimated cost, errors by category, latency histogram), stored in the app database (<code>devtools_ai_rollups</code>, part of <code>devtoolsMigrations</code>), in JSON files in development and in memory in specs. A write that fails part-way retries only the totals it did not save, so nothing is counted twice."
+            },
+            {
+              "type": "Added",
+              "html": "<code>devtools.ai</code> options: <code>reports</code>, <code>retentionDays</code> (30 in development, 90 in production, 1 to 400) and <code>flushIntervalMs</code> (default 60000, minimum 5000)."
+            },
+            {
+              "type": "Added",
+              "html": "Specific error codes for AI routes: <code>ai.range-invalid</code>, <code>ai.evaluate-unavailable</code>, <code>ai.prompt-not-found</code> and <code>ai.evaluate-failed</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Devtools publishes where it is mounted so other packages can point to it. In production, Reports, Models and Errors are listed only when Panoptic is installed."
+            },
+            {
+              "type": "Changed",
+              "html": "Upgrade note: in production, the Reports, Models and Errors tabs are on by default once Panoptic loads. Run <code>warlock migrate</code> to create <code>devtools_ai_rollups</code>; until then each process logs one warning at boot and the pages show \"AI reports need their table\". Turning all three tabs off with <code>production.panels</code> also stops the totals from being written."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>ai</code> tab keeps its id (and <code>production.panels.ai</code>) and is titled \"Runs\", inside the AI sidebar group."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 4,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>transaction(fn, { savepoint: true })</code> on PostgreSQL runs a nested call inside a savepoint, so a failing inner block rolls back alone and the outer transaction stays usable. The default (flat join) is unchanged; MongoDB always joins flat. Savepoint blocks started at the same time on one transaction (for example under <code>Promise.all</code>) run one after another, and a failed block drops only the <code>afterCommit()</code> callbacks it queued."
+            },
+            {
+              "type": "Fixed",
+              "html": "A model rebuilt from a cache snapshot (<code>Model.fromSnapshot()</code>, used by repository cached reads) has the same values as the one the database returned. Snapshots keep plain objects and arrays, so PostgreSQL <code>jsonb</code> and array columns no longer come back as strings on a cache hit. Snapshots stored by earlier versions still load."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>migrate:export-sql</code> writes statements in migration order (the order <code>migrate</code> runs them) instead of grouping them by kind; the down file is the exact inverse."
+            },
+            {
+              "type": "Fixed",
+              "html": "On MongoDB, two <code>atomic()</code> upserts of the same new key at the same time no longer fail with a duplicate-key error: the one that loses the race retries and updates the document the other inserted (outside a transaction, up to three tries)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>Usage</code> gains optional <code>audioInputTokens</code> and <code>textInputTokens</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>fallbackModel()</code> answers carry <code>fallbackAttempts</code>, and <code>AgentReport.fallbackTrips</code> counts trips answered after a failover (both absent when not applicable)."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>panoptic.evaluate</code>, <code>getEvaluateConfig()</code> and <code>isInsideWarlockApp()</code>; spans carry <code>agent.fallbackTrips</code> and <code>agent.refusals</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The Panoptic dashboard no longer starts inside a Warlock app (one notice points at the devtools AI pages), also when the app has no devtools and in a test run from the app folder. To keep it after upgrading, set <code>panoptic.dashboard.standalone: true</code>."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/notifications",
+          "slug": "notifications",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>defineNotification(...).send()</code> and <code>.queue()</code> resolve with a per-channel result (<code>sent</code>, <code>queued</code>, <code>failed</code> with the error, <code>skipped</code>) plus <code>delivered</code>, <code>failed</code>, <code>skipped</code> and <code>allFailed</code>, instead of nothing. A renderer that throws is reported as a <code>failed</code> entry for its channel while the other channels still run. A hand-written fake or wrapper typed as <code>DefinedNotification</code> must now return a result from <code>send()</code> and <code>queue()</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>throwOnFailure</code> (<code>\"all\"</code>, <code>\"any\"</code>, a channel or a list of channels) rejects with the new <code>NotificationDeliveryError</code> when those channels failed."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/access",
+          "slug": "access",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Cached roles and permissions expire a fixed <code>cache.ttl</code> after loading; reads no longer extend it on sliding cache drivers, so role changes show up within one ttl. Entries cached by older versions reload once."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-openai",
+          "slug": "ai-openai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>ai.transcribe()</code> keeps OpenAI's audio and text input token split in <code>usage</code>."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.59.0",
       "id": "v5-59-0",
       "date": "November 19, 2026",

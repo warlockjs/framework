@@ -1,4 +1,20 @@
 {
+  "5.60.0": {
+    "publishedAt": "2026-11-19T17:29:59.020Z",
+    "matrix": "none",
+    "headline": "An AI section in devtools with reports and charts, correct jsonb and array values on cached PostgreSQL reads, and delivery results from notifications.",
+    "highlights": [
+      "Devtools has an AI section: Reports (estimated cost, tokens, runs, error rate and p95 latency over 24h, 7d, 30d or a custom range, compared with the previous period), Runs, Agents, Models, Errors and Evaluate, backed by durable hourly totals.",
+      "Panoptic's own dashboard stays off inside a Warlock app and points at devtools; `dashboard.standalone: true` starts it anyway.",
+      "Repository cache hits on PostgreSQL return jsonb objects and arrays as values, not JSON text; snapshots cached by earlier versions still load.",
+      "`defineNotification(...).send()` and `.queue()` resolve with per-channel results, and `throwOnFailure` rejects when channels fail.",
+      "Opt-in savepoints for nested transactions on PostgreSQL, a fixed expiry for cached permissions, a global `beforeSending` hook that can cancel a mail, and one generator for every `AGENTS.md` writer."
+    ],
+    "upgradeNotes": [
+      "Production devtools: run migrations to create `devtools_ai_rollups`; the `ai` tab keeps its id and is titled Runs.",
+      "A hand-written fake typed as `DefinedNotification` must return a result from `send()` and `queue()`."
+    ]
+  },
   "5.59.0": {
     "publishedAt": "2026-11-19T13:57:51.592Z",
     "matrix": "none",

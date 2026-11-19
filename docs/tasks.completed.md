@@ -26,7 +26,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
   `panoptic.dashboard` stays off and enabling it logs a notice pointing at `/__warlock`. Removal only in a major release.
 - Plan: its own release (5.60.0) after 5.59.0 ships, started in a fresh session with an architect pass (storage schema,
   rollup writer, report API, chart components; follow the `dataviz` skill for charts).
-- Shipped: 5.60.0 (2026-11-19). Six AI pages under "AI" in devtools (Reports, Runs, Agents, Models, Errors,
+- Shipped: 5.60.0 (npm 2026-11-19 17:29 UTC, tag v5.60.0 on 5455a91c8). Six AI pages under "AI" in devtools (Reports, Runs, Agents, Models, Errors,
   Evaluate), hourly rollups (`devtools_ai_rollups` in production, daily JSON files in development), report API
   `/api/ai/*`, `devtools.ai` options, Panoptic dashboard off inside a Warlock app (`dashboard.standalone`), fallback
   counts in `@warlock.js/ai`. Design: `findings/5.60/ARCHITECTURE.md`.
