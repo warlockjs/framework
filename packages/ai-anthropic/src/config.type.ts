@@ -88,11 +88,11 @@ export type AnthropicModelConfig = ModelConfig & {
    */
   structuredOutput?: boolean;
   /**
-   * Opt into Anthropic prompt caching. When a request has no explicit
-   * `ModelCallOptions.cacheControl.breakpoints`, the adapter sends
+   * Opt into Anthropic prompt caching. The adapter always sends
    * request-level `cache_control: { type: "ephemeral" }`, letting
-   * Anthropic cache the longest reusable prefix automatically. Tool
-   * definitions are still marked explicitly when present.
+   * Anthropic cache the longest reusable prefix automatically (system
+   * prompt and the rolling conversation history across trips), and marks
+   * the last tool definition when tools are present.
    *
    * Off by default: a cache *write* costs ~1.25x, so it only pays off
    * when the cached prefix is read at least twice (multi-trip agents).
@@ -104,8 +104,10 @@ export type AnthropicModelConfig = ModelConfig & {
    * pays the write surcharge without reads.
    *
    * Explicit per-call `ModelCallOptions.cacheControl.breakpoints`
-   * behave as before: they place a breakpoint on the system prompt and
-   * replace the automatic request-level marker.
+   * additionally place a breakpoint on the system prompt. It is
+   * kept alongside the automatic request-level marker (tools + system +
+   * automatic = 3 of Anthropic's 4 allowed breakpoints), so history
+   * caching keeps working.
    */
   promptCaching?: boolean;
   /**

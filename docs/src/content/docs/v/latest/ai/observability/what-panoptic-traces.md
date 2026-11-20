@@ -146,24 +146,33 @@ Namespaced under `warlock.*` so they never collide with a future `gen_ai.*` key:
 
 The collector populates the `attributes` bag with detail specific to each primitive. Every scalar entry rides along verbatim onto the backend span:
 
-| Key                       | On span type   | Meaning                                                                             |
-| ------------------------- | -------------- | ----------------------------------------------------------------------------------- |
-| `agent.model.name`        | `agent`        | model the agent ran against                                                         |
-| `agent.model.provider`    | `agent`        | provider of that model                                                              |
-| `agent.trips`             | `agent`        | number of LLM round-trips                                                           |
-| `workflow.name`           | `workflow`     | workflow identity (when present)                                                    |
-| `workflow.signature`      | `workflow`     | workflow signature (when present)                                                   |
-| `workflow.steps`          | `workflow`     | number of steps                                                                     |
-| `supervisor.name`         | `supervisor`   | supervisor identity (when present)                                                  |
-| `supervisor.iterations`   | `supervisor`   | iteration count                                                                     |
-| `supervisor.terminatedBy` | `supervisor`   | what ended the loop                                                                 |
-| `orchestrator.turnIndex`  | `orchestrator` | which turn this report is                                                           |
-| `orchestrator.signature`  | `orchestrator` | orchestrator signature (when present)                                               |
-| `orchestrator.turns`      | `orchestrator` | number of turns in the report                                                       |
-| `tool.tripIndex`          | `tool`         | the agent trip that dispatched the tool                                             |
-| `tool.callId`             | `tool`         | the provider's tool-call id — pairs the span with the agent's `agent.tool.*` events |
-| `tool.recoveredFrom`      | `tool`         | recovery origin (when present)                                                      |
-| `retries`                 | any            | retry count, from `BaseReport.attempts`                                             |
+| Key                             | On span type    | Meaning                                                                             |
+| ------------------------------- | --------------- | ----------------------------------------------------------------------------------- |
+| `agent.model.name`              | `agent`         | model the agent ran against                                                         |
+| `agent.model.provider`          | `agent`         | provider of that model                                                              |
+| `agent.trips`                   | `agent`         | number of LLM round-trips                                                           |
+| `image.model.name`              | `image`         | image model the run used                                                            |
+| `image.model.provider`          | `image`         | provider of that model                                                              |
+| `image.count`                   | `image`         | number of images returned                                                           |
+| `speech.model.name`             | `speech`        | speech model the run used                                                           |
+| `speech.model.provider`         | `speech`        | provider of that model                                                              |
+| `speech.characters`             | `speech`        | input characters synthesized                                                        |
+| `transcription.model.name`      | `transcription` | transcription model the run used                                                    |
+| `transcription.model.provider`  | `transcription` | provider of that model                                                              |
+| `transcription.durationSeconds` | `transcription` | input audio duration in seconds (when the provider reported it)                     |
+| `workflow.name`                 | `workflow`      | workflow identity (when present)                                                    |
+| `workflow.signature`            | `workflow`      | workflow signature (when present)                                                   |
+| `workflow.steps`                | `workflow`      | number of steps                                                                     |
+| `supervisor.name`               | `supervisor`    | supervisor identity (when present)                                                  |
+| `supervisor.iterations`         | `supervisor`    | iteration count                                                                     |
+| `supervisor.terminatedBy`       | `supervisor`    | what ended the loop                                                                 |
+| `orchestrator.turnIndex`        | `orchestrator`  | which turn this report is                                                           |
+| `orchestrator.signature`        | `orchestrator`  | orchestrator signature (when present)                                               |
+| `orchestrator.turns`            | `orchestrator`  | number of turns in the report                                                       |
+| `tool.tripIndex`                | `tool`          | the agent trip that dispatched the tool                                             |
+| `tool.callId`                   | `tool`          | the provider's tool-call id — pairs the span with the agent's `agent.tool.*` events |
+| `tool.recoveredFrom`            | `tool`          | recovery origin (when present)                                                      |
+| `retries`                       | any             | retry count, from `BaseReport.attempts`                                             |
 
 ### Lineage
 

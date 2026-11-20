@@ -96,6 +96,26 @@ describe("AI route in production", () => {
   });
 });
 
+describe("Agent runs route in production", () => {
+  it("answers with the production not-collected message, not the install guidance", async () => {
+    const server = Fastify();
+    servers.push(server);
+    const options = resolveDevtoolsOptions();
+    registerAiRoutes(server, {
+      collector: createCollector(options),
+      options,
+      isDevelopment: () => false,
+      mode: "production",
+    });
+    const response = await server.inject({ url: "/api/ai/agent-runs" });
+    const body = response.json();
+
+    expect(body).toMatchObject({ available: false, reason: "not-collected", runs: [] });
+    expect(body.message).toContain("hourly AI totals");
+    expect(body.message).not.toContain("warlock add");
+  });
+});
+
 describe("Runs list API", () => {
   it("lists, filters and groups the stored traces", async () => {
     const { server } = fixture();

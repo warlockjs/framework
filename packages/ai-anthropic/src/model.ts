@@ -257,8 +257,8 @@ export class AnthropicModel implements ModelContract {
       // explicit config override wins for proxied/legacy targets.
       reasoning: config.reasoning ?? true,
       ...windowCapability(config.contextWindow ?? inferContextWindow(config.name)),
-      // Anthropic prompt caching is caller-driven via `cache_control`
-      // breakpoints. The adapter both places those breakpoints (tools
+      // Anthropic prompt caching is driven by `cache_control` markers. The
+      // adapter both places them (request-level automatic marker and tools
       // when `config.promptCaching`, system when
       // `options.cacheControl.breakpoints`) and reports the read/write
       // accounting (`cachedTokens` / `cacheWriteTokens`), so advertise
@@ -996,9 +996,11 @@ export class AnthropicModel implements ModelContract {
    * the system prompt is emitted as a single `TextBlockParam` carrying
    * `cache_control: ephemeral` — the system prompt is the longest stable
    * prefix on a turn, so one breakpoint there lets multi-turn agents
-   * read it back at the ~0.1x cache-read rate. Without the hint the
-   * system prompt stays a plain string (left uncached) so a one-shot
-   * call never pays the ~1.25x cache-write surcharge.
+   * read it back at the ~0.1x cache-read rate. This marker is added
+   * alongside the request-level automatic marker (see
+   * `buildAutomaticCacheControl`), never instead of it. Without the hint
+   * the system prompt stays a plain string with no marker of its own, so
+   * a one-shot call never pays the ~1.25x cache-write surcharge.
    */
   private buildSystem(
     system: string | undefined,
@@ -1022,18 +1024,19 @@ export class AnthropicModel implements ModelContract {
   }
 
   /**
-   * Let Anthropic select the last cacheable block when caching is enabled
-   * without a caller-selected breakpoint. An explicit breakpoint remains
-   * authoritative, so the request-level form is deliberately omitted then.
+   * Request-level `cache_control` (Anthropic automatic caching) whenever
+   * `promptCaching` is on. Anthropic places it on the last cacheable block,
+   * so the rolling conversation prefix is read back across trips. It stays
+   * in place when explicit `cacheControl.breakpoints` are set: the tools
+   * marker, the system marker and this one make 3 markers, within
+   * Anthropic's limit of 4 per request. The adapter sets no other markers
+   * (messages are never marked), and one TTL applies to all of them, so the
+   * "1h entries before 5m entries" ordering rule cannot be violated.
    */
   private buildAutomaticCacheControl(cacheControl: ModelCallOptions["cacheControl"]): {
     cache_control?: Anthropic.CacheControlEphemeral;
   } {
-    const breakpoints = cacheControl?.breakpoints ?? 0;
-
-    return this.config.promptCaching && breakpoints <= 0
-      ? { cache_control: this.cacheControl(cacheControl?.ttl) }
-      : {};
+    return this.config.promptCaching ? { cache_control: this.cacheControl(cacheControl?.ttl) } : {};
   }
 
   /**

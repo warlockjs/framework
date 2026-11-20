@@ -898,10 +898,98 @@ describe("AnthropicModel.complete()", () => {
     );
 
     expect(firstCall(calls).params.cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
-    expect(calls[1].params.cache_control).toBeUndefined();
+    expect(calls[1].params.cache_control).toEqual({ type: "ephemeral", ttl: "1h" });
     expect(calls[1].params.system).toEqual([
       { type: "text", text: "Be concise.", cache_control: { type: "ephemeral", ttl: "1h" } },
     ]);
+  });
+
+  it("keeps the request-level marker alongside explicit breakpoints and stays within 4 markers", async () => {
+    const { client, calls } = makeFakeClient({ message: message() });
+    const model = new AnthropicModel(client, { name: "claude-haiku-5-5", promptCaching: true });
+    const tools = [
+      {
+        name: "a",
+        description: "a",
+        input: {
+          "~standard": {
+            version: 1,
+            vendor: "test",
+            validate: (value: unknown) => ({ value }),
+            jsonSchema: { input: () => ({ type: "object", properties: {} }) },
+          },
+        },
+        execute: async (value: unknown) => value,
+      },
+      {
+        name: "b",
+        description: "b",
+        input: {
+          "~standard": {
+            version: 1,
+            vendor: "test",
+            validate: (value: unknown) => ({ value }),
+            jsonSchema: { input: () => ({ type: "object", properties: {} }) },
+          },
+        },
+        execute: async (value: unknown) => value,
+      },
+    ] as never;
+
+    await model.complete(
+      [
+        { role: "system", content: "Static rules." },
+        { role: "user", content: "hi" },
+      ],
+      { tools, cacheControl: { breakpoints: 1 } },
+    );
+
+    const params = firstCall(calls).params as unknown as Record<string, unknown> & {
+      system: Array<{ cache_control?: unknown }>;
+      tools: Array<{ cache_control?: unknown }>;
+    };
+
+    expect(params.cache_control).toEqual({ type: "ephemeral" });
+    expect(params.system[0]?.cache_control).toEqual({ type: "ephemeral" });
+    expect(params.tools[1]?.cache_control).toEqual({ type: "ephemeral" });
+    expect(params.tools[0]?.cache_control).toBeUndefined();
+    expect(JSON.stringify(params).match(/"cache_control"/g)?.length).toBeLessThanOrEqual(4);
+  });
+
+  it("emits no automatic or tool markers when prompt caching is off, with or without the hint", async () => {
+    const { client, calls } = makeFakeClient({ message: message() });
+    const model = new AnthropicModel(client, { name: "claude-haiku-5-5" });
+    const tools = [
+      {
+        name: "a",
+        description: "a",
+        input: {
+          "~standard": {
+            version: 1,
+            vendor: "test",
+            validate: (value: unknown) => ({ value }),
+            jsonSchema: { input: () => ({ type: "object", properties: {} }) },
+          },
+        },
+        execute: async (value: unknown) => value,
+      },
+    ] as never;
+    const input = [
+      { role: "system", content: "Static rules." },
+      { role: "user", content: "hi" },
+    ] as const;
+
+    await model.complete([...input], { tools });
+    await model.complete([...input], { tools, cacheControl: { breakpoints: 1 } });
+
+    expect(JSON.stringify(firstCall(calls).params)).not.toContain("cache_control");
+
+    const hinted = calls[1].params as unknown as Record<string, unknown> & {
+      tools: Array<{ cache_control?: unknown }>;
+    };
+
+    expect(hinted.cache_control).toBeUndefined();
+    expect(hinted.tools[0]?.cache_control).toBeUndefined();
   });
 
   it("does not emit automatic cache control when prompt caching is disabled", async () => {

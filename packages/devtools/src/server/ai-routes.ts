@@ -75,6 +75,11 @@ export function registerAiRoutes(server: FastifyInstance, deps: MountDevtoolsRou
       const source = deps.agentTraces;
 
       if (!source?.available()) {
+        // Production never records agent traces: say so instead of the development install guidance.
+        if (deps.mode === "production") {
+          return { ...describeAiUnavailable("not-collected"), runs: [] };
+        }
+
         return { available: false, message: AGENT_TRACE_INSTALL_GUIDANCE, runs: [] };
       }
 

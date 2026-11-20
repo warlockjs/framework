@@ -644,6 +644,24 @@ export function productionPanels(
   return { builtIn, panels };
 }
 
+/** The tabs that read per-process run details; production keeps hourly totals instead. */
+export const DEVTOOLS_DEVELOPMENT_ONLY_AI_TABS: readonly string[] = ["ai", "agents"];
+
+/**
+ * Drops the Runs (`ai`) and Agents (`agents`) tabs from a production tab list.
+ * `ignored` lists the ones the project asked for (`production.panels[id] === true`),
+ * so boot can warn once.
+ */
+export function withoutDevelopmentAiTabs(
+  builtIn: readonly string[],
+  overrides: Readonly<Record<string, boolean>> = {},
+): { builtIn: string[]; ignored: string[] } {
+  return {
+    builtIn: builtIn.filter((tab) => !DEVTOOLS_DEVELOPMENT_ONLY_AI_TABS.includes(tab)),
+    ignored: DEVTOOLS_DEVELOPMENT_ONLY_AI_TABS.filter((tab) => overrides[tab] === true),
+  };
+}
+
 /**
  * The tab list `GET api/panels` answers with: the built-in tabs in
  * `builtIn` (default: every one), in display order, then the package panels

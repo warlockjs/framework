@@ -10,13 +10,14 @@ and exist in development only.
 | Page         | Reads                                   | Development | Production (default)          |
 | ------------ | --------------------------------------- | ----------- | ----------------------------- |
 | **Reports**  | Hourly totals                           | Yes         | On when Panoptic is installed |
-| **Runs**     | Panoptic traces in memory               | Yes         | Off                           |
-| **Agents**   | `@warlock.js/ai` agent traces in memory | Yes         | Off                           |
+| **Runs**     | Panoptic traces in memory               | Yes         | Never (development only)      |
+| **Agents**   | `@warlock.js/ai` agent traces in memory | Yes         | Never (development only)      |
 | **Models**   | Hourly totals                           | Yes         | On when Panoptic is installed |
 | **Errors**   | Hourly totals (and recent failed runs)  | Yes         | On when Panoptic is installed |
 | **Evaluate** | Grades a system prompt with a judge     | Yes         | Off                           |
 
-Runs, Agents and Evaluate show prompts, tool data and run details, so they stay in development. See
+Runs, Agents and Evaluate show prompts, tool data and run details, so they stay in development. `production.panels.ai` and `production.panels.agents` are ignored in production, with one
+warning at boot. See
 [Devtools in production](/v/latest/devtools/production/#ai-reports) for the production setup.
 
 ## Turn observation on
@@ -103,6 +104,9 @@ status, type and exact HTTP request id, and group by **Session**, **Prompt** or 
 runs, estimated cost (with the number of unpriced runs when there are any), p50 and p95 of the filtered set. Opening a run shows the span tree with a cost tint on each span (stronger for the costlier spans; the number
 is always shown). `#ai/<traceId>` links keep working, and a run's **Open HTTP request** button returns to its request
 record while that record is retained.
+
+Agent, image, speech and transcription runs all appear here with the model they used (for example `mock/mock-image`),
+and the same model shows in Models and Reports.
 
 Runs are the Panoptic traces collected after devtools attached, bounded by `maxRequests` (200 by default) and
 independent of request retention. **Clear**, shutdown and restart discard them. Use the hourly totals for anything that

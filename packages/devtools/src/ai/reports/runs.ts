@@ -7,7 +7,12 @@ import type {
 } from "../../production/contracts";
 import { DevtoolsApiError } from "../../production/errors";
 import { classifyAiError } from "../rollup/categories";
-import { aiRollupNamesOf, isAiModelSpan, traceToRollupDeltas } from "../rollup/extract";
+import {
+  aiRollupNamesOf,
+  isAiModelSpan,
+  spanModelOf,
+  traceToRollupDeltas,
+} from "../rollup/extract";
 import type { DevtoolsAiTotalCost } from "../types";
 
 const DEFAULT_LIMIT = 200;
@@ -71,12 +76,11 @@ export type DevtoolsAiRunsQuery = {
 
 /** The model identity a span reports, as `provider/model`. */
 function modelOf(span: TraceSpan): string | null {
-  const model = span.attributes?.["agent.model.name"];
-  const provider = span.attributes?.["agent.model.provider"];
+  const { name, provider } = spanModelOf(span);
 
-  if (typeof model !== "string") return null;
+  if (name === undefined) return null;
 
-  return typeof provider === "string" ? `${provider}/${model}` : model;
+  return provider !== undefined ? `${provider}/${name}` : name;
 }
 
 /** A span's own priced cost, else the sum of its children (a wrapper root carries tokens but no cost). */
@@ -316,10 +320,7 @@ export function recentAiFailures(
           failures.push({
             traceId: trace.traceId,
             agent: span.name,
-            model:
-              typeof span.attributes?.["agent.model.name"] === "string"
-                ? `${names.provider}/${names.model}`
-                : null,
+            model: spanModelOf(span).name !== undefined ? `${names.provider}/${names.model}` : null,
             status: span.status,
             category: classifyAiError(span.status, span.error?.type),
             code: span.error?.type ?? null,

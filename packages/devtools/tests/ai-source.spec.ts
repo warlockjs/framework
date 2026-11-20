@@ -1,3 +1,4 @@
+import { image, MockImageModel } from "@warlock.js/ai";
 import { createCollector, createInMemoryTraceStore } from "@warlock.js/ai-panoptic";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { attachAiSource, summarizeAiTrace } from "../src/sources/ai-source";
@@ -140,5 +141,21 @@ describe("Panoptic source", () => {
     expect(summarizeAiTrace(trace).incomplete).toBe(true);
     delete trace.root.attributes["agent.cacheHits"];
     expect(summarizeAiTrace(trace).cacheHits).toBeUndefined();
+  });
+});
+
+describe("Panoptic source — image runs", () => {
+  it("lists the model of an ai.image run in the run summary", async () => {
+    source = await attachAiSource(2);
+    if (!source.available) throw new Error(source.message);
+    const model = new MockImageModel("mock-image", [{}], { perImage: 0.04 });
+    const result = await image({ model, prompt: "a red bicycle" });
+
+    await createCollector().collect(result.report);
+
+    const runs = source.store.query().map(source.summarize);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.models).toContain("mock/mock-image");
   });
 });

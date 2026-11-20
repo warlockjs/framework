@@ -41,6 +41,11 @@ export type ResolvedDevtoolsProductionOptions = {
     lockMinutes: number;
   };
   explain: { executing: boolean };
+  /**
+   * Turn a dashboard tab on or off by id. `ai` (Runs) and `agents` are development
+   * tabs: they are ignored in production, with one warning at boot. Production
+   * shows AI totals in the Reports, Models and Errors tabs.
+   */
   panels: Readonly<Record<string, boolean>>;
   logLevels: readonly DevtoolsLogEntry["level"][];
   auditRetentionDays: number;

@@ -32,6 +32,9 @@ type ReportExtensions = {
   callId?: string;
   recoveredFrom?: string;
   fallbackTrips?: number;
+  imageCount?: number;
+  characters?: number;
+  durationSeconds?: number;
 };
 
 /**
@@ -97,6 +100,13 @@ export function extractSpanAttributes(report: BaseReport): Record<string, unknow
 
     case "tool": {
       addToolAttributes(attributes, extensions);
+      break;
+    }
+
+    case "image":
+    case "speech":
+    case "transcription": {
+      addMediaAttributes(attributes, report.type, extensions);
       break;
     }
 
@@ -246,5 +256,37 @@ function addToolAttributes(
 
   if (extensions.recoveredFrom !== undefined) {
     attributes["tool.recoveredFrom"] = extensions.recoveredFrom;
+  }
+}
+
+/**
+ * Image, speech and transcription runs report the model they ran against.
+ * It is written under `<type>.model.name` / `<type>.model.provider`
+ * (for example `image.model.name`), next to one size field per type:
+ * `image.count`, `speech.characters`, `transcription.durationSeconds`.
+ */
+function addMediaAttributes(
+  attributes: Record<string, unknown>,
+  type: "image" | "speech" | "transcription",
+  extensions: ReportExtensions,
+): void {
+  if (extensions.model?.name !== undefined) {
+    attributes[`${type}.model.name`] = extensions.model.name;
+  }
+
+  if (extensions.model?.provider !== undefined) {
+    attributes[`${type}.model.provider`] = extensions.model.provider;
+  }
+
+  if (type === "image" && extensions.imageCount !== undefined) {
+    attributes["image.count"] = extensions.imageCount;
+  }
+
+  if (type === "speech" && extensions.characters !== undefined) {
+    attributes["speech.characters"] = extensions.characters;
+  }
+
+  if (type === "transcription" && extensions.durationSeconds !== undefined) {
+    attributes["transcription.durationSeconds"] = extensions.durationSeconds;
   }
 }

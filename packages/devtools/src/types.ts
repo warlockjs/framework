@@ -233,8 +233,11 @@ export type DevtoolsProductionOptions = {
     executing?: boolean;
   };
   /**
-   * Turn tabs on or off by id. Built-in tabs `mail`, `ai`, `agents`, `api`
-   * and `processes` are off in production unless set to `true`; a package
+   * Turn tabs on or off by id. Built-in tabs `mail`, `api` and `processes`
+   * are off in production unless set to `true`. `ai` (Runs) and `agents` are
+   * development tabs: setting them to `true` is ignored in production, with
+   * one warning at boot (production shows AI totals in Reports, Models and
+   * Errors). A package
    * panel shows only when it declares `production: true` or is set to `true`
    * here.
    *

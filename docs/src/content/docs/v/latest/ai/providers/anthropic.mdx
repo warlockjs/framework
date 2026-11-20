@@ -162,21 +162,22 @@ bytes (`image/jpeg`, `image/png`, `image/gif`, `image/webp`).
 
 ## Prompt caching
 
-Claude bills the most-repeated tokens — tool schemas, the system prompt — at a fraction of the input rate when reused across trips. The adapter exposes **two independent breakpoints**:
+Claude bills the most-repeated tokens — tool schemas, the system prompt, the conversation so far — at a fraction of the input rate when reused across trips. The adapter places up to **three cache markers** per request, well within Anthropic's limit of four:
 
-| Where             | How you opt in                                                  | What it caches                                                                                                                   |
-| ----------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **Tool schemas**  | `model({ promptCaching: true })` (per-model)                    | Marks the tools block `cache_control: { type: "ephemeral" }` so multi-trip agents reuse tool definitions at the cache-read rate. |
-| **System prompt** | `modelOptions: { cacheControl: { breakpoints: 1 } }` (per-call) | Emits the system prompt as a cached `text` block.                                                                                |
+| Marker                  | How you opt in                                                  | What it caches                                                                                                                                                        |
+| ----------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Automatic (request)** | `model({ promptCaching: true })` (per-model)                    | Request-level `cache_control: { type: "ephemeral" }`: Anthropic caches the longest reusable prefix, including the conversation history that grows across agent trips. |
+| **Tool schemas**        | `model({ promptCaching: true })` (per-model)                    | Marks the last tool `cache_control: { type: "ephemeral" }` so multi-trip agents reuse tool definitions at the cache-read rate.                                        |
+| **System prompt**       | `modelOptions: { cacheControl: { breakpoints: 1 } }` (per-call) | Emits the system prompt as a cached `text` block, in addition to the automatic marker (it never replaces it).                                                         |
 
 ```ts
 const model = anthropic.model({
   name: "claude-sonnet-4-6",
-  promptCaching: true, // cache the static tool schemas across trips
+  promptCaching: true, // cache tool schemas and the growing history across trips
 });
 ```
 
-`promptCaching` is **off by default**: a cache _write_ costs ~1.25×, so a breakpoint only pays off when the cached prefix is read at least twice (multi-trip / multi-turn agents). The split is deliberate — tool schemas are static (a per-model decision), while the system prompt often carries per-turn placeholders (a per-call decision). Reads and writes flow back as `Usage.cachedTokens` / `Usage.cacheWriteTokens` (1-hour writes also as `Usage.cacheWrite1hTokens`) and are billed at their own rates — see [Pricing and usage](#pricing-and-usage).
+`promptCaching` is **off by default**: a cache _write_ costs ~1.25×, so a breakpoint only pays off when the cached prefix is read at least twice (multi-trip / multi-turn agents). The split is deliberate — the automatic prefix and tool schemas are a per-model decision, while the extra system-prompt breakpoint is per call because the system prompt often carries per-turn placeholders. Reads and writes flow back as `Usage.cachedTokens` / `Usage.cacheWriteTokens` (1-hour writes also as `Usage.cacheWrite1hTokens`) and are billed at their own rates — see [Pricing and usage](#pricing-and-usage).
 
 :::note[Bedrock differs]
 On the [Bedrock adapter](/v/latest/ai/providers/bedrock/), `promptCaching` is a _capability override_ rather than an opt-in — auto-inferred `true` for Claude 3.5+ / 4 / 5 and Nova. A per-call `cacheControl` breakpoint places Converse `cachePoint` blocks on the tools (Claude only), the system prompt and the last message. Set `promptCaching: false` to force it off.

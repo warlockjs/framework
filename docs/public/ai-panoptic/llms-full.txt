@@ -219,7 +219,7 @@ Each `TraceSpan` becomes one OTel span with the source start/end times and paren
 - `gen_ai.conversation.id` (from the span's `sessionId`)
 - `gen_ai.system` / `gen_ai.request.model` / `gen_ai.operation.name` — **never invented**: these appear only when the span's free-form `attributes` bag already carried that exact key. `otelExporter`'s `system` option backfills `gen_ai.system` when the span supplied none (and never overrides one it did).
 - `warlock.report.type` / `warlock.version` / `warlock.duration_ms` / `warlock.cost.usd`
-- the collector's own per-primitive keys ride along verbatim — `agent.model.name` / `agent.model.provider` / `agent.trips`, `workflow.steps`, `supervisor.iterations` / `supervisor.terminatedBy`, `tool.tripIndex`, `tool.callId`, `retries`, … — since `toGenAiAttributes` copies every scalar entry of the span's `attributes` bag.
+- the collector's own per-primitive keys ride along verbatim — `agent.model.name` / `agent.model.provider` / `agent.trips`, `image.model.name` / `image.model.provider` / `image.count` (likewise `speech.*` with `characters`, `transcription.*` with `durationSeconds`), `workflow.steps`, `supervisor.iterations` / `supervisor.terminatedBy`, `tool.tripIndex`, `tool.callId`, `retries`, … — since `toGenAiAttributes` copies every scalar entry of the span's `attributes` bag.
 
 Failed/cancelled/incomplete spans get OTel `ERROR` status plus a recorded exception.
 

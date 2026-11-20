@@ -6,6 +6,7 @@ import {
   listPanelInfos,
   loadDevtoolsPanels,
   productionPanels,
+  withoutDevelopmentAiTabs,
 } from "../../../src/panels";
 import { DEVTOOLS_BUILT_IN_PANELS } from "../../../src/production/contracts";
 import { createApp, mounted, testPanel } from "./harness";
@@ -269,5 +270,24 @@ describe("panels in the production dashboard", () => {
     const admin = await t.signIn("admin@example.com", "admin");
 
     expect((await t.send("GET", "/api/background", { session: admin })).statusCode).toBe(404);
+  });
+});
+
+describe("withoutDevelopmentAiTabs", () => {
+  it("drops Runs and Agents and reports the ones the project turned on", () => {
+    const overrides = { ai: true, agents: true };
+    const { builtIn } = productionPanels([], overrides);
+    const result = withoutDevelopmentAiTabs(builtIn, overrides);
+
+    expect(builtIn).toEqual(expect.arrayContaining(["ai", "agents"]));
+    expect(result.builtIn).not.toContain("ai");
+    expect(result.builtIn).not.toContain("agents");
+    expect(result.builtIn).toContain("ai-reports");
+    expect(result.ignored).toEqual(["ai", "agents"]);
+  });
+
+  it("reports nothing when the project did not ask for them", () => {
+    expect(withoutDevelopmentAiTabs(productionPanels([]).builtIn).ignored).toEqual([]);
+    expect(withoutDevelopmentAiTabs(["ai"], { ai: false }).ignored).toEqual([]);
   });
 });

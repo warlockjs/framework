@@ -300,21 +300,21 @@ Cache TTL per call: `options.cacheControl.ttl` (`"5m"` | `"1h"`) overrides the m
 
 ## Prompt caching (`cache_control`)
 
-Caching is opt-in: `model({ promptCaching: true })` sends request-level
-`cache_control: { type: "ephemeral" }` when a call has no explicit
-`options.cacheControl.breakpoints`. Anthropic then marks the last cacheable
+Caching is opt-in: `model({ promptCaching: true })` always sends request-level
+`cache_control: { type: "ephemeral" }`. Anthropic then marks the last cacheable
 block itself, caching the longest reusable request prefix (including growing
-message history). A caller-supplied breakpoint remains authoritative, so its
-request has no top-level automatic marker.
+message history across trips). A per-call `options.cacheControl.breakpoints >= 1`
+adds a system-prompt marker and keeps the automatic marker, so history caching
+continues.
 
 Set `promptCacheTtl: "1h"` on the model to apply a one-hour TTL to automatic
 caching and emitted explicit markers. Omit it (or use `"5m"`) for Anthropic's
 default five-minute TTL; the one-hour cache has a higher write cost.
 
-Two independent breakpoint sites, both reported back via `usage.cachedTokens` / `usage.cacheWriteTokens`:
+Up to three markers per request (tools + system + automatic, within Anthropic's limit of 4), all reported back via `usage.cachedTokens` / `usage.cacheWriteTokens`:
 
 - **Tools** — set `model({ promptCaching: true })` to mark the _last_ tool definition with `cache_control: ephemeral`. One breakpoint caches the whole tool prefix; off by default since a write costs ~1.25x and only pays off across multiple trips.
-- **System prompt** — a per-call `options.cacheControl.breakpoints >= 1` emits the system prompt as a `TextBlockParam` carrying `cache_control: ephemeral` (the longest stable prefix on a turn). Without the hint the system prompt stays a plain string with no marker of its own, but with `promptCaching: true` the automatic request-level marker still caches the longest reusable prefix, system prompt included (a live check read back 10,090 cached tokens of a large system prompt on the second call). With `promptCaching` off and no hint, nothing is cached, so a one-shot call never pays the write surcharge. A system prompt with per-turn placeholders changes the prefix each turn: write surcharge, no reads. No system prompt → no block.
+- **System prompt** — a per-call `options.cacheControl.breakpoints >= 1` emits the system prompt as a `TextBlockParam` carrying `cache_control: ephemeral` (the longest stable prefix on a turn). The automatic request-level marker stays in place next to it. Without the hint the system prompt stays a plain string with no marker of its own, but with `promptCaching: true` the automatic request-level marker still caches the longest reusable prefix, system prompt included (a live check read back 10,090 cached tokens of a large system prompt on the second call). With `promptCaching` off and no hint, nothing is cached, so a one-shot call never pays the write surcharge. A system prompt with per-turn placeholders changes the prefix each turn: write surcharge, no reads. No system prompt → no block.
 
 ```ts
 await agent.execute("…", { cacheControl: { breakpoints: 1 } }); // cache the system prefix

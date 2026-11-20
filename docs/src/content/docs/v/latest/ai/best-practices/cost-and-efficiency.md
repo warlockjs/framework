@@ -152,7 +152,9 @@ const supportAgent = ai.agent({
   tools: [lookupOrder, checkRefund], // stable schemas → cached alongside the prompt
   // On adapters with capabilities.promptCaching, place a write breakpoint after
   // the stable prefix. Read-side accounting works without this — it only controls
-  // WHERE the cache boundary is written.
+  // WHERE the cache boundary is written. On Anthropic with `promptCaching: true`
+  // the breakpoint is added next to the automatic marker, so the growing
+  // conversation history is still cached across trips.
   modelOptions: { cacheControl: { breakpoints: 1 } },
 });
 

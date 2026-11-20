@@ -6,7 +6,7 @@ import {
   loadAiFeed,
 } from "../ai/attach";
 import { resolveDevtoolsAiOptions } from "../ai/options";
-import { type MountedDevtoolsPanel, productionPanels } from "../panels";
+import { type MountedDevtoolsPanel, productionPanels, withoutDevelopmentAiTabs } from "../panels";
 import type { MountDevtoolsRoutesDeps } from "../server/types";
 import type { ResolvedDevtoolsOptions } from "../types";
 import { DevtoolsProductionConfigError } from "./errors";
@@ -201,7 +201,19 @@ export async function bootProductionDevtools(
     input.onInsights?.(insights);
 
     const state = httpModule.createDashboardState(store, production.path);
-    const { builtIn: shownTabs, panels } = productionPanels(input.panels, production.panels);
+    const { builtIn: requestedTabs, panels } = productionPanels(input.panels, production.panels);
+
+    // Runs and Agents read per-process run details, which production does not keep (it keeps hourly totals).
+    const { builtIn: shownTabs, ignored: ignoredAiTabs } = withoutDevelopmentAiTabs(
+      requestedTabs,
+      production.panels,
+    );
+
+    if (ignoredAiTabs.length > 0) {
+      warn(
+        "The Runs and Agents tabs are development tabs, so production.panels.ai and production.panels.agents are ignored. Production shows AI totals in Reports, Models and Errors.",
+      );
+    }
 
     // The AI report tabs are listed only when the app has the AI feed (Panoptic), unless the project turned one on.
     // With every report tab turned off, no totals are written (and no missing-table warning is logged).

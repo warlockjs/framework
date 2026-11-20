@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  aiRollupNamesOf,
   addRollupCounters,
   emptyRollupDelta,
   rollupId,
+  spanModelOf,
   traceToRollupDeltas,
 } from "../../../src/ai/rollup/extract";
 import { agentSpan, HOUR, HOUR_START, noPrice, priceOf, span, T0, traceOf, usage } from "./helpers";
@@ -311,5 +313,37 @@ describe("emptyRollupDelta and addRollupCounters", () => {
     expect(target.errors.tool).toBe(2);
     expect(target.latency[4]).toBe(6);
     expect(emptyRollupDelta(key).runs).toBe(0);
+  });
+});
+
+describe("spanModelOf", () => {
+  it("reads the model of an image span", () => {
+    const image = span("render", {
+      type: "image",
+      attributes: { "image.model.name": "mock-image", "image.model.provider": "mock" },
+    });
+
+    expect(spanModelOf(image)).toEqual({ name: "mock-image", provider: "mock" });
+    expect(aiRollupNamesOf(image)).toMatchObject({ model: "mock-image", provider: "mock" });
+  });
+
+  it("prefers agent.model.* and returns nothing for a span without a model", () => {
+    expect(spanModelOf(agentSpan("a", "gpt-4o", "openai"))).toEqual({
+      name: "gpt-4o",
+      provider: "openai",
+    });
+    expect(spanModelOf(span("bare", { type: "tool" }))).toEqual({
+      name: undefined,
+      provider: undefined,
+    });
+  });
+
+  it("skips an empty agent.model.name and falls back to the span type's key", () => {
+    const image = span("render", {
+      type: "image",
+      attributes: { "agent.model.name": "", "image.model.name": "mock-image" },
+    });
+
+    expect(spanModelOf(image).name).toBe("mock-image");
   });
 });

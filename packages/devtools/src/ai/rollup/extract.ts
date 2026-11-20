@@ -51,11 +51,28 @@ function subtract(own: Tokens, other: Tokens): void {
   own.reasoning = Math.max(0, own.reasoning - other.reasoning);
 }
 
+/**
+ * The model a span reports: `agent.model.*` first, then `<span type>.model.*`
+ * (image, speech and transcription spans).
+ */
+export function spanModelOf(span: Span): { name?: string; provider?: string } {
+  const attributes = span.attributes;
+  const pick = (key: string): string | undefined => {
+    for (const prefix of ["agent", span.type]) {
+      const value = attributes?.[`${prefix}.${key}`];
+
+      if (typeof value === "string" && value !== "") return value;
+    }
+
+    return undefined;
+  };
+
+  return { name: pick("model.name"), provider: pick("model.provider") };
+}
+
 /** Whether a span is one run in the rollups: it reports a model, or is an agent/image/speech/transcription span. */
 export function isAiModelSpan(span: Span): boolean {
-  return (
-    typeof span.attributes?.["agent.model.name"] === "string" || MODEL_SPAN_TYPES.has(span.type)
-  );
+  return spanModelOf(span).name !== undefined || MODEL_SPAN_TYPES.has(span.type);
 }
 
 /** The nearest model-bearing descendants of `span` (their own subtrees are not entered). */
@@ -239,8 +256,8 @@ export function traceToRollupDeltas(
 export function aiRollupNamesOf(span: Span): { agent: string; model: string; provider: string } {
   return {
     agent: cut(span.name, 200),
-    model: cut(span.attributes?.["agent.model.name"], 200),
-    provider: cut(span.attributes?.["agent.model.provider"], 100),
+    model: cut(spanModelOf(span).name, 200),
+    provider: cut(spanModelOf(span).provider, 100),
   };
 }
 

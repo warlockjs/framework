@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-anthropic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.62.0
+
+### Fixed
+
+- With `promptCaching: true`, a per-call `cacheControl: { breakpoints: n }` no longer removes the request-level `cache_control` marker. The automatic marker (the conversation prefix, cached across trips), the tools marker and the system marker are sent together (3 of the 4 breakpoints a request may carry), so a multi-trip agent that sets `breakpoints: 1` keeps reading its history from cache.
+
 ## 5.54.0 - 2026-11-16
 
 ### Fixed

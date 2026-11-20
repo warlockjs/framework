@@ -1,6 +1,7 @@
 import type { Trace, TraceSpan, TraceStoreContract } from "@warlock.js/ai-panoptic";
 import { installedVersion } from "../app-versions";
 import type { DevtoolsAiRunHelpers } from "../ai/reports/runs";
+import { spanModelOf } from "../ai/rollup/extract";
 import type { DevtoolsAiTotalCost } from "../ai/types";
 import type { DevtoolsAiUnavailableView } from "../production/contracts";
 import { toSafeValue } from "../safe-value";
@@ -174,10 +175,8 @@ export function summarizeAiTrace(trace: Trace, cost?: number): DevtoolsAiRun {
   let providerCompactions = 0;
   const visit = (span: TraceSpan): void => {
     const attributes = span.attributes ?? {};
-    const model = attributes["agent.model.name"];
-    const provider = attributes["agent.model.provider"];
-    if (typeof model === "string")
-      models.add(typeof provider === "string" ? `${provider}/${model}` : model);
+    const { name: model, provider } = spanModelOf(span);
+    if (model !== undefined) models.add(provider !== undefined ? `${provider}/${model}` : model);
     if (span.type === "tool") toolCalls += 1;
     if (typeof attributes.retries === "number") retries += attributes.retries;
     if (typeof attributes["agent.cacheHits"] === "number")

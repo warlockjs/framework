@@ -49,3 +49,35 @@ describe("extractSpanAttributes — fallback and refusal counts", () => {
     expect(attributes).not.toHaveProperty("agent.refusals");
   });
 });
+
+describe("extractSpanAttributes — image, speech and transcription", () => {
+  const media = (type: string, extra: Record<string, unknown>): BaseReport =>
+    agentReport({ type, model: { name: "m-1", provider: "mock" }, ...extra });
+
+  it("writes the image model and count", () => {
+    expect(extractSpanAttributes(media("image", { imageCount: 2 }))).toEqual({
+      "image.model.name": "m-1",
+      "image.model.provider": "mock",
+      "image.count": 2,
+    });
+  });
+
+  it("writes the speech model and character count", () => {
+    expect(extractSpanAttributes(media("speech", { characters: 40 }))).toEqual({
+      "speech.model.name": "m-1",
+      "speech.model.provider": "mock",
+      "speech.characters": 40,
+    });
+  });
+
+  it("writes the transcription model and duration, and skips a missing duration", () => {
+    expect(extractSpanAttributes(media("transcription", { durationSeconds: 12 }))).toEqual({
+      "transcription.model.name": "m-1",
+      "transcription.model.provider": "mock",
+      "transcription.durationSeconds": 12,
+    });
+    expect(extractSpanAttributes(media("transcription", {}))).not.toHaveProperty(
+      "transcription.durationSeconds",
+    );
+  });
+});

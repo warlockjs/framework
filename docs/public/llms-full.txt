@@ -47866,21 +47866,21 @@ Cache TTL per call: `options.cacheControl.ttl` (`"5m"` | `"1h"`) overrides the m
 
 ## Prompt caching (`cache_control`)
 
-Caching is opt-in: `model({ promptCaching: true })` sends request-level
-`cache_control: { type: "ephemeral" }` when a call has no explicit
-`options.cacheControl.breakpoints`. Anthropic then marks the last cacheable
+Caching is opt-in: `model({ promptCaching: true })` always sends request-level
+`cache_control: { type: "ephemeral" }`. Anthropic then marks the last cacheable
 block itself, caching the longest reusable request prefix (including growing
-message history). A caller-supplied breakpoint remains authoritative, so its
-request has no top-level automatic marker.
+message history across trips). A per-call `options.cacheControl.breakpoints >= 1`
+adds a system-prompt marker and keeps the automatic marker, so history caching
+continues.
 
 Set `promptCacheTtl: "1h"` on the model to apply a one-hour TTL to automatic
 caching and emitted explicit markers. Omit it (or use `"5m"`) for Anthropic's
 default five-minute TTL; the one-hour cache has a higher write cost.
 
-Two independent breakpoint sites, both reported back via `usage.cachedTokens` / `usage.cacheWriteTokens`:
+Up to three markers per request (tools + system + automatic, within Anthropic's limit of 4), all reported back via `usage.cachedTokens` / `usage.cacheWriteTokens`:
 
 - **Tools** — set `model({ promptCaching: true })` to mark the _last_ tool definition with `cache_control: ephemeral`. One breakpoint caches the whole tool prefix; off by default since a write costs ~1.25x and only pays off across multiple trips.
-- **System prompt** — a per-call `options.cacheControl.breakpoints >= 1` emits the system prompt as a `TextBlockParam` carrying `cache_control: ephemeral` (the longest stable prefix on a turn). Without the hint the system prompt stays a plain string with no marker of its own, but with `promptCaching: true` the automatic request-level marker still caches the longest reusable prefix, system prompt included (a live check read back 10,090 cached tokens of a large system prompt on the second call). With `promptCaching` off and no hint, nothing is cached, so a one-shot call never pays the write surcharge. A system prompt with per-turn placeholders changes the prefix each turn: write surcharge, no reads. No system prompt → no block.
+- **System prompt** — a per-call `options.cacheControl.breakpoints >= 1` emits the system prompt as a `TextBlockParam` carrying `cache_control: ephemeral` (the longest stable prefix on a turn). The automatic request-level marker stays in place next to it. Without the hint the system prompt stays a plain string with no marker of its own, but with `promptCaching: true` the automatic request-level marker still caches the longest reusable prefix, system prompt included (a live check read back 10,090 cached tokens of a large system prompt on the second call). With `promptCaching` off and no hint, nothing is cached, so a one-shot call never pays the write surcharge. A system prompt with per-turn placeholders changes the prefix each turn: write surcharge, no reads. No system prompt → no block.
 
 ```ts
 await agent.execute("…", { cacheControl: { breakpoints: 1 } }); // cache the system prefix
@@ -51847,7 +51847,7 @@ Each `TraceSpan` becomes one OTel span with the source start/end times and paren
 - `gen_ai.conversation.id` (from the span's `sessionId`)
 - `gen_ai.system` / `gen_ai.request.model` / `gen_ai.operation.name` — **never invented**: these appear only when the span's free-form `attributes` bag already carried that exact key. `otelExporter`'s `system` option backfills `gen_ai.system` when the span supplied none (and never overrides one it did).
 - `warlock.report.type` / `warlock.version` / `warlock.duration_ms` / `warlock.cost.usd`
-- the collector's own per-primitive keys ride along verbatim — `agent.model.name` / `agent.model.provider` / `agent.trips`, `workflow.steps`, `supervisor.iterations` / `supervisor.terminatedBy`, `tool.tripIndex`, `tool.callId`, `retries`, … — since `toGenAiAttributes` copies every scalar entry of the span's `attributes` bag.
+- the collector's own per-primitive keys ride along verbatim — `agent.model.name` / `agent.model.provider` / `agent.trips`, `image.model.name` / `image.model.provider` / `image.count` (likewise `speech.*` with `characters`, `transcription.*` with `durationSeconds`), `workflow.steps`, `supervisor.iterations` / `supervisor.terminatedBy`, `tool.tripIndex`, `tool.callId`, `retries`, … — since `toGenAiAttributes` copies every scalar entry of the span's `attributes` bag.
 
 Failed/cancelled/incomplete spans get OTel `ERROR` status plus a recorded exception.
 
@@ -54114,7 +54114,9 @@ An older core without the request log leaves the panel in-memory only.
 The **AI** sidebar group has six pages. Reports (`ai-reports`), Models (`ai-models`) and Errors (`ai-errors`) read
 **hourly rollups** (names and numbers only: agent, model, provider, runs, tokens, estimated cost, errors by category,
 latency histogram, fallback and refusal counts). Runs (`ai`, id unchanged), Agents (`agents`) and Evaluate
-(`ai-evaluate`) read in-memory data and exist in development only. Cost is always "Estimated from model pricing"; runs of
+(`ai-evaluate`) read in-memory data and exist in development only; `production.panels.ai` / `.agents` are ignored in
+production (one boot warning, tabs and routes not registered). Image, speech and transcription runs show their model in
+Runs, Models and Reports. Cost is always "Estimated from model pricing"; runs of
 models without pricing are counted as unpriced and shown next to every cost (a model priced at 0 counts as priced).
 Runs filters by text, status, type and exact HTTP request id (`GET api/ai/runs?requestId=`). A comparison whose
 previous period is older than the kept history reads "No earlier data". Custom ranges longer than 8 days use daily
@@ -54136,7 +54138,8 @@ export default {
   `devtoolsMigrations`. After upgrading run `warlock migrate`; without it one warning is logged and the pages answer
   `table-missing` ("AI reports need their table", command `warlock migrate`).
 - Production tabs: Reports, Models and Errors are on by default when Panoptic is installed and loads; Runs, Agents and
-  Evaluate stay off. `production.panels` overrides by id (`{ "ai-reports": false }`). Every process that boots the
+  Evaluate are development only (`panels.ai` / `panels.agents` are ignored, with one warning). `production.panels`
+  overrides the other tabs by id (`{ "ai-reports": false }`). Every process that boots the
   connector writes to the same table, so totals add up all instances and workers.
 - Needs Panoptic and observation (`ai.config({ panoptic: { observeAll: true } })`). Evaluate also needs
   `ai.config({ panoptic: { evaluate: { model, instructions? } } })`; without it the page shows the setup.

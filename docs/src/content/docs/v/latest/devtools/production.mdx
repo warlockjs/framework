@@ -277,7 +277,8 @@ the query calls from writing. Every run is audited.
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | Requests, Queries, Routes, Resources, Health, Errors, Logs, Jobs | On (Jobs shows each schedule's recent runs and the queue counts)          |
 | AI Reports, Models, Errors                                       | On when Panoptic is installed; see [AI reports](#ai-reports)              |
-| Mail, AI Runs, Agents, AI Evaluate, API, Processes               | Off unless `panels` sets the id to `true`                                 |
+| Mail, AI Evaluate, API, Processes                                | Off unless `panels` sets the id to `true`                                 |
+| AI Runs, Agents                                                  | Development only: `panels` cannot turn them on                            |
 | A package panel (such as Grimoire)                               | On when it declares `production: true`, or `panels` sets its id to `true` |
 
 The API tab builds its OpenAPI document from the routes the process registered. Under `warlock start` there are no
@@ -308,9 +309,11 @@ totals of agent runs, tokens, estimated cost, errors by category, latency, fallb
   hours. `devtools.ai.reports: false` turns the writer off, and so does turning off all three report tabs with
   `panels`.
 - **What stays in development.** **Runs**, **Agents** and **Evaluate** show prompts, tool data and single-run details,
-  and Evaluate spends a model call, so they stay off in production unless `panels` turns them on. Even then production
-  keeps no run details (the Runs list explains this), and Evaluate never grades in production: its page explains where
-  to run it, and `POST /api/ai/evaluate` does not exist there. The totals hold names and numbers only: no prompts, completions, tool data or user ids.
+  and Evaluate spends a model call, so they stay in development. Setting `panels.ai` or `panels.agents` to `true` in
+  production is ignored: the tabs are not listed, their routes are not registered, and boot logs one warning ("The Runs
+  and Agents tabs are development tabs ..."). Production shows AI totals in Reports, Models and Errors instead.
+  Evaluate never grades in production: its page explains where to run it, and `POST /api/ai/evaluate` does not exist
+  there. The totals hold names and numbers only: no prompts, completions, tool data or user ids.
 - **Access.** The three report pages need a signed-in user (viewer or above); a tab turned off answers the same empty 404
   as an unknown path. Cost is always an estimate from model pricing; runs of unpriced models are counted separately.
 

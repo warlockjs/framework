@@ -101,7 +101,9 @@ An older core without the request log leaves the panel in-memory only.
 The **AI** sidebar group has six pages. Reports (`ai-reports`), Models (`ai-models`) and Errors (`ai-errors`) read
 **hourly rollups** (names and numbers only: agent, model, provider, runs, tokens, estimated cost, errors by category,
 latency histogram, fallback and refusal counts). Runs (`ai`, id unchanged), Agents (`agents`) and Evaluate
-(`ai-evaluate`) read in-memory data and exist in development only. Cost is always "Estimated from model pricing"; runs of
+(`ai-evaluate`) read in-memory data and exist in development only; `production.panels.ai` / `.agents` are ignored in
+production (one boot warning, tabs and routes not registered). Image, speech and transcription runs show their model in
+Runs, Models and Reports. Cost is always "Estimated from model pricing"; runs of
 models without pricing are counted as unpriced and shown next to every cost (a model priced at 0 counts as priced).
 Runs filters by text, status, type and exact HTTP request id (`GET api/ai/runs?requestId=`). A comparison whose
 previous period is older than the kept history reads "No earlier data". Custom ranges longer than 8 days use daily
@@ -123,7 +125,8 @@ export default {
   `devtoolsMigrations`. After upgrading run `warlock migrate`; without it one warning is logged and the pages answer
   `table-missing` ("AI reports need their table", command `warlock migrate`).
 - Production tabs: Reports, Models and Errors are on by default when Panoptic is installed and loads; Runs, Agents and
-  Evaluate stay off. `production.panels` overrides by id (`{ "ai-reports": false }`). Every process that boots the
+  Evaluate are development only (`panels.ai` / `panels.agents` are ignored, with one warning). `production.panels`
+  overrides the other tabs by id (`{ "ai-reports": false }`). Every process that boots the
   connector writes to the same table, so totals add up all instances and workers.
 - Needs Panoptic and observation (`ai.config({ panoptic: { observeAll: true } })`). Evaluate also needs
   `ai.config({ panoptic: { evaluate: { model, instructions? } } })`; without it the page shows the setup.

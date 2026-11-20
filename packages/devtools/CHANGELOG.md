@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.62.0
+
+### Fixed
+
+- Image, speech and transcription runs show their model in the Runs page, the run summary and the AI totals (Reports, Models, Errors) instead of `(unknown)`. Totals saved before the upgrade stay under `(unknown)`, so a range that spans the upgrade lists both.
+- In production, `production.panels.ai` and `production.panels.agents` are ignored with one warning at boot: Runs and Agents are development tabs, and production shows AI totals in Reports, Models and Errors. Before, both tabs were listed and stayed empty. Their routes are no longer registered there.
+
 ## 5.61.0 - 2026-11-20
 
 ### Added

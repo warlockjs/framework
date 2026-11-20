@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/ai-panoptic` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.62.0
+
+### Fixed
+
+- Spans of `ai.image`, `ai.speech` and `ai.transcribe` runs carry their model and size: `image.model.name`, `image.model.provider`, `image.count`, `speech.model.name`, `speech.model.provider`, `speech.characters`, `transcription.model.name`, `transcription.model.provider` and `transcription.durationSeconds`. Before, these spans had no attributes.
+
 ## 5.60.0 - 2026-11-19
 
 ### Added

@@ -1573,7 +1573,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai-panoptic/skills/use-local-dashboard/SKILL.md` - use-local-dashboard - Run the zero-setup local Panoptic dashboard — a loopback `node:http` server over a trace …
 - `packages/ai-panoptic/src/collector/collector.ts` - ExporterErrorHandler, CollectorOptions, Collector, collector/collector.ts, createCollector
 - `packages/ai-panoptic/src/collector/content-capture.type.ts` - ContentRedactor, ContentCaptureOptions
-- `packages/ai-panoptic/src/collector/extract-span-attributes.ts` - ReportExtensions, extractSpanAttributes, addAgentAttributes, addWorkflowAttributes, addSupervisorAttributes, addOrchestratorAttributes, addToolAttributes
+- `packages/ai-panoptic/src/collector/extract-span-attributes.ts` - ReportExtensions, extractSpanAttributes, addAgentAttributes, addWorkflowAttributes, addSupervisorAttributes, addOrchestratorAttributes, addToolAttributes, addMediaAttributes
 - `packages/ai-panoptic/src/collector/index.ts` - collector/index.ts
 - `packages/ai-panoptic/src/collector/normalize-error.ts` - normalizeError, pickString
 - `packages/ai-panoptic/src/collector/report-to-span.ts` - ContentReport, reportToSpan, captureContent, lastNonEmptyOutput
@@ -3525,7 +3525,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/src/ai/reports/service.ts` - DevtoolsAiReportServiceInput, DevtoolsAiReportService, reports/service.ts, createAiReportService, load, answer
 - `packages/devtools/src/ai/rollup/cascade-store.ts` - RowQuery, rollup/cascade-store.ts, createCascadeAiRollupStore
 - `packages/devtools/src/ai/rollup/categories.ts` - DEVTOOLS_AI_ERROR_LABELS, emptyErrorCounts, CODE_CATEGORIES, classifyAiError
-- `packages/devtools/src/ai/rollup/extract.ts` - Span, RollupKey, Tokens, MODEL_SPAN_TYPES, count, normalise, subtract, isAiModelSpan
+- `packages/devtools/src/ai/rollup/extract.ts` - Span, RollupKey, Tokens, MODEL_SPAN_TYPES, count, normalise, subtract, spanModelOf
 - `packages/devtools/src/ai/rollup/file-store.ts` - FileAiRollupStoreOptions, dayName, dayStart, createFileAiRollupStore, readDay, writeDay
 - `packages/devtools/src/ai/rollup/histogram.ts` - rollup/histogram.ts, emptyAiLatency, aiLatencyBucket, addAiLatency, aiLatencyQuantile
 - `packages/devtools/src/ai/rollup/increment-error.ts` - DevtoolsAiRollupIncrementError
@@ -3808,7 +3808,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/tests/panels/helpers.tsx` - Answer, Route, ApiCall, FakeEventSource, instanceA, instanceB, session, devSession
 - `packages/devtools/ui-src/tests/setup.ts` - tests/setup.ts
 - `packages/devtools/ui-src/vite.config.ts` - ui-src/vite.config.ts, devBase, proxied
-- `packages/devtools/ui/dashboard/assets/app.js` - i, pe, be, ce, me, ve, xe, ye
+- `packages/devtools/ui/dashboard/assets/app.js` - pe, be, me, ve, xe, ye, i, C
 - `packages/devtools/ui/docs-swagger.js`
 - `packages/devtools/ui/panels/processes.js` - renderProcesses
 - `packages/devtools/vitest.config.ts` - devtools/vitest.config.ts
