@@ -2,6 +2,69 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+## 5.62.0 (2026-11-20)
+
+Source for all three: app findings page https://claude.ai/artifact/2oVjQgDQeLsNPzETbXNBzF (reported against 5.59.0).
+Each repro was re-run on the 5.61.0 sources on 2026-11-20 and still reproduces.
+
+### T-185 [bug] Production monitor: the Runs and Agents tabs can be turned on but never collect
+
+- What and why: `production.panels: { ai: true, agents: true }` mounts both tabs, but production never attaches the
+  AI or agent-trace source, so `/api/ai` answers `not-collected` and `/api/ai/agent-runs` tells a production user to
+  run an agent in development. Since 5.60.0 production has hourly totals (Reports, Models, Errors), so usage is
+  visible; what is missing is the run list, or a clear refusal.
+- Evidence: `packages/devtools/src/production/boot.ts:229-233` attaches only the mail source;
+  `packages/devtools/src/devtools-connector.ts:128-134` (development only);
+  `packages/devtools/src/production/http/mount.ts:500` registers the AI routes without `ai`/`agentTraces`;
+  `packages/devtools/src/server/ai-routes.ts:13-17`; tab defaults in `packages/devtools/src/production/contracts.ts:469-470`.
+- Decide one of: a content-free production run list (name, model, usage, cost, duration, status; no prompt text,
+  bounded store) fed to the Runs/Agents routes, or a config error (DT code) when `production.panels.ai`/`agents` is
+  `true`. The Agents message in production should not point to `warlock dev` either way.
+- Acceptance: spec that boots production with both tabs on and gets either runs or the config error; docs
+  (`devtools/production` page), skill and CHANGELOG.
+- Decision (2026-11-20): no production run store (production keeps hourly totals across instances; a per-process run
+  list would differ per instance). `ai`/`agents` set to `true` in production are dropped with one boot warning that
+  points to Reports, Models and Errors; no boot error, so apps that already set the flags keep booting.
+- Shipped: 5.62.0 (fix b779cc0e5, release b90f0e1b7, tag v5.62.0, publish run 44784763593), 2026-11-20.
+- Verified: repro re-run on 5.61.0 before the fix, now a regression spec; full workspace verify pass, release gate and
+  registry check green.
+
+### T-186 [bug] Image runs carry no model in Panoptic span attributes
+
+- What and why: an `ai.image` report has `model: { name, provider }` and `imageCount`, but
+  `extractSpanAttributes` has no `image` case, so the span has no attributes. The development Runs tab shows
+  `models: []`, and the production rollups count image runs under model `(unknown)`.
+- Evidence: `packages/ai-panoptic/src/collector/extract-span-attributes.ts:72-104` (switch without `image`);
+  `packages/ai/src/image/image.ts:66-72` (report shape); readers of `agent.model.name` in
+  `packages/devtools/src/sources/ai-source.ts:177`, `packages/devtools/src/ai/reports/runs.ts:74`,
+  `packages/devtools/src/ai/rollup/extract.ts:242`.
+- Fix: an `image` case that writes the model name/provider (the same keys the readers use, or a shared
+  `model.name` key read by all three) and `image.count`. Check `speech` and the other `MODEL_SPAN_TYPES` in
+  `rollup/extract.ts:12` for the same gap.
+- Acceptance: spec with `MockImageModel` through Panoptic and the devtools source shows the model in the run summary
+  and the rollup key; ai-panoptic + devtools CHANGELOG.
+- Shipped: 5.62.0 (fix b779cc0e5, release b90f0e1b7, tag v5.62.0, publish run 44784763593), 2026-11-20.
+- Verified: repro re-run on 5.61.0 before the fix, now a regression spec; full workspace verify pass, release gate and
+  registry check green.
+
+### T-187 [bug] Anthropic: `cacheControl.breakpoints` drops the automatic request-level cache marker
+
+- What and why: with `promptCaching: true`, any `breakpoints > 0` removes the request-level `cache_control`, so a
+  multi-trip agent stops reading its history from cache (reported live: trip 2 read 0 cached tokens with the hint vs
+  26,957 without, about 27K tokens of history). The JSDoc says the hint replaces the marker, but the public docs do
+  not: `ai/providers/anthropic.mdx` (Prompt caching) describes "two independent breakpoints" and never mentions the
+  automatic marker, and `ai/best-practices/cost-and-efficiency.md:153-156` recommends `breakpoints: 1` for a
+  multi-trip agent.
+- Evidence: `packages/ai-anthropic/src/model.ts:1029-1037` (`buildAutomaticCacheControl`), `:1000-1021`
+  (`buildSystem`); `packages/ai-anthropic/src/config.type.ts:90-110`.
+- Fix: keep the request-level marker next to the system breakpoint (Anthropic allows 4 breakpoints: tools, system,
+  automatic = 3), and update both docs pages; check Bedrock for the same choice.
+- Acceptance: mocked-fetch spec: `{ breakpoints: 1 }` sends the system block marker, the tools marker and the top-level
+  `cache_control`; docs, skill, CHANGELOG.
+- Shipped: 5.62.0 (fix b779cc0e5, release b90f0e1b7, tag v5.62.0, publish run 44784763593), 2026-11-20.
+- Verified: repro re-run on 5.61.0 before the fix, now a regression spec; full workspace verify pass, release gate and
+  registry check green.
+
 ## Preview infrastructure (2026-11-20)
 
 ### T-184 [chore] Move the devtools preview off an ephemeral port (suggested default: 17320)

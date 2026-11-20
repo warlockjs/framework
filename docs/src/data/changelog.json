@@ -140,6 +140,89 @@
   ],
   "releases": [
     {
+      "version": "5.62.0",
+      "id": "v5-62-0",
+      "date": "November 20, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Anthropic agents keep conversation caching with a system-prompt breakpoint, image, speech and transcription runs show their model, and the production monitor keeps Runs and Agents in development.",
+      "highlights": [
+        "Anthropic: with <code>promptCaching: true</code>, a per-call <code>cacheControl: { breakpoints: n }</code> no longer removes the request-level cache marker, so multi-trip agents keep reading their history from cache.",
+        "Panoptic spans of <code>ai.image</code>, <code>ai.speech</code> and <code>ai.transcribe</code> runs carry their model and size (<code>image.model.name</code>, <code>image.count</code>, and the matching <code>speech.*</code> and <code>transcription.*</code> keys).",
+        "Devtools shows the model of image, speech and transcription runs in the Runs page, the run summary and the AI totals instead of <code>(unknown)</code>.",
+        "In production, <code>production.panels.ai</code> and <code>production.panels.agents</code> are ignored with one boot warning; production shows AI totals in Reports, Models and Errors."
+      ],
+      "upgradeNotes": [
+        "AI totals saved before the upgrade keep image, speech and transcription runs under <code>(unknown)</code>, so a range that spans the upgrade lists both rows."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.62.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Image, speech and transcription runs show their model in the Runs page, the run summary and the AI totals (Reports, Models, Errors) instead of <code>(unknown)</code>. Totals saved before the upgrade stay under <code>(unknown)</code>, so a range that spans the upgrade lists both."
+            },
+            {
+              "type": "Fixed",
+              "html": "In production, <code>production.panels.ai</code> and <code>production.panels.agents</code> are ignored with one warning at boot: Runs and Agents are development tabs, and production shows AI totals in Reports, Models and Errors. Before, both tabs were listed and stayed empty. Their routes are no longer registered there."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-anthropic",
+          "slug": "ai-anthropic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "With <code>promptCaching: true</code>, a per-call <code>cacheControl: { breakpoints: n }</code> no longer removes the request-level <code>cache_control</code> marker. The automatic marker (the conversation prefix, cached across trips), the tools marker and the system marker are sent together (3 of the 4 breakpoints a request may carry), so a multi-trip agent that sets <code>breakpoints: 1</code> keeps reading its history from cache."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai-panoptic",
+          "slug": "ai-panoptic",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "Spans of <code>ai.image</code>, <code>ai.speech</code> and <code>ai.transcribe</code> runs carry their model and size: <code>image.model.name</code>, <code>image.model.provider</code>, <code>image.count</code>, <code>speech.model.name</code>, <code>speech.model.provider</code>, <code>speech.characters</code>, <code>transcription.model.name</code>, <code>transcription.model.provider</code> and <code>transcription.durationSeconds</code>. Before, these spans had no attributes."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 0,
+          "counts": [],
+          "items": []
+        }
+      ]
+    },
+    {
       "version": "5.61.0",
       "id": "v5-61-0",
       "date": "November 19, 2026",

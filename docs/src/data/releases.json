@@ -1,4 +1,18 @@
 {
+  "5.62.0": {
+    "publishedAt": "2026-11-20T18:05:02.074Z",
+    "matrix": "none",
+    "headline": "Anthropic agents keep conversation caching with a system-prompt breakpoint, image, speech and transcription runs show their model, and the production monitor keeps Runs and Agents in development.",
+    "highlights": [
+      "Anthropic: with `promptCaching: true`, a per-call `cacheControl: { breakpoints: n }` no longer removes the request-level cache marker, so multi-trip agents keep reading their history from cache.",
+      "Panoptic spans of `ai.image`, `ai.speech` and `ai.transcribe` runs carry their model and size (`image.model.name`, `image.count`, and the matching `speech.*` and `transcription.*` keys).",
+      "Devtools shows the model of image, speech and transcription runs in the Runs page, the run summary and the AI totals instead of `(unknown)`.",
+      "In production, `production.panels.ai` and `production.panels.agents` are ignored with one boot warning; production shows AI totals in Reports, Models and Errors."
+    ],
+    "upgradeNotes": [
+      "AI totals saved before the upgrade keep image, speech and transcription runs under `(unknown)`, so a range that spans the upgrade lists both rows."
+    ]
+  },
   "5.61.0": {
     "publishedAt": "2026-11-19T23:05:52.475Z",
     "matrix": "none",
