@@ -984,7 +984,7 @@ describe("AnthropicModel.complete()", () => {
 
     expect(JSON.stringify(firstCall(calls).params)).not.toContain("cache_control");
 
-    const hinted = calls[1].params as unknown as Record<string, unknown> & {
+    const hinted = calls[1]!.params as unknown as Record<string, unknown> & {
       tools: Array<{ cache_control?: unknown }>;
     };
 
