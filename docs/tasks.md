@@ -8,7 +8,9 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Next release
 
-- Nothing planned yet. 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
+- 5.62.0: T-185, T-186 and T-187 are fixed on main (b779cc0e5) and verified (typecheck + unit tests of devtools,
+  ai-panoptic, ai-anthropic; review pass). Next step: full workspace verification, release gate, publish.
+- 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
 
 ## From the 2026-11-20 AI findings page
 
@@ -30,7 +32,10 @@ Each repro was re-run on the 5.61.0 sources on 2026-11-20 and still reproduces.
   `true`. The Agents message in production should not point to `warlock dev` either way.
 - Acceptance: spec that boots production with both tabs on and gets either runs or the config error; docs
   (`devtools/production` page), skill and CHANGELOG.
-- Status: open.
+- Decision (2026-11-20): no production run store (production keeps hourly totals across instances; a per-process run
+  list would differ per instance). `ai`/`agents` set to `true` in production are dropped with one boot warning that
+  points to Reports, Models and Errors; no boot error, so apps that already set the flags keep booting.
+- Status: fixed on main in b779cc0e5 (2026-11-20); ships in 5.62.0.
 
 ### T-186 [bug] Image runs carry no model in Panoptic span attributes
 
@@ -46,7 +51,7 @@ Each repro was re-run on the 5.61.0 sources on 2026-11-20 and still reproduces.
   `rollup/extract.ts:12` for the same gap.
 - Acceptance: spec with `MockImageModel` through Panoptic and the devtools source shows the model in the run summary
   and the rollup key; ai-panoptic + devtools CHANGELOG.
-- Status: open.
+- Status: fixed on main in b779cc0e5 (2026-11-20); ships in 5.62.0.
 
 ### T-187 [bug] Anthropic: `cacheControl.breakpoints` drops the automatic request-level cache marker
 
@@ -62,7 +67,7 @@ Each repro was re-run on the 5.61.0 sources on 2026-11-20 and still reproduces.
   automatic = 3), and update both docs pages; check Bedrock for the same choice.
 - Acceptance: mocked-fetch spec: `{ breakpoints: 1 }` sends the system block marker, the tools marker and the top-level
   `cache_control`; docs, skill, CHANGELOG.
-- Status: open.
+- Status: fixed on main in b779cc0e5 (2026-11-20); ships in 5.62.0.
 
 ## From the 5.61.0 release
 
