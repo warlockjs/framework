@@ -1,7 +1,7 @@
 # Graph Report - warlock.js  (2026-11-20)
 
 ## Corpus Check
-- 6910 files · ~5,108,917 words
+- 6910 files · ~5,108,960 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 163 file(s) not represented in the graph (top: (none) 85, .orig 32, .jsonl 28)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `8a0b3f68`
+- Built from commit: `a4093deb`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -991,16 +991,16 @@
 10. `RepositoryManager` - 150 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `Measure the tool schemas — then send them compact` --references--> `measure()`  [INFERRED]
-  docs/src/content/docs/v/latest/ai/best-practices/cost-and-efficiency.md → packages/ai/src/measure/measure.ts
-- `Add a semantic cache for FAQ repeats — skip the LLM entirely` --references--> `semanticCache()`  [INFERRED]
-  docs/src/content/docs/v/latest/ai/best-practices/cost-and-efficiency.md → packages/ai/src/middleware/builtins/semantic-cache.ts
-- `Put a budget and SLO contract around every run` --references--> `budget()`  [INFERRED]
-  docs/src/content/docs/v/latest/ai/best-practices/cost-and-efficiency.md → packages/ai/src/middleware/builtins/budget.ts
-- `Use a fallback model for resilience — but it's a failover, not a default` --references--> `fallbackModel()`  [INFERRED]
-  docs/src/content/docs/v/latest/ai/best-practices/cost-and-efficiency.md → packages/ai/src/model/fallback-model.ts
-- ``gen_ai.*` — OpenTelemetry GenAI semantic conventions` --references--> `otelExporter()`  [INFERRED]
-  docs/src/content/docs/v/latest/ai/observability/what-panoptic-traces.md → packages/ai-panoptic/src/exporters/otel/otel-exporter.ts
+- `T-171 [feature] Parked: requests only one app has made` --references--> `event()`  [INFERRED]
+  docs/tasks.md → packages/ai-openai/src/responses-model.spec.ts
+- `T-120 [bug] Windows CI: the development e2e test times out waiting for a hot update` --references--> `dataset()`  [INFERRED]
+  docs/tasks.md → packages/ai/src/eval/dataset.ts
+- `Files` --references--> `UploadedFile`  [INFERRED]
+  docs/src/content/docs/v/latest/core/the-basics/http-request.md → packages/core/src/http/uploaded-file.ts
+- `The Scheduler Singleton` --references--> `Scheduler`  [INFERRED]
+  docs/src/content/docs/v/latest/scheduler/getting-started/introduction.mdx → packages/scheduler/src/scheduler.ts
+- `The class form — the narrow escape hatch` --references--> `Migration`  [INFERRED]
+  docs/src/content/docs/v/latest/cascade/the-basics/migrations.md → packages/cascade/src/migration/migration.ts
 
 ## Import Cycles
 - 2-file cycle: `packages/herald/src/message-managers/event-consumer.ts -> packages/herald/src/message-managers/types.ts -> packages/herald/src/message-managers/event-consumer.ts`
@@ -1008,19 +1008,19 @@
 - 2-file cycle: `packages/web/src/index.ts -> packages/web/src/localization.tsx -> packages/web/src/index.ts`
 - 2-file cycle: `packages/web/src/index.ts -> packages/web/src/routing/route-types.ts -> packages/web/src/index.ts`
 - 2-file cycle: `packages/web/src/index.ts -> packages/web/src/shared.ts -> packages/web/src/index.ts`
+- 2-file cycle: `packages/ai/src/prompts/prompts-manager.ts -> packages/ai/src/system-prompt/system-prompt.ts -> packages/ai/src/prompts/prompts-manager.ts`
 - 2-file cycle: `packages/core/src/http/middleware/inject-request-context.ts -> packages/core/src/http/request.ts -> packages/core/src/http/middleware/inject-request-context.ts`
 - 2-file cycle: `packages/core/src/router/route-builder.ts -> packages/core/src/router/router.ts -> packages/core/src/router/route-builder.ts`
 - 2-file cycle: `packages/core/src/resource/nullable-resource.ts -> packages/core/src/resource/resource.ts -> packages/core/src/resource/nullable-resource.ts`
 - 2-file cycle: `packages/core/src/resource/resource.ts -> packages/core/src/resource/types.ts -> packages/core/src/resource/resource.ts`
 - 2-file cycle: `packages/core/src/resource/resource-field-builder.ts -> packages/core/src/resource/types.ts -> packages/core/src/resource/resource-field-builder.ts`
-- 2-file cycle: `packages/core/src/config/config-loader.ts -> packages/core/src/config/config-special-handlers.ts -> packages/core/src/config/config-loader.ts`
 - 2-file cycle: `packages/cascade/src/model/methods/guarded-columns.ts -> packages/cascade/src/model/model.ts -> packages/cascade/src/model/methods/guarded-columns.ts`
 - 2-file cycle: `packages/cascade/src/drivers/mongodb/mongodb-driver.ts -> packages/cascade/src/drivers/mongodb/mongodb-query-builder.ts -> packages/cascade/src/drivers/mongodb/mongodb-driver.ts`
-- 2-file cycle: `packages/ai/src/prompts/prompts-manager.ts -> packages/ai/src/system-prompt/system-prompt.ts -> packages/ai/src/prompts/prompts-manager.ts`
 - 2-file cycle: `packages/fs/src/facade/directory.ts -> packages/fs/src/facade/file.ts -> packages/fs/src/facade/directory.ts`
+- 2-file cycle: `packages/core/src/config/config-loader.ts -> packages/core/src/config/config-special-handlers.ts -> packages/core/src/config/config-loader.ts`
 - 3-file cycle: `packages/web/src/client/navigation/refresh.ts -> packages/web/src/shared.ts -> packages/web/src/index.ts -> packages/web/src/client/navigation/refresh.ts`
-- 3-file cycle: `packages/web/src/client/navigation/change-locale-code.ts -> packages/web/src/shared.ts -> packages/web/src/index.ts -> packages/web/src/client/navigation/change-locale-code.ts`
 - 3-file cycle: `packages/web/src/index.ts -> packages/web/src/use-text-direction.ts -> packages/web/src/localization.tsx -> packages/web/src/index.ts`
+- 3-file cycle: `packages/web/src/client/navigation/change-locale-code.ts -> packages/web/src/shared.ts -> packages/web/src/index.ts -> packages/web/src/client/navigation/change-locale-code.ts`
 - 3-file cycle: `packages/core/src/container/index.ts -> packages/core/src/router/index.ts -> packages/core/src/router/router.ts -> packages/core/src/container/index.ts`
 - 3-file cycle: `packages/core/src/resource/nullable-resource.ts -> packages/core/src/resource/resource.ts -> packages/core/src/resource/types.ts -> packages/core/src/resource/nullable-resource.ts`
 
@@ -4499,24 +4499,24 @@ Cohesion: 0.50
 Nodes (3): held, lockKeys, NOW
 
 ## Knowledge Gaps
-- **113 isolated node(s):** `DASHBOARD_BUILD_DEPENDENCIES`, `DASHBOARD_FILES`, `DASHBOARD_GZIP_BUDGET_BYTES`, `../../src/app/posts/resources/post.resource`, `RFC-4122` (+108 more)
+- **113 isolated node(s):** `DASHBOARD_BUILD_DEPENDENCIES`, `DASHBOARD_FILES`, `DASHBOARD_GZIP_BUDGET_BYTES`, `../../src/app/posts/resources/post.resource`, `../app/orders/tracker.service` (+108 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 18570 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **182 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `authMiddleware()` connect `authMiddleware` to `RefreshToken`, `routing-deep.md`, `inject-request-context.ts`, `router/types.ts`, `Restful`, `access.ts`, `DatabaseNotification`, `useHashedPassword`, `01-the-request-lifecycle.md`, `warlock/src/app/auth/routes.ts`, `Check permissions`, `DefaultAccessResolver`, `Auth`, `auth.middleware.ts`, `deployment.md`, `Warlock — generate an OpenAPI document`, `.validated`, `login-throttle.middleware.ts`, `jwt.ts`, `Warlock — use built-in middleware`, `Request`, `check-permissions.md`, `request-locals-isolation.spec.ts`, `Warlock — `warlock inspect``, `start-http-development-server.ts`, `guarded`, `handle-login-and-logout.md`, `devtools/index.mdx`, `cli-commands.md`, `WL9xxx — conventions and hygiene`, `openapi/types.ts`?**
-  _High betweenness centrality (0.020) - this node is a cross-community bridge._
+- **Why does `MongoQueryBuilder` connect `MongoQueryBuilder` to `QueryBuilder`, `Model`, `MongoDbDriver`, `batch-loads.ts`, `DataSource`, `MongoQueryParser`, `ref_mongez_reinforcements`?**
+  _High betweenness centrality (0.032) - this node is a cross-community bridge._
 - **What connects `DASHBOARD_BUILD_DEPENDENCIES`, `DASHBOARD_FILES`, `DASHBOARD_GZIP_BUDGET_BYTES` to the rest of the system?**
   _113 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `supervisor/execution.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.02102383899692529 - nodes in this community are weakly interconnected._
-- **Why does `MongoQueryBuilder` connect `MongoQueryBuilder` to `QueryBuilder`, `Model`, `MongoDbDriver`, `batch-loads.ts`, `DataSource`, `MongoQueryParser`, `ref_mongez_reinforcements`?**
-  _High betweenness centrality (0.013) - this node is a cross-community bridge._
+- **Why does `Model` connect `Model` to `ModelEvents`, `accessors.md`, `RefreshToken`, `request.ts`, `MongoQueryBuilder`, `batch-loads.ts`, `factories.ts`, `RegisterModel`, `seal/src/index.ts`, `ChildModel`, `DatabaseNotification`, `budget.ts`, `hardening-suite.ts`, `cascade/src/index.ts`, `base-notifications-repository.ts`, `What the UI shows`, `serialized.ts`, `inspect-app.ts`, `LoggingData`, `Migration`, `DataSource`, `events-and-hooks.md`, `migrate`, `ref_mongez_reinforcements`, `web/src/index.ts`, `database-log/database-log.ts`, `QueryBuilderContract`, `BaseValidator`, `MongoQueryParser`?**
+  _High betweenness centrality (0.027) - this node is a cross-community bridge._
 - **Should `ai/src/errors/index.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.015173686638982269 - nodes in this community are weakly interconnected._
-- **Why does `Auth` connect `RefreshToken` to `Model`, `auth/src/index.ts`, `access.ts`, `useHashedPassword`, `hardening-suite.ts`, `auth/src/contracts/types.ts`, `cascade/src/index.ts`, `auth/src/contracts/types.ts`, `Auth`, `provider-login.ts`, `authMiddleware`, `migrate`, `jwt.ts`, `request-locals-isolation.spec.ts`, `5.54.0 (2026-11-16)`, `Every option, explained`, `start-http-development-server.ts`, `guarded`, `handle-login-and-logout.md`?**
-  _High betweenness centrality (0.012) - this node is a cross-community bridge._
+- **Why does `5.54.0 (2026-11-16)` connect `5.54.0 (2026-11-16)` to `ai/src/errors/index.ts`, `ModelContract`, `request.ts`, `render-page.ts`, `RefreshToken`, `install-page-routes.ts`, `Always-true facts`, `translation-usage.ts`, `serve/serve.ts`, `Restful`, `windows-helper.ts`, `web/src/index.ts`, `ResourceFieldBuilder`, `5.55.0 (2026-11-17)`, `conversation-session.ts`, `core/src/index.ts`, `collect-sitemap-entries.ts`, `.preventOverlap`, `string-validator.ts`, `DefaultAccessResolver`, `setupTest`, `host`, `.validated`, `MemoryCacheDriver`, `Warlock — use built-in middleware`, `web/src/index.ts`, `CacheConfigurationError`, `Context`, `UploadedFile`, `ConsoleLog`, `update-warlock-packages.ts`, `rag/index.ts`?**
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
 - **Should `ModelContract` be split into smaller, more focused modules?**
   _Cohesion score 0.015837791828793774 - nodes in this community are weakly interconnected._

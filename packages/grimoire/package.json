@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/grimoire",
-  "version": "5.61.0",
+  "version": "5.62.0",
   "type": "module",
   "description": "Experimental project map for Warlock.js apps: a generated book of the code, agent-written features, flows, apps, tasks and releases, a read-only check, and scry queries for agents.",
   "keywords": [
@@ -59,8 +59,8 @@
     }
   },
   "peerDependencies": {
-    "@warlock.js/core": "5.61.0",
-    "@warlock.js/web": "5.61.0"
+    "@warlock.js/core": "5.62.0",
+    "@warlock.js/web": "5.62.0"
   },
   "peerDependenciesMeta": {
     "@warlock.js/web": {
