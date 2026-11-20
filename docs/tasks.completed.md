@@ -2,6 +2,36 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+## Preview infrastructure (2026-11-20)
+
+### T-184 [chore] Move the devtools preview off an ephemeral port (suggested default: 17320)
+
+- Source: 5.61.0 release, 2026-11-20. Owner asked for a default port suggestion.
+- What and why: the preview dev server listens on `127.0.0.1:47320`, which is inside this server's ephemeral port
+  range (`/proc/sys/net/ipv4/ip_local_port_range` = 32768–60999). Outgoing connections from any process can briefly
+  take that port as their local port, so a preview restart can fail with `EADDRINUSE` while nothing is listening.
+  That happened on 2026-11-20: every rebuild restart failed, `ss` showed only a TIME-WAIT socket using 47320 as a
+  client port, and a plain `net.listen` on it failed too. A retry a little later worked.
+- Suggested default: 17320. It is below the ephemeral range, not a well-known service port, was free on 2026-11-20
+  (`ss -ltn`), and keeps the old port's last four digits, so it stays easy to recognise. Any free port from 10000 to
+  32767 works the same way; avoid 2000–6999 here, where tenant apps and services already listen.
+- Where: in `DEVTOOLS_PREVIEW_HOME` (git-ignored root `.env`), the scripts `preview-start.sh` (HTTP_PORT, BASE_URL,
+  FRONTEND_URL and the health-check URLs) and README.md; Apache's reverse proxy for the preview domain
+  (the preview domain's `proxy.conf` under Apache's `conf.d/userdata` tree). Never write the preview address into
+  tracked files.
+- Steps: stop the preview by its recorded process group, change the port in the scripts and the proxy config, check the
+  Apache config, reload Apache gracefully, start the preview, then curl both the local port and the public URL.
+  Afterwards, health-check the Apache/PHP tenant sites and pm2.
+- Also check: the framework's own fixed test ports (for example the e2e dev test server's 47301/47302, see the
+  `PortInUseError` in the 5.61.0 Windows logs) sit in the same range; consider moving them below 32768 or using port 0.
+- Acceptance: the preview answers on the new port locally and through the public URL, and two restarts in a row
+  succeed.
+- Status: done 2026-11-20 with the owner's go-ahead. The preview scripts, README and Apache proxy config now use 17320
+  (backups in `findings/5.61/port/`). `apachectl -t` passed and Apache was reloaded gracefully. The preview answered
+  200 locally after two restarts in a row, and the public URL gave its 401 login prompt. pm2 (62 online, 2 stopped)
+  and all 334 sites returned the same status codes before and after the reload. The framework's e2e test ports are
+  not changed (see "Also check").
+
 ## 5.61.0 (2026-11-20)
 
 Shipped in 5.61.0 (npm 2026-11-19 23:05 UTC; release commits fb11c741e and 1cde18e7d, tag v5.61.0, publish run 44630058688). Verified by one typecheck, the strictness gate and every package's test suite on the final tree, plus a live Redis run of BullMQ counts and measured Grimoire first-open timings (`findings/5.61/reports/`).
