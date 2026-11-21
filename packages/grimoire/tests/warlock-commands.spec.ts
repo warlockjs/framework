@@ -286,6 +286,28 @@ describe("warlock scry", () => {
     expect(JSON.parse(json.stdout.join("\n"))).toMatchObject({ type: "flow", routes: "fresh" });
   });
 
+  it("prints a failure as a JSON error on stdout under --json, and exits 1", async () => {
+    const copy = fixture();
+    const adapter = createShopAdapter();
+    const io = capture();
+
+    await runBuild({ root: copy.root, adapter, io: capture() });
+
+    expect(
+      await runScry({ root: copy.root, adapter, io }, [], {
+        route: "DELETE /api/nowhere",
+        json: true,
+      }),
+    ).toBe(1);
+    expect(io.stderr).toEqual([]);
+
+    const error = JSON.parse(io.stdout.join("\n"));
+
+    expect(error).toMatchObject({ type: "error", code: "GR9002" });
+    expect(error.message).toMatch(/^No route matches DELETE \/api\/nowhere/);
+    expect(error.fix).not.toBe("");
+  });
+
   it("exits 1 with the code, the message and the fix", async () => {
     const io = capture();
     const copy = fixture();

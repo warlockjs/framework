@@ -18,6 +18,8 @@
 
 ### Added
 
+- `warlock scry --route "GET /chat"` finds pages and mobile screens. For `GET` and `HEAD` with no API route on the path, it looks the path up in the pages and screens and returns each one with its file, setup file, layouts and the import closure of those; a path several sites serve lists every site, and the new `--site <id>` (and an optional `site` on `grimoire_route`) keeps one. `ScryRouteResult.route` is `null` for such a page and `pages` lists the matches. The `GR9002` message names the pages on the path when the method is not `GET` or `HEAD`.
+- `warlock scry --json` prints a failure as `{ "type": "error", "code", "message", "fix" }` on stdout and exits 1 (text mode still writes to stderr). The shape is the new `ScryError` type.
 - `GR9007` (error): the book was never built, or was built by another version. Run `warlock grimoire build`.
 - `openStoredGrimoire(root, adapter)`, the read-only open behind `scry`, and `checkBook()`, the change check of `buildBook` with nothing rebuilt or written. The snapshot gains an optional `behind` field.
 

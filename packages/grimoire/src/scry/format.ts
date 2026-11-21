@@ -174,6 +174,28 @@ function formatImpact(result: ScryImpactResult, options: FormatScryOptions): str
 function formatRoute(result: ScryRouteResult): string[] {
   const route = result.route;
   const width = 12;
+
+  if (route === null) {
+    const first = result.pages[0];
+
+    return [
+      first === undefined ? "page" : `GET ${first.route}  (${first.type})`,
+      ...section(
+        "pages",
+        result.pages.map((page) => `${page.app} ${page.route}  ${page.file}`),
+        width,
+      ),
+      ...section(
+        "setup",
+        result.pages.flatMap((page) => (page.setupFile === null ? [] : [page.setupFile])),
+        width,
+      ),
+      ...section("layouts", [...new Set(result.pages.flatMap((page) => page.layouts))], width),
+      ...section("files", result.files, width),
+      ...notes(result),
+    ];
+  }
+
   const auth = route.auth.required
     ? `required (${route.auth.userTypes.length > 0 ? route.auth.userTypes.join(", ") : "any user"})`
     : "none";

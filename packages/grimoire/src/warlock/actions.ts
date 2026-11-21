@@ -10,7 +10,7 @@ import { checkGrimoire, formatCheckReport } from "../check";
 import { createFinding, explainGrimoireCode, GrimoireError } from "../codes";
 import type { BookAdapter } from "../contracts/adapter";
 import type { GrimoireCheckReport, GrimoireFinding } from "../contracts/findings";
-import type { ScryQuery, ScryResult } from "../contracts/scry";
+import type { ScryError, ScryQuery, ScryResult } from "../contracts/scry";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import { loadBook } from "../book";
 import { projectPath } from "../paths";
@@ -52,6 +52,16 @@ export function reportError(io: CommandIO, error: unknown): number {
   }
 
   throw error;
+}
+
+/** The JSON error a failed `scry --json` prints and the MCP tools share. */
+export function scryErrorOf(error: GrimoireError): ScryError {
+  return {
+    type: "error",
+    code: error.code,
+    message: error.message,
+    fix: explainGrimoireCode(error.code)?.fix ?? "",
+  };
 }
 
 function printJson(io: CommandIO, value: unknown): void {
@@ -406,6 +416,12 @@ export async function runScry(
 
     return 0;
   } catch (error) {
+    if (options.json === true && error instanceof GrimoireError) {
+      printJson(io, scryErrorOf(error));
+
+      return 1;
+    }
+
     return reportError(io, error);
   }
 }

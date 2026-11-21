@@ -233,6 +233,42 @@ steps       orders/place-order step 2
 trailing `/` is ignored and the method may be in any case. `warlock grimoire check` matches flow route steps the same
 way.
 
+`--route` also takes a page URL. In a web app every page sits behind one catch-all route, so for `GET` and `HEAD` with
+no API route on the path, `scry` looks the path up in the pages and mobile screens (params written either way, as above):
+
+```bash
+npx warlock scry --route "GET /chat"
+npx warlock scry --route "GET /login" --site admin   # only the page of one site or app
+```
+
+```
+GET /chat  (page)
+pages       web /chat  src/app/chat/pages/chat.page.tsx
+setup       src/app/chat/pages/chat.setup.ts
+layouts     src/app/shell/layouts/app.layout.tsx
+files       src/app/chat/pages/chat.page.tsx
+            src/app/chat/pages/chat.setup.ts
+            src/app/shell/layouts/app.layout.tsx
+```
+
+`files` holds the page file, its setup file and its layouts with everything they import. A path several sites serve
+(`/`, `/login`) lists every one of them; `--site <id>` keeps one site or mobile app. In `--json`, `route` is `null` and
+`pages` holds one entry per site (`app`, `site`, `route`, `file`, `type`, `setupFile`, `layouts`, `files`). Other methods
+on a page URL stop with `GR9002`, and its message lists the pages on that path. The `grimoire_route` MCP tool takes the
+same page URLs and an optional `site`.
+
+### Errors under `--json`
+
+With `--json`, a failed `scry` prints the error as JSON on stdout and exits 1, so a caller that parses stdout always
+gets an object:
+
+```json
+{ "type": "error", "code": "GR9002", "message": "No route matches DELETE /api/orders. …", "fix": "…" }
+```
+
+`fix` is the code's fix text (an empty string when it has none). Without `--json` the error is text on stderr, as for
+every command. The `ScryError` type describes the object.
+
 ### A feature: `--feature`
 
 ```bash

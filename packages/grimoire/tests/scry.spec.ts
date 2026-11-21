@@ -197,7 +197,86 @@ describe("scry over the shop fixture", () => {
   it("matches route params written either way and ALL methods", () => {
     const result = scry(snapshot, { type: "route", method: "GET", path: "/api/products/[id]/" });
 
-    expect(result.type === "route" && result.route.name).toBe("catalog.products.show");
+    expect(result.type === "route" && result.route?.name).toBe("catalog.products.show");
+  });
+
+  describe("--route with a page URL", () => {
+    /** The shop book with a catch-all `GET /*` route and no `/products/:id` API route. */
+    function webSnapshot(): GrimoireSnapshot {
+      const facts = snapshot.book.facts;
+      const order = facts.routes?.find((item) => item.path === "/api/orders");
+
+      if (order === undefined) throw new Error("fixture has no /api/orders");
+
+      return {
+        ...snapshot,
+        book: {
+          ...snapshot.book,
+          facts: { ...facts, routes: [{ ...order, method: "GET", path: "/*", isPage: true }] },
+        },
+      };
+    }
+
+    it("returns the page behind GET /* with its file, setup file, layouts and imports", () => {
+      const result = scry(webSnapshot(), { type: "route", method: "get", path: "/products/[id]" });
+
+      if (result.type !== "route") throw new Error("not a route result");
+
+      expect(result.route).toBeNull();
+      expect(result.pages.map((page) => `${page.type} ${page.route}`).sort()).toEqual([
+        "page /products/:id",
+        "screen /products/[id]",
+      ]);
+      expect(result.pages.find((page) => page.type === "page")).toMatchObject({
+        site: "client",
+        file: "src/web/$sites/client/products/show.page.tsx",
+        setupFile: "src/web/$sites/client/products/show.setup.ts",
+        layouts: ["src/web/$sites/client/layout.tsx"],
+      });
+      expect(result.files).toEqual(
+        expect.arrayContaining([
+          "src/web/$sites/client/products/show.page.tsx",
+          "src/web/$sites/client/products/show.setup.ts",
+          "src/web/$sites/client/layout.tsx",
+        ]),
+      );
+      expect(formatScryResult(result)[0]).toMatch(/^GET \/products\/.+ {2}\((page|screen)\)$/);
+    });
+
+    it("returns every site serving the path, and --site keeps one", () => {
+      const both = scry(webSnapshot(), { type: "route", method: "GET", path: "/" });
+      const one = scry(webSnapshot(), { type: "route", method: "GET", path: "/", site: "client" });
+      const mobile = scry(webSnapshot(), {
+        type: "route",
+        method: "GET",
+        path: "/",
+        site: "mobile",
+      });
+
+      expect(both.type === "route" && both.pages.map((page) => page.site).sort()).toEqual([
+        "client",
+        "mobile",
+      ]);
+      expect(one.type === "route" && one.pages.map((page) => page.site)).toEqual(["client"]);
+      expect(mobile.type === "route" && mobile.pages.map((page) => page.type)).toEqual(["screen"]);
+    });
+
+    it("keeps GR9002 for other methods and unknown paths, and lists the pages in the hint", () => {
+      expect(
+        codeOf(() => scry(webSnapshot(), { type: "route", method: "POST", path: "/products/1" })),
+      ).toMatch(/^GR9002 No route matches POST \/products\/1\./);
+      expect(
+        codeOf(() => scry(webSnapshot(), { type: "route", method: "POST", path: "/products/:id" })),
+      ).toMatch(/Pages on that path \(GET or HEAD only\).*web-client \/products\/:id/);
+      expect(
+        codeOf(() => scry(webSnapshot(), { type: "route", method: "GET", path: "/nowhere" })),
+      ).toMatch(/Run warlock routes/);
+      expect(
+        codeOf(() =>
+          scry(webSnapshot(), { type: "route", method: "GET", path: "/", site: "admin" }),
+        ),
+      ).toMatch(/none on site admin/);
+    });
   });
 
   it("ranks search hits: exact id, prefix, id words, detail words; respects the limit", () => {
