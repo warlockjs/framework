@@ -20,6 +20,7 @@ import type {
   ScryPageRef,
   ScryQuery,
   ScryResult,
+  ScryRoutePage,
   ScryRouteResult,
   ScrySearchResult,
 } from "../contracts/scry";
@@ -327,13 +328,25 @@ function scryRoute(
   const route = facts.routes.find((item) => routeMatches(item, method, query.path));
 
   if (!route) {
+    const pages = method === "GET" || method === "HEAD" ? pagesAt(snapshot, query) : [];
+
+    if (pages.length > 0) return pageRouteResult(snapshot, pages);
+
     const samePath = facts.routes
       .filter((item) => normalizeRoutePath(item.path) === normalizeRoutePath(query.path))
       .map((item) => `${item.method} ${item.path}`);
-    const hint =
-      samePath.length > 0
-        ? ` Routes on that path: ${samePath.join(", ")}.`
-        : " Run warlock routes to list them, or warlock grimoire build when the route is new.";
+    const pagePaths = pagesAt(snapshot, { path: query.path }).map(
+      (page) => `${page.app} ${page.route}`,
+    );
+    const hint = [
+      samePath.length > 0 ? ` Routes on that path: ${samePath.join(", ")}.` : "",
+      pagePaths.length > 0
+        ? ` Pages on that path (GET or HEAD only${query.site === undefined ? "" : `, none on site ${query.site}`}): ${pagePaths.join(", ")}.`
+        : "",
+      samePath.length === 0 && pagePaths.length === 0
+        ? " Run warlock routes to list them, or warlock grimoire build when the route is new."
+        : "",
+    ].join("");
 
     throw new GrimoireError("GR9002", `No route matches ${asked}.${hint}`);
   }
@@ -368,6 +381,78 @@ function scryRoute(
     files,
     steps: steps.sort((left, right) => byText(left.flow, right.flow) || left.index - right.index),
     page,
+    pages: [],
+  };
+}
+
+/** Pages and mobile screens whose URL is the asked path, narrowed to `--site` when given. */
+function pagesAt(
+  snapshot: GrimoireSnapshot,
+  query: { path: string; site?: string | undefined },
+): ScryRoutePage[] {
+  const facts = snapshot.book.facts;
+  const graph = fileGraph(facts.files);
+  const wanted = normalizeRoutePath(query.path);
+  const site = query.site;
+  const closure = (files: (string | null)[]): string[] =>
+    importClosure(
+      graph,
+      files.filter((file): file is string => file !== null),
+    );
+
+  return [
+    ...facts.pages
+      .filter(
+        (page) =>
+          normalizeRoutePath(page.route) === wanted &&
+          (site === undefined || page.site === site || siteApp(snapshot, page.site) === site),
+      )
+      .map((page) => ({
+        app: siteApp(snapshot, page.site),
+        site: page.site,
+        route: page.route,
+        file: page.file,
+        type: "page" as const,
+        setupFile: page.setupFile,
+        layouts: page.layouts,
+        files: closure([page.file, page.setupFile, ...page.layouts]),
+      })),
+    ...facts.mobile.flatMap((app) =>
+      site !== undefined && app.id !== site && mobileApp(snapshot, app.id) !== site
+        ? []
+        : app.screens
+            .filter((screen) => normalizeRoutePath(screen.route) === wanted)
+            .map((screen) => ({
+              app: mobileApp(snapshot, app.id),
+              site: app.id,
+              route: screen.route,
+              file: screen.file,
+              type: "screen" as const,
+              setupFile: null,
+              layouts: screen.layouts,
+              files: closure([screen.file, ...screen.layouts]),
+            })),
+    ),
+  ].sort((left, right) => byText(left.app, right.app) || byText(left.file, right.file));
+}
+
+/** The answer for a URL that only pages or screens serve. */
+function pageRouteResult(snapshot: GrimoireSnapshot, pages: ScryRoutePage[]): ScryRouteResult {
+  const first = pages[0];
+
+  return {
+    type: "route",
+    ...notesOf(snapshot, true),
+    route: null,
+    files: sortedUnique(pages.flatMap((page) => page.files)),
+    steps: [],
+    page:
+      first === undefined
+        ? null
+        : (snapshot.book.facts.pages.find(
+            (item) => item.file === first.file && item.site === first.site,
+          ) ?? null),
+    pages,
   };
 }
 

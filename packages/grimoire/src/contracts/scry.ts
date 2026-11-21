@@ -15,7 +15,7 @@ export type ScryQuery =
   /** `warlock scry --impact <file>` */
   | { type: "impact"; file: string }
   /** `warlock scry --route "<METHOD path>"` */
-  | { type: "route"; method: string; path: string }
+  | { type: "route"; method: string; path: string; site?: string }
   /** `warlock scry --feature <id>` */
   | { type: "feature"; feature: string }
   /** `warlock scry --flow <feature>/<flow>` */
@@ -61,13 +61,35 @@ export type ScryImpactResult = Omit<ScryNotes, "routes"> & {
 
 export type ScryRouteResult = ScryNotes & {
   type: "route";
-  route: BookRoute;
-  /** The handler file and everything it imports, transitively, sorted. */
+  /** The API route, or `null` when the path is a page or screen only (GET and HEAD). */
+  route: BookRoute | null;
+  /** The handler file and everything it imports, transitively, sorted (for a page: its file, setup file and layouts). */
   files: string[];
   /** Flow steps that name the route. */
   steps: { flow: string; index: number }[];
   /** Page whose route matches, for a page route. */
   page: BookPage | null;
+  /** Every page or screen that serves the path (one per site), each with its own files; empty for an API route. */
+  pages: ScryRoutePage[];
+};
+
+/** A page or screen found by its URL, with the import closure of its file, setup file and layouts. */
+export type ScryRoutePage = ScryPageRef & {
+  /** Site id of a page, or the mobile app id of a screen. */
+  site: string;
+  setupFile: string | null;
+  layouts: string[];
+  files: string[];
+};
+
+/** What a failed scry prints under `--json` and returns from the MCP tools. */
+export type ScryError = {
+  type: "error";
+  /** The `GRnnnn` code. */
+  code: string;
+  message: string;
+  /** What to do next, or an empty string when the code has no fix text. */
+  fix: string;
 };
 
 /** One flow of a feature answer, with the counts the flow cards show. */

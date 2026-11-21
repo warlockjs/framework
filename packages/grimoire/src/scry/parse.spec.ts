@@ -13,6 +13,16 @@ function codeOf(run: () => unknown): string | null {
 }
 
 describe("parseScryQuery", () => {
+  it("passes --site with --route", () => {
+    expect(parseScryQuery([], { route: "GET /chat", site: "admin" })).toEqual({
+      type: "route",
+      method: "GET",
+      path: "/chat",
+      site: "admin",
+    });
+    expect(() => parseScryQuery([], { route: "GET /chat", site: true })).toThrow(/--site needs a value/);
+  });
+
   it("reads every query form", () => {
     expect(parseScryQuery(["src/a.ts"], {})).toEqual({ type: "file", file: "src/a.ts" });
     expect(parseScryQuery([], { impact: "src/a.ts" })).toEqual({

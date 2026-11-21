@@ -55,6 +55,7 @@ edits a file you wrote either.
 npx warlock scry src/app/catalog/services/new-arrivals.service.ts   # what is this file?
 npx warlock scry --impact src/app/catalog/models/product.model.ts   # what breaks if I change it?
 npx warlock scry --route "POST /api/orders"                         # what is behind this URL?
+npx warlock scry --route "GET /chat"                                # a page URL works too (--site <id> picks one site)
 npx warlock scry --feature catalog                                  # the whole feature
 npx warlock scry --flow catalog/new-arrivals                        # one flow, step by step
 ```
@@ -65,7 +66,7 @@ the book, the answer is the stored one and ends with
 `note book is stale (12 files changed); run warlock grimoire build` (in `--json`, the `notes` list):
 build, then ask again. A project with no book stops with `GR9007`.
 
-Add `--json` for machine-readable output. `--impact` lists API routes, pages, flows and features,
+Add `--json` for machine-readable output; a failed call then prints `{ "type": "error", "code", "message", "fix" }` on stdout and exits 1. `--impact` lists API routes, pages, flows and features,
 including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`
 prints every line. `--search` also reads a flow's summary, story, cases and criteria (`AC-5` works), ranks features and flows above files, and groups hits by type; a hit found by written text shows the part that matched in brackets. Read the flows it names and run their tests after
 your change.

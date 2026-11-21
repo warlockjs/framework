@@ -103,11 +103,18 @@ export function createGrimoireMcpTools(
     {
       name: "grimoire_route",
       description:
-        "One HTTP route: handler and its file, routes file, middleware, guard, the files behind it and the flow steps that name it. Read-only.",
+        "One HTTP route: handler and its file, routes file, middleware, guard, the files behind it and the flow steps that name it. For GET and HEAD a page or screen URL also works: it returns every site serving the page with its file, setup file, layouts and their imports. Read-only.",
       input: inputSchema(
         {
           method: { type: "string", description: "HTTP method (GET, POST…)." },
-          path: { type: "string", description: "Path as registered (/api/products/:id)." },
+          path: {
+            type: "string",
+            description: "Path as registered (/api/products/:id), or a page URL for GET and HEAD.",
+          },
+          site: {
+            type: "string",
+            description: "Only the page of this site or mobile app, when several serve the path.",
+          },
         },
         ["method", "path"],
       ),
@@ -115,9 +122,12 @@ export function createGrimoireMcpTools(
       run: ask(async (input) => {
         const { parseRouteText } = await scryParts();
 
+        const site = text(input, "site").trim();
+
         return {
           type: "route",
           ...parseRouteText(`${text(input, "method")} ${text(input, "path")}`),
+          ...(site === "" ? {} : { site }),
         };
       }),
     },

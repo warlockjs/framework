@@ -182,7 +182,7 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
   const scry: CLICommand = command({
     name: "scry [file]",
     description:
-      'Grimoire (experimental): ask the stored book about a file, --impact <file>, --route "<METHOD path>", --feature <id>, --flow <feature>/<flow> or --search "<text>"; --json for JSON. Reads only; run warlock grimoire build after editing',
+      'Grimoire (experimental): ask the stored book about a file, --impact <file>, --route "<METHOD path>" (an API route or a page URL), --feature <id>, --flow <feature>/<flow> or --search "<text>"; --json for JSON. Reads only; run warlock grimoire build after editing',
     preAction: async ({ options: flags }) => {
       scry.commandPreload = undefined;
 
@@ -198,7 +198,12 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
     },
     options: [
       { text: "--impact", description: "What a change to this file reaches", type: "string" },
-      { text: "--route", description: 'One route: "<METHOD> <path>"', type: "string" },
+      {
+        text: "--route",
+        description: 'One route or page URL: "<METHOD> <path>" (GET and HEAD also find pages and screens)',
+        type: "string",
+      },
+      { text: "--site", description: "--route: only the page of this site or app", type: "string" },
       { text: "--feature", description: "One feature by id", type: "string" },
       { text: "--flow", description: "One flow: <feature>/<flow>", type: "string" },
       { text: "--search", description: "Search by words", type: "string" },

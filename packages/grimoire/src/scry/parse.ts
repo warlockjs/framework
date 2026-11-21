@@ -118,7 +118,11 @@ export function parseScryQuery(
     case "impact":
       return { type: "impact", file: text };
     case "route":
-      return { type: "route", ...parseRouteText(text) };
+      return {
+        type: "route",
+        ...parseRouteText(text),
+        ...(options.site === undefined ? {} : { site: textOf("site", options.site) }),
+      };
     case "feature":
       return { type: "feature", feature: parseFeatureText(text) };
     case "flow":
