@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - A routes file that throws on reload in `warlock dev` keeps its previous routes until it loads again; it used to drop them.
 
+### Documentation
+
+- The testing page states that the shared test HTTP server reads worker 1's database (`workerDatabaseName()` has no worker id in the main process), and to use `createTestHttpServer()` for tests in other workers.
+
 ## 5.62.0 - 2026-11-20
 
 ### Documentation

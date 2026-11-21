@@ -49,3 +49,16 @@ describe("worker identity", () => {
     expect(workerDatabaseName("app_test")).toBe("app_test_1");
   });
 });
+
+describe("database name of the shared test server", () => {
+  it("resolves to worker 1's database in the main process while worker 2 writes its own", () => {
+    // The scaffold names the test database `<name>_test_${VITEST_POOL_ID ?? 1}`.
+    vi.stubEnv("VITEST_POOL_ID", "");
+    const mainProcess = workerDatabaseName("app_test");
+    vi.stubEnv("VITEST_POOL_ID", "2");
+    const secondWorker = workerDatabaseName("app_test");
+    expect(mainProcess).toBe("app_test_1");
+    expect(secondWorker).toBe("app_test_2");
+    expect(mainProcess).not.toBe(secondWorker);
+  });
+});

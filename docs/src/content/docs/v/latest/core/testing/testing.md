@@ -742,7 +742,7 @@ const name = process.env.VITEST ? workerDatabaseName("app_test") : "app";
   before the next file, so their routes and ports do not leak. App modules
   (`loadAppModules`) load once per worker and are reused.
 - The global `startHttpTestServer()` server runs in Vitest's main process with its
-  own connections and fakes. Worker lifetime does not touch it, so keep requests
+  own connections and fakes. The main process has no worker id, so `workerDatabaseName("app_test")` gives `app_test_1` there: the server reads worker 1's database, while worker 2 writes `app_test_2`. Rows a test in worker 2 creates are invisible to requests through the shared server; use `createTestHttpServer()` for those tests. Worker lifetime does not touch it, so keep requests
   through it independent of the worker database, or use `createTestHttpServer()`
   in the worker for tests that read the same database the assertions use.
 - `isolate: false` shares module state between files of a worker: singletons,
