@@ -52,6 +52,7 @@ import { PostgresQueryBuilder } from "./postgres-query-builder";
 import { PostgresSQLSerializer } from "./postgres-sql-serializer";
 import { loadPostgresTTLPurgeJobs, unregisterAllPostgresTTLPurgeJobs } from "./postgres-ttl-purge";
 import { assertPostgresUpdate } from "./postgres-update-validator";
+import { createPostgresTypes } from "./postgres-pool-types";
 import type { PostgresPoolConfig, PostgresQueryResult, PostgresTransactionOptions } from "./types";
 
 /** Most bound parameters one PostgreSQL statement accepts. */
@@ -73,47 +74,8 @@ type UniqueKey = {
 type PgPool = import("pg").Pool;
 type PgPoolClient = import("pg").PoolClient;
 type PgPoolConfig = import("pg").PoolConfig;
-type PgTypes = Pick<typeof import("pg").types, "getTypeParser">;
 
-const POSTGRES_INT8_OID = 20;
-const POSTGRES_INT8_ARRAY_OID = 1016;
-
-/**
- * Convert a PostgreSQL int8 result to a number only when it can be represented
- * exactly. PostgreSQL sends int8 values as strings by default to avoid silently
- * losing precision above JavaScript's safe-integer limit.
- */
-export function parsePostgresInt8(value: string | null): number | string | null {
-  if (value === null) {
-    return null;
-  }
-
-  const numberValue = Number(value);
-  return Number.isSafeInteger(numberValue) ? numberValue : value;
-}
-
-/**
- * Build pool-local type overrides without changing pg's process-wide registry.
- */
-function createPostgresTypes(types: PgTypes): NonNullable<PgPoolConfig["types"]> {
-  return {
-    getTypeParser(oid, format) {
-      if (oid === POSTGRES_INT8_OID) {
-        return parsePostgresInt8;
-      }
-
-      if ((oid as number) === POSTGRES_INT8_ARRAY_OID) {
-        const parseArray = types.getTypeParser(oid, format);
-        return (value: string) => {
-          const array = parseArray(value);
-          return Array.isArray(array) ? array.map(parsePostgresInt8) : array;
-        };
-      }
-
-      return types.getTypeParser(oid, format);
-    },
-  };
-}
+export { parsePostgresInt8 } from "./postgres-pool-types";
 
 /**
  * Compose pg's `options` startup parameter: the app's own `options` plus the
@@ -463,7 +425,8 @@ export class PostgresDriver implements DriverContract {
 
     try {
       const poolConfig = buildPostgresPoolConfig(this.config);
-      poolConfig.types = createPostgresTypes(pg.types);
+      // An app's own `types` (from `clientOptions.types`) replaces the built-in parsers.
+      poolConfig.types ??= createPostgresTypes(pg.types);
 
       log.info(
         "database.postgres",

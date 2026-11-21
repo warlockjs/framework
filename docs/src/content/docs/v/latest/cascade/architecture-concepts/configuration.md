@@ -188,6 +188,10 @@ An explicit `-c TimeZone=…` in `clientOptions.options` (or in the connection s
 
 `bigint` / `int8` columns come back as numbers when they fit in a safe integer; larger values stay strings, so no precision is lost.
 
+`date` columns (and `date[]`) come back as a `Date` at UTC midnight of that calendar day, for example `2026-08-24` reads as `2026-08-24T00:00:00.000Z` whatever time zone the Node process runs in. `infinity`, `-infinity` and BC dates are left to `pg`'s own parser. `timestamp` and `timestamptz` columns are unchanged.
+
+These number and date readers are Cascade's built-in `types` for the pool. Passing your own `clientOptions.types` replaces them entirely: your object is the one the pool uses, so `int8` and `date` then follow whatever it returns.
+
 ## Native client options — `clientOptions`
 
 `clientOptions` punches through to the native database client library:
