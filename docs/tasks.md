@@ -5,10 +5,11 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 ## Owner decisions waiting
 
 - Next-major items (T-007, T-009, T-033) wait for 6.0.
+- T-196: index on-screen (locale) text for `scry --search` now, or wait for an app to ask.
 
 ## Next release
 
-- 5.63.0 candidates: T-189..T-195 (Grimoire scry, from the 2026-11-21 field report) and T-188.
+- 5.63.0 candidates: T-189..T-195 (T-196 waits for a decision) (Grimoire scry, from the 2026-11-21 field report) and T-188.
 - 5.62.0 shipped T-185, T-186 and T-187 (see `tasks.completed.md`).
 - 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
 
@@ -36,9 +37,20 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   BM25+embedding hybrids did not beat BM25F (best hybrid 28/36, lower hit@1) and cost a 742 MB dependency, a stored
   index and about 1 GB RAM to build: no embeddings. Keep ids such as `WL9003`, `AC-5` as tokens. Tell agents (help,
   skill) to pass the whole sentence: with BM25F sentences beat two keywords (29 vs 19 of 36).
+- Confirmed by a second, held-out eval (2026-11-21; 200 seeded commits, tuned only on a 95-commit practice half,
+  scored once on the 105-commit test half): full titles hit@20 today 0, planned partial-match fix 45, BM25F 72
+  (hit@1 37, MRR +0.167 over the partial-match fix, 95% CI 0.09-0.25); two keywords 18 / 25 / 31. Tuning did not
+  generalise (70 vs 72): keep the weights above. On 20 books built from the commit before each fix (no fix text in
+  the book): 0 / 5 / 9 of 20.
+- Must keep exact names on top: on 60 feature and flow titles today's levels find 60/60 (first in the all-type
+  list 36 times), plain BM25F only 48/60 (first 13 times), because written content ranks below files sharing the
+  words. So: keep today's exact / prefix / whole-word name levels as a first tier above every BM25F score, BM25F
+  ranks the rest. Page route text: today 134/149, BM25F 121/149: the same tier fixes it.
 - Acceptance: spec in `src/scry/search.spec.ts`: "the change history screen needs a better ui" ranks
-  `mobile/src/app/change-history.tsx` first; existing all-word specs keep their order; `scry --help`, the
-  `use-the-grimoire` skill and the scry docs page describe the rule.
+  `mobile/src/app/change-history.tsx` first; a flow's exact title ranks that flow first; existing all-word specs
+  keep their order; `scry --help`, the `use-the-grimoire` skill and the scry docs page describe the rule. Before the
+  release, re-run the eval harness (kept by the coordinator) on the real implementation: test-half full titles at
+  least 70/105 at hit@20 and feature/flow names at least 58/60.
 - Status: open.
 
 ### T-190 [bug] `scry --route "GET /chat"` cannot find a page served by the web dispatch route
@@ -53,7 +65,9 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   builds at `:229-250`); when several sites share the path, return all of them (optional `--site`); add matching pages
   to the GR9002 hint.
 - Checked offline on the same book: all 7 failed page URLs resolve to the right page file by a `facts.pages` lookup
-  (pages have no method field; 15 routes use `:param`, none use brackets); `GET /` matches 3 sites.
+  (pages have no method field; 15 routes use `:param`, none use brackets); `GET /` matches 3 sites. Second eval:
+  all 149 pages and mobile screens resolve to the right file; 133 to exactly one file (147 with the site given); 7
+  paths are shared (`*`, `/`, `/login`, `/privacy`, `/support`, `/terms`, mobile `/`).
 - Acceptance: spec with `routes = [GET /*]` and a `/chat` page returns the page; a path shared by two sites returns
   both; docs and `--help` say `--route` takes page URLs.
 - Status: open.
@@ -119,6 +133,21 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
 - Fix: add the route input files' times to the change stamp (or end the window on a dev-server route reload).
 - Acceptance: spec: after a routes-file mtime moves, `get()` opens again and reports "stale".
 - Status: open.
+
+### T-196 [feature] `scry --search` cannot find on-screen text (index locale text under the files that use it)
+
+- Source: second held-out scry eval on the same app, 2026-11-21 (owner asked for more query kinds before building).
+- What and why: an agent fixing a UI bug often has only the text on screen ("No watch workouts yet"). The app keeps
+  every user-facing string in locale files and the code names only a key, and the book indexes no file contents. On
+  80 seeded locale values: today 1/80 at hit@20, BM25F 19/80, BM25F plus source string literals 26/80 (adds about
+  0.6 MB of text and 60 ms to the index build). Indexing each locale value under the files that name its key reached
+  75/80, but that number is circular (the ground truth came from the same key-to-file link), so it is an upper bound.
+- Fix idea: at build time, map locale keys to the files that reference them and add the locale text as a low-weight
+  BM25F field of those files.
+- Acceptance: a non-circular eval (e.g. bug reports that quote on-screen text, with the files their fix changed) shows
+  the gain; specs; docs.
+- Status: owner decision: build it with T-189, or wait for an app to ask (vetting rule). Needs a measured,
+  non-circular gain first.
 
 ### T-195 [bug] Every `warlock scry` call rebuilds the whole book's derived data, about 6.6 s of an 8.8 s call
 
