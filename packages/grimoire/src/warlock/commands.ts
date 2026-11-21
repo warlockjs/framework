@@ -182,7 +182,7 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
   const scry: CLICommand = command({
     name: "scry [file]",
     description:
-      'Grimoire (experimental): ask the stored book about a file, --impact <file>, --route "<METHOD path>", --feature <id>, --flow <feature>/<flow> or --search "<text>"; --json for JSON. Reads only; run warlock grimoire build after editing',
+      'Grimoire (experimental): ask the stored book about a file, --impact <file>, --route "<METHOD path>", --feature <id>, --flow <feature>/<flow> or --search "<text>" (pass the whole sentence; hits come in score order, --app limits to one app); --json for JSON. Reads only; run warlock grimoire build after editing',
     preAction: async ({ options: flags }) => {
       scry.commandPreload = undefined;
 
@@ -201,7 +201,13 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
       { text: "--route", description: 'One route: "<METHOD> <path>"', type: "string" },
       { text: "--feature", description: "One feature by id", type: "string" },
       { text: "--flow", description: "One flow: <feature>/<flow>", type: "string" },
-      { text: "--search", description: "Search by words", type: "string" },
+      {
+        text: "--search",
+        description:
+          "Search by a sentence (a commit title, a bug report) or words; names first, then best match",
+        type: "string",
+      },
+      { text: "--app", description: "--search: only hits of this app", type: "string" },
       { text: "--limit", description: "--search: most hits (default 20)", type: "number" },
       {
         text: "--all",

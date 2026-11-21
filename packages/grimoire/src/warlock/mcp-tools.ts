@@ -204,28 +204,40 @@ export function createGrimoireMcpTools(
     {
       name: "grimoire_search",
       description:
-        "Search the Grimoire by words (the written text of flows too: summary, story, cases, criteria such as AC-5; written content ranks first and hits are grouped by type): features, flows, blocks, pages, screens, routes, file paths, export names, header sentences and tasks, best match first. Read-only.",
+        "Search the Grimoire with a sentence or words (pass the whole commit title or bug report, not two keywords): features, flows, blocks, pages, screens, routes, file paths, export names, header sentences, written text (summary, story, cases, criteria such as AC-5) and tasks. Hits whose name or title holds the words come first; every other hit follows by BM25F score. Hits are in score order and carry their score and app. Read-only.",
       input: inputSchema(
         {
-          text: { type: "string", description: "Words to look for, in any order." },
+          text: {
+            type: "string",
+            description: "A sentence or words to look for; whole words, in any order.",
+          },
           limit: { type: "integer", description: "Most hits to return (default 20).", minimum: 1 },
+          app: {
+            type: "string",
+            description: "Keep only the hits of this app (a page, screen, block or file of it).",
+          },
         },
         ["text"],
       ),
       writes: false,
       run: ask(async (input) => {
-        const limit = input.limit;
-
-        if (limit === undefined || limit === null)
-          return { type: "search", text: text(input, "text") };
-
-        const { parseLimit } = await scryParts();
+        const { limit, app } = input;
+        const { parseLimit, parseApp } = await scryParts();
 
         // A limit of 0, a negative or a fraction is refused with GR9006, as `--limit` is.
         return {
           type: "search",
           text: text(input, "text"),
-          limit: parseLimit(typeof limit === "number" || typeof limit === "string" ? limit : true),
+          ...(limit === undefined || limit === null
+            ? {}
+            : {
+                limit: parseLimit(
+                  typeof limit === "number" || typeof limit === "string" ? limit : true,
+                ),
+              }),
+          ...(app === undefined || app === null
+            ? {}
+            : { app: parseApp(typeof app === "string" ? app : true) }),
         };
       }),
     },

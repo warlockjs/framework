@@ -285,32 +285,41 @@ changed since it ran), `not run` or `no test` (see [Test results](/v/latest/grim
 ### Search: `--search`
 
 ```bash
+npx warlock scry --search "the change history screen needs a better ui"
 npx warlock scry --search "new arrivals"
-npx warlock scry --search "order" --limit 5
+npx warlock scry --search "order" --limit 5 --app mobile
 ```
 
 ```
-flow     catalog/new-arrivals              New arrivals
-block    mobile/home/new-arrivals          catalog/new-arrivals
-block    web-client/home/new-arrivals      catalog/new-arrivals
-route    GET /api/products/new-arrivals    catalog.new-arrivals
-file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
+ 21.4  flow     catalog/new-arrivals              New arrivals
+ 12.9  block    mobile/home/new-arrivals          catalog/new-arrivals
+ 11.3  route    GET /api/products/new-arrivals    catalog.new-arrivals
+  9.8  file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
 …
 ```
 
-Search reads the written content of features and flows too: a flow is found by the words of its title, summary,
-story, cases and criteria (`AC-5` finds the flow that holds that criterion, and the hit shows the part that matched,
-like `[AC-5: A receipt is emailed]`). Written content ranks above files and exports of the same match, and the answer is grouped by
-type (features and flows first). Files and exports never push matching features and flows out of the list: up to
-three quarters of the limit is kept for them first. When the limit cuts the list, a last line counts the matches per
-type (`showing 20 of 41 (2 flow, 39 file); raise --limit for more`), and `--json` carries the same `counts`.
+Pass the whole sentence (a commit title, a bug report) rather than two keywords: a hit needs only some of the words,
+and more words give the right file more to match. Case does not matter, words are matched whole (`ui` does not find
+`build`), a plural or `-ing`/`-ed` form matches its base word, and small words such as `the`, `of` and `for` are left
+out (a text of small words only finds nothing). An id such as `AC-5` or `WL9003` stays one word.
 
-Search looks at features, flows, blocks, pages, screens, API routes, mail and job names, file paths, export names, header sentences and
-tasks. Case does not matter, and every word must appear, in any order. Hits are ranked: an exact name or
-path first, then a name or path that starts with the text, then one that holds the words as whole words, then a
-substring, then a match found only in the header sentence or in a flow's written text, and last a fuzzy match (the letters in order, for texts of
-four letters or more). A feature or flow adds two ranks to its match. Within a rank the type decides: feature, flow, block, page, screen, route, mail, job, file, export, task.
-`--limit` defaults to 20.
+Hits are ranked in two tiers and printed in score order, best first, with the score in front of each line:
+
+1. **Names first.** A feature, flow, block, page, route, file or export whose name or title is the whole text ranks
+   highest, then one that starts with the text, then one that holds every word as a whole word. A feature or flow
+   adds two ranks to such a match.
+2. **Everything else by BM25F score.** Candidates that share only some of the words are scored over four fields:
+   the words of the id or path (weight 3), export names (2), the header sentence or title (1) and written text (1:
+   a flow's summary, story, cases and criteria). Rare words count more than common ones. A block is found through
+   its `<app>/<page>` and its text, never through the slug of its whole text.
+
+Name matches always rank above scored matches. On an equal score features and flows come first, then a page or screen
+file before its helper files. A flow found by its written text shows the part that matched, like
+`[AC-5: A receipt is emailed]`. Page, screen, block and file hits carry the `app` they belong to; `--app <id>` keeps
+only the hits of that app (features, flows, routes and tasks belong to none and are left out). When the limit cuts the
+list, a last line counts the matches per type (`showing 20 of 41 (2 flow, 39 file); raise --limit for more`), and
+`--json` carries the same `counts`. The index is built once for each opened book, so repeated searches in the MCP
+server stay fast. `--limit` defaults to 20.
 
 ### Errors
 
@@ -343,7 +352,7 @@ no route facts reads them once, as `warlock scry --route` does).
 | `grimoire_route`   | `{ method, path }`                 | the route answer                                       | no     |
 | `grimoire_feature` | `{ feature }`                      | the feature answer                                     | no     |
 | `grimoire_flow`    | `{ flow, files?, step?, offset? }` | the compact flow answer, or one page of a step's files | no     |
-| `grimoire_search`  | `{ text, limit? }`                 | the search answer                                      | no     |
+| `grimoire_search`  | `{ text, limit?, app? }`           | the search answer                                      | no     |
 | `grimoire_check`   | `{}`                               | the check report                                       | no     |
 | `grimoire_build`   | `{ force? }`                       | `{ rebuilt, written, removed, routes }`                | no     |
 | `grimoire_release` | `{ release }`                      | the release file, its list and whether it changed      | yes    |

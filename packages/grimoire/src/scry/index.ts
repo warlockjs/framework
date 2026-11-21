@@ -7,11 +7,12 @@
  *   pages, flows, features including borrowers, tests).
  * - `route`: a route's handler, guard and the files behind it.
  * - `feature` / `flow`: the written description with its book map.
- * - `search`: words over ids, paths, export names, header sentences, routes,
- *   flows, blocks and tasks.
+ * - `search`: a sentence or words over ids, paths, export names, header sentences,
+ *   routes, flows, blocks and tasks, ranked by name match first, then BM25F.
  */
 export { formatScryResult } from "./format";
 export {
+  parseApp,
   parseFeatureText,
   parseFlowText,
   parseLimit,
@@ -19,3 +20,4 @@ export {
   parseScryQuery,
 } from "./parse";
 export { scry } from "./query";
+export { SCRY_STOP_WORDS } from "./search";

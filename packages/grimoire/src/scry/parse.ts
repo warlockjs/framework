@@ -81,9 +81,14 @@ export function parseLimit(value: string | boolean | number): number {
   return limit;
 }
 
+/** An app id for `--app`, checked to have a value. */
+export function parseApp(value: string | boolean | number): string {
+  return textOf("app", value);
+}
+
 /**
  * The query of `warlock scry` arguments: a positional file, or one of the
- * options `impact`, `route`, `feature`, `flow`, `search` (with `limit`).
+ * options `impact`, `route`, `feature`, `flow`, `search` (with `limit` and `app`).
  * Throws `GrimoireError` `GR9006` for none, several, or a malformed value.
  */
 export function parseScryQuery(
@@ -124,11 +129,14 @@ export function parseScryQuery(
     case "flow":
       return { type: "flow", ...parseFlowText(text) };
     case "search": {
-      const limit = options.limit;
+      const { limit, app } = options;
 
-      return limit === undefined
-        ? { type: "search", text }
-        : { type: "search", text, limit: parseLimit(limit) };
+      return {
+        type: "search",
+        text,
+        ...(limit === undefined ? {} : { limit: parseLimit(limit) }),
+        ...(app === undefined ? {} : { app: parseApp(app) }),
+      };
     }
   }
 }
