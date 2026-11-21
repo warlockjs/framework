@@ -27,9 +27,15 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
 - Evidence: `packages/grimoire/src/scry/query.ts:780` (every word is a token, no stop words), `:716` (all tokens must be
   in id + detail), `:675-700` (`partMatches`/`bodyMatch` need every token in one part), `:704-738` (`scoreOf` has no
   partial level).
-- Fix: drop stop words (one exported, extendable list; keep ids such as `WL9003`, `AC-5`); add a partial score below
-  the all-word levels with a minimum (at least 2 words or half of them); when nothing matches every word, say which
-  words were used (`matchedAll`/`usedWords` in `ScrySearchResult`); use word-start matching for short tokens.
+- Fix (decided by an offline eval on the same app's book, 2026-11-21; 36 queries, hit@20 = an expected file in the
+  top 20): replace the all-or-nothing levels with one BM25F score over fields: id/path words split on `/ - _ .` and
+  camelCase (weight 3), export names (2), `about` (1), written body text (1); light stemming (s, es, ing, ed), an
+  exported extendable stop-word list, IDF. Measured: full sentences 0/36 today → 29/36 (hit@1 16, recall@20 0.41,
+  about 2 ms a query, index rebuilt from the facts in 0.2 s); two keywords 11/36 → 19/36. The patched scorer (partial
+  matches + word-start, T-191 below) reached only 19/36 on sentences. Local embeddings (MiniLM, bge-small) and
+  BM25+embedding hybrids did not beat BM25F (best hybrid 28/36, lower hit@1) and cost a 742 MB dependency, a stored
+  index and about 1 GB RAM to build: no embeddings. Keep ids such as `WL9003`, `AC-5` as tokens. Tell agents (help,
+  skill) to pass the whole sentence: with BM25F sentences beat two keywords (29 vs 19 of 36).
 - Acceptance: spec in `src/scry/search.spec.ts`: "the change history screen needs a better ui" ranks
   `mobile/src/app/change-history.tsx` first; existing all-word specs keep their order; `scry --help`, the
   `use-the-grimoire` skill and the scry docs page describe the rule.
@@ -46,6 +52,8 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   `normalizeRoutePath`; return the page and the import closure of its file, setup file and layouts (as `scryImpact`
   builds at `:229-250`); when several sites share the path, return all of them (optional `--site`); add matching pages
   to the GR9002 hint.
+- Checked offline on the same book: all 7 failed page URLs resolve to the right page file by a `facts.pages` lookup
+  (pages have no method field; 15 routes use `:param`, none use brackets); `GET /` matches 3 sites.
 - Acceptance: spec with `routes = [GET /*]` and a `/chat` page returns the page; a path shared by two sites returns
   both; docs and `--help` say `--route` takes page URLs.
 - Status: open.
@@ -59,10 +67,12 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
 - Evidence: `packages/grimoire/src/scry/query.ts:587-599` (block id = full slug), `:713-716` (`includes`), `:752-771`
   (`pickHits` regroups by `TYPE_ORDER`, `:492-503`), `:745` (tie-break by id); `ScryHit` in
   `packages/grimoire/src/contracts/scry.ts` has no app field.
-- Fix: word-start matching for every token; match a block on `<app>/<page>` plus its first words, not the full slug;
-  print in score order (keep features and flows first only on equal score, which the skill documents), show the score;
-  add `app` to page, screen, block and file hits and an `--app` filter; a page or screen file outranks its helper
-  files on equal score.
+- Fix: with the BM25F scorer of T-189 (which tokenises whole words, so `ui` no longer matches `build`): index a block
+  by `<app>/<page>` with its text as body, not as a 200-character id; print in score order (keep features and flows
+  first only on equal score, which the skill documents), show the score; add `app` to page, screen, block and file
+  hits and an `--app` filter; a page or screen file outranks its helper files on equal score. The eval showed type
+  grouping alone hides files: with partial matching but grouped output, the first right file was in the visible top
+  5 for 1 of 36 sentence queries.
 - Not in scope (vetting): the flat `WRITTEN_BOOST` removal the report suggests; written-first ranking is documented
   in the skill and worked for the keyword queries that succeeded. Revisit only with data.
 - Acceptance: specs for `ui` not matching `build`, a long block id not matching an unrelated sentence, a higher-scored
