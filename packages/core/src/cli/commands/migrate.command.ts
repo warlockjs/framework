@@ -32,6 +32,12 @@ export const migrateCommand = command({
       type: "boolean",
     },
     {
+      text: "--prune-missing",
+      description:
+        "With --fresh or --rollback: delete the records of executed migrations whose file no longer exists, instead of failing on them",
+      type: "boolean",
+    },
+    {
       text: "--path, -p",
       description: "Migration file path, if not provided, all migrations will be wroking",
       type: "string",

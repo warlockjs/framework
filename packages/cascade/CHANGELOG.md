@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.63.0
+
+### Fixed
+
+- `.default("word")` on a migration column throws when the migration is defined, naming the column and pointing to `defaultString()`. It used to write the bare word as raw SQL, which the database rejected as a column reference. SQL keywords (`CURRENT_TIMESTAMP`, `NULL`, `TRUE`, ...), expressions, numbers and booleans are unchanged.
+- `rollbackMigrations()` and `freshMigrate()` accept `pruneMissing`, and `confirmRollback()` honours it, so a rollback no longer fails on records whose migration file was removed when the option is set.
+
 ## 5.60.0 - 2026-11-19
 
 ### Added

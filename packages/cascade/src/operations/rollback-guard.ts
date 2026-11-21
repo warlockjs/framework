@@ -118,7 +118,7 @@ export async function confirmRollback(options: ConfirmRollbackOptions = {}): Pro
   const development = options.development ?? process.env.NODE_ENV === "development";
   const batches = options.all ? Number.POSITIVE_INFINITY : (options.batches ?? 1);
 
-  const plan = await migrationRunner.planRollback(batches);
+  const plan = await migrationRunner.planRollback(batches, { pruneMissing: options.pruneMissing });
 
   if (plan.length === 0) return true;
 
