@@ -163,7 +163,7 @@ A `404.page.tsx` renders with no layouts, even when it sits in a directory with 
 
 This is scoped to the not-found page: an ordinary page in the same directory still gets its full layout chain, and nested-layout refusal on the 404's own path is still enforced exactly as it is for any other page.
 
-`error.page.tsx` (its one error boundary) and `forbidden.page.tsx` (the page for a refused request) — the application's other special pages (the `create-a-page` topic) — are excluded from discovery's layout-chain analysis the same way: no special page has a layout chain of its own.
+`error.page.tsx` (its one error boundary) and `forbidden.page.tsx` (the page for a refused request) — the application's other special pages (the `create-a-page` topic) — are excluded from discovery's layout-chain analysis the same way: no special page has a layout chain of its own. A failure page renders inside the root and the layouts whose data was loaded; a layout with a loader whose loader did not run (a page middleware refused the request first) is left out, so the layout never receives missing data.
 
 ## Why layout state persists
 

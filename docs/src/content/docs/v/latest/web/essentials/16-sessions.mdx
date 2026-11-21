@@ -67,7 +67,7 @@ export const config = {
 };
 ```
 
-- A guest gets a 302 to `loginPath?redirect=<request.url>`. The login path is locale-prefixed when locale routing prefixes the request locale. Data navigations follow the redirect, so client navigation lands on the login page too.
+- A guest gets a 302 to `loginPath?redirect=<request.url>`. The login path is locale-prefixed when locale routing prefixes the request locale. Data navigations follow the redirect, so client navigation lands on the login page too. The redirect is the whole answer, also when the reply is sent asynchronously (for example behind a compression hook): the page pipeline never renders or serialises a body for it.
 - The query name is `redirect`, or `auth.pageAuth.returnUrlParam` when you set it.
 - A request carrying an `Authorization` header, or an app with no `loginPath` (option or `auth.pageAuth.loginPath`), gets a 401 instead.
 - `userType` restricts to one user type and `when(model)` adds a check (it may be async). A failure is a 403, not a redirect.

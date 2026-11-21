@@ -530,7 +530,9 @@ function buildBoundaryElement(
         requestId,
       });
 
-  const wrapped = wrapRootward(triple, bundle, boundary.boundaryLevel, element);
+  const wrapped = wrapRootward(triple, bundle, boundary.boundaryLevel, element, {
+    skipUnloadedLayout: true,
+  });
 
   // "App" has no level rootward of it, so `wrapRootward` returns `wrapped`
   // unwrapped when the boundary covers the app level itself — but the
@@ -558,11 +560,20 @@ function buildLeaf(module: PageTripleModule, bundle: PageDataBundle): ReactNode 
   });
 }
 
+/** A layout with a loader whose data never loaded (a page middleware refused first). */
+function isLayoutUnloaded(
+  triple: Record<PageLevelName, PageTripleModule>,
+  bundle: PageDataBundle,
+): boolean {
+  return triple.layout.loader !== undefined && bundle.layoutData === undefined;
+}
+
 function wrapRootward(
   triple: Record<PageLevelName, PageTripleModule>,
   bundle: PageDataBundle,
   from: PageLevelName,
   leaf: ReactNode,
+  options: { skipUnloadedLayout?: boolean } = {},
 ): ReactNode {
   const wrappers: PageLevelName[] =
     from === "page" ? ["layout", "app"] : from === "layout" ? ["app"] : [];
@@ -572,6 +583,17 @@ function wrapRootward(
   for (const level of wrappers) {
     // The document owns #vessel; only its page/layout children are hydrated.
     if (level === "app") element = strictPageTree(triple.app, element);
+
+    // A failure page rendered before the layout's loader ran (a page
+    // middleware refusal) has no data for the layout; the layout's component
+    // expects it, so the failure page renders without that layout.
+    if (
+      options.skipUnloadedLayout === true &&
+      level === "layout" &&
+      isLayoutUnloaded(triple, bundle)
+    ) {
+      continue;
+    }
 
     const Component = triple[level].default as ((props: LevelProps) => ReactNode) | undefined;
 
@@ -1140,7 +1162,13 @@ async function finishRender(
 
     if (statusCode < 400) {
       const value = unsentMiddlewareShortCircuit.value;
-      const body = typeof value === "string" ? value : JSON.stringify(value);
+      // A core `Response` is the reply itself, never a body to serialise.
+      const body =
+        typeof value === "string"
+          ? value
+          : value instanceof Response
+            ? ""
+            : JSON.stringify(value);
 
       return { html: body, status: statusCode, headers, cookies, data: bundle.pageData, bundle };
     }
@@ -1544,6 +1572,7 @@ async function finishRender(
       currentError?.debug,
     );
     bundle.errorPage = errorPage;
+    if (isLayoutUnloaded(triple, bundle)) bundle.layoutSkipped = true;
     const ssrProps = resolveServerErrorPageProps(props, errorPage);
     bundle.metadata = resolveErrorPageMetadata(module, ssrProps);
     documentValue = {
@@ -1562,6 +1591,7 @@ async function finishRender(
           errorPageElement(module, ssrProps),
           devErrorPanelElement(errorPage.debug),
         ),
+        { skipUnloadedLayout: true },
       ),
     );
   };
@@ -1801,7 +1831,8 @@ function wrapInFailureShell(shell: FailureShell, content: ReactNode): ReactNode 
   for (const layout of [...(shell.layouts ?? [])].reverse()) {
     const Layout = layout.default as ComponentType<LevelProps> | undefined;
 
-    if (Layout !== undefined) {
+    // A layout with a loader needs its data, which a failure page never has.
+    if (Layout !== undefined && layout.loader === undefined) {
       element = createElement(Layout, { data: undefined, shared: undefined, children: element });
     }
   }

@@ -237,6 +237,8 @@ export type PageDataBundle = {
    * (`build-hydration-payload.ts`), never a component prop.
    */
   errorPage?: SerializedErrorPageProps;
+  /** The failure page rendered without the layout, whose loader never ran. */
+  layoutSkipped?: true;
   /**
    * Top-level PAGE loader keys returned as promises via `defer()`, in
    * declaration order. Undefined for a page that never called `defer()` —

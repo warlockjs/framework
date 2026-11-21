@@ -2,6 +2,13 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.63.0
+
+### Fixed
+
+- `requireUser()` and `requireGuest()` redirects no longer log "Converting circular structure to JSON" and "send() called on already-sent response" when the reply is sent asynchronously (an `onSend` hook such as compression). A page middleware that returns the core `Response` counts as having sent the reply, and the page pipeline never serialises a `Response`.
+- A failure page (`forbidden.page.tsx`, `error.page.tsx`) reached before the layout's loader ran, for example a page middleware that throws `ForbiddenError` under a layout with a loader, no longer crashes inside that layout (`Cannot read properties of undefined`). It renders in the root without that layout, and the browser leaves the same layout out when it hydrates (the payload carries `layoutSkipped`). A layout with a loader is also left out of the shell that wraps a refusal raised before routing.
+
 ## 5.55.0 - 2026-11-17
 
 ### Upgrading

@@ -86,3 +86,34 @@ describe("buildHydratedTree: forbidden page", () => {
     expect(leafTypeOf(tree)).toBe(ForbiddenPage);
   });
 });
+
+describe("buildHydratedTree: failure page whose layout loader never ran", () => {
+  function hasLayout(node: ReactNode): boolean {
+    let current = node;
+
+    while (isValidElement(current)) {
+      const element = current as ReactElement<LevelProps>;
+
+      if (element.type === Layout) return true;
+      current = element.props.children as ReactNode;
+    }
+
+    return false;
+  }
+
+  it("leaves the layouts out when the server marked them skipped", async () => {
+    const tree = await buildHydratedTree([entry(withBoth)], {
+      ...payloadWithStatus(403),
+      layoutSkipped: true,
+    });
+
+    expect(hasLayout(tree)).toBe(false);
+    expect(leafTypeOf(tree)).toBe(ForbiddenPage);
+  });
+
+  it("keeps the layouts when the server did not mark them skipped", async () => {
+    const tree = await buildHydratedTree([entry(withBoth)], payloadWithStatus(403));
+
+    expect(hasLayout(tree)).toBe(true);
+  });
+});

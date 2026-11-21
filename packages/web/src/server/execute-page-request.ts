@@ -264,7 +264,10 @@ async function runMiddlewareChain(
             // Read AFTER the middleware ran (it already resolved above) — a
             // middleware that called `response.redirect()`/`.forbidden()`/
             // `.send()` itself has already written the real reply by now.
-            responseSent: response.sent,
+            // `response.sent` can still read false when the reply is flushed
+            // by an async `onSend` hook (compression), so a middleware that
+            // hands back the core `Response` itself also counts as sent.
+            responseSent: response.sent || output === response || output instanceof Response,
           },
         };
 
