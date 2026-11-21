@@ -8,7 +8,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Next release
 
-- 5.63.0: T-188..T-195 (Grimoire scry; T-196/T-197 wait on their offline tests) and T-198..T-203 (2026-11-22 app findings).
+- 5.63.1: T-204 (PostgreSQL `date` columns). 5.63.0 shipped T-188..T-195, T-197 (closed), T-198..T-200, T-202, T-203 (closed).
 - 5.62.0 shipped T-185, T-186 and T-187 (see `tasks.completed.md`).
 - 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
 
@@ -17,42 +17,22 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 Source for T-198..T-203: an app findings page, https://claude.ai/artifact/FJ9uNFjxfnijeXb6fYo97J (app on 5.62.0 with
 PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the reporter ran their repros on 5.62.0.
 
-### T-198 [bug] `.default("word")` on a column is written as raw SQL
+### T-204 [bug] PostgreSQL `date` columns read back as server-local midnight; `clientOptions.types` is discarded
 
-- What and why: `string(20).default("agency")` emits `DEFAULT agency`; PostgreSQL rejects the batch ("cannot use column
-  reference in DEFAULT expression"), and the message names neither the column nor `defaultString()`.
-- Evidence: `packages/cascade/src/migration/column-builder.ts:138-142` (`default()` always sets `isRawDefault = true`),
-  `packages/cascade/src/drivers/postgres/postgres-sql-serializer.ts:202-210` (raw default unquoted).
-- Fix (as built): the PostgreSQL driver stops on a raw default that is a bare identifier and not a SQL keyword, naming
-  the column and `defaultString()` (`packages/cascade/src/migration/raw-default.ts`). Not at definition time: MongoDB
-  ignores column defaults, so a bare word there was harmless. Review found the scaffold's `role` column used
-  `.default("user")`, which PostgreSQL reads as `CURRENT_USER`; the template now uses `.defaultString("user")`.
-- Acceptance: spec: `default("agency")` throws with `defaultString`; `default("NOW()")`, `default("CURRENT_TIMESTAMP")`,
-  `default(1)` unchanged; docs, CHANGELOG.
-- Status: open (5.63.0).
+- Source: same app findings page (F4, added 2026-11-22 after 5.63.0 was dispatched); repro run by the reporter on
+  cascade 5.62.0 with PostgreSQL 18.7: under `TZ=Africa/Cairo` a `date` of `2026-08-24` reads back as
+  `2026-08-23T21:00:00.000Z`; a custom 1082 parser in `clientOptions.types` is never called.
+- Evidence (re-read on `main` at `e87c03a20`): `packages/cascade/src/drivers/postgres/postgres-driver.ts:98-116`
+  (`createPostgresTypes` overrides only int8), `:466` (`poolConfig.types = createPostgresTypes(pg.types)` always,
+  overwriting `clientOptions.types`); `postgres-type-converters.ts:29` (`[1082, toDate]` never runs: pg already
+  returned a `Date`). The session `TimeZone` is pinned to UTC; the Node process zone is not.
+- Fix: parse `date` (1082, and the 1182 array) as UTC midnight in `createPostgresTypes` (keep `infinity` and BC values
+  on pg's parser); when the app passes `clientOptions.types`, use it instead of the built-in overrides.
+- Acceptance: spec with `TZ` ahead of UTC (or the parser called directly under a forced offset): `2026-08-24` reads as
+  `2026-08-24T00:00:00.000Z`; a custom `types` object is used; docs (PostgreSQL driver page), CHANGELOG.
+- Status: open (5.63.1).
 
-### T-199 [bug] The rollback error suggests `--prune-missing`, which `warlock migrate` does not accept
-
-- Evidence: `packages/cascade/src/migration/migration-runner.ts:1636-1641` (message), `packages/core/src/cli/commands/migrate.command.ts`
-  (no such option), `packages/core/src/database/migrate-action.ts:219`, `:234` (no `pruneMissing` passed).
-- Fix: add `--prune-missing` to `warlock migrate` and pass it to `rollbackMigrations` and `freshMigrate`.
-- Acceptance: spec: with an orphan migration record, `migrate --fresh --prune-missing` removes it and completes; docs,
-  CHANGELOG.
-- Status: open (5.63.0).
-
-### T-200 [bug] `requireUser()` guest redirect is serialised as a page body when the reply is sent asynchronously
-
-- What and why: with an async `onSend` hook (core compression), `response.sent` is still false after `redirect()`, so
-  the page pipeline treats the returned `Response` as a 2xx body and `JSON.stringify`s it: "Converting circular
-  structure to JSON", plus "send() called on already-sent response". Two error logs per signed-out page hit.
-- Evidence: `packages/web/src/session/require-user.ts:126-128` (and `requireGuest`), `packages/web/src/server/execute-page-request.ts:267`
-  (`responseSent: response.sent`), `packages/web/src/server/render-page.ts:1138-1146`; the test `ReplyShim`
-  (`packages/web/src/server/__fixtures__/core-http.ts:156`) marks `sent` synchronously, so no spec caught it.
-- Fix: a middleware that returns the core `Response` counts as sent; never `JSON.stringify` a `Response`.
-- Acceptance: the reporter's spec (real Fastify reply with an async `onSend` hook) passes; docs if behaviour is described; CHANGELOG.
-- Status: open (5.63.0).
-
-### T-201 [bug] Unconfirmed: the shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
+### T-201 [bug] The shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
 
 - Evidence named: scaffold `src/test-global-setup.ts`, scaffold `src/config/database.ts`, `packages/core/src/tests/reset-test-database.ts:49-60`.
 - Checked 2026-11-22: confirmed as name resolution. The main-process server has no `VITEST_POOL_ID`, so it reads
@@ -63,18 +43,6 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
   per worker. Workaround: `createTestHttpServer()` per test file.
 - Status: documented in 5.63.0; behaviour fix open.
 
-### T-202 [bug] Unconfirmed: the 403 page renders inside the root layout without the layout's loader data
-
-- Needs: a page whose middleware throws `ForbiddenError` under a layout with a loader (`packages/web/src/server/render-page.ts`).
-- Status: being reproduced (5.63.0).
-
-### T-203 [bug] Unconfirmed: `.apk` files from `public/` are served with an empty `Content-Type`
-
-- Checked 2026-11-22: not reproduced. `packages/core/src/http/lazy-static-mime.spec.ts` serves `downloads/x.apk`
-  through `registerLazyStatic` and gets `application/vnd.android.package-archive` (`@fastify/static` 10.1.5 via
-  `@fastify/send` 4.1.1); core sets no content type. Likely the reporter's proxy or a custom header.
-- Status: not reproduced; spec kept. Close unless the reporter shows a repro on a clean app.
-
 ## From the 2026-11-21 scry field report
 
 Source for T-189..T-194: an app's `warlock scry` benchmark and release QA on 5.62.0 (9,882 files, 277 routes, three
@@ -82,119 +50,6 @@ sites plus a mobile app; 56 fixed-wording queries), 2026-11-21. Single-finding p
 https://claude.ai/artifact/UvoeeFqtvJFbMGcPuPcDRm (`--search` needs every word) and
 https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Every cited line was re-read on `main` at
 `9998a5e30` (grimoire 5.62.0); the repros were run by the reporter, not in this repository.
-
-### T-189 [bug] `scry --search` drops a hit unless it contains every query word
-
-- What and why: agents search with sentences (commit titles, bug reports). One missing word scores 0, so 0 of 36
-  sentence queries found the right file in the top 20. With two keywords, 11 of 36 did. Agents then fall back to grep.
-- Evidence: `packages/grimoire/src/scry/query.ts:780` (every word is a token, no stop words), `:716` (all tokens must be
-  in id + detail), `:675-700` (`partMatches`/`bodyMatch` need every token in one part), `:704-738` (`scoreOf` has no
-  partial level).
-- Fix (decided by an offline eval on the same app's book, 2026-11-21; 36 queries, hit@20 = an expected file in the
-  top 20): replace the all-or-nothing levels with one BM25F score over fields: id/path words split on `/ - _ .` and
-  camelCase (weight 3), export names (2), `about` (1), written body text (1); light stemming (s, es, ing, ed), an
-  exported extendable stop-word list, IDF. Measured: full sentences 0/36 today → 29/36 (hit@1 16, recall@20 0.41,
-  about 2 ms a query, index rebuilt from the facts in 0.2 s); two keywords 11/36 → 19/36. The patched scorer (partial
-  matches + word-start, T-191 below) reached only 19/36 on sentences. Local embeddings (MiniLM, bge-small) and
-  BM25+embedding hybrids did not beat BM25F (best hybrid 28/36, lower hit@1) and cost a 742 MB dependency, a stored
-  index and about 1 GB RAM to build: no embeddings. Keep ids such as `WL9003`, `AC-5` as tokens. Tell agents (help,
-  skill) to pass the whole sentence: with BM25F sentences beat two keywords (29 vs 19 of 36).
-- Confirmed by a second, held-out eval (2026-11-21; 200 seeded commits, tuned only on a 95-commit practice half,
-  scored once on the 105-commit test half): full titles hit@20 today 0, planned partial-match fix 45, BM25F 72
-  (hit@1 37, MRR +0.167 over the partial-match fix, 95% CI 0.09-0.25); two keywords 18 / 25 / 31. Tuning did not
-  generalise (70 vs 72): keep the weights above. On 20 books built from the commit before each fix (no fix text in
-  the book): 0 / 5 / 9 of 20.
-- Must keep exact names on top: on 60 feature and flow titles today's levels find 60/60 (first in the all-type
-  list 36 times), plain BM25F only 48/60 (first 13 times), because written content ranks below files sharing the
-  words. So: keep today's exact / prefix / whole-word name levels as a first tier above every BM25F score, BM25F
-  ranks the rest. Page route text: today 134/149, BM25F 121/149: the same tier fixes it.
-- Acceptance: spec in `src/scry/search.spec.ts`: "the change history screen needs a better ui" ranks
-  `mobile/src/app/change-history.tsx` first; a flow's exact title ranks that flow first; existing all-word specs
-  keep their order; `scry --help`, the `use-the-grimoire` skill and the scry docs page describe the rule. Before the
-  release, re-run the eval harness (`findings/scry-eval/`, git-ignored, in the main checkout; `round2/` holds the held-out set) on the real implementation: test-half full titles at
-  least 70/105 at hit@20 and feature/flow names at least 58/60.
-- Status: open.
-
-### T-190 [bug] `scry --route "GET /chat"` cannot find a page served by the web dispatch route
-
-- What and why: in a `@warlock.js/web` app every page sits behind `GET /*`, so `facts.routes` never holds the page
-  path and the lookup throws GR9002 while the book lists the page. 0 of 7 page lookups worked; the hint ("Run warlock
-  routes") leads to `GET /*` only.
-- Evidence: `packages/grimoire/src/scry/query.ts:304-331` (`scryRoute` searches `facts.routes` only), `:348-355` (page
-  lookup only for routes flagged `isPage`), `routeMatches` in `packages/grimoire/src/bookmap/steps.ts:35` (no wildcard).
-- Fix: for GET/HEAD with no API match, look the path up in `facts.pages` (and mobile screens) with
-  `normalizeRoutePath`; return the page and the import closure of its file, setup file and layouts (as `scryImpact`
-  builds at `:229-250`); when several sites share the path, return all of them (optional `--site`); add matching pages
-  to the GR9002 hint.
-- Checked offline on the same book: all 7 failed page URLs resolve to the right page file by a `facts.pages` lookup
-  (pages have no method field; 15 routes use `:param`, none use brackets); `GET /` matches 3 sites. Second eval:
-  all 149 pages and mobile screens resolve to the right file; 133 to exactly one file (147 with the site given); 7
-  paths are shared (`*`, `/`, `/login`, `/privacy`, `/support`, `/terms`, mobile `/`).
-- Acceptance: spec with `routes = [GET /*]` and a `/chat` page returns the page; a path shared by two sites returns
-  both; docs and `--help` say `--route` takes page URLs.
-- Status: open.
-
-### T-191 [bug] `scry --search` ranking: substring matches on long block ids, output grouped by type before score
-
-- What and why: when a query matches, the right file still ranks 4th to 15th or is cut. Two unrelated billing blocks
-  matched a sentence because a block id is the slug of its whole text (200+ characters) and tokens match as
-  substrings (`ui` matches `build`). The output is grouped by type, so a file that scores 6 prints under blocks that
-  score 2. Hits carry no app, so web and mobile ties fall back to alphabetical order.
-- Evidence: `packages/grimoire/src/scry/query.ts:587-599` (block id = full slug), `:713-716` (`includes`), `:752-771`
-  (`pickHits` regroups by `TYPE_ORDER`, `:492-503`), `:745` (tie-break by id); `ScryHit` in
-  `packages/grimoire/src/contracts/scry.ts` has no app field.
-- Fix: with the BM25F scorer of T-189 (which tokenises whole words, so `ui` no longer matches `build`): index a block
-  by `<app>/<page>` with its text as body, not as a 200-character id; print in score order (keep features and flows
-  first only on equal score, which the skill documents), show the score; add `app` to page, screen, block and file
-  hits and an `--app` filter; a page or screen file outranks its helper files on equal score. The eval showed type
-  grouping alone hides files: with partial matching but grouped output, the first right file was in the visible top
-  5 for 1 of 36 sentence queries.
-- Not in scope (vetting): the flat `WRITTEN_BOOST` removal the report suggests; written-first ranking is documented
-  in the skill and worked for the keyword queries that succeeded. Revisit only with data.
-- Acceptance: specs for `ui` not matching `build`, a long block id not matching an unrelated sentence, a higher-scored
-  file printed above a lower-scored block, the `--app` filter; docs, skill, CHANGELOG.
-- Status: open.
-
-### T-192 [bug] Route facts that shrank to a handful of routes are still reported "fresh"
-
-- What and why: an app's facts cache once held 10 routes (core and dispatch) instead of 277 and every route answer was
-  silently wrong: GR9002 for routes that exist, `routes: []` in `--impact`, no note. The reporter could not reproduce
-  the write in five attempts; what is confirmed is that freshness never looks at the facts themselves.
-- Evidence: `packages/grimoire/src/book/build.ts:264-272` (`bootState` compares input hashes only), `:340-362` (a
-  fresh read replaces `facts.routes` with no check); `packages/grimoire/src/contracts/scry.ts:42-43` (impact answers
-  drop the freshness field) and `notesOf` in `query.ts:35-43` (notes only for stale/missing). Candidate causes, not
-  reproduced: an HMR reload removes a routes file's routes before re-importing it and a failed import leaves them out
-  (`packages/core/src/dev-server/module-loader.ts:219-230`, rethrow at `:208`), or the dev panel's first live read
-  (`packages/grimoire/src/devtools/snapshot-source.ts:155-163`, started by `warm()` in `devtools/index.ts:127`) runs
-  before the routes finish loading.
-- Fix: store route/page counts with `boot` in the manifest; in the live path never replace a stored list with one
-  under half its size without a note, and skip the write; a GR9002 on facts with no route that has a `sourceFile` says
-  "route facts look incomplete; run warlock grimoire build"; impact answers carry a route-freshness note.
-- Acceptance: specs: a live read returning 10 routes over a stored 277 keeps the stored list and adds the note; GR9002
-  wording on core-only facts; impact note. Try to reproduce the HMR path (route file that throws on reload while the
-  dev tab is open) and fix it if it is the cause.
-- Status: open.
-
-### T-193 [bug] `scry --json` prints errors as text on stderr and nothing on stdout
-
-- What and why: a caller that parses stdout gets an empty string and exit 1, with no code.
-- Evidence: `packages/grimoire/src/warlock/actions.ts:405-423` (`runScry` catch calls `reportError`), `:43-55`
-  (`reportError` writes text with `io.err`).
-- Fix: under `--json` print `{ "type": "error", "code", "message", "fix" }` on stdout, exit 1; add `ScryError` to
-  `contracts/scry.ts` so MCP and the CLI share it.
-- Acceptance: spec for `runScry` with `json: true` and an unknown route; docs.
-- Status: open.
-
-### T-194 [bug] Dev tab reports route facts "fresh" for about a minute after a route file changed
-
-- What and why: the reuse window is `max(2 s, 5 × last open)` and the change stamp covers only the book and written
-  folders, so an edit to a routes file keeps the tab "fresh" (observed about 75 s). `scry` on the command line is not
-  affected. Overlaps T-183 ("refresh live facts after route edits"), which now has an app asking; do them together.
-- Evidence: `packages/grimoire/src/devtools/snapshot-source.ts:84-107` (`STAMPED`, `changeStamp`), `:135` and
-  `:197-205` (reuse window).
-- Fix: add the route input files' times to the change stamp (or end the window on a dev-server route reload).
-- Acceptance: spec: after a routes-file mtime moves, `get()` opens again and reports "stale".
-- Status: open.
 
 ### T-196 [feature] `scry --search` cannot find on-screen text (index locale text under the files that use it)
 
@@ -217,81 +72,7 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   -0.005). The gain is in exact quotes only (n=26: 8 → 12); the whole bug-report line gains nothing.
 - Status: waiting. Owner decision (2026-11-22): keep it for now; build when an app asks (start with the exact-value tier).
 
-### T-197 [feature] `scry --search`: files borrow the words of the flows and features that own them
-
-- Source: second held-out scry eval, 2026-11-21: two-keyword queries stay weak with BM25F (31/105 at hit@20 against
-  72/105 with full titles), because two words match dozens of files whose names do not say what they do.
-- What and why: the book already knows which flow and feature own each file (ownership in the derived data). Adding
-  the owner's title and story words to the file as a low-weight BM25F field lets "meal swap" find
-  `edit-nutrition.tool.ts` owned by a "swap a meal" flow; it may help full sentences too. Cheapest part, done in
-  T-189 anyway: help and skill tell agents to pass the whole commit title or bug report.
-- Offline test before building: same harness and the same 105 held-out commits (full titles and two keywords), BM25F
-  with and without the borrowed words; weight fixed before scoring.
-- Acceptance: a gain on the held-out set without losing feature/flow name lookups (at least 58/60); specs; docs.
-- Measured 2026-11-22 (round 3, same harness, weight chosen on the practice half from 0.25/0.5/1, test half scored
-  once): full titles hit@20 72 → 70 (reciprocal rank -0.033, 95% CI -0.080 to 0.012), two keywords 29 → 30 (+0.010, CI
-  -0.003 to 0.026); names 60/60 unchanged. No gain.
-- Status: not built (measured no gain). Close.
-
-### T-195 [bug] Every `warlock scry` call rebuilds the whole book's derived data, about 6.6 s of an 8.8 s call
-
-- Source: owner request after T-189 (query time), 2026-11-21. Measured on a copy of the same app (11,454 files, 3,279
-  test files), grimoire 5.62.0, book fresh (`rebuilt=false`, 0 changed files), three runs each.
-- What and why: `scry` opens the book through `openGrimoireCached` → `runGrimoire`
-  (`packages/grimoire/src/warlock/actions.ts:384-393`, `packages/grimoire/src/workspace/index.ts:77-140`), which runs
-  the full pipeline on every CLI call: the in-memory cache only helps a long-lived process (MCP, dev tab). Steps
-  timed by a script that calls the same functions in order:
-
-  | Step                                                           | ms          |
-  | -------------------------------------------------------------- | ----------- |
-  | `buildCollectedFiles` (book maps, indexes)                     | 3,290-3,500 |
-  | `matchApps` + `resolveOwnership`                               | 1,030       |
-  | `scanProofs` (reads 3,279 test files)                          | 770-810     |
-  | `writeBook` + `writeCollectedFiles` (writes nothing, compares) | 490         |
-  | `buildBook` (scan + fingerprint)                               | 310         |
-  | the search itself                                              | 210         |
-  | facts load, `parseGrimoire`, rest                              | about 300   |
-  | in process total                                               | 6,000-6,750 |
-  | CLI start-up before the command runs                           | about 1,800 |
-  | whole `npx warlock scry` call                                  | 8,660-8,900 |
-
-  Also: a read command writes (compares) the book on every call (`write` defaults to true).
-
-- Decision (owner, 2026-11-21): `scry` only reads; it never rebuilds or writes the book. Rebuilding is
-  `warlock grimoire build`, which agents run after they finish their edits (skill: "after editing, run
-  `warlock grimoire build`"). Today the skill says the opposite (`use-the-grimoire/SKILL.md:74`: "`scry` and `check`
-  do it when it is stale").
-- Fix: `scry` loads the stored book and derived files (persist ownership/proofs/collected data at build time if they
-  are not already on disk), opens with `write: false`, and keeps only the cheap change check (the `buildBook`
-  fingerprint scan, about 0.3 s) to print a note when the book is behind, the way route facts already do:
-  `note book is stale (12 files changed); run warlock grimoire build`. In `--json`, `notes` carries it. A file that is
-  not in the book keeps GR9001 with its "run warlock grimoire build" hint. Estimate, not measured: about 0.7 s in
-  process plus start-up. Check separately why CLI start-up is about 1.8 s (`warlock --help` alone takes about 3 s).
-- Acceptance: a spec that scry never calls `buildCollectedFiles`/`scanProofs` or writes; a spec for the stale note; the
-  same timing script (kept with the eval) shows the in-process time on this app; answers identical to today's.
-- Status: done on branch `t195-scry-read-only`, not merged or released. `build` writes
-  `grimoire/book/.cache/derived.json`; `scry` and the MCP tools read it (`workspace/stored.ts`), new code GR9007 when
-  the book is not built. Measured on a copy of the same app, 56 benchmark queries, one process each, time around the
-  answer: median 6,573 ms → 1,104 ms (p90 6,816 → 1,147), 56/56 answers identical. What is left of the 1.1 s: change
-  check 0.33 s (facts load + scan), `derived.json` load 0.3 s (72 MB, of which book maps 59 MB), search 0.2 s.
-  Grimoire typecheck clean, 678/678 tests pass. Follow-ups: load book maps only for queries that need them; CLI
-  start-up about 1.8 s.
-
 ## From the 5.62.0 release
-
-### T-188 [bug] Grimoire cache spec flakes when the fixture is copied in the same millisecond as the open
-
-- Source: 5.62.0 main CI run 44782739091 (job 136449521300), 2026-11-20; passed 15/15 locally and on rerun.
-- What: `packages/grimoire/src/workspace/cache.spec.ts:50` expected 2 opens, got 3. `openOnce` in
-  `packages/grimoire/src/workspace/cache.ts:206-214` marks the book `unsettled` when the newest file mtime is after
-  `startedAt`; mtimes are sub-millisecond, `Date.now()` is a whole millisecond, so a fixture copied in the same
-  millisecond as the open counts as changed, and the next `routes: "cached"` call opens again. The runtime behaviour is
-  conservative and fine (one extra open); the spec is timing-dependent.
-- Fix: in the spec, set the copied fixture's mtimes in the past (or wait until `Date.now()` passes the newest mtime)
-  before the first open; check the other specs in that file that call `copyFixture()` right before an open.
-- Acceptance: the spec passes with the fixture copied and opened in the same millisecond (force it with a fake clock
-  or by setting mtimes to `Date.now()`).
-- Status: open.
 
 ## From the 5.61.0 release
 
@@ -318,7 +99,8 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   (`liveFacts`), `packages/grimoire/src/devtools/index.ts` (warm-up).
 - Acceptance: the first open shows the summary before the full book is built; a route edit in dev shows up in the tab
   without a manual build; specs.
-- Status: open; do only if an app asks (vet first).
+- Status: the route-refresh half shipped in 5.63.0 (the dev tab reads routes again after a routes-file change).
+  Open: streaming partial answers on the first open; do only if an app asks (vet first).
 
 ## From the 5.60.0 release
 

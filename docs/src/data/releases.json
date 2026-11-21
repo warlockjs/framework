@@ -1,4 +1,21 @@
 {
+  "5.63.0": {
+    "publishedAt": "2026-11-21T23:05:29.879Z",
+    "matrix": "none",
+    "headline": "`warlock scry` reads the stored book instead of rebuilding it (about 6.6 s to 1.1 s per answer), `--search` ranks hits for a whole sentence, `--route` finds page URLs, and six app-reported fixes in cascade, core, web and create-warlock.",
+    "highlights": [
+      "`warlock scry` and the Grimoire MCP read tools answer from the book `warlock grimoire build` stored, with a stale note when files changed; `GR9007` when the book was never built.",
+      "`scry --search` takes a commit title or bug report: exact names first, then a BM25F score; hits print in score order with `app`, and `--app` keeps one app.",
+      "`scry --route \"GET /chat\"` returns the page or mobile screen behind a page URL; `--site` picks one site; `--json` errors print `{ type: \"error\", code, message, fix }` on stdout.",
+      "Route facts that shrink are kept with a note, and the dev Grimoire tab reads routes again after a routes file changes; `warlock dev` keeps a routes file's routes when it throws on reload.",
+      "`warlock migrate --prune-missing`; PostgreSQL migrations name the column when `.default(\"word\")` needs `defaultString()`; `requireUser()` redirects no longer throw with compression on; failure pages skip a layout whose data never loaded."
+    ],
+    "upgradeNotes": [
+      "Run `warlock grimoire build` after editing: `scry` no longer rebuilds the book.",
+      "PostgreSQL apps scaffolded earlier: change the user migration's `role` default to `.defaultString(\"user\")` (`.default(\"user\")` stores `CURRENT_USER`).",
+      "`scry --search` text output is in score order with a score column; parse `--json` instead of the text."
+    ]
+  },
   "5.62.0": {
     "publishedAt": "2026-11-20T18:05:02.074Z",
     "matrix": "none",

@@ -140,6 +140,199 @@
   ],
   "releases": [
     {
+      "version": "5.63.0",
+      "id": "v5-63-0",
+      "date": "November 21, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "<code>warlock scry</code> reads the stored book instead of rebuilding it (about 6.6 s to 1.1 s per answer), <code>--search</code> ranks hits for a whole sentence, <code>--route</code> finds page URLs, and six app-reported fixes in cascade, core, web and create-warlock.",
+      "highlights": [
+        "<code>warlock scry</code> and the Grimoire MCP read tools answer from the book <code>warlock grimoire build</code> stored, with a stale note when files changed; <code>GR9007</code> when the book was never built.",
+        "<code>scry --search</code> takes a commit title or bug report: exact names first, then a BM25F score; hits print in score order with <code>app</code>, and <code>--app</code> keeps one app.",
+        "<code>scry --route \"GET /chat\"</code> returns the page or mobile screen behind a page URL; <code>--site</code> picks one site; <code>--json</code> errors print <code>{ type: \"error\", code, message, fix }</code> on stdout.",
+        "Route facts that shrink are kept with a note, and the dev Grimoire tab reads routes again after a routes file changes; <code>warlock dev</code> keeps a routes file's routes when it throws on reload.",
+        "<code>warlock migrate --prune-missing</code>; PostgreSQL migrations name the column when <code>.default(\"word\")</code> needs <code>defaultString()</code>; <code>requireUser()</code> redirects no longer throw with compression on; failure pages skip a layout whose data never loaded."
+      ],
+      "upgradeNotes": [
+        "Run <code>warlock grimoire build</code> after editing: <code>scry</code> no longer rebuilds the book.",
+        "PostgreSQL apps scaffolded earlier: change the user migration's <code>role</code> default to <code>.defaultString(\"user\")</code> (<code>.default(\"user\")</code> stores <code>CURRENT_USER</code>).",
+        "<code>scry --search</code> text output is in score order with a score column; parse <code>--json</code> instead of the text."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.63.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/grimoire",
+          "slug": "grimoire",
+          "total": 17,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 6
+            },
+            {
+              "type": "Changed",
+              "n": 6
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock scry --route \"GET /chat\"</code> finds pages and mobile screens. For <code>GET</code> and <code>HEAD</code> with no API route on the path, it looks the path up in the pages and screens and returns each one with its file, setup file, layouts and the import closure of those; a path several sites serve lists every site, and the new <code>--site &lt;id&gt;</code> (and an optional <code>site</code> on <code>grimoire_route</code>) keeps one. <code>ScryRouteResult.route</code> is <code>null</code> for such a page and <code>pages</code> lists the matches. A page URL is found even before the route facts were read, and the <code>GR9002</code> message names the pages on the path when the method is not <code>GET</code> or <code>HEAD</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock scry --json</code> prints a failure as <code>{ \"type\": \"error\", \"code\", \"message\", \"fix\" }</code> on stdout and exits 1 (text mode still writes to stderr). The shape is the new <code>ScryError</code> type; the scry MCP tools (<code>grimoire_file</code>, <code>grimoire_impact</code>, <code>grimoire_route</code>, <code>grimoire_feature</code>, <code>grimoire_flow</code>, <code>grimoire_search</code>) return the same JSON as their error text."
+            },
+            {
+              "type": "Added",
+              "html": "Page, screen, block and file search hits carry <code>app</code>; <code>--app &lt;id&gt;</code> and the <code>app</code> input of <code>grimoire_search</code> keep one app's hits."
+            },
+            {
+              "type": "Added",
+              "html": "<code>GR9007</code> (error): the book was never built, or was built by another version. Run <code>warlock grimoire build</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>openStoredGrimoire(root, adapter)</code>, the read-only open behind <code>scry</code>, and <code>checkBook()</code>, the change check of <code>buildBook</code> with nothing rebuilt or written. The snapshot gains an optional <code>behind</code> field."
+            },
+            {
+              "type": "Added",
+              "html": "<code>SCRY_STOP_WORDS</code>, the extendable list of words search leaves out."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock scry</code> and the MCP read tools only read. They answer from the book the last <code>warlock grimoire build</code> left on disk and no longer rebuild it, boot the app or write a file. Each call used to run the whole pipeline (book maps, owners, proofs, a write comparison); it now runs one change check and reads the stored book. When code, test or written files differ from the book, the answer is still the stored one and ends with <code>note book is stale (12 files changed); run warlock grimoire build</code> (in <code>--json</code>, the <code>notes</code> list). <code>grimoire_check</code> reads the stored book the same way and adds a <code>note</code> when it is behind."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock grimoire build</code> and <code>warlock grimoire check</code> now also write <code>grimoire/book/.cache/derived.json</code> (owners, apps, proofs, test results, book maps, annotations). It is a git-ignored cache."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock scry --route</code> no longer boots the app to read missing route facts; it stops with <code>GR9002</code> and tells you to run <code>warlock grimoire build</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock scry --search</code> takes a whole sentence (a commit title, a bug report). A hit no longer needs every word: hits whose name or title is the text, starts with it or holds every word come first, and everything else is ranked by a BM25F score over the id and path words (weight 3), export names (2), the header sentence (1) and written text (1), with whole-word matching and light stemming. Ids such as <code>AC-5</code> and <code>WL9003</code> stay one word. Matching by letters in order (<code>newarr</code>) is gone. Help text, the skill and the docs tell agents to pass the whole sentence."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>--search</code> prints hits in score order with the score in front of each line (features and flows first only on an equal score, then page and screen files before helper files), no longer grouped by type. The search index is built once for each opened book."
+            },
+            {
+              "type": "Changed",
+              "html": "The dev Grimoire tab reads the route facts again from the running dev server after a routes file (or a file it imports) changes, so a route edit shows as <code>fresh</code> without <code>warlock grimoire build</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Search words match whole words only: <code>ui</code> no longer matches <code>build</code>. A block is found by <code>&lt;app&gt;/&lt;page&gt;</code> and its text, so a block whose long text shares a word with the query no longer matches through its id."
+            },
+            {
+              "type": "Fixed",
+              "html": "A live read of the route facts that finds fewer than half of the routes the book already holds no longer replaces the stored list: the book keeps it, writes nothing for it, reports the facts <code>stale</code> and adds a note, which <code>warlock grimoire build</code> and <code>grimoire_build</code> print. <code>warlock grimoire build --force</code> trusts the read, so a real removal is still accepted. The manifest stores the route and page counts of the last read (<code>boot.counts</code>)."
+            },
+            {
+              "type": "Fixed",
+              "html": "Route facts where no route names its source file are reported as <code>route facts look incomplete; run warlock grimoire build</code> in <code>GR9002</code> and in <code>--impact</code> and other answers' notes."
+            },
+            {
+              "type": "Fixed",
+              "html": "The dev Grimoire tab no longer reports route facts <code>fresh</code> for about a minute after a routes file changed: the files the route facts were read from are part of its change stamp, so the next view reopens at once."
+            },
+            {
+              "type": "Fixed",
+              "html": "The dev Grimoire tab's route view shows the pages behind a page URL instead of failing on it."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "PostgreSQL migrations stop with a clear error when a column has <code>.default(\"word\")</code>, naming the column and pointing to <code>defaultString()</code>. The bare word used to be written as raw SQL, which the database rejected as a column reference without naming the column. MongoDB migrations, which ignore column defaults, are unaffected. SQL keywords (<code>CURRENT_TIMESTAMP</code>, <code>NULL</code>, <code>TRUE</code>, ...) in any case, expressions (<code>NOW()</code>, <code>gen_random_uuid()</code>), numbers (also as strings, such as <code>\"-1\"</code>) and booleans are unchanged. Note that <code>USER</code> is a keyword (<code>CURRENT_USER</code> in PostgreSQL): a text default of <code>user</code> needs <code>.defaultString(\"user\")</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>rollbackMigrations()</code> and <code>freshMigrate()</code> accept <code>pruneMissing</code>, and <code>confirmRollback()</code> honours it, so a rollback no longer fails on records whose migration file was removed when the option is set."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>warlock migrate --fresh</code> and <code>--rollback</code> accept <code>--prune-missing</code>, which deletes the records of executed migrations whose file no longer exists instead of failing on them (the rollback error already suggested it)."
+            },
+            {
+              "type": "Fixed",
+              "html": "A routes file that throws on reload in <code>warlock dev</code> keeps its previous routes until it loads again; it used to drop them."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "<code>requireUser()</code> and <code>requireGuest()</code> redirects no longer log \"Converting circular structure to JSON\" and \"send() called on already-sent response\" when the reply is sent asynchronously (an <code>onSend</code> hook such as compression). A page middleware that returns the core <code>Response</code> counts as having sent the reply, and the page pipeline never serialises a <code>Response</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "A failure page (<code>forbidden.page.tsx</code>, <code>error.page.tsx</code>) reached before the layout's loader ran, for example a page middleware that throws <code>ForbiddenError</code> under a layout with a loader, no longer crashes inside that layout (<code>Cannot read properties of undefined</code>). It renders in the root without that layout, and the browser leaves the same layout out when it hydrates (the payload carries <code>layoutSkipped</code>). A page's own <code>ErrorBoundary</code> shown for such a refusal renders without that layout the same way. A layout with a loader is also left out of the shell that wraps a refusal raised before routing."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The scaffolded user migration gives <code>role</code> the text default <code>'user'</code> (<code>.defaultString(\"user\")</code>). It used <code>.default(\"user\")</code>, which PostgreSQL reads as <code>CURRENT_USER</code>, so new users got the database role name as their <code>role</code>. Apps scaffolded on PostgreSQL earlier should change that line and fix the column default."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.62.0",
       "id": "v5-62-0",
       "date": "November 20, 2026",
