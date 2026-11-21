@@ -8,7 +8,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Next release
 
-- 5.63.0 candidates: T-189..T-194 (Grimoire scry, from the 2026-11-21 field report) and T-188.
+- 5.63.0 candidates: T-189..T-195 (Grimoire scry, from the 2026-11-21 field report) and T-188.
 - 5.62.0 shipped T-185, T-186 and T-187 (see `tasks.completed.md`).
 - 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
 
@@ -118,6 +118,39 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   `:197-205` (reuse window).
 - Fix: add the route input files' times to the change stamp (or end the window on a dev-server route reload).
 - Acceptance: spec: after a routes-file mtime moves, `get()` opens again and reports "stale".
+- Status: open.
+
+### T-195 [bug] Every `warlock scry` call rebuilds the whole book's derived data, about 6.6 s of an 8.8 s call
+
+- Source: owner request after T-189 (query time), 2026-11-21. Measured on a copy of the same app (11,454 files, 3,279
+  test files), grimoire 5.62.0, book fresh (`rebuilt=false`, 0 changed files), three runs each.
+- What and why: `scry` opens the book through `openGrimoireCached` → `runGrimoire`
+  (`packages/grimoire/src/warlock/actions.ts:384-393`, `packages/grimoire/src/workspace/index.ts:77-140`), which runs
+  the full pipeline on every CLI call: the in-memory cache only helps a long-lived process (MCP, dev tab). Steps
+  timed by a script that calls the same functions in order:
+
+  | Step | ms |
+  |---|---|
+  | `buildCollectedFiles` (book maps, indexes) | 3,290-3,500 |
+  | `matchApps` + `resolveOwnership` | 1,030 |
+  | `scanProofs` (reads 3,279 test files) | 770-810 |
+  | `writeBook` + `writeCollectedFiles` (writes nothing, compares) | 490 |
+  | `buildBook` (scan + fingerprint) | 310 |
+  | the search itself | 210 |
+  | facts load, `parseGrimoire`, rest | about 300 |
+  | in process total | 6,000-6,750 |
+  | CLI start-up before the command runs | about 1,800 |
+  | whole `npx warlock scry` call | 8,660-8,900 |
+
+  Also: a read command writes (compares) the book on every call (`write` defaults to true).
+- Fix: when the book is fresh and the written folders are unchanged, reuse the stored derived data instead of
+  rebuilding it (persist the collected files and ownership/proofs with a stamp, the way `takeStamp` in
+  `workspace/cache.ts` stamps the in-memory copy), or compute only what the query needs (search needs candidates,
+  `--impact` needs the file graph and pages). Open with `write: false` for scry. Estimate, not measured: a fresh-book
+  call drops to about 0.7 s in process plus start-up. Check separately why CLI start-up is about 1.8 s (`warlock --help`
+  alone takes about 3 s).
+- Acceptance: a spec that a second scry on an unchanged book does not call `buildCollectedFiles`/`scanProofs`; the
+  same timing script (kept with the eval) shows the in-process time on this app; answers identical to today's.
 - Status: open.
 
 ## From the 5.62.0 release
