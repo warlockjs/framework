@@ -179,6 +179,8 @@ configured (`auth.pageAuth.loginPath`) is still redirected to it; only a
 refusal with nowhere to redirect reaches the forbidden page. API routes keep
 their JSON answers.
 
+The forbidden page renders inside the root and the layouts whose data was loaded. When a page middleware refuses the request before a layout's loader ran, that layout is left out of the page, so a layout that reads its loader data never receives `undefined`.
+
 Core also refuses some requests before any route runs: a path with dot
 segments such as `/public/../x` (403), or a malformed URL (400). On an app that
 serves pages, a request that accepts HTML (an explicit `text/html` in `Accept`,

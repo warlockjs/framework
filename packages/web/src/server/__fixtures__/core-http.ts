@@ -87,7 +87,7 @@ export type ReplyShim = {
   redirect(url: string, statusCode?: number): ReplyShim;
 };
 
-export function createReplyShim(): ReplyShim {
+export function createReplyShim(options: { deferSent?: boolean } = {}): ReplyShim {
   const raw = new PassThrough() as ReplyShim["raw"];
   // A document nobody reads from must not backpressure `pipe()` closed —
   // flow the readable side straight to nowhere, mirroring how a real socket
@@ -175,7 +175,10 @@ export function createReplyShim(): ReplyShim {
       shim.redirects.push({ url, statusCode });
       shim.appliedHeaders.location = url;
       shim.statusCode = statusCode;
-      shim.sent = true;
+      // `deferSent` mimics a reply with an async `onSend` hook (compression):
+      // the redirect is queued, and `sent` stays false until the hook settles.
+      if (options.deferSent) setImmediate(() => (shim.sent = true));
+      else shim.sent = true;
       return shim;
     },
   };
@@ -204,10 +207,12 @@ export function createCoreHttp(input: {
   params?: Record<string, string>;
   query?: Record<string, string>;
   headers?: Record<string, string>;
+  /** Keep `reply.sent` false after `send()`/`redirect()` until the next tick, like a reply with an async `onSend` hook. */
+  deferSent?: boolean;
 }) {
   const request = new Request();
   const response = new Response();
-  const reply = createReplyShim();
+  const reply = createReplyShim({ deferSent: input.deferSent });
 
   response.setResponse(reply as any); // router.ts:927
   (request as any).response = response; // router.ts:928

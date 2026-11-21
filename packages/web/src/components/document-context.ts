@@ -185,6 +185,12 @@ export type HydrationDocumentPayloadSource = {
    */
   readonly errorPage?: SerializedErrorPageProps;
   /**
+   * True when the failure page was rendered without the layouts (a layout with a
+   * loader whose loader never ran). The browser leaves those layouts out of the
+   * tree too, so it hydrates the markup the server rendered.
+   */
+  readonly layoutSkipped?: true;
+  /**
    * Top-level `pageData` key names, in declaration order, that a `defer()`
    * call produced (Stage 2 implementation contract, rule 3) — a page
    * component reads each with `use()` and must NOT be handed a bare value.
