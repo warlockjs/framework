@@ -270,6 +270,7 @@ Run database migrations. Without flags, runs all pending migrations.
 ```bash
 warlock migrate
 warlock migrate --fresh                  # drop all tables, run from scratch (also clears the seed log)
+warlock migrate --fresh --prune-missing  # ...and delete records of migration files that were removed
 warlock migrate --rollback               # roll everything back
 warlock migrate --list                   # migration state: executed, then what's next
 warlock migrate --pending                # only what will run next, in execution order
@@ -285,6 +286,7 @@ warlock migrate --path src/app/orders/models/order/migrations
 | `--rollback, -r` | boolean | Roll back migrations, dropping all tables.                                  |
 | `--yes, -y`      | boolean | With `--fresh` or `--rollback`: confirm without asking. See below.          |
 | `--force`        | boolean | Same as `--yes`.                                                            |
+| `--prune-missing` | boolean | With `--fresh` or `--rollback`: delete the records of executed migrations whose file no longer exists, instead of failing on them. |
 | `--path, -p`     | string  | Path to a specific migration file or folder. Defaults to running all.       |
 | `--timeout, -t`  | number  | Abort a migration that runs longer than this many seconds (off by default). |
 | `--list, -l`     | boolean | Migration state: executed migrations, then what will run next.              |

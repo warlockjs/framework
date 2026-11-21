@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `warlock migrate --fresh` and `--rollback` accept `--prune-missing`, which deletes the records of executed migrations whose file no longer exists instead of failing on them (the rollback error already suggested it).
 - A routes file that throws on reload in `warlock dev` keeps its previous routes until it loads again; it used to drop them.
 
 ## 5.62.0 - 2026-11-20

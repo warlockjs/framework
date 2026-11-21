@@ -177,6 +177,7 @@ async function runMigrateAction(options: CommandActionData) {
     yes,
     force,
     timeout,
+    pruneMissing,
   } = options.options;
 
   if (timeout !== undefined) {
@@ -207,6 +208,8 @@ async function runMigrateAction(options: CommandActionData) {
     await loadAllMigrations();
   }
 
+  const prune = pruneMissing ? true : undefined;
+
   if (fresh && rollback) {
     console.log(colors.redBright("You can't use --fresh and --rollback together"));
     await shutdownMigrateConnections();
@@ -214,9 +217,9 @@ async function runMigrateAction(options: CommandActionData) {
   }
 
   if (rollback) {
-    if (!(await confirmDestructiveRollback(Boolean(yes || force)))) return;
+    if (!(await confirmDestructiveRollback(Boolean(yes || force), prune))) return;
 
-    await rollbackMigrations({ all: true });
+    await rollbackMigrations({ all: true, pruneMissing: prune });
     return;
   }
 
@@ -229,9 +232,9 @@ async function runMigrateAction(options: CommandActionData) {
   }
 
   if (fresh) {
-    if (!(await confirmDestructiveRollback(Boolean(yes || force)))) return;
+    if (!(await confirmDestructiveRollback(Boolean(yes || force), prune))) return;
 
-    await freshMigrate();
+    await freshMigrate({ pruneMissing: prune });
     // The schema is new, so "already seeded" no longer holds.
     await resetSeedLedger(dataSourceRegistry.get());
     return;
@@ -245,10 +248,14 @@ async function runMigrateAction(options: CommandActionData) {
  * after the summary; elsewhere it prompts, takes `--yes`/`--force`, and exits 1
  * when there is no terminal to ask.
  */
-async function confirmDestructiveRollback(yes: boolean): Promise<boolean> {
+async function confirmDestructiveRollback(
+  yes: boolean,
+  pruneMissing?: boolean,
+): Promise<boolean> {
   try {
     const proceed = await confirmRollback({
       all: true,
+      pruneMissing,
       development: environment() === "development",
       yes,
     });

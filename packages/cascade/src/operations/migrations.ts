@@ -19,6 +19,11 @@ export type RollbackMigrationsOptions = {
   readonly all?: boolean;
   /** Number of batches to roll back when `all` is not set. Default: 1. */
   readonly batches?: number;
+  /**
+   * Delete the migration records whose migration file is no longer registered,
+   * instead of failing the rollback on them. CLI: `--prune-missing`.
+   */
+  readonly pruneMissing?: boolean;
 };
 
 /**
@@ -50,12 +55,12 @@ export async function rollbackMigrations(
   options: RollbackMigrationsOptions = {},
 ): Promise<MigrationResult[]> {
   if (options.all) {
-    return migrationRunner.rollbackAll();
+    return migrationRunner.rollbackAll({ pruneMissing: options.pruneMissing });
   }
 
   const batches = options.batches ?? 1;
 
-  return migrationRunner.rollbackBatches(batches);
+  return migrationRunner.rollbackBatches(batches, { pruneMissing: options.pruneMissing });
 }
 
 /**
@@ -65,9 +70,12 @@ export async function rollbackMigrations(
  *
  * @example
  * await freshMigrate();
+ * await freshMigrate({ pruneMissing: true }); // also delete records of removed migration files
  */
-export async function freshMigrate(): Promise<MigrationResult[]> {
-  return migrationRunner.fresh();
+export async function freshMigrate(
+  options: Pick<RollbackMigrationsOptions, "pruneMissing"> = {},
+): Promise<MigrationResult[]> {
+  return migrationRunner.fresh({ pruneMissing: options.pruneMissing });
 }
 
 /**

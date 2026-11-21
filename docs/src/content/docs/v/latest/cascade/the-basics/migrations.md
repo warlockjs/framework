@@ -165,7 +165,7 @@ Grouped by what they do:
 
 - `.nullable()` — column accepts NULL.
 - `.notNullable()` — column rejects NULL.
-- `.default(value)` — default applied when the column isn't set on insert (string, number, or boolean). The value is emitted as raw SQL, so `.default("text")` writes `text` unquoted and breaks the statement. Use `.defaultString("text")` for a text default; keep `.default()` for numbers, booleans and SQL expressions such as `.default("NOW()")`.
+- `.default(value)` — default applied when the column isn't set on insert (string, number, or boolean). The value is emitted as raw SQL, so `.default("text")` writes `text` unquoted and breaks the statement. Use `.defaultString("text")` for a text default; keep `.default()` for numbers, booleans, SQL keywords (`CURRENT_TIMESTAMP`, `NULL`, `TRUE`) and expressions such as `.default("NOW()")`. A bare word that is not a SQL keyword, like `.default("agency")`, throws when the migration is defined, naming the column and `defaultString()`, because the database would read it as a column reference.
 
 **Single-column keys and constraints**
 

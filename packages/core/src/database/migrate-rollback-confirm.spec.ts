@@ -93,3 +93,28 @@ describe("migrate --rollback / --fresh confirmation", () => {
     expect(rollbackMigrations).not.toHaveBeenCalled();
   });
 });
+
+describe("migrate --prune-missing", () => {
+  beforeEach(() => {
+    confirmRollback.mockReset().mockResolvedValue(true);
+    rollbackMigrations.mockReset();
+    freshMigrate.mockReset();
+    getFiles.mockReset().mockResolvedValue([]);
+    vi.stubEnv("NODE_ENV", "production");
+  });
+
+  it("passes pruneMissing to the confirmation, rollback and fresh", async () => {
+    await run({ rollback: true, yes: true, pruneMissing: true });
+    await run({ fresh: true, yes: true, pruneMissing: true });
+
+    expect(confirmRollback).toHaveBeenCalledWith(expect.objectContaining({ pruneMissing: true }));
+    expect(rollbackMigrations).toHaveBeenCalledWith({ all: true, pruneMissing: true });
+    expect(freshMigrate).toHaveBeenCalledWith({ pruneMissing: true });
+  });
+
+  it("does not pass it without the flag", async () => {
+    await run({ fresh: true, yes: true });
+
+    expect(freshMigrate.mock.calls[0]![0].pruneMissing).toBeUndefined();
+  });
+});
