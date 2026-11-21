@@ -13,8 +13,6 @@ import type {
   ScryFeatureResult,
   ScryFileResult,
   ScryFlowResult,
-  ScryHit,
-  ScryHitType,
   ScryImpactResult,
   ScryNotes,
   ScryPageRef,
@@ -28,6 +26,7 @@ import type { GrimoireSnapshot } from "../contracts/snapshot";
 import type { WrittenFeature, WrittenFlow } from "../contracts/written";
 import { fileGraph, importClosure, importerClosure } from "../graph";
 import { bookEntryPaths, projectPath, toPosixPath } from "../paths";
+import { searchSnapshot, wordsOf } from "./search";
 
 const byText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
 const sortedUnique = (items: Iterable<string>): string[] => [...new Set(items)].sort(byText);
@@ -601,337 +600,20 @@ function scryFlow(
 
 // ── Search ─────────────────────────────────────────────────────────────────
 
-const TYPE_ORDER: readonly ScryHitType[] = [
-  "feature",
-  "flow",
-  "block",
-  "page",
-  "screen",
-  "route",
-  "mail",
-  "job",
-  "file",
-  "export",
-  "task",
-];
-
-/** Lower-case words: `catalog/new-arrivals.service.ts` → `catalog new arrivals service ts`. */
-function words(text: string): string {
-  return text
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-/** The last segment of an id (`catalog/new-arrivals` → `new-arrivals`). */
-function lastSegment(id: string): string {
-  const parts = id.split(/[\s/#]+/).filter((part) => part !== "");
-
-  return parts[parts.length - 1] ?? id;
-}
-
-/** The slug of a block name (`New arrivals` → `new-arrivals`). */
-function slug(text: string): string {
-  return words(text).split(" ").join("-");
-}
-
-/** One searchable piece of written text of a feature or flow (a summary, a story, a case, a criterion). */
-type BodyPart = { label: string; text: string };
-
-type Candidate = Omit<ScryHit, "score" | "matched"> & { body?: BodyPart[] };
-
-/** The searchable written text of a flow: summary, who, story, cases, criteria. */
-function flowBody(flow: WrittenFlow): BodyPart[] {
-  return [
-    ...(flow.summary === null ? [] : [{ label: "summary", text: flow.summary }]),
-    { label: "who", text: flow.who.value },
-    ...flow.story.map((step) => ({ label: `story ${step.index}`, text: step.text })),
-    ...flow.cases.map((item) => ({
-      label: `case ${item.question}`,
-      text: `${item.question} ${item.answer} ${item.criteria.join(" ")}`,
-    })),
-    ...flow.criteria.map((item) => ({ label: item.id, text: `${item.id} ${item.text}` })),
-  ];
-}
-
-/** The searchable written text of a feature: summary, why, audience. */
-function featureBody(feature: WrittenFeature): BodyPart[] {
-  const readme = feature.readme;
-
-  if (readme === null) return [];
-
-  return [
-    ...(readme.summary === null ? [] : [{ label: "summary", text: readme.summary }]),
-    ...(readme.why === null ? [] : [{ label: "why", text: readme.why }]),
-    ...readme.audience.map((item) => ({ label: "audience", text: item.value })),
-  ];
-}
-
-function candidates(snapshot: GrimoireSnapshot): Candidate[] {
-  const facts = snapshot.book.facts;
-  const list: Candidate[] = [];
-
-  for (const feature of snapshot.written.features) {
-    list.push({
-      type: "feature",
-      id: feature.id,
-      detail: feature.readme?.title.value ?? null,
-      body: featureBody(feature),
-    });
-
-    for (const flow of feature.flows) {
-      list.push({
-        type: "flow",
-        id: flow.ref,
-        detail: flow.heading?.value ?? null,
-        body: flowBody(flow),
-      });
-    }
-  }
-
-  for (const app of snapshot.written.apps) {
-    const appId = app.id.value;
-
-    for (const layout of app.layouts) {
-      for (const row of layout.blocks) {
-        list.push({
-          type: "block",
-          id: `${appId}/${layout.id}/${slug(row.block)}`,
-          detail: row.flow ?? row.block,
-        });
-      }
-    }
-
-    for (const page of [...app.pages, ...app.screens]) {
-      for (const row of page.blocks) {
-        list.push({
-          type: "block",
-          id: `${appId}/${page.id}/${slug(row.block)}`,
-          detail: row.flow ?? row.block,
-        });
-      }
-    }
-  }
-
-  for (const page of facts.pages) {
-    list.push({
-      type: "page",
-      id: `${siteApp(snapshot, page.site)} ${page.route}`,
-      detail: page.file,
-    });
-  }
-
-  for (const app of facts.mobile) {
-    for (const screen of app.screens) {
-      list.push({
-        type: "screen",
-        id: `${mobileApp(snapshot, app.id)} ${screen.route}`,
-        detail: screen.file,
-      });
-    }
-  }
-
-  for (const route of facts.routes ?? []) {
-    if (route.isPage) continue;
-
-    list.push({ type: "route", id: `${route.method} ${route.path}`, detail: route.name });
-  }
-
-  for (const thing of facts.named) {
-    if (thing.type !== "mail" && thing.type !== "job") continue;
-
-    list.push({ type: thing.type, id: thing.name, detail: thing.file });
-  }
-
-  for (const file of facts.files) {
-    list.push({ type: "file", id: file.file, detail: file.about });
-
-    for (const entry of file.exports) {
-      if (entry.name === "default" || entry.name === "*") continue;
-
-      list.push({ type: "export", id: `${file.file}#${entry.name}`, detail: entry.about });
-    }
-  }
-
-  for (const task of [
-    ...snapshot.collected.tasksIndex.open,
-    ...snapshot.collected.tasksIndex.done,
-  ]) {
-    list.push({ type: "task", id: task.id, detail: task.title });
-  }
-
-  return list;
-}
-
-/** Whether every character of `needle` appears in `text` in order. */
-function isSubsequence(needle: string, text: string): boolean {
-  let position = 0;
-
-  for (const char of text) {
-    if (char === needle[position]) position++;
-
-    if (position === needle.length) return true;
-  }
-
-  return needle.length === 0;
-}
-
-/** Shortest query that may match by fuzzy (in-order letters), so short queries stay precise. */
-const FUZZY_MIN = 4;
-
-/** Added to the score of written content (features, flows) so it ranks above files and exports of the same match. */
-const WRITTEN_BOOST = 2;
-
-/** Whether a word list holds a word that is, or starts with, every token (a short token must equal a word). */
-function partMatches(partWords: readonly string[], tokens: readonly string[]): boolean {
-  return tokens.every((token) =>
-    partWords.some((word) => (token.length >= 3 ? word.startsWith(token) : word === token)),
-  );
-}
-
-/** The first body part holding every token, as `label: text`, or `null`. */
-function bodyMatch(candidate: Candidate, tokens: readonly string[], base: string): string | null {
-  for (const part of candidate.body ?? []) {
-    const partWords = words(part.text).split(" ");
-    // Tokens may be split between the name and one written part.
-    const rest = tokens.filter((token) => !base.includes(token));
-
-    if (rest.length > 0 && partMatches(partWords, rest)) {
-      const text = part.text.replace(/\s+/g, " ").trim();
-
-      return `${part.label}: ${text.length > 90 ? `${text.slice(0, 89)}…` : text}`;
-    }
-  }
-
-  return null;
-}
-
-/**
- * Score of a candidate for the query words, or 0 when it does not match. From best
- * to worst: exact name or path (7), prefix (6), whole-word match (5), substring of
- * the name or path (4), the words found only in the detail or in written text (3),
- * fuzzy (2). Features and flows add {@link WRITTEN_BOOST} to a match.
- */
-function scoreOf(
-  candidate: Candidate,
-  query: string,
-  tokens: readonly string[],
-): { score: number; matched: string | null } {
-  const id = words(
-    candidate.type === "export" ? (candidate.id.split("#")[1] ?? candidate.id) : candidate.id,
-  );
-  const last = words(lastSegment(candidate.id));
-  const base = `${id} ${words(candidate.detail ?? "")}`;
-  const boost = candidate.type === "feature" || candidate.type === "flow" ? WRITTEN_BOOST : 0;
-
-  if (!tokens.every((token) => base.includes(token))) {
-    const matched = bodyMatch(candidate, tokens, base);
-
-    if (matched !== null) return { score: 3 + boost, matched };
-
-    const squeezed = id.replace(/ /g, "");
-
-    return query.length >= FUZZY_MIN && tokens.every((token) => isSubsequence(token, squeezed))
-      ? { score: 2, matched: null }
-      : { score: 0, matched: null };
-  }
-
-  if (id === query || last === query) return { score: 7 + boost, matched: null };
-  if (id.startsWith(query) || last.startsWith(query)) return { score: 6 + boost, matched: null };
-
-  const idWords = id.split(" ");
-
-  if (tokens.every((token) => idWords.includes(token))) return { score: 5 + boost, matched: null };
-  if (tokens.every((token) => id.includes(token))) return { score: 4 + boost, matched: null };
-
-  return { score: 3 + boost, matched: null };
-}
-
-/** The most hits of features and flows set aside before files and exports fill the list (a share of the limit). */
-const WRITTEN_SHARE = 0.75;
-
-const byRank = (left: ScryHit, right: ScryHit): number =>
-  right.score - left.score ||
-  TYPE_ORDER.indexOf(left.type) - TYPE_ORDER.indexOf(right.type) ||
-  byText(left.id, right.id);
-
-/**
- * The hits to return: the best features and flows first (up to a share of the
- * limit, so files and exports never push matching written content out), then
- * the best of the rest. Grouped by type in {@link TYPE_ORDER}, best first.
- */
-function pickHits(hits: ScryHit[], limit: number): ScryHit[] {
-  const ranked = [...hits].sort(byRank);
-  const written = ranked
-    .filter((hit) => hit.type === "feature" || hit.type === "flow")
-    .slice(0, Math.max(1, Math.ceil(limit * WRITTEN_SHARE)));
-  const chosen = new Set(written);
-
-  for (const hit of ranked) {
-    if (chosen.size >= limit) break;
-
-    chosen.add(hit);
-  }
-
-  return [...chosen]
-    .slice(0, limit)
-    .sort(
-      (left, right) =>
-        TYPE_ORDER.indexOf(left.type) - TYPE_ORDER.indexOf(right.type) ||
-        right.score - left.score ||
-        byText(left.id, right.id),
-    );
-}
-
 function scrySearch(
   snapshot: GrimoireSnapshot,
   query: Extract<ScryQuery, { type: "search" }>,
 ): ScrySearchResult {
-  const text = words(query.text);
-  const tokens = text.split(" ").filter((token) => token !== "");
-
-  if (tokens.length === 0) {
+  if (wordsOf(query.text).length === 0) {
     throw new GrimoireError(
       "GR9006",
       `Search text ${JSON.stringify(query.text)} has no letters or digits; pass a word to look for.`,
     );
   }
 
-  const seen = new Set<string>();
-  const hits: ScryHit[] = [];
+  const { counts, hits } = searchSnapshot(snapshot, query);
 
-  for (const candidate of candidates(snapshot)) {
-    const key = `${candidate.type} ${candidate.id}`;
-
-    if (seen.has(key)) continue;
-
-    seen.add(key);
-
-    const { score, matched } = scoreOf(candidate, text, tokens);
-
-    if (score > 0) {
-      hits.push({
-        type: candidate.type,
-        id: candidate.id,
-        detail: candidate.detail,
-        score,
-        ...(matched === null ? {} : { matched }),
-      });
-    }
-  }
-
-  const counts: Partial<Record<ScryHitType, number>> = {};
-
-  for (const hit of hits) counts[hit.type] = (counts[hit.type] ?? 0) + 1;
-
-  return {
-    type: "search",
-    ...notesOf(snapshot, false),
-    text: query.text,
-    counts,
-    hits: pickHits(hits, query.limit ?? 20),
-  };
+  return { type: "search", ...notesOf(snapshot, false), text: query.text, counts, hits };
 }
 
 /**

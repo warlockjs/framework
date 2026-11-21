@@ -29,7 +29,7 @@ edits a file you wrote either.
 1. Find the feature and flow the task is about.
 
    ```bash
-   npx warlock scry --search "new arrivals"
+   npx warlock scry --search "new arrivals"          # or the whole task sentence
    ```
 
    ```text
@@ -70,7 +70,7 @@ build, then ask again. A project with no book stops with `GR9007`. A note
 
 Add `--json` for machine-readable output; a failed call then prints `{ "type": "error", "code", "message", "fix" }` on stdout and exits 1. `--impact` lists API routes, pages, flows and features,
 including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`
-prints every line. `--search` also reads a flow's summary, story, cases and criteria (`AC-5` works), ranks features and flows above files, and groups hits by type; a hit found by written text shows the part that matched in brackets. Read the flows it names and run their tests after
+prints every line. `--search` takes the whole sentence (the commit title or the bug report, not two keywords): hits whose name or title holds the words come first, every other hit follows by score, and the list is printed in score order with the score in front. It also reads a flow's summary, story, cases and criteria (`AC-5` works); a hit found by written text shows the part that matched in brackets. Page, screen, block and file hits carry their app, and `--app <id>` keeps one app's hits. Read the flows it names and run their tests after
 your change.
 
 A file's entry is also at a fixed path: `src/app/auth/controllers/login.controller.ts` is described

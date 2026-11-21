@@ -400,20 +400,31 @@ function truncatedLine(result: ScrySearchResult): string[] {
   ];
 }
 
+/** A score for print: one decimal, or none from 100 up. */
+function scoreText(score: number): string {
+  return score >= 100 ? score.toFixed(0) : score.toFixed(1);
+}
+
+/** Hits in score order, one line each: `score type id  detail  (app)  [matched]`. */
 function formatSearch(result: ScrySearchResult): string[] {
   if (result.hits.length === 0)
     return [`no match for ${JSON.stringify(result.text)}`, ...notes(result)];
 
+  const scoreWidth = Math.max(...result.hits.map((hit) => scoreText(hit.score).length));
   const idWidth = Math.min(32, Math.max(0, ...result.hits.map((hit) => hit.id.length)));
 
   return [
-    ...result.hits.map(
-      (hit) =>
-        (hit.detail === null
-          ? `${hit.type.padEnd(9)}${hit.id}`
-          : `${hit.type.padEnd(9)}${hit.id.padEnd(idWidth)}  ${hit.detail}`
-        ).trimEnd() + (hit.matched === undefined ? "" : `   [${hit.matched}]`),
-    ),
+    ...result.hits.map((hit) => {
+      const head = `${scoreText(hit.score).padStart(scoreWidth)}  ${hit.type.padEnd(9)}`;
+      // Page, screen and block ids start with the app; a file's app is not in its path.
+      const app = hit.app !== undefined && hit.type === "file" ? `  (${hit.app})` : "";
+      const line =
+        hit.detail === null
+          ? `${head}${hit.id}${app}`
+          : `${head}${hit.id.padEnd(idWidth)}  ${hit.detail}${app}`;
+
+      return line.trimEnd() + (hit.matched === undefined ? "" : `   [${hit.matched}]`);
+    }),
     ...truncatedLine(result),
     ...notes(result),
   ];

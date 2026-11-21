@@ -20,8 +20,8 @@ export type ScryQuery =
   | { type: "feature"; feature: string }
   /** `warlock scry --flow <feature>/<flow>` */
   | { type: "flow"; feature: string; flow: string }
-  /** `warlock scry --search "<text>"`; `limit` defaults to 20. */
-  | { type: "search"; text: string; limit?: number };
+  /** `warlock scry --search "<text>"`; `limit` defaults to 20; `app` keeps the hits of one app. */
+  | { type: "search"; text: string; limit?: number; app?: string };
 
 /** Notes every result may carry (stale routes, a book rebuilt on the way). */
 export type ScryNotes = {
@@ -156,7 +156,9 @@ export type ScryHit = {
   id: string;
   /** Short text shown after the id (a header sentence, a block's flow). */
   detail: string | null;
-  /** Higher is better. Only the order is meaningful. */
+  /** The app of a page, screen, block or file hit; absent for the rest. */
+  app?: string;
+  /** Higher is better. Only the order is meaningful: name matches score above every written-text match. */
   score: number;
   /**
    * For a feature or flow found by its written text: the part that matched
@@ -170,7 +172,7 @@ export type ScrySearchResult = ScryNotes & {
   text: string;
   /** How many candidates matched, per type, before the limit cut the list. */
   counts: Partial<Record<ScryHitType, number>>;
-  /** Grouped by type (features and flows first), best first inside a group. */
+  /** Best first, whatever the type; on an equal score features and flows come first. */
   hits: ScryHit[];
 };
 
