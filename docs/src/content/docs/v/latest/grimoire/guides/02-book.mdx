@@ -27,8 +27,9 @@ npx warlock grimoire build           # refresh what changed
 npx warlock grimoire build --force   # collect everything again and restore edited or deleted entries
 ```
 
-You rarely run this yourself. `warlock grimoire check`, `warlock scry`, the MCP tools and the devtools tab all check
-that the book is fresh first and refresh it when it is not.
+Run it after you finish editing. `warlock grimoire check` and the devtools tab check that the book is fresh first and
+refresh it when it is not; `warlock scry` and the MCP read tools only read the stored book and add a note when it is
+behind the files.
 
 ## Layout
 
@@ -256,8 +257,9 @@ When a command answers from stale routes, it says so and tells you to run `warlo
 
 A live read (`routes: "fresh"`) that finds fewer than half of the routes the book already holds is not trusted: the
 book keeps its stored list, writes nothing for it, reports the facts as `stale` and says
-`a live read found 10 routes against the 277 stored; kept the stored routes; run warlock grimoire build`. The manifest
-stores the route and page counts of the last read (`boot.counts`) for this. When the stored routes exist but none names
+`a live read found 10 routes against the 277 stored; kept the stored routes; run warlock grimoire build again, or warlock grimoire build --force when the routes were removed`
+(`warlock grimoire build` prints the same note). A forced build (`--force`) trusts the read, so a real removal of most
+routes is accepted that way. The manifest stores the route and page counts of the last read (`boot.counts`) for this. When the stored routes exist but none names
 its source file, answers say `route facts look incomplete; run warlock grimoire build`, and `warlock scry --route`
 gives that as the reason for `GR9002`; `--impact` carries the same note.
 

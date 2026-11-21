@@ -22,6 +22,7 @@ import type {
 } from "../../contracts/migration-driver.contract";
 import type { MigrationDefaults, UuidStrategy } from "../../types";
 import type { PostgresDriver } from "./postgres-driver";
+import { rawDefaultSql } from "../../migration/raw-default";
 import {
   postgresTTLPurgeComment,
   registerPostgresTTLPurgeJob,
@@ -314,7 +315,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
           sql += ` DEFAULT ${column.defaultValue}`;
         } else {
           // Raw SQL expression (default behavior when isRawDefault is true or undefined)
-          sql += ` DEFAULT ${column.defaultValue}`;
+          sql += ` DEFAULT ${rawDefaultSql(column.name, column.defaultValue)}`;
         }
       }
 

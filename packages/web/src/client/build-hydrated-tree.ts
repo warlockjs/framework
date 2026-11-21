@@ -329,9 +329,11 @@ export async function buildHydratedTree(
 
   // Innermost layout wraps the page, so walk the outermost-first list backwards.
   for (let index = composition.layouts.length - 1; index >= 0; index -= 1) {
-    // The server rendered this failure page without its layouts (their
-    // loaders never ran); the browser tree leaves them out the same way.
-    if (errorPageProps !== undefined && payload.layoutSkipped === true) break;
+    // The server rendered this failure page or page boundary without its
+    // layout (its loader never ran); the browser tree leaves it out the same
+    // way. Only one layout on the chain renders, so skipping the chain skips
+    // exactly that one; the others are passthroughs.
+    if (payload.layoutSkipped === true) break;
 
     const layout = composition.layouts[index]!;
 

@@ -330,8 +330,14 @@ function scryRoute(
   const facts = snapshot.book.facts;
   const method = query.method.toUpperCase();
   const asked = `${method} ${query.path}`;
+  // Pages and screens come from the code scan, so a page URL is found with or without route facts.
+  const pageMethod = method === "GET" || method === "HEAD";
 
   if (facts.routes === null) {
+    const pages = pageMethod ? pagesAt(snapshot, query) : [];
+
+    if (pages.length > 0) return pageRouteResult(snapshot, pages);
+
     throw new GrimoireError(
       "GR9002",
       `No route facts yet, so ${asked} cannot be looked up. Run warlock grimoire build (it boots the app once to read the routes), then ask again.`,
@@ -341,7 +347,7 @@ function scryRoute(
   const route = facts.routes.find((item) => routeMatches(item, method, query.path));
 
   if (!route) {
-    const pages = method === "GET" || method === "HEAD" ? pagesAt(snapshot, query) : [];
+    const pages = pageMethod ? pagesAt(snapshot, query) : [];
 
     if (pages.length > 0) return pageRouteResult(snapshot, pages);
 

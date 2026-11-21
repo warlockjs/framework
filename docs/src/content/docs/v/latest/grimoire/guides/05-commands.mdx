@@ -46,8 +46,9 @@ runs, so `warlock.config.ts` stays fast to load.
 
 ## When the app boots
 
-Every command first makes sure the book exists and is fresh. Only changed files are read again; an unchanged
-project reads nothing and writes nothing.
+`warlock grimoire build` and `warlock grimoire check` first make sure the book exists and is fresh. Only changed files
+are read again; an unchanged project reads nothing and writes nothing. `warlock scry` and the MCP read tools only read
+the stored book (see [`warlock scry`](#warlock-scry)).
 
 Route facts (routes, events and jobs) need the app booted, the way `warlock inspect` boots it: connectors boot, none
 starts, no database connection opens and no port is bound. They are cached in the book and read again only when a
@@ -57,7 +58,8 @@ routes file, a file it imports, a config file, a mail, job, event or notificatio
 - `warlock grimoire build` and `warlock grimoire check` boot the app only when the route facts are stale or missing.
   When the app does not boot, they go on with the cached route facts and print a `GR8002` warning.
 - `warlock scry` and the MCP tools never boot the app. They use the cached route facts and add a note when they are
-  stale. A route question of a project with no route facts stops with `GR9002`; run `warlock grimoire build` first.
+  stale. A route question of a project with no route facts stops with `GR9002` (a page or screen URL is still found);
+  run `warlock grimoire build` first.
 - An app with several sites (`src/web/$sites/<site>`) loads only `src/config/web.ts` for file questions, because the
   sites' base paths shape the page routes.
 
@@ -263,11 +265,17 @@ With `--json`, a failed `scry` prints the error as JSON on stdout and exits 1, s
 gets an object:
 
 ```json
-{ "type": "error", "code": "GR9002", "message": "No route matches DELETE /api/orders. …", "fix": "…" }
+{
+  "type": "error",
+  "code": "GR9002",
+  "message": "No route matches DELETE /api/orders. …",
+  "fix": "…"
+}
 ```
 
 `fix` is the code's fix text (an empty string when it has none). Without `--json` the error is text on stderr, as for
-every command. The `ScryError` type describes the object.
+every command. The `ScryError` type describes the object; the scry MCP tools return the same object as their error
+text (see [MCP tools](#mcp-tools)).
 
 ### A feature: `--feature`
 
@@ -378,21 +386,31 @@ GR9003  No feature has the id "billing". Features: auth, catalog, orders.
 ## MCP tools
 
 `warlock mcp` and `warlock dev --mcp` serve these tools next to the built-in ones. They answer with the same objects
-`--json` prints. The read tools never boot the app; they use the cached route facts (only the first `grimoire_route` of a project with
-no route facts reads them once, as `warlock scry --route` does).
+`--json` prints. The read tools never boot the app; they use the cached route facts, and a `grimoire_route` question
+on a project with no route facts stops with `GR9002` (pages and screens are still found by their URL).
 
 | Tool               | Input                              | Answer                                                 | Writes |
 | ------------------ | ---------------------------------- | ------------------------------------------------------ | ------ |
 | `grimoire_file`    | `{ file }`                         | the file answer                                        | no     |
 | `grimoire_impact`  | `{ file }`                         | the impact answer                                      | no     |
-| `grimoire_route`   | `{ method, path }`                 | the route answer                                       | no     |
+| `grimoire_route`   | `{ method, path, site? }`          | the route answer                                       | no     |
 | `grimoire_feature` | `{ feature }`                      | the feature answer                                     | no     |
 | `grimoire_flow`    | `{ flow, files?, step?, offset? }` | the compact flow answer, or one page of a step's files | no     |
 | `grimoire_search`  | `{ text, limit?, app? }`           | the search answer                                      | no     |
-| `grimoire_check`   | `{}`                               | the check report                                       | no     |
-| `grimoire_build`   | `{ force? }`                       | `{ rebuilt, written, removed, routes }`                | no     |
+| `grimoire_check`   | `{}`                               | the check report (`note` when the book is behind)      | no     |
+| `grimoire_build`   | `{ force? }`                       | `{ rebuilt, written, removed, routes, note? }`         | no     |
 | `grimoire_release` | `{ release }`                      | the release file, its list and whether it changed      | yes    |
 | `grimoire_explain` | `{ code }`                         | the code's title, fix, skill and docs link             | no     |
+
+When a question fails, the scry tools (`grimoire_file`, `grimoire_impact`, `grimoire_route`, `grimoire_feature`,
+`grimoire_flow`, `grimoire_search`) return a tool error whose text is the same `ScryError` JSON that `warlock scry --json`
+prints, so a client can parse the code and the fix:
+
+```json
+{ "type": "error", "code": "GR9004", "message": "No flow catalog/returns. …", "fix": "…" }
+```
+
+The other tools' errors read `GR9006: <message> Fix: <fix>`.
 
 `grimoire_flow` answers with counts instead of file lists: each step has `counts` (`direct`, `feature`, `reachable`,
 `typeOnly`) and its first 50 direct imports, so the answer stays small on a large app. To see the files behind one
@@ -446,6 +464,16 @@ console.log(
   ),
 );
 console.log(await collectMobileFacts(root));
+```
+
+`openStoredGrimoire(root, adapter)` opens the book the last build left without building it, the way `warlock scry`
+does (`GR9007` when it was never built). `SCRY_STOP_WORDS` is the set of small words search leaves out; add a word to
+it before the first search of a process to leave that word out too:
+
+```ts
+import { SCRY_STOP_WORDS } from "@warlock.js/grimoire";
+
+SCRY_STOP_WORDS.add("please");
 ```
 
 `createWarlockAdapter(options)` turns the inspect report into the book's facts: files from `collectFiles()` of

@@ -48,4 +48,4 @@ export { scanProofs, scanProofsInText, type ScanProofsResult } from "./proves";
 export { checkGrimoire, formatCheckReport } from "./check";
 export { collectRelease, renderCollectedList, writeRelease } from "./releases";
 export { criterionStatus, readTestResults, type CriterionTestResult } from "./test-results";
-export { formatScryResult, parseScryQuery, scry } from "./scry";
+export { formatScryResult, parseScryQuery, SCRY_STOP_WORDS, scry } from "./scry";

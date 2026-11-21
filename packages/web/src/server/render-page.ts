@@ -1164,11 +1164,7 @@ async function finishRender(
       const value = unsentMiddlewareShortCircuit.value;
       // A core `Response` is the reply itself, never a body to serialise.
       const body =
-        typeof value === "string"
-          ? value
-          : value instanceof Response
-            ? ""
-            : JSON.stringify(value);
+        typeof value === "string" ? value : value instanceof Response ? "" : JSON.stringify(value);
 
       return { html: body, status: statusCode, headers, cookies, data: bundle.pageData, bundle };
     }
@@ -1620,6 +1616,21 @@ async function finishRender(
           attempt = await renderFrameworkAfterErrorPageFailure();
         }
         break;
+      }
+
+      // A page boundary rendered before the layout's loader ran (a page
+      // middleware refusal) renders without that layout; the payload says so,
+      // so the browser leaves the layout out of its tree too.
+      if (
+        currentError?.boundary.boundaryLevel === "page" &&
+        bundle.layoutSkipped !== true &&
+        isLayoutUnloaded(triple, bundle)
+      ) {
+        bundle.layoutSkipped = true;
+        documentValue = {
+          ...documentValue,
+          payload: buildHydrationPayload(bundle, documentSlots.locale, sessionExtras(bundle)),
+        };
       }
 
       const element = currentError

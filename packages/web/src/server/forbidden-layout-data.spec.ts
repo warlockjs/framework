@@ -95,3 +95,30 @@ describe("a forbidden page when the page middleware refuses and the layout has a
     expect(rendered.html).not.toContain('id="layout"');
   });
 });
+
+describe("a page boundary when the page middleware refuses and the layout has a loader", () => {
+  it("renders the boundary without the layout and marks the payload", async () => {
+    const { request, response } = createHttp();
+    const withBoundary: PageRouteEntry = {
+      ...entry,
+      triple: {
+        ...entry.triple,
+        page: {
+          ...entry.triple.page,
+          ErrorBoundary: ({ status }: { status: number }) =>
+            createElement("main", { id: "boundary" }, `boundary:${status}`),
+        },
+      },
+    };
+
+    const rendered = (await renderPageRequest("/staff", {
+      routes: [withBoundary],
+      createHttp: () => ({ request, response }),
+    })) as RenderedPage;
+
+    expect(rendered.html).toContain("boundary:403");
+    expect(rendered.html).not.toContain('id="layout"');
+    expect(rendered.bundle?.layoutSkipped).toBe(true);
+    expect(rendered.html).toContain("layoutSkipped");
+  });
+});

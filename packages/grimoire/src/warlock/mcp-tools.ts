@@ -7,6 +7,7 @@ import { inputSchema, type WarlockMcpContext, type WarlockMcpTool } from "@warlo
 import { explainGrimoireCode, GrimoireError, grimoireCodeDocsUrl } from "../codes";
 import type { BookAdapter } from "../contracts/adapter";
 import type { ScryQuery } from "../contracts/scry";
+import { scryErrorOf } from "../scry/error";
 import type { WarlockAdapterOptions } from "./adapter";
 
 /** The names of the tools, in the order they are listed. */
@@ -23,13 +24,24 @@ export const GRIMOIRE_MCP_TOOL_NAMES = [
   "grimoire_explain",
 ] as const;
 
-/** A Grimoire error as a tool error: the code, what failed, and what to do. */
+/** A Grimoire error of a non-scry tool (check, build, release) as a tool error: the code, what failed, and what to do. */
 function toolError(error: unknown): never {
   if (error instanceof GrimoireError) {
     const fix = explainGrimoireCode(error.code)?.fix;
 
     throw new Error(`${error.code}: ${error.message}${fix ? ` Fix: ${fix}` : ""}`);
   }
+
+  throw error;
+}
+
+/**
+ * A scry error as a tool error whose text is the `ScryError` JSON that
+ * `warlock scry --json` prints (`{ "type": "error", "code", "message", "fix" }`).
+ * It stays a thrown error so the MCP result is still marked `isError`.
+ */
+function scryToolError(error: unknown): never {
+  if (error instanceof GrimoireError) throw new Error(JSON.stringify(scryErrorOf(error)));
 
   throw error;
 }
@@ -71,7 +83,7 @@ export function createGrimoireMcpTools(
 
         return await answer(root, await loadAdapter(), await query(input));
       } catch (error) {
-        return toolError(error);
+        return scryToolError(error);
       }
     };
 
@@ -207,7 +219,7 @@ export function createGrimoireMcpTools(
 
           return compact.stepFilePage(snapshot, result.bookmap, step, set, offset, 200);
         } catch (error) {
-          return toolError(error);
+          return scryToolError(error);
         }
       },
     },
@@ -254,7 +266,7 @@ export function createGrimoireMcpTools(
     {
       name: "grimoire_check",
       description:
-        "Run the Grimoire check: written names that point at nothing, files without a header or feature, criteria without tests, version and changelog problems. Findings on proposed work are marked expected. Read-only; checks the stored book (run warlock grimoire build after editing).",
+        "Run the Grimoire check: written names that point at nothing, files without a header or feature, criteria without tests, version and changelog problems. Findings on proposed work are marked expected. Read-only; checks the stored book (run warlock grimoire build after editing); `note` says when the book is behind the files.",
       input: inputSchema({}),
       writes: false,
       run: async () => {
@@ -264,9 +276,17 @@ export function createGrimoireMcpTools(
             import("../check"),
           ]);
 
-          return checkGrimoire(
-            await openStoredGrimoireCached(root, await loadAdapter()),
-          );
+          const snapshot = await openStoredGrimoireCached(root, await loadAdapter());
+          const report = checkGrimoire(snapshot);
+          const changed = snapshot.behind?.changed;
+
+          // The stored book may be behind the files: say so, as scry answers do.
+          return changed === undefined
+            ? report
+            : {
+                ...report,
+                note: `book is stale (${changed} ${changed === 1 ? "file" : "files"} changed); run warlock grimoire build`,
+              };
         } catch (error) {
           return toolError(error);
         }
@@ -295,12 +315,15 @@ export function createGrimoireMcpTools(
             run = await runGrimoire(root, loaded, { routes: "cached", force });
           }
 
+          const routeNote = run.snapshot.book.routeNote;
+          const notes = [note, routeNote ?? null].filter((item): item is string => item !== null);
+
           return {
             rebuilt: run.rebuilt,
             written: [...run.book.written, ...run.collected.written],
             removed: [...run.book.removed, ...run.collected.removed],
             routes: run.snapshot.routes,
-            ...(note === null ? {} : { note }),
+            ...(notes.length === 0 ? {} : { note: notes.join("; ") }),
           };
         } catch (error) {
           return toolError(error);

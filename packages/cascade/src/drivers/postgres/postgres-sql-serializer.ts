@@ -1,6 +1,7 @@
 import type { SqlDialectContract } from "../sql/sql-dialect.contract";
 import type { PendingOperation } from "../../migration/migration";
 import { SQLSerializer } from "../../migration/sql-serializer";
+import { rawDefaultSql } from "../../migration/raw-default";
 import type {
   ColumnDefinition,
   ForeignKeyDefinition,
@@ -207,7 +208,7 @@ export class PostgresSQLSerializer extends SQLSerializer {
         } else if (typeof column.defaultValue === "number") {
           sql += ` DEFAULT ${column.defaultValue}`;
         } else {
-          sql += ` DEFAULT ${column.defaultValue}`; // raw default
+          sql += ` DEFAULT ${rawDefaultSql(column.name, column.defaultValue)}`; // raw default
         }
       }
 
@@ -296,7 +297,7 @@ export class PostgresSQLSerializer extends SQLSerializer {
       } else if (typeof column.defaultValue === "boolean") {
         defaultVal = column.defaultValue ? "TRUE" : "FALSE";
       } else {
-        defaultVal = String(column.defaultValue);
+        defaultVal = rawDefaultSql(column.name, column.defaultValue);
       }
       alters.push(`ALTER COLUMN ${quotedColumn} SET DEFAULT ${defaultVal}`);
     }

@@ -3259,6 +3259,22 @@ async function routeView(ctx, method, path) {
   );
   const { el } = ctx;
   const found = data.route;
+
+  // A page or screen URL: no API route, one entry per site that serves the path.
+  if (found === null) {
+    return el("div", { class: "grimoire-view" }, [
+      crumbs(ctx, [["Modules", "modules"], [`${method} ${path}`]]),
+      heading(ctx, `${method} ${path}`, [muted(ctx, "page")]),
+      section(ctx, "Pages", [
+        list(
+          ctx,
+          data.pages.map((page) => [`${page.app} ${page.route} `, fileLink(ctx, page.file)]),
+        ),
+      ]),
+      section(ctx, "Files behind it", [fileChips(ctx, data.files, 20)]),
+    ]);
+  }
+
   const out = el("div", { class: "grimoire-view" }, [
     crumbs(ctx, [["Modules", "modules"], [`${found.method} ${found.path}`]]),
     heading(ctx, `${found.method} ${found.path}`, [muted(ctx, found.description ?? found.handler)]),

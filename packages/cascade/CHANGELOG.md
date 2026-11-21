@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- `.default("word")` on a migration column throws when the migration is defined, naming the column and pointing to `defaultString()`. It used to write the bare word as raw SQL, which the database rejected as a column reference. SQL keywords (`CURRENT_TIMESTAMP`, `NULL`, `TRUE`, ...), expressions, numbers and booleans are unchanged.
+- PostgreSQL migrations stop with a clear error when a column has `.default("word")`, naming the column and pointing to `defaultString()`. The bare word used to be written as raw SQL, which the database rejected as a column reference without naming the column. MongoDB migrations, which ignore column defaults, are unaffected. SQL keywords (`CURRENT_TIMESTAMP`, `NULL`, `TRUE`, ...) in any case, expressions (`NOW()`, `gen_random_uuid()`), numbers (also as strings, such as `"-1"`) and booleans are unchanged. Note that `USER` is a keyword (`CURRENT_USER` in PostgreSQL): a text default of `user` needs `.defaultString("user")`.
 - `rollbackMigrations()` and `freshMigrate()` accept `pruneMissing`, and `confirmRollback()` honours it, so a rollback no longer fails on records whose migration file was removed when the option is set.
 
 ## 5.60.0 - 2026-11-19

@@ -122,6 +122,14 @@ describe("confirmRollback", () => {
 
     await confirmRollback({ all: true, print: vi.fn() });
 
-    expect(spy).toHaveBeenCalledWith(Number.POSITIVE_INFINITY);
+    expect(spy).toHaveBeenCalledWith(Number.POSITIVE_INFINITY, { pruneMissing: undefined });
+  });
+
+  it("passes pruneMissing to the plan, so removed migration files do not fail it", async () => {
+    const spy = planReturns([]);
+
+    await confirmRollback({ all: true, pruneMissing: true, print: vi.fn() });
+
+    expect(spy).toHaveBeenCalledWith(Number.POSITIVE_INFINITY, { pruneMissing: true });
   });
 });

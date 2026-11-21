@@ -4,27 +4,31 @@
 
 ## 5.63.0
 
+### Added
+
+- `warlock scry --route "GET /chat"` finds pages and mobile screens. For `GET` and `HEAD` with no API route on the path, it looks the path up in the pages and screens and returns each one with its file, setup file, layouts and the import closure of those; a path several sites serve lists every site, and the new `--site <id>` (and an optional `site` on `grimoire_route`) keeps one. `ScryRouteResult.route` is `null` for such a page and `pages` lists the matches. A page URL is found even before the route facts were read, and the `GR9002` message names the pages on the path when the method is not `GET` or `HEAD`.
+- `warlock scry --json` prints a failure as `{ "type": "error", "code", "message", "fix" }` on stdout and exits 1 (text mode still writes to stderr). The shape is the new `ScryError` type; the scry MCP tools (`grimoire_file`, `grimoire_impact`, `grimoire_route`, `grimoire_feature`, `grimoire_flow`, `grimoire_search`) return the same JSON as their error text.
+- Page, screen, block and file search hits carry `app`; `--app <id>` and the `app` input of `grimoire_search` keep one app's hits.
+- `GR9007` (error): the book was never built, or was built by another version. Run `warlock grimoire build`.
+- `openStoredGrimoire(root, adapter)`, the read-only open behind `scry`, and `checkBook()`, the change check of `buildBook` with nothing rebuilt or written. The snapshot gains an optional `behind` field.
+- `SCRY_STOP_WORDS`, the extendable list of words search leaves out.
+
 ### Changed
 
-- `warlock scry` and the MCP read tools only read. They answer from the book the last `warlock grimoire build` left on disk and no longer rebuild it, boot the app or write a file. Each call used to run the whole pipeline (book maps, owners, proofs, a write comparison); it now runs one change check and reads the stored book. When code, test or written files differ from the book, the answer is still the stored one and ends with `note book is stale (12 files changed); run warlock grimoire build` (in `--json`, the `notes` list). `grimoire_check` reads the stored book the same way.
+- `warlock scry` and the MCP read tools only read. They answer from the book the last `warlock grimoire build` left on disk and no longer rebuild it, boot the app or write a file. Each call used to run the whole pipeline (book maps, owners, proofs, a write comparison); it now runs one change check and reads the stored book. When code, test or written files differ from the book, the answer is still the stored one and ends with `note book is stale (12 files changed); run warlock grimoire build` (in `--json`, the `notes` list). `grimoire_check` reads the stored book the same way and adds a `note` when it is behind.
 - `warlock grimoire build` and `warlock grimoire check` now also write `grimoire/book/.cache/derived.json` (owners, apps, proofs, test results, book maps, annotations). It is a git-ignored cache.
 - `warlock scry --route` no longer boots the app to read missing route facts; it stops with `GR9002` and tells you to run `warlock grimoire build`.
+- `warlock scry --search` takes a whole sentence (a commit title, a bug report). A hit no longer needs every word: hits whose name or title is the text, starts with it or holds every word come first, and everything else is ranked by a BM25F score over the id and path words (weight 3), export names (2), the header sentence (1) and written text (1), with whole-word matching and light stemming. Ids such as `AC-5` and `WL9003` stay one word. Matching by letters in order (`newarr`) is gone. Help text, the skill and the docs tell agents to pass the whole sentence.
+- `--search` prints hits in score order with the score in front of each line (features and flows first only on an equal score, then page and screen files before helper files), no longer grouped by type. The search index is built once for each opened book.
+- The dev Grimoire tab reads the route facts again from the running dev server after a routes file (or a file it imports) changes, so a route edit shows as `fresh` without `warlock grimoire build`.
 
 ### Fixed
 
-- A live read of the route facts that finds fewer than half of the routes the book already holds no longer replaces the stored list: the book keeps it, writes nothing for it, reports the facts `stale` and adds a note. The manifest stores the route and page counts of the last read (`boot.counts`).
+- Search words match whole words only: `ui` no longer matches `build`. A block is found by `<app>/<page>` and its text, so a block whose long text shares a word with the query no longer matches through its id.
+- A live read of the route facts that finds fewer than half of the routes the book already holds no longer replaces the stored list: the book keeps it, writes nothing for it, reports the facts `stale` and adds a note, which `warlock grimoire build` and `grimoire_build` print. `warlock grimoire build --force` trusts the read, so a real removal is still accepted. The manifest stores the route and page counts of the last read (`boot.counts`).
 - Route facts where no route names its source file are reported as `route facts look incomplete; run warlock grimoire build` in `GR9002` and in `--impact` and other answers' notes.
-- The dev Grimoire tab no longer reports route facts `fresh` for about a minute after a routes file changed: the files the route facts were read from are part of its change stamp, so the next view reopens and reports them `stale`.
-
-### Added
-
-- `warlock scry --route "GET /chat"` finds pages and mobile screens. For `GET` and `HEAD` with no API route on the path, it looks the path up in the pages and screens and returns each one with its file, setup file, layouts and the import closure of those; a path several sites serve lists every site, and the new `--site <id>` (and an optional `site` on `grimoire_route`) keeps one. `ScryRouteResult.route` is `null` for such a page and `pages` lists the matches. The `GR9002` message names the pages on the path when the method is not `GET` or `HEAD`.
-- `warlock scry --json` prints a failure as `{ "type": "error", "code", "message", "fix" }` on stdout and exits 1 (text mode still writes to stderr). The shape is the new `ScryError` type.
-- `warlock scry --search` finds files from a whole sentence. A hit no longer needs every word: hits whose name or title is the text, starts with it or holds every word come first, and everything else is ranked by a BM25F score over the id and path words (weight 3), export names (2), the header sentence (1) and written text (1), with whole-word matching, light stemming and an extendable stop-word list (`SCRY_STOP_WORDS`). Ids such as `AC-5` and `WL9003` stay one word. Help text, the skill and the docs tell agents to pass the whole sentence.
-- `--search` prints hits in score order with the score shown (features and flows first only on an equal score, then page and screen files before helper files), no longer grouped by type. A block is found by `<app>/<page>` and its text, not by the slug of its whole text, and `ui` no longer matches `build`.
-- Page, screen, block and file hits carry `app`; `--app <id>` and the `app` input of `grimoire_search` keep one app's hits. The search index is built once for each opened book.
-- `GR9007` (error): the book was never built, or was built by another version. Run `warlock grimoire build`.
-- `openStoredGrimoire(root, adapter)`, the read-only open behind `scry`, and `checkBook()`, the change check of `buildBook` with nothing rebuilt or written. The snapshot gains an optional `behind` field.
+- The dev Grimoire tab no longer reports route facts `fresh` for about a minute after a routes file changed: the files the route facts were read from are part of its change stamp, so the next view reopens at once.
+- The dev Grimoire tab's route view shows the pages behind a page URL instead of failing on it.
 
 ## 5.61.0 - 2026-11-20
 

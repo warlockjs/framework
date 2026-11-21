@@ -1,14 +1,17 @@
-flow     catalog/new-arrivals              New arrivals
-block    mobile/home/new-arrivals          catalog/new-arrivals
-block    web-client/home/new-arrivals      catalog/new-arrivals
-route    GET /api/products/new-arrivals    catalog.new-arrivals
-file     src/app/catalog/controllers/new-arrivals.controller.ts  Answers the new arrivals request.
-file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
-file     src/app/catalog/tests/new-arrivals.test.ts  Proves the new arrivals rules.
-file     mobile/app/index.tsx              The home screen with new arrivals.
-file     src/web/$sites/client/home.page.tsx  The home page with featured products and new arrivals.
-file     src/web/$sites/client/home.setup.ts  Loads featured products and new arrivals for the home page.
-export   src/app/catalog/controllers/new-arrivals.controller.ts#NewArrivalsController  Returns the new arrivals for the customer's country.
-export   src/app/catalog/services/new-arrivals.service.ts#listNewArrivals  Returns up to 20 products, newest first.
-export   src/web/$sites/client/home.setup.ts#loader  Returns featured products and up to 20 new arrivals.
-task     T-010                             New arrivals were empty for customers with no country
+16.8  flow     catalog/new-arrivals              New arrivals
+15.0  route    GET /api/products/new-arrivals    catalog.new-arrivals
+14.0  file     src/app/catalog/controllers/new-arrivals.controller.ts  Answers the new arrivals request.
+13.9  file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
+13.9  file     src/app/catalog/tests/new-arrivals.test.ts  Proves the new arrivals rules.
+13.8  task     T-010                             New arrivals were empty for customers with no country
+13.1  export   src/app/catalog/controllers/new-arrivals.controller.ts#NewArrivalsController  Returns the new arrivals for the customer's country.
+12.8  block    mobile/home/new-arrivals          catalog/new-arrivals
+12.8  block    web-client/home/new-arrivals      catalog/new-arrivals
+12.7  file     mobile/app/index.tsx              The home screen with new arrivals.  (mobile)
+12.6  file     src/web/$sites/client/home.page.tsx  The home page with featured products and new arrivals.  (web-client)
+12.6  file     src/web/$sites/client/home.setup.ts  Loads featured products and new arrivals for the home page.  (web-client)
+12.1  export   src/app/catalog/services/new-arrivals.service.ts#listNewArrivals  Returns up to 20 products, newest first.
+12.1  export   src/web/$sites/client/home.setup.ts#loader  Returns featured products and up to 20 new arrivals.
+ 1.4  feature  catalog                           Product catalog   [summary: Customers browse products, see what is new in their country, and will save products for l…]
+ 1.3  flow     orders/place-order                Place an order   [case duplicate: duplicate does not apply: each submit is a new order]
+ 1.2  flow     auth/sign-up                      Sign up   [AC-1: AC-1 a new account waits for email verification]

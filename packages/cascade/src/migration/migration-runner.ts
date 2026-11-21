@@ -1638,7 +1638,7 @@ export class MigrationRunner {
           `Cannot roll back: ${orphans.length} executed migration(s) have no registered file: ` +
             `${orphans.map((o) => o.name).join(", ")}. ` +
             `They were renamed, deleted, or not matched by the migration pattern. ` +
-            `Restore the file(s), or pass `pruneMissing: true` (CLI: `warlock migrate --rollback --prune-missing` or `--fresh --prune-missing`) to delete those records.`,
+            `Restore the file(s), or pass \`pruneMissing: true\` (CLI: \`warlock migrate --rollback --prune-missing\` or \`--fresh --prune-missing\`) to delete those records.`,
         );
       }
 

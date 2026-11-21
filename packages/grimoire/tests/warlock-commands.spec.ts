@@ -14,6 +14,7 @@ import {
 } from "@warlock.js/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BookAdapter } from "../src/contracts/adapter";
+import type { ScryError } from "../src/contracts/scry";
 import { GRIMOIRE_MCP_TOOL_NAMES, createGrimoireMcpTools } from "../src/warlock/mcp-tools";
 import {
   needsBoot,
@@ -497,6 +498,17 @@ describe("Grimoire MCP tools", () => {
     );
   }
 
+  /** The `ScryError` a scry tool's rejection carries as its message. */
+  async function scryErrorFrom(call: Promise<unknown> | undefined): Promise<ScryError> {
+    try {
+      await call;
+    } catch (error) {
+      return JSON.parse((error as Error).message) as ScryError;
+    }
+
+    throw new Error("the tool did not fail");
+  }
+
   it("lists the tools in order; only grimoire_release writes", () => {
     const list = [...tools("/project", createShopAdapter()).values()];
 
@@ -533,11 +545,17 @@ describe("Grimoire MCP tools", () => {
     expect(
       await run("grimoire_flow", { flow: "catalog/new-arrivals", files: "reachable", step: 1 }),
     ).toMatchObject({ set: "reachable", index: 1 });
-    await expect(
-      byName
-        .get("grimoire_flow")
-        ?.run({ flow: "catalog/new-arrivals", files: "reachable", step: 99 }),
-    ).rejects.toThrow(/^GR9006: Pass step/);
+    expect(
+      await scryErrorFrom(
+        byName
+          .get("grimoire_flow")
+          ?.run({ flow: "catalog/new-arrivals", files: "reachable", step: 99 }),
+      ),
+    ).toMatchObject({
+      type: "error",
+      code: "GR9006",
+      message: expect.stringMatching(/^Pass step/),
+    });
     expect(await run("grimoire_search", { text: "order", limit: 2 })).toMatchObject({
       type: "search",
     });
@@ -555,24 +573,52 @@ describe("Grimoire MCP tools", () => {
     });
   });
 
-  it("turns Grimoire errors into tool errors with the code and the fix", async () => {
+  it("turns scry errors into tool errors whose text is the ScryError JSON", async () => {
     const copy = fixture();
     const adapter = createShopAdapter();
     const byName = tools(copy.root, adapter);
 
-    await expect(
-      byName.get("grimoire_file")?.run({ file: "src/app/orders/routes.ts" }),
-    ).rejects.toThrow(/^GR9007: The book has not been built yet\./);
+    expect(
+      await scryErrorFrom(byName.get("grimoire_file")?.run({ file: "src/app/orders/routes.ts" })),
+    ).toMatchObject({
+      type: "error",
+      code: "GR9007",
+      message: expect.stringMatching(/^The book has not been built yet\./),
+    });
     await byName.get("grimoire_build")?.run({});
 
-    await expect(byName.get("grimoire_flow")?.run({ flow: "catalog/returns" })).rejects.toThrow(
-      /^GR9004: No flow catalog\/returns\..* Fix: /,
-    );
+    const flow = await scryErrorFrom(byName.get("grimoire_flow")?.run({ flow: "catalog/returns" }));
+
+    expect(flow).toMatchObject({
+      type: "error",
+      code: "GR9004",
+      message: expect.stringMatching(/^No flow catalog\/returns\./),
+    });
+    expect(flow.fix).not.toBe("");
+    expect(
+      await scryErrorFrom(byName.get("grimoire_search")?.run({ text: "order", limit: 0 })),
+    ).toMatchObject({
+      code: "GR9006",
+      message: expect.stringMatching(/^--limit must be a whole number above 0/),
+    });
+    expect(
+      await scryErrorFrom(byName.get("grimoire_route")?.run({ method: "DELETE", path: "/nope" })),
+    ).toMatchObject({ code: "GR9002" });
     await expect(byName.get("grimoire_explain")?.run({ code: "GR0000" })).rejects.toThrow(
       /Unknown Grimoire code/,
     );
-    await expect(byName.get("grimoire_search")?.run({ text: "order", limit: 0 })).rejects.toThrow(
-      /^GR9006: --limit must be a whole number above 0/,
-    );
+  });
+
+  it("reports a stored book that is behind the files in grimoire_check", async () => {
+    const copy = fixture();
+    const byName = tools(copy.root, createShopAdapter());
+
+    await byName.get("grimoire_build")?.run({});
+    expect(await byName.get("grimoire_check")?.run({})).not.toHaveProperty("note");
+
+    copy.replace("src/app/orders/routes.ts", "\n", "\n// changed\n");
+    expect(await byName.get("grimoire_check")?.run({})).toMatchObject({
+      note: "book is stale (1 file changed); run warlock grimoire build",
+    });
   });
 });

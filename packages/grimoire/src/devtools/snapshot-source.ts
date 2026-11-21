@@ -3,7 +3,9 @@
  * `routes: "cached"` (a devtools request never boots the app) and kept in
  * memory. Concurrent requests share one open. A change stamp (the book
  * manifest, the agent-written folders and indexes and the files the route
- * facts were read from, a few `stat` calls and no directory walk) tells when the book changed.
+ * facts were read from, a few `stat` calls and no directory walk) tells when the book changed. With live
+ * facts (`liveFacts`, development), an edit to a file the route facts were read from reads them again from
+ * the running app on the next open, so a route edit shows without `warlock grimoire build`.
  *
  * - Production (`mode: "production"`): a snapshot is reused until the stamp
  *   changes, with no time limit, unless `ttlMs` is set. A request that finds
@@ -93,20 +95,8 @@ const STAMPED = [
   GRIMOIRE_PATHS.releases,
 ];
 
-/**
- * `routeInputs` are the project-relative files the route facts were read from (`manifest.boot.inputs`): an
- * edit to one ends the reuse window, so the next open reports the route facts stale.
- */
-async function changeStamp(
-  root: string,
-  resultsFile: string,
-  routeInputs: string[] = [],
-): Promise<string> {
-  const files = [
-    ...STAMPED.map((entry) => path.join(root, ...entry.split("/"))),
-    resultsFile,
-    ...routeInputs.map((file) => path.join(root, ...file.split("/"))),
-  ];
+/** The modified times of `files`, joined (`0` for a missing file). */
+async function timesOf(files: string[]): Promise<string> {
   const times = await Promise.all(
     files.map(async (file) => {
       try {
@@ -118,6 +108,24 @@ async function changeStamp(
   );
 
   return times.join(",");
+}
+
+/**
+ * The change stamp in two parts: `book` (the book manifest, the written folders, the results file) and `routes`
+ * (the project-relative files the route facts were read from, `manifest.boot.inputs`). An edit to a route input
+ * ends the reuse window; with live facts the next open reads the routes again, otherwise it reports them stale.
+ */
+async function changeStamp(
+  root: string,
+  resultsFile: string,
+  routeInputs: string[] = [],
+): Promise<{ book: string; routes: string }> {
+  const [book, routes] = await Promise.all([
+    timesOf([...STAMPED.map((entry) => path.join(root, ...entry.split("/"))), resultsFile]),
+    timesOf(routeInputs.map((file) => path.join(root, ...file.split("/")))),
+  ]);
+
+  return { book, routes };
 }
 
 const routeInputsOf = (snapshot: GrimoireSnapshot): string[] =>
@@ -138,12 +146,19 @@ export function createSnapshotSource(
   root: string,
   options: SnapshotSourceOptions = {},
 ): SnapshotSource {
-  let cached: { snapshot: GrimoireSnapshot; at: number; stamp: string; took: number } | null = null;
+  let cached: {
+    snapshot: GrimoireSnapshot;
+    at: number;
+    stamp: { book: string; routes: string };
+    took: number;
+  } | null = null;
   let opening: Promise<GrimoireSnapshot> | null = null;
 
   const live = options.liveFacts === true && options.mode !== "production";
   let collected = options.collectRoutes !== true || options.mode === "production";
   let liveCollected = !live;
+  // Set when a route input changed: with live facts, the next open reads the routes from the running app again.
+  let refreshRoutes = false;
   const resultsFile = resolveResultsFile(root, options.testResultsFile);
 
   const keepUntilChanged = options.mode === "production" && options.ttlMs === undefined;
@@ -160,9 +175,11 @@ export function createSnapshotSource(
     };
     let snapshot: GrimoireSnapshot;
 
-    if (!liveCollected) {
+    if (!liveCollected || refreshRoutes) {
       // One pass: the book and the live route facts together, so a first open never builds twice.
+      // After a routes-file edit: the dev server reloads the file on save, so the live read sees its new routes.
       liveCollected = true;
+      refreshRoutes = false;
 
       try {
         snapshot = await openGrimoire(root, adapter, { routes: "fresh", ...openOptions });
@@ -211,8 +228,11 @@ export function createSnapshotSource(
       if (cached === null) return ensureOpening();
 
       const known = cached;
-      const changed =
-        (await changeStamp(root, resultsFile, routeInputsOf(known.snapshot))) !== known.stamp;
+      const stamp = await changeStamp(root, resultsFile, routeInputsOf(known.snapshot));
+      const routesMoved = stamp.routes !== known.stamp.routes;
+      const changed = routesMoved || stamp.book !== known.stamp.book;
+
+      if (routesMoved && live) refreshRoutes = true;
 
       if (changed || options.mode === "production") {
         if (!changed && (keepUntilChanged || Date.now() - known.at < reuseFor(known.took))) {

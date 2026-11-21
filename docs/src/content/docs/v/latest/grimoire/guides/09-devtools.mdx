@@ -38,7 +38,8 @@ in is marked, and small counts show how much each holds. Detail views (a feature
 file) belong to the view they came from and show a breadcrumb back to it, such as Features, then `auth`, then the flow.
 
 One search box sits above every view. Press `/` anywhere outside a text field to jump to it and `Escape` to clear it.
-It looks across flows, blocks, pages, routes, files, exports and tasks, and groups the hits by type. Move through them
+It looks across flows, blocks, pages, routes, files, exports and tasks and ranks them the way `warlock scry --search` does,
+so a whole sentence works; the hits are grouped by type, the group with the best hit first. Move through them
 with the arrow keys and press `Enter` to open one. Views link to each other with hash links such as
 `#grimoire/flow/catalog/new-arrivals`, so you can copy the address of what you are looking at.
 
@@ -146,7 +147,9 @@ The tab opens the book once and keeps that snapshot in memory; concurrent reques
   longer. After that the tab serves the cached snapshot at once and refreshes it in the background, so a view never
   waits on a reopen once the first open is done. If a refresh fails, the old snapshot keeps being served. Editing a
   file the route facts were read from (a routes file or something it imports) ends that window at once: the next view
-  reopens the book and the tab reports the route facts as `stale` until you run `warlock grimoire build`.
+  reopens the book and reads the route facts again from the running dev server, so the edited routes show as `fresh`.
+  A panel given your own `adapter` does not read them live; it reports them `stale` until you run
+  `warlock grimoire build`.
 
 Set `ttlMs` (milliseconds) to choose the reuse time yourself, in either mode, by listing the panel as a pair:
 
@@ -158,8 +161,9 @@ export default {
 
 ## It never boots your app
 
-The tab opens the snapshot the way `warlock grimoire build` does, but with `routes: "cached"`: it never boots the app,
-and it never reads routes again. It reads the agent-written files and never changes them. It does write Warlock's own
+The tab opens the snapshot the way `warlock grimoire build` does, but it never boots the app: in development it reads
+the route facts from the running dev server (on the first open and after a route edit), and otherwise it uses the
+cached ones. It reads the agent-written files and never changes them. It does write Warlock's own
 generated files (the book entries and manifest, the book maps and the indexes), so the next open only redoes what
 changed since the last one.
 
@@ -194,7 +198,7 @@ Served at `/__warlock/api/grimoire`, all `GET`:
 
 An unknown item answers `404` with a message, and a missing parameter `400`.
 
-In development the tab reads the route, event and job facts from the running dev server itself: the live router, the event listeners noted since the dev server started, and the registered jobs. Nothing is booted and no module is loaded a second time, so the app's connectors start once. A fresh checkout shows `routes: fresh` after the first open, without running `warlock grimoire build`. The first open builds the book once and shares that build across the tab's first requests; the dev server also starts that build in the background when the tab is registered, so it is usually ready by the time you open the tab. A failed background build never stops the dev server; the next request tries again. Facts are read on the first open and then live in the book; after you change a routes file the tab says the route facts are `stale`; run `warlock grimoire build` (or restart the dev server) to refresh them. A panel given your own `adapter` reads the facts through that adapter and is not warmed early. In production the tab only reads the book as it is on disk.
+In development the tab reads the route, event and job facts from the running dev server itself: the live router, the event listeners noted since the dev server started, and the registered jobs. Nothing is booted and no module is loaded a second time, so the app's connectors start once. A fresh checkout shows `routes: fresh` after the first open, without running `warlock grimoire build`. The first open builds the book once and shares that build across the tab's first requests; the dev server also starts that build in the background when the tab is registered, so it is usually ready by the time you open the tab. A failed background build never stops the dev server; the next request tries again. Facts are read on the first open and then live in the book; after you change a routes file (the dev server reloads it on save), the next view reads them again, so a route edit shows without `warlock grimoire build`. A routes file that throws on reload keeps its previous routes in the dev server until it loads again. A panel given your own `adapter` reads the facts through that adapter and is not warmed early. In production the tab only reads the book as it is on disk.
 
 ## Export a static folder
 

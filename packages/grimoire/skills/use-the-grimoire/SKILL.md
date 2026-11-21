@@ -28,16 +28,20 @@ edits a file you wrote either.
 
 1. Find the feature and flow the task is about.
 
+   Pass the whole task sentence (the commit title or the bug report), not two keywords:
+
    ```bash
-   npx warlock scry --search "new arrivals"          # or the whole task sentence
+   npx warlock scry --search "new arrivals are empty for customers with no country"
    ```
 
    ```text
-   flow     catalog/new-arrivals          New arrivals
-   block    web-client/home/new-arrivals  catalog/new-arrivals
-   route    GET /api/products/new-arrivals
-   file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
+   21.4  flow     catalog/new-arrivals              New arrivals
+   12.9  block    web-client/home/new-arrivals      catalog/new-arrivals
+   11.3  route    GET /api/products/new-arrivals    catalog.new-arrivals
+    9.8  file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
    ```
+
+   The number in front is the score: hits are in score order, best first, whatever their type.
 
 2. Read the feature's `README.md`, then the flow file. They say what the behaviour should be.
 3. Ask for the flow's book map. It lists the files behind each step, the tests that prove each
@@ -68,7 +72,7 @@ build, then ask again. A project with no book stops with `GR9007`. A note
 `route facts look incomplete; run warlock grimoire build` means the stored routes are missing their source files
 (an empty or partial route list): `--route` and `--impact` routes cannot be trusted until you build.
 
-Add `--json` for machine-readable output; a failed call then prints `{ "type": "error", "code", "message", "fix" }` on stdout and exits 1. `--impact` lists API routes, pages, flows and features,
+Add `--json` for machine-readable output; a failed call then prints `{ "type": "error", "code", "message", "fix" }` on stdout and exits 1 (the scry MCP tools return the same JSON as their error text). `--impact` lists API routes, pages, flows and features,
 including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`
 prints every line. `--search` takes the whole sentence (the commit title or the bug report, not two keywords): hits whose name or title holds the words come first, every other hit follows by score, and the list is printed in score order with the score in front. It also reads a flow's summary, story, cases and criteria (`AC-5` works); a hit found by written text shows the part that matched in brackets. Page, screen, block and file hits carry their app, and `--app <id>` keeps one app's hits. Read the flows it names and run their tests after
 your change.
@@ -94,7 +98,7 @@ that is still `proposed`; it does not fail the check.
 
 - **Exports, imports, importers, routes, middleware, pages:** read from the code. Trust them.
 - **Route middleware:** a route step also reaches the middleware files the matched route names (not the routes file's other imports). Roles that run by being present (migration, seed, command, main, layout, root) and spec-only helpers are not listed as unreached.
-- **Dev tab route facts:** the dev tab reads routes, events and jobs from the running dev server (nothing is booted twice), so it shows `routes: fresh` on the first open; they are read once, so rebuild with `warlock grimoire build` after changing routes.
+- **Dev tab route facts:** the dev tab reads routes, events and jobs from the running dev server (nothing is booted twice), so it shows `routes: fresh` on the first open, and reads them again after a routes file changes. `scry` and the MCP tools use the routes of the last `warlock grimoire build`.
 - **Without route facts** (`routes: missing`): route, mail, notification, job and event steps are `found: null` (not checked), not resolved and not failed; `GR5008` skips mail and notification entries.
 - **Files behind a route:** every file the handler can reach through imports. It is not the exact
   call path; open the handler to see which ones it really uses.
@@ -106,8 +110,9 @@ that is still `proposed`; it does not fail the check.
 
 - No flow matches the task: the behaviour is undescribed. Describe it first with
   `write-a-feature`, then change the code.
-- The command says the book is missing or stale: it rebuilds on its own. If it reports problems,
-  read them; `npx warlock grimoire check` prints the same list.
+- The command says the book is missing (`GR9007`) or stale (`note book is stale …`): run
+  `npx warlock grimoire build`, then ask again. If the build reports problems, read them;
+  `npx warlock grimoire check` prints the same list.
 - The project has code but no `grimoire/` folder: use `backfill-a-grimoire`.
 
 ## See also
@@ -125,7 +130,8 @@ From `@warlock.js/grimoire` (no dependency on core or web):
   and `writeCollectedFiles`), and returns a snapshot.
 - `openStoredGrimoire(root, adapter)` is the read-only open behind `scry` (the stored snapshot, `behind` set when files moved; `GR9007` when never built) and `checkBook()` is `buildBook`'s change check with nothing rebuilt or written.
 - `scry` answers a query from the snapshot; `formatScryResult` prints it; `parseScryQuery` reads
-  CLI arguments into a query.
+  CLI arguments into a query. `SCRY_STOP_WORDS` is the set of small words search leaves out (add to it
+  before the first search of a process).
 - `checkGrimoire` runs every rule; `formatCheckReport` prints the report. Each finding has a code
   from `GRIMOIRE_CODES` (also `GRIMOIRE_CODE_LIST`); `explainGrimoireCode`, `isGrimoireCode` and
   `grimoireCodeDocsUrl` (based on `GRIMOIRE_CODES_DOCS_URL`) describe it, and rules build

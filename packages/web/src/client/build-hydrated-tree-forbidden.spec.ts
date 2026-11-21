@@ -111,6 +111,18 @@ describe("buildHydratedTree: failure page whose layout loader never ran", () => 
     expect(leafTypeOf(tree)).toBe(ForbiddenPage);
   });
 
+  it("leaves the layouts out of a page-boundary render the server marked skipped", async () => {
+    const { errorPage: _errorPage, ...ordinary } = payloadWithStatus(403);
+    // The chain may hold a middleware-only layout too; only one renders.
+    const tree = await buildHydratedTree(
+      [entry({ ...withBoth, layouts: [moduleOf(undefined), moduleOf(Layout)] })],
+      { ...ordinary, layoutSkipped: true },
+    );
+
+    expect(hasLayout(tree)).toBe(false);
+    expect(leafTypeOf(tree)).toBe(Page);
+  });
+
   it("keeps the layouts when the server did not mark them skipped", async () => {
     const tree = await buildHydratedTree([entry(withBoth)], payloadWithStatus(403));
 

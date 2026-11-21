@@ -10,12 +10,13 @@ import { checkGrimoire, formatCheckReport } from "../check";
 import { createFinding, explainGrimoireCode, GrimoireError } from "../codes";
 import type { BookAdapter } from "../contracts/adapter";
 import type { GrimoireCheckReport, GrimoireFinding } from "../contracts/findings";
-import type { ScryError, ScryQuery, ScryResult } from "../contracts/scry";
+import type { ScryQuery, ScryResult } from "../contracts/scry";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import { loadBook } from "../book";
 import { projectPath } from "../paths";
 import { writeRelease } from "../releases";
 import { formatScryResult, parseScryQuery, scry } from "../scry";
+import { scryErrorOf } from "../scry/error";
 import { runGrimoire, type GrimoireRun } from "../workspace";
 import { openStoredGrimoireCached } from "../workspace/cache";
 import { parseGrimoire } from "../written";
@@ -52,16 +53,6 @@ export function reportError(io: CommandIO, error: unknown): number {
   }
 
   throw error;
-}
-
-/** The JSON error a failed `scry --json` prints and the MCP tools share. */
-export function scryErrorOf(error: GrimoireError): ScryError {
-  return {
-    type: "error",
-    code: error.code,
-    message: error.message,
-    fix: explainGrimoireCode(error.code)?.fix ?? "",
-  };
 }
 
 function printJson(io: CommandIO, value: unknown): void {
@@ -245,6 +236,9 @@ export async function runBuild(context: CommandContext, options: Options = {}): 
       siteUpToDate = exported.upToDate;
     }
 
+    // A live read refused for finding far fewer routes than the book holds.
+    const routeNote = run.snapshot.book.routeNote;
+
     if (options.json === true) {
       printJson(io, {
         rebuilt: run.rebuilt,
@@ -256,6 +250,7 @@ export async function runBuild(context: CommandContext, options: Options = {}): 
         siteUpToDate,
         siteMode: site === null ? null : options.product === true ? "product" : "full",
         problems: bootProblem === null ? [] : [bootProblem],
+        ...(routeNote === undefined ? {} : { note: routeNote }),
       });
 
       return 0;
@@ -271,6 +266,8 @@ export async function runBuild(context: CommandContext, options: Options = {}): 
 
     io.out(summary.book);
     io.out(summary.collected);
+
+    if (routeNote !== undefined) io.out(`note      ${routeNote}`);
 
     if (site !== null) {
       io.out(

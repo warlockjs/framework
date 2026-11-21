@@ -261,6 +261,19 @@ describe("scry over the shop fixture", () => {
       expect(mobile.type === "route" && mobile.pages.map((page) => page.type)).toEqual(["screen"]);
     });
 
+    it("finds a page URL when the book has no route facts yet", () => {
+      const noRoutes: GrimoireSnapshot = {
+        ...snapshot,
+        book: { ...snapshot.book, facts: { ...snapshot.book.facts, routes: null } },
+      };
+      const result = scry(noRoutes, { type: "route", method: "GET", path: "/", site: "client" });
+
+      expect(result.type === "route" && result.pages.map((page) => page.site)).toEqual(["client"]);
+      expect(
+        codeOf(() => scry(noRoutes, { type: "route", method: "POST", path: "/api/orders" })),
+      ).toMatch(/^GR9002 No route facts yet/);
+    });
+
     it("keeps GR9002 for other methods and unknown paths, and lists the pages in the hint", () => {
       expect(
         codeOf(() => scry(webSnapshot(), { type: "route", method: "POST", path: "/products/1" })),
@@ -279,17 +292,17 @@ describe("scry over the shop fixture", () => {
     });
   });
 
-  it("ranks search hits: exact id, prefix, id words, detail words; respects the limit", () => {
+  it("ranks search hits by name, then by score; respects the limit", () => {
     const result = scry(snapshot, { type: "search", text: "new arrivals", limit: 3 });
 
     expect(result.type === "search" && result.hits.map((hit) => `${hit.type} ${hit.id}`)).toEqual([
       "flow catalog/new-arrivals",
-      "block mobile/home/new-arrivals",
-      "block web-client/home/new-arrivals",
+      "route GET /api/products/new-arrivals",
+      "file src/app/catalog/controllers/new-arrivals.controller.ts",
     ]);
-    expect(scry(snapshot, { type: "search", text: "zzz-nothing" })).toMatchObject({ hits: [] });
-    expect(formatScryResult(scry(snapshot, { type: "search", text: "zzz-nothing" }))).toEqual([
-      'no match for "zzz-nothing"',
+    expect(scry(snapshot, { type: "search", text: "zzzq-qqqx" })).toMatchObject({ hits: [] });
+    expect(formatScryResult(scry(snapshot, { type: "search", text: "zzzq-qqqx" }))).toEqual([
+      'no match for "zzzq-qqqx"',
     ]);
   });
 });
@@ -317,9 +330,11 @@ describe("scry search finds mails and jobs", () => {
       return result.type === "search" ? result.hits.map((hit) => `${hit.type} ${hit.id}`) : [];
     };
 
-    expect(hitsFor("zz-verification")).toEqual(["mail zz-verification"]);
-    expect(hitsFor("zz-reengagement")).toEqual(["job zz-reengagement"]);
-    expect(hitsFor("zz-event")).toEqual([]);
+    // The exact name ranks first; hits that share only some words follow it.
+    expect(hitsFor("zz-verification")[0]).toBe("mail zz-verification");
+    expect(hitsFor("zz-reengagement")[0]).toBe("job zz-reengagement");
+    // Events are not search candidates: the name finds no event, only hits that share a word.
+    expect(hitsFor("zz-event").some((hit) => hit.startsWith("event "))).toBe(false);
   });
 });
 
@@ -330,52 +345,38 @@ describe("scry search ranking and impact caps", () => {
     return result.type === "search" ? result.hits : [];
   };
 
-  it("ranks exact, prefix, whole word, substring, then fuzzy matches, with features and flows two ranks up", () => {
+  it("ranks name matches above every scored match, with features and flows two levels up", () => {
     const flowScore = (text: string) =>
       scoresOf(text).find((hit) => hit.id === "catalog/new-arrivals")?.score;
+    const routeScore = (text: string) =>
+      scoresOf(text).find((hit) => hit.id === "GET /api/products/new-arrivals")?.score;
 
-    expect(new Set(scoresOf("new arrivals").map((hit) => hit.score))).toContain(7);
-    // A flow adds two ranks (WRITTEN_BOOST); every other type tops out at 6 for a prefix.
-    expect(flowScore("new arrivals")).toBe(9);
-    expect(scoresOf("new-arr").every((hit) => hit.score <= (hit.type === "flow" ? 8 : 6))).toBe(
-      true,
-    );
-    expect(flowScore("arrivals")).toBe(7);
-    expect(flowScore("arrival")).toBe(6);
-    expect(flowScore("newarr")).toBe(2);
-    expect(scoresOf("ne")).not.toContainEqual(expect.objectContaining({ score: 2 }));
+    // Both names end with the whole text (level 7); the flow adds two levels, and the
+    // BM25F score only orders hits inside a level (it adds less than one).
+    const gap = (flowScore("new arrivals") ?? 0) - (routeScore("new arrivals") ?? 0);
 
-    for (const text of ["arrivals", "products", "new arrivals"]) {
-      // The answer is grouped by type; within a type the best match comes first.
-      const byType = new Map<string, number[]>();
-
-      for (const hit of scoresOf(text))
-        byType.set(hit.type, [...(byType.get(hit.type) ?? []), hit.score]);
-
-      for (const scores of byType.values())
-        expect(scores).toEqual([...scores].sort((left, right) => right - left));
-    }
+    expect(scoresOf("new arrivals")[0]?.id).toBe("catalog/new-arrivals");
+    expect(gap).toBeGreaterThan(1);
+    expect(gap).toBeLessThan(3);
+    // A whole word of the name (level 5) still puts the flow first.
+    expect(scoresOf("arrivals")[0]?.id).toBe("catalog/new-arrivals");
+    // A stemmed form matches through the score, below names; in-order letters no longer match.
+    expect(flowScore("arrival")).toBeGreaterThan(0);
+    expect(scoresOf("newarr")).toEqual([]);
   });
 
-  it("groups hits by type: flow, block, route, file, task, best match first in each group", () => {
-    const hits = scoresOf("new arrivals");
-    const order = [
-      "feature",
-      "flow",
-      "block",
-      "page",
-      "screen",
-      "route",
-      "mail",
-      "job",
-      "file",
-      "export",
-      "task",
-    ];
-    const ranks = hits.map((hit) => order.indexOf(hit.type));
+  it("prints hits in score order, whatever the type", () => {
+    for (const text of ["arrivals", "products", "new arrivals"]) {
+      const scores = scoresOf(text).map((hit) => hit.score);
 
-    expect(ranks).toEqual([...ranks].sort((left, right) => left - right));
-    expect(hits[0]?.type).toBe("flow");
+      expect(scores).toEqual([...scores].sort((left, right) => right - left));
+    }
+
+    const types = scoresOf("new arrivals").map((hit) => hit.type);
+
+    // A route and a file outrank the blocks of the same words: no grouping by type.
+    expect(types.indexOf("route")).toBeLessThan(types.indexOf("block"));
+    expect(types.indexOf("file")).toBeLessThan(types.indexOf("block"));
   });
 
   function bigImpact(): ScryResult {

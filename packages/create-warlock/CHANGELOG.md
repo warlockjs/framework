@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The scaffolded user migration gives `role` the text default `'user'` (`.defaultString("user")`). It used `.default("user")`, which PostgreSQL reads as `CURRENT_USER`, so new users got the database role name as their `role`. Apps scaffolded on PostgreSQL earlier should change that line and fix the column default.
+
+### Documentation
+
 - The scaffolded database configs explain that the shared test HTTP server reads worker 1's database (`<name>_test_1`) and point to `createTestHttpServer()` for tests in other workers.
 
 ## 5.55.0 - 2026-11-17

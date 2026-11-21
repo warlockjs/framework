@@ -271,13 +271,26 @@ function bootState(
   return sameRecord(boot.inputs, inputs) ? "fresh" : "stale";
 }
 
-/** A fresh read that found under half the routes the book already holds is not trusted over the stored list. */
-function shrankTooFar(stored: BookFacts["routes"], read: BookFacts["routes"]): boolean {
-  return stored !== null && read !== null && stored.length > 0 && read.length * 2 < stored.length;
+/**
+ * A fresh read that found under half the routes the book already holds is not trusted over the stored list,
+ * unless the build was forced (`warlock grimoire build --force`): that is how a real removal is accepted.
+ */
+function shrankTooFar(
+  stored: BookFacts["routes"],
+  read: BookFacts["routes"],
+  force: boolean,
+): boolean {
+  return (
+    !force &&
+    stored !== null &&
+    read !== null &&
+    stored.length > 0 &&
+    read.length * 2 < stored.length
+  );
 }
 
 const shrankNote = (kept: number, read: number): string =>
-  `a live read found ${read} routes against the ${kept} stored; kept the stored routes; run warlock grimoire build`;
+  `a live read found ${read} routes against the ${kept} stored; kept the stored routes; run warlock grimoire build again, or warlock grimoire build --force when the routes were removed`;
 
 async function writeStoredBook(
   root: string,
@@ -364,7 +377,7 @@ export async function buildBook(
         );
         const read = await collectBootFacts(projectRoot, adapter);
 
-        if (shrankTooFar(facts.routes, read.routes)) {
+        if (shrankTooFar(facts.routes, read.routes, false)) {
           routeNote = shrankNote(facts.routes?.length ?? 0, read.routes?.length ?? 0);
           routes = "stale";
         } else {
@@ -451,7 +464,7 @@ export async function buildBook(
   if (mode === "fresh" && hasBootFacts(adapter) && (routes !== "fresh" || options.force === true)) {
     const read = await collectBootFacts(projectRoot, adapter);
 
-    if (shrankTooFar(bootFacts.routes, read.routes)) {
+    if (shrankTooFar(bootFacts.routes, read.routes, options.force === true)) {
       routeNote = shrankNote(bootFacts.routes?.length ?? 0, read.routes?.length ?? 0);
       routes = "stale";
     } else {

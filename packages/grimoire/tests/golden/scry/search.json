@@ -4,97 +4,124 @@
   "notes": [],
   "text": "new arrivals",
   "counts": {
-    "flow": 1,
-    "block": 2,
+    "flow": 3,
     "route": 1,
     "file": 6,
+    "task": 1,
     "export": 3,
-    "task": 1
+    "block": 2,
+    "feature": 1
   },
   "hits": [
     {
       "type": "flow",
       "id": "catalog/new-arrivals",
       "detail": "New arrivals",
-      "score": 9
-    },
-    {
-      "type": "block",
-      "id": "mobile/home/new-arrivals",
-      "detail": "catalog/new-arrivals",
-      "score": 7
-    },
-    {
-      "type": "block",
-      "id": "web-client/home/new-arrivals",
-      "detail": "catalog/new-arrivals",
-      "score": 7
+      "score": 16.77128737581987
     },
     {
       "type": "route",
       "id": "GET /api/products/new-arrivals",
       "detail": "catalog.new-arrivals",
-      "score": 7
+      "score": 15.00318575465648
     },
     {
       "type": "file",
       "id": "src/app/catalog/controllers/new-arrivals.controller.ts",
       "detail": "Answers the new arrivals request.",
-      "score": 6
+      "score": 13.99091769777327
     },
     {
       "type": "file",
       "id": "src/app/catalog/services/new-arrivals.service.ts",
       "detail": "Lists the newest products sold in the customer's country.",
-      "score": 6
+      "score": 13.943952870934872
     },
     {
       "type": "file",
       "id": "src/app/catalog/tests/new-arrivals.test.ts",
       "detail": "Proves the new arrivals rules.",
-      "score": 6
-    },
-    {
-      "type": "file",
-      "id": "mobile/app/index.tsx",
-      "detail": "The home screen with new arrivals.",
-      "score": 3
-    },
-    {
-      "type": "file",
-      "id": "src/web/$sites/client/home.page.tsx",
-      "detail": "The home page with featured products and new arrivals.",
-      "score": 3
-    },
-    {
-      "type": "file",
-      "id": "src/web/$sites/client/home.setup.ts",
-      "detail": "Loads featured products and new arrivals for the home page.",
-      "score": 3
-    },
-    {
-      "type": "export",
-      "id": "src/app/catalog/controllers/new-arrivals.controller.ts#NewArrivalsController",
-      "detail": "Returns the new arrivals for the customer's country.",
-      "score": 6
-    },
-    {
-      "type": "export",
-      "id": "src/app/catalog/services/new-arrivals.service.ts#listNewArrivals",
-      "detail": "Returns up to 20 products, newest first.",
-      "score": 5
-    },
-    {
-      "type": "export",
-      "id": "src/web/$sites/client/home.setup.ts#loader",
-      "detail": "Returns featured products and up to 20 new arrivals.",
-      "score": 3
+      "score": 13.943789001883104
     },
     {
       "type": "task",
       "id": "T-010",
       "detail": "New arrivals were empty for customers with no country",
-      "score": 3
+      "score": 13.797229937102077
+    },
+    {
+      "type": "export",
+      "id": "src/app/catalog/controllers/new-arrivals.controller.ts#NewArrivalsController",
+      "detail": "Returns the new arrivals for the customer's country.",
+      "score": 13.14317943795753
+    },
+    {
+      "type": "block",
+      "id": "mobile/home/new-arrivals",
+      "detail": "catalog/new-arrivals",
+      "app": "mobile",
+      "score": 12.812332015332041
+    },
+    {
+      "type": "block",
+      "id": "web-client/home/new-arrivals",
+      "detail": "catalog/new-arrivals",
+      "app": "web-client",
+      "score": 12.768982488192076
+    },
+    {
+      "type": "file",
+      "id": "mobile/app/index.tsx",
+      "detail": "The home screen with new arrivals.",
+      "app": "mobile",
+      "score": 12.707998312218788
+    },
+    {
+      "type": "file",
+      "id": "src/web/$sites/client/home.page.tsx",
+      "detail": "The home page with featured products and new arrivals.",
+      "app": "web-client",
+      "score": 12.608284894947777
+    },
+    {
+      "type": "file",
+      "id": "src/web/$sites/client/home.setup.ts",
+      "detail": "Loads featured products and new arrivals for the home page.",
+      "app": "web-client",
+      "score": 12.58691993728263
+    },
+    {
+      "type": "export",
+      "id": "src/app/catalog/services/new-arrivals.service.ts#listNewArrivals",
+      "detail": "Returns up to 20 products, newest first.",
+      "score": 12.14317943795753
+    },
+    {
+      "type": "export",
+      "id": "src/web/$sites/client/home.setup.ts#loader",
+      "detail": "Returns featured products and up to 20 new arrivals.",
+      "score": 12.14317943795753
+    },
+    {
+      "type": "feature",
+      "id": "catalog",
+      "detail": "Product catalog",
+      "score": 1.3736513137723994,
+      "matched": "summary: Customers browse products, see what is new in their country, and will save products for l…"
+    },
+    {
+      "type": "flow",
+      "id": "orders/place-order",
+      "detail": "Place an order",
+      "score": 1.3187700997865501,
+      "matched": "case duplicate: duplicate does not apply: each submit is a new order"
+    },
+    {
+      "type": "flow",
+      "id": "auth/sign-up",
+      "detail": "Sign up",
+      "score": 1.1592981967892435,
+      "matched": "AC-1: AC-1 a new account waits for email verification"
     }
   ]
 }

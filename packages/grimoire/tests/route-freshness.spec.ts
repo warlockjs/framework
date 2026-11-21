@@ -12,6 +12,7 @@ import type { BookFacts } from "../src/contracts";
 import { createSnapshotSource } from "../src/devtools/snapshot-source";
 import { GRIMOIRE_PATHS } from "../src/paths";
 import { formatScryResult, scry } from "../src/scry";
+import { runBuild } from "../src/warlock/actions";
 import { openGrimoire } from "../src/workspace";
 import { createShopAdapter, shopFacts } from "./fixtures/shop-facts";
 import { copyFixture, type FixtureCopy } from "./support/copy-fixture";
@@ -74,6 +75,32 @@ describe("a live read that found far fewer routes", () => {
     expect(fileOf(copy.root, GRIMOIRE_PATHS.bookManifest)).toBe(manifestBefore);
     expect(fileOf(copy.root, GRIMOIRE_PATHS.bookFactsCache)).toBe(factsBefore);
   });
+
+  it("prints the note from warlock grimoire build, and accepts the smaller list with --force", async () => {
+    copy = copyFixture();
+
+    await buildBook(copy.root, createShopAdapter(manyRoutes(277)), { routes: "fresh" });
+    copy.replace("src/app/orders/routes.ts", "\n", "\n// changed\n");
+
+    const lines: string[] = [];
+    const io = { out: (line: string) => lines.push(line), err: (line: string) => lines.push(line) };
+    const small = createShopAdapter(manyRoutes(10));
+
+    expect(await runBuild({ root: copy.root, adapter: small, io })).toBe(0);
+    expect(lines).toContainEqual(
+      expect.stringMatching(
+        /^note {6}a live read found 10 routes against the 277 stored; .*--force/,
+      ),
+    );
+
+    // A forced build trusts the read: the routes were really removed.
+    const forced = await buildBook(copy.root, small, { routes: "fresh", force: true });
+
+    expect(forced.book.facts.routes).toHaveLength(10);
+    expect(forced.book.routes).toBe("fresh");
+    expect(forced.book.routeNote).toBeUndefined();
+    expect(forced.book.manifest.boot.counts?.routes).toBe(10);
+  });
 });
 
 describe("route facts without a source file", () => {
@@ -126,5 +153,46 @@ describe("the dev tab and a routes-file edit", () => {
 
     expect(second).not.toBe(first);
     expect(second.routes).toBe("stale");
+  });
+});
+
+describe("the dev tab with live facts and a routes-file edit", () => {
+  it("reads the routes again from the running app and shows the new route as fresh", async () => {
+    copy = copyFixture();
+    const facts = structuredClone(shopFacts);
+    const adapter = createShopAdapter(facts);
+
+    await openGrimoire(copy.root, adapter, { routes: "fresh" });
+
+    const source = createSnapshotSource(copy.root, {
+      adapter,
+      write: true,
+      ttlMs: 600_000,
+      liveFacts: true,
+    });
+    const first = await source.get();
+    const reads = adapter.calls.routes;
+
+    expect(first.routes).toBe("fresh");
+
+    // The dev server reloaded the edited routes file: the running app now serves one more route.
+    const order = facts.routes?.find((route) => route.path === "/api/orders");
+
+    if (order === undefined) throw new Error("the fixture has no /api/orders");
+
+    facts.routes = [...(facts.routes ?? []), { ...order, method: "GET", path: "/api/orders/live" }];
+
+    const routesFile = path.join(copy.root, "src", "app", "orders", "routes.ts");
+
+    copy.replace("src/app/orders/routes.ts", "\n", "\n// changed\n");
+    const later = new Date(Date.now() + 10_000);
+
+    utimesSync(routesFile, later, later);
+
+    const second = await source.get();
+
+    expect(adapter.calls.routes).toBe(reads + 1);
+    expect(second.routes).toBe("fresh");
+    expect(second.book.facts.routes?.map((route) => route.path)).toContain("/api/orders/live");
   });
 });

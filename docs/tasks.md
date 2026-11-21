@@ -23,9 +23,10 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
   reference in DEFAULT expression"), and the message names neither the column nor `defaultString()`.
 - Evidence: `packages/cascade/src/migration/column-builder.ts:138-142` (`default()` always sets `isRawDefault = true`),
   `packages/cascade/src/drivers/postgres/postgres-sql-serializer.ts:202-210` (raw default unquoted).
-- Fix: `default()` with a bare identifier (letters, digits, `_`) that is not a known SQL keyword throws at definition
-  time naming the column and `defaultString()` (it could never have worked: every SQL dialect reads it as a column
-  reference). Expressions (`NOW()`, `gen_random_uuid()`), numbers, booleans and keywords stay raw.
+- Fix (as built): the PostgreSQL driver stops on a raw default that is a bare identifier and not a SQL keyword, naming
+  the column and `defaultString()` (`packages/cascade/src/migration/raw-default.ts`). Not at definition time: MongoDB
+  ignores column defaults, so a bare word there was harmless. Review found the scaffold's `role` column used
+  `.default("user")`, which PostgreSQL reads as `CURRENT_USER`; the template now uses `.defaultString("user")`.
 - Acceptance: spec: `default("agency")` throws with `defaultString`; `default("NOW()")`, `default("CURRENT_TIMESTAMP")`,
   `default(1)` unchanged; docs, CHANGELOG.
 - Status: open (5.63.0).

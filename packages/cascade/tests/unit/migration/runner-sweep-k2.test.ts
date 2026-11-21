@@ -79,6 +79,9 @@ describe("MigrationRunner K2 sweep", () => {
     const runner = new MigrationRunner({ dataSource: source, verbose: false });
 
     await expect(runner.rollbackLast()).rejects.toThrow(/gone/);
+    await expect(runner.rollbackLast()).rejects.toThrow(
+      "pass `pruneMissing: true` (CLI: `warlock migrate --rollback --prune-missing`",
+    );
 
     await runner.rollbackLast({ pruneMissing: true });
     expect(log).toContain("delete:gone");
