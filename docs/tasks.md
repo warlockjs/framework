@@ -9,9 +9,65 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Next release
 
-- 5.63.0 candidates: T-189..T-195 (T-196 waits for a decision) (Grimoire scry, from the 2026-11-21 field report) and T-188.
+- 5.63.0: T-188..T-195 (Grimoire scry; T-196/T-197 wait on their offline tests) and T-198..T-203 (2026-11-22 app findings).
 - 5.62.0 shipped T-185, T-186 and T-187 (see `tasks.completed.md`).
 - 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
+
+## From the 2026-11-22 app findings page (5.62.0)
+
+Source for T-198..T-203: an app findings page, https://claude.ai/artifact/FJ9uNFjxfnijeXb6fYo97J (app on 5.62.0 with
+PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the reporter ran their repros on 5.62.0.
+
+### T-198 [bug] `.default("word")` on a column is written as raw SQL
+
+- What and why: `string(20).default("agency")` emits `DEFAULT agency`; PostgreSQL rejects the batch ("cannot use column
+  reference in DEFAULT expression"), and the message names neither the column nor `defaultString()`.
+- Evidence: `packages/cascade/src/migration/column-builder.ts:138-142` (`default()` always sets `isRawDefault = true`),
+  `packages/cascade/src/drivers/postgres/postgres-sql-serializer.ts:202-210` (raw default unquoted).
+- Fix: `default()` with a bare identifier (letters, digits, `_`) that is not a known SQL keyword throws at definition
+  time naming the column and `defaultString()` (it could never have worked: every SQL dialect reads it as a column
+  reference). Expressions (`NOW()`, `gen_random_uuid()`), numbers, booleans and keywords stay raw.
+- Acceptance: spec: `default("agency")` throws with `defaultString`; `default("NOW()")`, `default("CURRENT_TIMESTAMP")`,
+  `default(1)` unchanged; docs, CHANGELOG.
+- Status: open (5.63.0).
+
+### T-199 [bug] The rollback error suggests `--prune-missing`, which `warlock migrate` does not accept
+
+- Evidence: `packages/cascade/src/migration/migration-runner.ts:1636-1641` (message), `packages/core/src/cli/commands/migrate.command.ts`
+  (no such option), `packages/core/src/database/migrate-action.ts:219`, `:234` (no `pruneMissing` passed).
+- Fix: add `--prune-missing` to `warlock migrate` and pass it to `rollbackMigrations` and `freshMigrate`.
+- Acceptance: spec: with an orphan migration record, `migrate --fresh --prune-missing` removes it and completes; docs,
+  CHANGELOG.
+- Status: open (5.63.0).
+
+### T-200 [bug] `requireUser()` guest redirect is serialised as a page body when the reply is sent asynchronously
+
+- What and why: with an async `onSend` hook (core compression), `response.sent` is still false after `redirect()`, so
+  the page pipeline treats the returned `Response` as a 2xx body and `JSON.stringify`s it: "Converting circular
+  structure to JSON", plus "send() called on already-sent response". Two error logs per signed-out page hit.
+- Evidence: `packages/web/src/session/require-user.ts:126-128` (and `requireGuest`), `packages/web/src/server/execute-page-request.ts:267`
+  (`responseSent: response.sent`), `packages/web/src/server/render-page.ts:1138-1146`; the test `ReplyShim`
+  (`packages/web/src/server/__fixtures__/core-http.ts:156`) marks `sent` synchronously, so no spec caught it.
+- Fix: a middleware that returns the core `Response` counts as sent; never `JSON.stringify` a `Response`.
+- Acceptance: the reporter's spec (real Fastify reply with an async `onSend` hook) passes; docs if behaviour is described; CHANGELOG.
+- Status: open (5.63.0).
+
+### T-201 [bug] Unconfirmed: the shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
+
+- Evidence named: scaffold `src/test-global-setup.ts`, scaffold `src/config/database.ts`, `packages/core/src/tests/reset-test-database.ts:49-60`.
+- Needs: a repro in a fresh scaffold with two workers before a fix.
+- Status: being reproduced (5.63.0).
+
+### T-202 [bug] Unconfirmed: the 403 page renders inside the root layout without the layout's loader data
+
+- Needs: a page whose middleware throws `ForbiddenError` under a layout with a loader (`packages/web/src/server/render-page.ts`).
+- Status: being reproduced (5.63.0).
+
+### T-203 [bug] Unconfirmed: `.apk` files from `public/` are served with an empty `Content-Type`
+
+- Needs: a curl repro on a clean app; find whether core's static layer (`packages/core/src/http/lazy-static.ts`) or
+  `@fastify/static` drops the type.
+- Status: being reproduced (5.63.0).
 
 ## From the 2026-11-21 scry field report
 
@@ -149,7 +205,11 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
 - Offline test before building (same harness, `findings/scry-eval/round2/`): queries = the app's bug reports that
   quote on-screen text, expected = the files their fix changed (not derived from the key link, so not circular).
 - Acceptance: that test shows a clear gain over T-189's BM25F; specs; docs.
-- Status: owner decision: build it with T-189, or wait for an app to ask (vetting rule). Needs the measured gain first.
+- Measured 2026-11-22 (round 3): 51 non-circular queries mined from commits that quote a locale value (expected = the
+  code files the fix changed). Whole quote: today's BM25F 13/51 at hit@20; exact-value tier alone 17/51 (+0.061 RR, CI
+  0.008 to 0.128, 4 gained, 0 lost); locale field 17/51 but full-title commit queries drop 72 → 69 (CI -0.046 to
+  -0.005). The gain is in exact quotes only (n=26: 8 → 12); the whole bug-report line gains nothing.
+- Status: owner decision: build the exact-value tier only (small, measured gain of 4/51), or wait for an app to ask.
 
 ### T-197 [feature] `scry --search`: files borrow the words of the flows and features that own them
 
@@ -162,7 +222,10 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
 - Offline test before building: same harness and the same 105 held-out commits (full titles and two keywords), BM25F
   with and without the borrowed words; weight fixed before scoring.
 - Acceptance: a gain on the held-out set without losing feature/flow name lookups (at least 58/60); specs; docs.
-- Status: idea; run the offline test first.
+- Measured 2026-11-22 (round 3, same harness, weight chosen on the practice half from 0.25/0.5/1, test half scored
+  once): full titles hit@20 72 → 70 (reciprocal rank -0.033, 95% CI -0.080 to 0.012), two keywords 29 → 30 (+0.010, CI
+  -0.003 to 0.026); names 60/60 unchanged. No gain.
+- Status: not built (measured no gain). Close.
 
 ### T-195 [bug] Every `warlock scry` call rebuilds the whole book's derived data, about 6.6 s of an 8.8 s call
 
