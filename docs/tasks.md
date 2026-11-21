@@ -143,13 +143,17 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   | whole `npx warlock scry` call | 8,660-8,900 |
 
   Also: a read command writes (compares) the book on every call (`write` defaults to true).
-- Fix: when the book is fresh and the written folders are unchanged, reuse the stored derived data instead of
-  rebuilding it (persist the collected files and ownership/proofs with a stamp, the way `takeStamp` in
-  `workspace/cache.ts` stamps the in-memory copy), or compute only what the query needs (search needs candidates,
-  `--impact` needs the file graph and pages). Open with `write: false` for scry. Estimate, not measured: a fresh-book
-  call drops to about 0.7 s in process plus start-up. Check separately why CLI start-up is about 1.8 s (`warlock --help`
-  alone takes about 3 s).
-- Acceptance: a spec that a second scry on an unchanged book does not call `buildCollectedFiles`/`scanProofs`; the
+- Decision (owner, 2026-11-21): `scry` only reads; it never rebuilds or writes the book. Rebuilding is
+  `warlock grimoire build`, which agents run after they finish their edits (skill: "after editing, run
+  `warlock grimoire build`"). Today the skill says the opposite (`use-the-grimoire/SKILL.md:74`: "`scry` and `check`
+  do it when it is stale").
+- Fix: `scry` loads the stored book and derived files (persist ownership/proofs/collected data at build time if they
+  are not already on disk), opens with `write: false`, and keeps only the cheap change check (the `buildBook`
+  fingerprint scan, about 0.3 s) to print a note when the book is behind, the way route facts already do:
+  `note book is stale (12 files changed); run warlock grimoire build`. In `--json`, `notes` carries it. A file that is
+  not in the book keeps GR9001 with its "run warlock grimoire build" hint. Estimate, not measured: about 0.7 s in
+  process plus start-up. Check separately why CLI start-up is about 1.8 s (`warlock --help` alone takes about 3 s).
+- Acceptance: a spec that scry never calls `buildCollectedFiles`/`scanProofs` or writes; a spec for the stale note; the
   same timing script (kept with the eval) shows the in-process time on this app; answers identical to today's.
 - Status: open.
 
