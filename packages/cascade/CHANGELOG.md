@@ -4,6 +4,13 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.63.1
+
+### Fixed
+
+- PostgreSQL `date` and `date[]` columns read back as a `Date` at UTC midnight of their calendar day, instead of midnight in the Node process time zone (a `date` of `2026-08-24` under `TZ=Africa/Cairo` used to read as `2026-08-23T21:00:00.000Z`). `infinity`, `-infinity` and BC dates stay on `pg`'s parser; `timestamp` and `timestamptz` are unchanged.
+- A `types` object passed in `clientOptions` now reaches the PostgreSQL pool and replaces Cascade's built-in parsers; it used to be overwritten.
+
 ## 5.63.0 - 2026-11-22
 
 ### Fixed
