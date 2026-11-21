@@ -271,6 +271,14 @@ function bootState(
   return sameRecord(boot.inputs, inputs) ? "fresh" : "stale";
 }
 
+/** A fresh read that found under half the routes the book already holds is not trusted over the stored list. */
+function shrankTooFar(stored: BookFacts["routes"], read: BookFacts["routes"]): boolean {
+  return stored !== null && read !== null && stored.length > 0 && read.length * 2 < stored.length;
+}
+
+const shrankNote = (kept: number, read: number): string =>
+  `a live read found ${read} routes against the ${kept} stored; kept the stored routes; run warlock grimoire build`;
+
 async function writeStoredBook(
   root: string,
   manifest: BookManifest,
@@ -344,6 +352,7 @@ export async function buildBook(
         ? bootState(manifest.boot, facts.routes, inputs)
         : "missing";
       let changedBook = false;
+      let routeNote: string | undefined;
 
       if (mode === "fresh" && hasBootFacts(adapter) && routes !== "fresh") {
         // The stored input list can be older than the files (a cached rebuild keeps it): work it out again.
@@ -353,10 +362,21 @@ export async function buildBook(
           scan.files,
           sourceRoots,
         );
-        Object.assign(facts, await collectBootFacts(projectRoot, adapter));
-        manifest.boot = { collectedAt: now().toISOString(), inputs: current };
-        routes = "fresh";
-        changedBook = true;
+        const read = await collectBootFacts(projectRoot, adapter);
+
+        if (shrankTooFar(facts.routes, read.routes)) {
+          routeNote = shrankNote(facts.routes?.length ?? 0, read.routes?.length ?? 0);
+          routes = "stale";
+        } else {
+          Object.assign(facts, read);
+          manifest.boot = {
+            collectedAt: now().toISOString(),
+            inputs: current,
+            counts: { routes: read.routes?.length ?? 0, pages: facts.pages.length },
+          };
+          routes = "fresh";
+          changedBook = true;
+        }
       }
 
       if (changedBook || scan.statMoved) {
@@ -370,7 +390,7 @@ export async function buildBook(
       }
 
       return {
-        book: { root: projectRoot, manifest, facts, routes },
+        book: { root: projectRoot, manifest, facts, routes, ...(routeNote ? { routeNote } : {}) },
         rebuilt: changedBook,
         changed: [],
       };
@@ -419,6 +439,7 @@ export async function buildBook(
   );
   const previousBoot = stored?.manifest.boot ?? { collectedAt: null, inputs: {} };
   let boot = previousBoot;
+  let routeNote: string | undefined;
   let bootFacts: Pick<BookFacts, "routes" | "named"> = {
     routes: stored?.facts.routes ?? null,
     named: stored?.facts.named ?? [],
@@ -428,9 +449,20 @@ export async function buildBook(
     : "missing";
 
   if (mode === "fresh" && hasBootFacts(adapter) && (routes !== "fresh" || options.force === true)) {
-    bootFacts = await collectBootFacts(projectRoot, adapter);
-    boot = { collectedAt: now().toISOString(), inputs };
-    routes = "fresh";
+    const read = await collectBootFacts(projectRoot, adapter);
+
+    if (shrankTooFar(bootFacts.routes, read.routes)) {
+      routeNote = shrankNote(bootFacts.routes?.length ?? 0, read.routes?.length ?? 0);
+      routes = "stale";
+    } else {
+      bootFacts = read;
+      boot = {
+        collectedAt: now().toISOString(),
+        inputs,
+        counts: { routes: read.routes?.length ?? 0, pages: staticFacts.pages.length },
+      };
+      routes = "fresh";
+    }
   }
 
   const facts: BookFacts = { files, ...bootFacts, ...staticFacts };
@@ -461,7 +493,7 @@ export async function buildBook(
   }
 
   return {
-    book: { root: projectRoot, manifest, facts, routes },
+    book: { root: projectRoot, manifest, facts, routes, ...(routeNote ? { routeNote } : {}) },
     rebuilt: true,
     changed: changedFiles(previousFiles, scan.files),
   };

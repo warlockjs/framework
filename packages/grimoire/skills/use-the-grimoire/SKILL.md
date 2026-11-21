@@ -63,7 +63,9 @@ npx warlock scry --flow catalog/new-arrivals                        # one flow, 
 finish editing files, run `npx warlock grimoire build`. When code, test or written files differ from
 the book, the answer is the stored one and ends with
 `note book is stale (12 files changed); run warlock grimoire build` (in `--json`, the `notes` list):
-build, then ask again. A project with no book stops with `GR9007`.
+build, then ask again. A project with no book stops with `GR9007`. A note
+`route facts look incomplete; run warlock grimoire build` means the stored routes are missing their source files
+(an empty or partial route list): `--route` and `--impact` routes cannot be trusted until you build.
 
 Add `--json` for machine-readable output. `--impact` lists API routes, pages, flows and features,
 including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`

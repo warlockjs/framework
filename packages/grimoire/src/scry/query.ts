@@ -31,6 +31,17 @@ import { bookEntryPaths, projectPath, toPosixPath } from "../paths";
 const byText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
 const sortedUnique = (items: Iterable<string>): string[] => [...new Set(items)].sort(byText);
 
+/** Route facts with routes but none that names its source file: only the core list was read, not the app's routes files. */
+const INCOMPLETE_ROUTES = "route facts look incomplete; run warlock grimoire build";
+
+function routeFactsIncomplete(facts: GrimoireSnapshot["book"]["facts"]): boolean {
+  return (
+    facts.routes !== null &&
+    facts.routes.length > 0 &&
+    facts.routes.every((route) => route.sourceFile === null)
+  );
+}
+
 /** Notes every answer carries: whether the stored book is behind the files, and how fresh the route facts are. */
 function notesOf(snapshot: GrimoireSnapshot, needsRoutes: boolean): ScryNotes {
   const notes: string[] = [];
@@ -47,6 +58,9 @@ function notesOf(snapshot: GrimoireSnapshot, needsRoutes: boolean): ScryNotes {
   if (snapshot.routes === "missing" && needsRoutes) {
     notes.push("route facts were never read; run warlock grimoire build");
   }
+
+  if (snapshot.book.routeNote !== undefined) notes.push(snapshot.book.routeNote);
+  if (needsRoutes && routeFactsIncomplete(snapshot.book.facts)) notes.push(INCOMPLETE_ROUTES);
 
   return { routes: snapshot.routes, notes };
 }
@@ -330,6 +344,10 @@ function scryRoute(
     const samePath = facts.routes
       .filter((item) => normalizeRoutePath(item.path) === normalizeRoutePath(query.path))
       .map((item) => `${item.method} ${item.path}`);
+    if (routeFactsIncomplete(facts)) {
+      throw new GrimoireError("GR9002", `No route matches ${asked}; ${INCOMPLETE_ROUTES}.`);
+    }
+
     const hint =
       samePath.length > 0
         ? ` Routes on that path: ${samePath.join(", ")}.`

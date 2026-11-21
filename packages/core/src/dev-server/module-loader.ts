@@ -214,7 +214,7 @@ export class ModuleLoader {
   /**
    * Reload a previously-loaded special file. The version-bump that makes the
    * import fresh is done by the caller (layer-executor) before invoking this.
-   * Routes are removed from the registry first so re-registration is clean.
+   * A routes file is replaced atomically: if the new version throws, its previous routes stay registered.
    */
   public async reloadModule(file: FileManager): Promise<void> {
     const moduleType = this.specialFilesCollector.getFileType(file.relativePath);
@@ -222,11 +222,16 @@ export class ModuleLoader {
 
     this.runCleanup(file);
 
+    this.loadedModules.delete(file.absolutePath);
+
     if (moduleType === "route") {
-      router.removeRoutesBySourceFile(file.relativePath);
+      // Atomic: when the new version throws, the previous routes stay and the error still reaches the caller.
+      await router.replaceRoutesBySourceFiles([file.relativePath], () =>
+        this.loadModule(file, moduleType),
+      );
+      return;
     }
 
-    this.loadedModules.delete(file.absolutePath);
     await this.loadModule(file, moduleType);
   }
 
