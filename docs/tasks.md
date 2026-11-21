@@ -8,8 +8,107 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Next release
 
-- Nothing planned yet. 5.62.0 shipped T-185, T-186 and T-187 (see `tasks.completed.md`).
+- 5.63.0 candidates: T-189..T-194 (Grimoire scry, from the 2026-11-21 field report) and T-188.
+- 5.62.0 shipped T-185, T-186 and T-187 (see `tasks.completed.md`).
 - 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
+
+## From the 2026-11-21 scry field report
+
+Source for T-189..T-194: an app's `warlock scry` benchmark and release QA on 5.62.0 (9,882 files, 277 routes, three
+sites plus a mobile app; 56 fixed-wording queries), 2026-11-21. Single-finding pages:
+https://claude.ai/artifact/UvoeeFqtvJFbMGcPuPcDRm (`--search` needs every word) and
+https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Every cited line was re-read on `main` at
+`9998a5e30` (grimoire 5.62.0); the repros were run by the reporter, not in this repository.
+
+### T-189 [bug] `scry --search` drops a hit unless it contains every query word
+
+- What and why: agents search with sentences (commit titles, bug reports). One missing word scores 0, so 0 of 36
+  sentence queries found the right file in the top 20. With two keywords, 11 of 36 did. Agents then fall back to grep.
+- Evidence: `packages/grimoire/src/scry/query.ts:780` (every word is a token, no stop words), `:716` (all tokens must be
+  in id + detail), `:675-700` (`partMatches`/`bodyMatch` need every token in one part), `:704-738` (`scoreOf` has no
+  partial level).
+- Fix: drop stop words (one exported, extendable list; keep ids such as `WL9003`, `AC-5`); add a partial score below
+  the all-word levels with a minimum (at least 2 words or half of them); when nothing matches every word, say which
+  words were used (`matchedAll`/`usedWords` in `ScrySearchResult`); use word-start matching for short tokens.
+- Acceptance: spec in `src/scry/search.spec.ts`: "the change history screen needs a better ui" ranks
+  `mobile/src/app/change-history.tsx` first; existing all-word specs keep their order; `scry --help`, the
+  `use-the-grimoire` skill and the scry docs page describe the rule.
+- Status: open.
+
+### T-190 [bug] `scry --route "GET /chat"` cannot find a page served by the web dispatch route
+
+- What and why: in a `@warlock.js/web` app every page sits behind `GET /*`, so `facts.routes` never holds the page
+  path and the lookup throws GR9002 while the book lists the page. 0 of 7 page lookups worked; the hint ("Run warlock
+  routes") leads to `GET /*` only.
+- Evidence: `packages/grimoire/src/scry/query.ts:304-331` (`scryRoute` searches `facts.routes` only), `:348-355` (page
+  lookup only for routes flagged `isPage`), `routeMatches` in `packages/grimoire/src/bookmap/steps.ts:35` (no wildcard).
+- Fix: for GET/HEAD with no API match, look the path up in `facts.pages` (and mobile screens) with
+  `normalizeRoutePath`; return the page and the import closure of its file, setup file and layouts (as `scryImpact`
+  builds at `:229-250`); when several sites share the path, return all of them (optional `--site`); add matching pages
+  to the GR9002 hint.
+- Acceptance: spec with `routes = [GET /*]` and a `/chat` page returns the page; a path shared by two sites returns
+  both; docs and `--help` say `--route` takes page URLs.
+- Status: open.
+
+### T-191 [bug] `scry --search` ranking: substring matches on long block ids, output grouped by type before score
+
+- What and why: when a query matches, the right file still ranks 4th to 15th or is cut. Two unrelated billing blocks
+  matched a sentence because a block id is the slug of its whole text (200+ characters) and tokens match as
+  substrings (`ui` matches `build`). The output is grouped by type, so a file that scores 6 prints under blocks that
+  score 2. Hits carry no app, so web and mobile ties fall back to alphabetical order.
+- Evidence: `packages/grimoire/src/scry/query.ts:587-599` (block id = full slug), `:713-716` (`includes`), `:752-771`
+  (`pickHits` regroups by `TYPE_ORDER`, `:492-503`), `:745` (tie-break by id); `ScryHit` in
+  `packages/grimoire/src/contracts/scry.ts` has no app field.
+- Fix: word-start matching for every token; match a block on `<app>/<page>` plus its first words, not the full slug;
+  print in score order (keep features and flows first only on equal score, which the skill documents), show the score;
+  add `app` to page, screen, block and file hits and an `--app` filter; a page or screen file outranks its helper
+  files on equal score.
+- Not in scope (vetting): the flat `WRITTEN_BOOST` removal the report suggests; written-first ranking is documented
+  in the skill and worked for the keyword queries that succeeded. Revisit only with data.
+- Acceptance: specs for `ui` not matching `build`, a long block id not matching an unrelated sentence, a higher-scored
+  file printed above a lower-scored block, the `--app` filter; docs, skill, CHANGELOG.
+- Status: open.
+
+### T-192 [bug] Route facts that shrank to a handful of routes are still reported "fresh"
+
+- What and why: an app's facts cache once held 10 routes (core and dispatch) instead of 277 and every route answer was
+  silently wrong: GR9002 for routes that exist, `routes: []` in `--impact`, no note. The reporter could not reproduce
+  the write in five attempts; what is confirmed is that freshness never looks at the facts themselves.
+- Evidence: `packages/grimoire/src/book/build.ts:264-272` (`bootState` compares input hashes only), `:340-362` (a
+  fresh read replaces `facts.routes` with no check); `packages/grimoire/src/contracts/scry.ts:42-43` (impact answers
+  drop the freshness field) and `notesOf` in `query.ts:35-43` (notes only for stale/missing). Candidate causes, not
+  reproduced: an HMR reload removes a routes file's routes before re-importing it and a failed import leaves them out
+  (`packages/core/src/dev-server/module-loader.ts:219-230`, rethrow at `:208`), or the dev panel's first live read
+  (`packages/grimoire/src/devtools/snapshot-source.ts:155-163`, started by `warm()` in `devtools/index.ts:127`) runs
+  before the routes finish loading.
+- Fix: store route/page counts with `boot` in the manifest; in the live path never replace a stored list with one
+  under half its size without a note, and skip the write; a GR9002 on facts with no route that has a `sourceFile` says
+  "route facts look incomplete; run warlock grimoire build"; impact answers carry a route-freshness note.
+- Acceptance: specs: a live read returning 10 routes over a stored 277 keeps the stored list and adds the note; GR9002
+  wording on core-only facts; impact note. Try to reproduce the HMR path (route file that throws on reload while the
+  dev tab is open) and fix it if it is the cause.
+- Status: open.
+
+### T-193 [bug] `scry --json` prints errors as text on stderr and nothing on stdout
+
+- What and why: a caller that parses stdout gets an empty string and exit 1, with no code.
+- Evidence: `packages/grimoire/src/warlock/actions.ts:405-423` (`runScry` catch calls `reportError`), `:43-55`
+  (`reportError` writes text with `io.err`).
+- Fix: under `--json` print `{ "type": "error", "code", "message", "fix" }` on stdout, exit 1; add `ScryError` to
+  `contracts/scry.ts` so MCP and the CLI share it.
+- Acceptance: spec for `runScry` with `json: true` and an unknown route; docs.
+- Status: open.
+
+### T-194 [bug] Dev tab reports route facts "fresh" for about a minute after a route file changed
+
+- What and why: the reuse window is `max(2 s, 5 × last open)` and the change stamp covers only the book and written
+  folders, so an edit to a routes file keeps the tab "fresh" (observed about 75 s). `scry` on the command line is not
+  affected. Overlaps T-183 ("refresh live facts after route edits"), which now has an app asking; do them together.
+- Evidence: `packages/grimoire/src/devtools/snapshot-source.ts:84-107` (`STAMPED`, `changeStamp`), `:135` and
+  `:197-205` (reuse window).
+- Fix: add the route input files' times to the change stamp (or end the window on a dev-server route reload).
+- Acceptance: spec: after a routes-file mtime moves, `get()` opens again and reports "stale".
+- Status: open.
 
 ## From the 5.62.0 release
 
@@ -94,6 +193,9 @@ Open work for the framework repository. Finished entries move to `tasks.complete
   3. Plan gating and locales as structured data: `who` is free text and audience has many free-text values; ask is a declared audience and plan vocabulary and per-flow locale coverage.
   4. A screenshot workflow (`warlock grimoire shoot`: capture per page and story step plus a staleness check).
   5. A plain-words journey diagram of how flows connect, per feature and across features.
+  6. `scry --impact <package-name>` ("which files import this package") for dependency upgrades. Asked by one agent
+     after `scry --impact package.json` answered GR9001, which is by design (`bookFile`,
+     `packages/grimoire/src/scry/query.ts:49-65`: code files only). Source: the 2026-11-21 scry field report (T-189).
 - Status: parked, one app asked. Revisit when a second app asks for the same item.
 
 ### T-172 [bug] Product map and developer UI issues seen in screenshots, no runnable repro yet
