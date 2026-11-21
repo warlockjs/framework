@@ -49,7 +49,7 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
 - Acceptance: spec in `src/scry/search.spec.ts`: "the change history screen needs a better ui" ranks
   `mobile/src/app/change-history.tsx` first; a flow's exact title ranks that flow first; existing all-word specs
   keep their order; `scry --help`, the `use-the-grimoire` skill and the scry docs page describe the rule. Before the
-  release, re-run the eval harness (kept by the coordinator) on the real implementation: test-half full titles at
+  release, re-run the eval harness (`findings/scry-eval/`, git-ignored, in the main checkout; `round2/` holds the held-out set) on the real implementation: test-half full titles at
   least 70/105 at hit@20 and feature/flow names at least 58/60.
 - Status: open.
 
