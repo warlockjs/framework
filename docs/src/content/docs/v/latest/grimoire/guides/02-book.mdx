@@ -254,6 +254,13 @@ command:
 So a question about a file never boots the app, and neither does `warlock scry --route`: with no cached routes it stops with `GR9002` and tells you to run `warlock grimoire build`.
 When a command answers from stale routes, it says so and tells you to run `warlock grimoire build`.
 
+A live read (`routes: "fresh"`) that finds fewer than half of the routes the book already holds is not trusted: the
+book keeps its stored list, writes nothing for it, reports the facts as `stale` and says
+`a live read found 10 routes against the 277 stored; kept the stored routes; run warlock grimoire build`. The manifest
+stores the route and page counts of the last read (`boot.counts`) for this. When the stored routes exist but none names
+its source file, answers say `route facts look incomplete; run warlock grimoire build`, and `warlock scry --route`
+gives that as the reason for `GR9002`; `--impact` carries the same note.
+
 Route freshness is reported as one of:
 
 | Value     | Means                                                                        |

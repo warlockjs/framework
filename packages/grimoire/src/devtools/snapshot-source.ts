@@ -2,8 +2,8 @@
  * Where the panel's routes get the snapshot: opened once with
  * `routes: "cached"` (a devtools request never boots the app) and kept in
  * memory. Concurrent requests share one open. A change stamp (the book
- * manifest plus the agent-written folders and indexes, a few `stat` calls and
- * no directory walk) tells when the book changed.
+ * manifest, the agent-written folders and indexes and the files the route
+ * facts were read from, a few `stat` calls and no directory walk) tells when the book changed.
  *
  * - Production (`mode: "production"`): a snapshot is reused until the stamp
  *   changes, with no time limit, unless `ttlMs` is set. A request that finds
@@ -93,8 +93,20 @@ const STAMPED = [
   GRIMOIRE_PATHS.releases,
 ];
 
-async function changeStamp(root: string, resultsFile: string): Promise<string> {
-  const files = [...STAMPED.map((entry) => path.join(root, ...entry.split("/"))), resultsFile];
+/**
+ * `routeInputs` are the project-relative files the route facts were read from (`manifest.boot.inputs`): an
+ * edit to one ends the reuse window, so the next open reports the route facts stale.
+ */
+async function changeStamp(
+  root: string,
+  resultsFile: string,
+  routeInputs: string[] = [],
+): Promise<string> {
+  const files = [
+    ...STAMPED.map((entry) => path.join(root, ...entry.split("/"))),
+    resultsFile,
+    ...routeInputs.map((file) => path.join(root, ...file.split("/"))),
+  ];
   const times = await Promise.all(
     files.map(async (file) => {
       try {
@@ -107,6 +119,9 @@ async function changeStamp(root: string, resultsFile: string): Promise<string> {
 
   return times.join(",");
 }
+
+const routeInputsOf = (snapshot: GrimoireSnapshot): string[] =>
+  Object.keys(snapshot.book.manifest.boot.inputs).sort();
 
 async function loadAdapter(option: SnapshotSourceOptions["adapter"]): Promise<BookAdapter> {
   if (option === undefined) {
@@ -172,7 +187,12 @@ export function createSnapshotSource(
 
     const at = Date.now();
 
-    cached = { snapshot, at, stamp: await changeStamp(root, resultsFile), took: at - started };
+    cached = {
+      snapshot,
+      at,
+      stamp: await changeStamp(root, resultsFile, routeInputsOf(snapshot)),
+      took: at - started,
+    };
 
     return snapshot;
   }
@@ -191,7 +211,8 @@ export function createSnapshotSource(
       if (cached === null) return ensureOpening();
 
       const known = cached;
-      const changed = (await changeStamp(root, resultsFile)) !== known.stamp;
+      const changed =
+        (await changeStamp(root, resultsFile, routeInputsOf(known.snapshot))) !== known.stamp;
 
       if (changed || options.mode === "production") {
         if (!changed && (keepUntilChanged || Date.now() - known.at < reuseFor(known.took))) {

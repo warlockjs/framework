@@ -1,4 +1,4 @@
-import { utimesSync, writeFileSync, readFileSync } from "node:fs";
+import { lstatSync, readdirSync, utimesSync, writeFileSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createShopAdapter } from "../../tests/fixtures/shop-facts";
@@ -24,6 +24,27 @@ function counted() {
   return { state, cache };
 }
 
+/** Move every file and folder time of the copy into the past, so the spec never depends on how fast the copy and the open follow each other. */
+function age(root: string): string {
+  const past = new Date(Date.now() - 60_000);
+  const walk = (folder: string): void => {
+    for (const entry of readdirSync(folder, { withFileTypes: true })) {
+      const full = path.join(folder, entry.name);
+
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) walk(full);
+
+      utimesSync(full, past, past);
+    }
+
+    if (!lstatSync(folder).isSymbolicLink()) utimesSync(folder, past, past);
+  };
+
+  walk(root);
+
+  return root;
+}
+
 const touch = (file: string) => {
   writeFileSync(file, `${readFileSync(file, "utf8")}\n`);
   utimesSync(file, new Date(), new Date(Date.now() + 10_000));
@@ -32,6 +53,7 @@ const touch = (file: string) => {
 describe("the kept opened book", () => {
   it("opens once for repeated calls on an unchanged book and shares concurrent opens", async () => {
     copy = copyFixture();
+    age(copy.root);
     const adapter = createShopAdapter();
     const { state, cache } = counted();
     const [first, second] = await Promise.all([
@@ -53,6 +75,7 @@ describe("the kept opened book", () => {
 
   it("opens again after a written file, a code file or the manifest changes", async () => {
     copy = copyFixture();
+    age(copy.root);
     const adapter = createShopAdapter();
     const { state, cache } = counted();
     const options = { routes: "cached", write: false } as const;
@@ -82,6 +105,7 @@ describe("the kept opened book", () => {
 
   it("opens again when a folder above the listed ones changes (a new module folder)", async () => {
     copy = copyFixture();
+    age(copy.root);
     const adapter = createShopAdapter();
     const { state, cache } = counted();
     const options = { routes: "cached", write: false } as const;
@@ -99,6 +123,7 @@ describe("the kept opened book", () => {
 
   it("never runs two writing opens of one project at the same time", async () => {
     copy = copyFixture();
+    age(copy.root);
     const adapter = createShopAdapter();
     const running = { now: 0, most: 0, opens: 0 };
     const cache = createBookCache(async (...args: Parameters<typeof openGrimoire>) => {
@@ -125,6 +150,7 @@ describe("the kept opened book", () => {
 
   it("opens again after an open during which a code file changed", async () => {
     copy = copyFixture();
+    age(copy.root);
     const adapter = createShopAdapter();
     const state = { opens: 0 };
     const cache = createBookCache(async (...args: Parameters<typeof openGrimoire>) => {

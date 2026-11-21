@@ -163,6 +163,8 @@ export type BookManifest = {
     /** ISO time the routes were read, or `null` when never. */
     collectedAt: string | null;
     inputs: Record<string, string>;
+    /** How many routes and pages the last read found; absent in books written before it was stored. */
+    counts?: { routes: number; pages: number };
   };
 };
 
@@ -183,6 +185,8 @@ export type LoadedBook = {
   manifest: BookManifest;
   facts: BookFacts;
   routes: RouteFreshness;
+  /** Set when a live read of the route facts was refused (it found far fewer routes than the book holds); the book keeps its list. */
+  routeNote?: string;
 };
 
 /** Options of `buildBook()`. */

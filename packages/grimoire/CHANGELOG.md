@@ -10,6 +10,12 @@
 - `warlock grimoire build` and `warlock grimoire check` now also write `grimoire/book/.cache/derived.json` (owners, apps, proofs, test results, book maps, annotations). It is a git-ignored cache.
 - `warlock scry --route` no longer boots the app to read missing route facts; it stops with `GR9002` and tells you to run `warlock grimoire build`.
 
+### Fixed
+
+- A live read of the route facts that finds fewer than half of the routes the book already holds no longer replaces the stored list: the book keeps it, writes nothing for it, reports the facts `stale` and adds a note. The manifest stores the route and page counts of the last read (`boot.counts`).
+- Route facts where no route names its source file are reported as `route facts look incomplete; run warlock grimoire build` in `GR9002` and in `--impact` and other answers' notes.
+- The dev Grimoire tab no longer reports route facts `fresh` for about a minute after a routes file changed: the files the route facts were read from are part of its change stamp, so the next view reopens and reports them `stale`.
+
 ### Added
 
 - `GR9007` (error): the book was never built, or was built by another version. Run `warlock grimoire build`.
