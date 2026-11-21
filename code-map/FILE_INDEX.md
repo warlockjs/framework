@@ -1973,7 +1973,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/cache/src/utils.ts` - CACHE_FOR, cache/src/utils.ts, escapeCacheKeySegment, escapeKeyObject, parseCacheKey, parseTtl, expiresAtToTtl, normalizeToOptions
 - `packages/cache/vitest.config.ts` - cache/vitest.config.ts
 
-## packages/cascade (156 test files not listed)
+## packages/cascade (157 test files not listed)
 
 - `packages/cascade/README.md`
 - `packages/cascade/bin/cascade.js`
@@ -2063,8 +2063,9 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/cascade/src/drivers/postgres/naming.ts` - snakeCache, camelCache, remember, camelToSnake, snakeToCamel, snakeKeysToCamel
 - `packages/cascade/src/drivers/postgres/postgres-blueprint.ts` - PostgresBlueprint
 - `packages/cascade/src/drivers/postgres/postgres-dialect.ts` - PostgresNaming, PostgresDialectOptions, PostgresDialect, escapeSqlLiteral, toSafeInteger, toFiniteNumber
-- `packages/cascade/src/drivers/postgres/postgres-driver.ts` - UniqueKey, PgPool, PgPoolClient, PgPoolConfig, PgTypes, PostgresQueryOptions, PostgresDriver, parsePostgresInt8
+- `packages/cascade/src/drivers/postgres/postgres-driver.ts` - UniqueKey, PgPool, PgPoolClient, PgPoolConfig, PostgresQueryOptions, PostgresDriver, resolvePostgresStartupOptions, buildPostgresPoolConfig
 - `packages/cascade/src/drivers/postgres/postgres-migration-driver.ts` - PostgresMigrationDriver
+- `packages/cascade/src/drivers/postgres/postgres-pool-types.ts` - PgPoolConfig, PgTypes, parsePostgresInt8, parsePostgresDate, splitPostgresDateArray, createPostgresTypes
 - `packages/cascade/src/drivers/postgres/postgres-query-builder.ts` - JoinRelationConfig, PostgresQueryBuilder, parseAggregateValue, toParserOps, containsOperatorKey
 - `packages/cascade/src/drivers/postgres/postgres-query-parser.ts` - PostgresOperationType, PostgresParserOperation, PostgresParserOptions, PostgresQueryParser, MULTI_WORD_TYPE_WORDS, isSafeCastType
 - `packages/cascade/src/drivers/postgres/postgres-sql-serializer.ts` - PostgresSQLSerializer
@@ -3809,7 +3810,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/tests/panels/helpers.tsx` - Answer, Route, ApiCall, FakeEventSource, instanceA, instanceB, session, devSession
 - `packages/devtools/ui-src/tests/setup.ts` - tests/setup.ts
 - `packages/devtools/ui-src/vite.config.ts` - ui-src/vite.config.ts, devBase, proxied
-- `packages/devtools/ui/dashboard/assets/app.js` - i, pe, be, ce, me, ve, xe, ye
+- `packages/devtools/ui/dashboard/assets/app.js` - ae, C, ce, ee, ne, oe, re, se
 - `packages/devtools/ui/docs-swagger.js`
 - `packages/devtools/ui/panels/processes.js` - renderProcesses
 - `packages/devtools/vitest.config.ts` - devtools/vitest.config.ts
