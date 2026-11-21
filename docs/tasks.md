@@ -142,12 +142,27 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   80 seeded locale values: today 1/80 at hit@20, BM25F 19/80, BM25F plus source string literals 26/80 (adds about
   0.6 MB of text and 60 ms to the index build). Indexing each locale value under the files that name its key reached
   75/80, but that number is circular (the ground truth came from the same key-to-file link), so it is an upper bound.
-- Fix idea: at build time, map locale keys to the files that reference them and add the locale text as a low-weight
-  BM25F field of those files.
-- Acceptance: a non-circular eval (e.g. bug reports that quote on-screen text, with the files their fix changed) shows
-  the gain; specs; docs.
-- Status: owner decision: build it with T-189, or wait for an app to ask (vetting rule). Needs a measured,
-  non-circular gain first.
+- Fix idea: at build time read the translation files (every language, so Arabic text works) through the framework's
+  localization, map each key to the files that reference it, and add the text as a BM25F field of those files. An
+  exact match of the query to a translation value is a first-tier hit (people copy screen text word for word), above
+  BM25F. Apps whose mobile app uses another i18n library plug it in through an adapter hook.
+- Offline test before building (same harness, `findings/scry-eval/round2/`): queries = the app's bug reports that
+  quote on-screen text, expected = the files their fix changed (not derived from the key link, so not circular).
+- Acceptance: that test shows a clear gain over T-189's BM25F; specs; docs.
+- Status: owner decision: build it with T-189, or wait for an app to ask (vetting rule). Needs the measured gain first.
+
+### T-197 [feature] `scry --search`: files borrow the words of the flows and features that own them
+
+- Source: second held-out scry eval, 2026-11-21: two-keyword queries stay weak with BM25F (31/105 at hit@20 against
+  72/105 with full titles), because two words match dozens of files whose names do not say what they do.
+- What and why: the book already knows which flow and feature own each file (ownership in the derived data). Adding
+  the owner's title and story words to the file as a low-weight BM25F field lets "meal swap" find
+  `edit-nutrition.tool.ts` owned by a "swap a meal" flow; it may help full sentences too. Cheapest part, done in
+  T-189 anyway: help and skill tell agents to pass the whole commit title or bug report.
+- Offline test before building: same harness and the same 105 held-out commits (full titles and two keywords), BM25F
+  with and without the borrowed words; weight fixed before scoring.
+- Acceptance: a gain on the held-out set without losing feature/flow name lookups (at least 58/60); specs; docs.
+- Status: idea; run the offline test first.
 
 ### T-195 [bug] Every `warlock scry` call rebuilds the whole book's derived data, about 6.6 s of an 8.8 s call
 
