@@ -482,3 +482,54 @@ export async function loadBook(root: string): Promise<LoadedBook | null> {
     routes: stored.facts.routes === null ? "missing" : "cached",
   };
 }
+
+/** What `checkBook` found: the stored book, and how far the files have moved from it. */
+export type BookCheck = {
+  /** The stored book, with its route freshness measured against the files as they are now. */
+  book: LoadedBook;
+  /** Code and test files added, changed or removed since the last build, sorted. */
+  changed: string[];
+};
+
+/**
+ * The cheap change check of `buildBook` with nothing rebuilt and nothing
+ * written: scans the source roots (hashing only files whose size or time
+ * moved) and compares them, and the tests, with the manifest. The adapter is
+ * asked for its source roots only, never for files or route facts. `null`
+ * when the book was never built (or was written by an older schema).
+ *
+ * @param root Absolute project root.
+ */
+export async function checkBook(root: string, adapter: BookAdapter): Promise<BookCheck | null> {
+  const projectRoot = path.resolve(root);
+  const stored = await readStoredBook(projectRoot);
+
+  if (stored === null) return null;
+
+  const { manifest, facts } = stored;
+  const sourceRoots = [
+    ...new Set((await adapter.sourceRoots(projectRoot)).map(cleanFolder)),
+  ].sort();
+  const scan = await scanSourceRoots(projectRoot, sourceRoots, manifest.files);
+  const changed = new Set(changedFiles(manifest.files, scan.files));
+  const tests = await hashFiles(projectRoot, Object.keys(manifest.tests), scan.files, sourceRoots);
+
+  for (const [file, hash] of Object.entries(tests)) {
+    if (manifest.tests[file] !== hash) changed.add(file);
+  }
+
+  const inputs = await hashFiles(
+    projectRoot,
+    Object.keys(manifest.boot.inputs),
+    scan.files,
+    sourceRoots,
+  );
+  const routes: RouteFreshness = hasBootFacts(adapter)
+    ? bootState(manifest.boot, facts.routes, inputs)
+    : "missing";
+
+  return {
+    book: { root: projectRoot, manifest, facts, routes },
+    changed: [...changed].sort(),
+  };
+}

@@ -17,7 +17,7 @@ import { projectPath } from "../paths";
 import { writeRelease } from "../releases";
 import { formatScryResult, parseScryQuery, scry } from "../scry";
 import { runGrimoire, type GrimoireRun } from "../workspace";
-import { openGrimoireCached } from "../workspace/cache";
+import { openStoredGrimoireCached } from "../workspace/cache";
 import { parseGrimoire } from "../written";
 
 /** Where a command writes: `out` for its answer, `err` for problems. */
@@ -79,11 +79,6 @@ async function withFreshRoutes<T>(
       }),
     };
   }
-}
-
-/** Whether the book holds route facts already (a `--route` question with none boots once). */
-export async function hasRouteFacts(root: string): Promise<boolean> {
-  return (await loadBook(root))?.facts.routes != null;
 }
 
 /** sha256 of a project file, `""` when it is missing (the book's boot-cache rule). */
@@ -380,16 +375,9 @@ export async function runRelease(
   }
 }
 
-/** Open the snapshot for a scry question: cached routes, fresh once when a route question finds none. */
-async function openForScry(
-  root: string,
-  adapter: BookAdapter,
-  query: ScryQuery,
-): Promise<GrimoireSnapshot> {
-  const routes: "fresh" | "cached" =
-    query.type === "route" && !(await hasRouteFacts(root)) ? "fresh" : "cached";
-
-  return openGrimoireCached(root, adapter, { routes });
+/** Open the snapshot for a scry question: the stored book, read only (`GR9007` when it was never built). */
+async function openForScry(root: string, adapter: BookAdapter): Promise<GrimoireSnapshot> {
+  return openStoredGrimoireCached(root, adapter);
 }
 
 /** Answer a parsed query (shared by the CLI and the MCP tools). */
@@ -398,7 +386,7 @@ export async function answer(
   adapter: BookAdapter,
   query: ScryQuery,
 ): Promise<ScryResult> {
-  return scry(await openForScry(root, adapter, query), query);
+  return scry(await openForScry(root, adapter), query);
 }
 
 /** `warlock scry <file> | --impact … | --route … | --feature … | --flow … | --search … [--limit n] [--all] [--json]`. */

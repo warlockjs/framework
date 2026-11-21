@@ -251,7 +251,7 @@ command:
 | `warlock grimoire build`, `warlock grimoire check` | Read again (the app boots once).                            |
 | `warlock scry`, the MCP tools, the devtools tab    | Not read. The cached routes are used and reported as stale. |
 
-So a question about a file never boots the app. `warlock scry --route` reads routes once when none were ever cached.
+So a question about a file never boots the app, and neither does `warlock scry --route`: with no cached routes it stops with `GR9002` and tells you to run `warlock grimoire build`.
 When a command answers from stale routes, it says so and tells you to run `warlock grimoire build`.
 
 Route freshness is reported as one of:

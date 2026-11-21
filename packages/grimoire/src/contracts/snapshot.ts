@@ -33,6 +33,12 @@ export type GrimoireSnapshot = {
   collected: CollectedFiles;
   annotations: BookAnnotations;
   routes: RouteFreshness;
+  /**
+   * Set only by the read-only open (`openStoredGrimoire`): the code, test and
+   * written files that changed since the last build. The snapshot is the
+   * stored one; `scry` says so in a note.
+   */
+  behind?: { changed: number };
   /** What the adapter's `host()` reported (framework brand, app name and version); `null` or absent when it reports none. */
   host?: BookHost | null;
 };

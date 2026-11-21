@@ -4,7 +4,7 @@
  * registration (MCP tools, `warlock explain` codes, boot decisions) and the
  * MCP tools.
  */
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 import {
   explainersOf,
@@ -24,6 +24,7 @@ import {
   type CommandIO,
 } from "../src/warlock/actions";
 import { registerGrimoireCommands } from "../src/warlock";
+import { DERIVED_PATH } from "../src/workspace/derived";
 import { createShopAdapter } from "./fixtures/shop-facts";
 import { copyFixture, type FixtureCopy } from "./support/copy-fixture";
 
@@ -39,6 +40,27 @@ function capture(): Captured {
     out: (line) => void stdout.push(line),
     err: (line) => void stderr.push(line),
   };
+}
+
+/** Every file of a project with its size and modified time, to see that a command wrote nothing. */
+function snapshotOfFiles(root: string): string[] {
+  const lines: string[] = [];
+  const walk = (folder: string): void => {
+    for (const entry of readdirSync(folder, { withFileTypes: true })) {
+      const absolute = path.join(folder, entry.name);
+
+      if (entry.isDirectory()) walk(absolute);
+      else {
+        const info = statSync(absolute);
+
+        lines.push(`${path.relative(root, absolute)} ${info.size} ${info.mtimeMs}`);
+      }
+    }
+  };
+
+  walk(root);
+
+  return lines.sort();
 }
 
 const copies: FixtureCopy[] = [];
@@ -266,19 +288,24 @@ describe("warlock scry", () => {
 
   it("exits 1 with the code, the message and the fix", async () => {
     const io = capture();
+    const copy = fixture();
+    const adapter = createShopAdapter();
 
-    expect(
-      await runScry({ root: fixture().root, adapter: createShopAdapter(), io }, [], {
-        feature: "billing",
-      }),
-    ).toBe(1);
+    await runBuild({ root: copy.root, adapter, io: capture() });
+
+    expect(await runScry({ root: copy.root, adapter, io }, [], { feature: "billing" })).toBe(1);
     expect(io.stderr[0]).toMatch(/^GR9003 {2}No feature has the id "billing"/);
     expect(io.stderr[1]).toMatch(/^ {2}fix: /);
   });
 
-  it("never calls routes or named for file-only questions, built or not", async () => {
+  it("never calls routes, named or files, and never writes", async () => {
     const copy = fixture();
     const adapter = createShopAdapter();
+
+    await runBuild({ root: copy.root, adapter, io: capture() });
+
+    const calls = { ...adapter.calls };
+    const before = snapshotOfFiles(copy.root);
 
     for (const [args, options] of [
       [["src/app/orders/routes.ts"], {}],
@@ -286,29 +313,81 @@ describe("warlock scry", () => {
       [[], { feature: "catalog" }],
       [[], { flow: "orders/place-order" }],
       [[], { search: "order" }],
+      [[], { route: "POST /api/orders" }],
     ] as const) {
       expect(await runScry({ root: copy.root, adapter, io: capture() }, args, options)).toBe(0);
     }
 
-    expect(adapter.calls.routes).toBe(0);
-    expect(adapter.calls.named).toBe(0);
+    // The change check reads the source roots (a cheap list); nothing else is asked of the adapter.
+    expect({ ...adapter.calls, sourceRoots: 0 }).toEqual({ ...calls, sourceRoots: 0 });
+    expect(snapshotOfFiles(copy.root)).toEqual(before);
+  });
 
-    // A route question with no route facts reads them once, then never again.
+  it("notes a stale book, answers from the stored one and writes nothing", async () => {
+    const copy = fixture();
+    const adapter = createShopAdapter();
+
+    await runBuild({ root: copy.root, adapter, io: capture() });
+    copy.replace("src/app/orders/routes.ts", "\n", "\n// changed\n");
+
+    const calls = { ...adapter.calls };
+    const before = snapshotOfFiles(copy.root);
+    const io = capture();
+
+    expect(await runScry({ root: copy.root, adapter, io }, ["src/app/orders/routes.ts"])).toBe(0);
+    expect(io.stdout.join("\n")).toContain(
+      "note      book is stale (1 file changed); run warlock grimoire build",
+    );
+    expect(adapter.calls.files).toBe(calls.files);
+    expect(adapter.calls.routes).toBe(calls.routes);
+
+    const json = capture();
+
+    await runScry({ root: copy.root, adapter, io: json }, ["src/app/orders/routes.ts"], {
+      json: true,
+    });
+    expect(JSON.parse(json.stdout.join("\n")).notes).toContain(
+      "book is stale (1 file changed); run warlock grimoire build",
+    );
+    expect(snapshotOfFiles(copy.root).filter((line) => !line.startsWith("src/"))).toEqual(
+      before.filter((line) => !line.startsWith("src/")),
+    );
+  });
+
+  it("fails with GR9007 when the book was never built, and builds nothing", async () => {
+    const copy = fixture();
+    const adapter = createShopAdapter();
+    const io = capture();
+
+    expect(await runScry({ root: copy.root, adapter, io }, ["src/app/orders/routes.ts"])).toBe(1);
+    expect(io.stderr[0]).toMatch(
+      /^GR9007 {2}The book has not been built yet\. Run warlock grimoire build/,
+    );
+    expect(adapter.calls.files).toBe(0);
+    expect(existsSync(path.join(copy.root, "grimoire", "book"))).toBe(false);
+  });
+
+  it("fails with GR9007 when the derived data is missing", async () => {
+    const copy = fixture();
+    const adapter = createShopAdapter();
+
+    await runBuild({ root: copy.root, adapter, io: capture() });
+    rmSync(path.join(copy.root, ...DERIVED_PATH.split("/")));
+
+    const io = capture();
+
+    expect(await runScry({ root: copy.root, adapter, io }, ["src/app/orders/routes.ts"])).toBe(1);
+    expect(io.stderr[0]).toMatch(/^GR9007 {2}The book's derived data is missing/);
+  });
+
+  it("answers a route question from the stored facts, and says so when there are none", async () => {
+    const copy = fixture();
+    const adapter = createShopAdapter();
+
+    await runBuild({ root: copy.root, adapter, io: capture() });
     expect(
       await runScry({ root: copy.root, adapter, io: capture() }, [], { route: "POST /api/orders" }),
     ).toBe(0);
-    expect(
-      await runScry({ root: copy.root, adapter, io: capture() }, [], {
-        route: "GET /api/products",
-      }),
-    ).toBe(0);
-    expect(adapter.calls.routes).toBe(1);
-
-    copy.replace("src/app/orders/routes.ts", "\n", "\n// changed\n");
-    expect(
-      await runScry({ root: copy.root, adapter, io: capture() }, ["src/app/orders/routes.ts"]),
-    ).toBe(0);
-    expect(adapter.calls.routes).toBe(1);
   });
 });
 
@@ -352,7 +431,7 @@ describe("registerGrimoireCommands", () => {
     expect(await needsBoot(copy.root, false)).toBe(true);
   });
 
-  it("loads only src/config/web.ts for a multi-site app, and boots for a first route question", async () => {
+  it("loads only src/config/web.ts for a multi-site app, and never boots for a route question", async () => {
     const copy = fixture();
     const cwd = vi.spyOn(process, "cwd").mockReturnValue(copy.root);
 
@@ -362,8 +441,9 @@ describe("registerGrimoireCommands", () => {
       await scry?.commandPreAction?.({ args: ["src/app/orders/routes.ts"], options: {} });
       expect(scry?.commandPreload).toEqual({ config: ["web"] });
 
+      // A route question never boots the app: scry only reads the stored book.
       await scry?.commandPreAction?.({ args: [], options: { route: "POST /api/orders" } });
-      expect(scry?.commandPreload).toMatchObject({ bootstrap: true, config: true });
+      expect(scry?.commandPreload).toEqual({ config: ["web"] });
 
       await grimoire?.commandPreAction?.({ args: ["check"], options: {} });
       expect(grimoire?.commandPreload).toMatchObject({ bootstrap: true });
@@ -410,6 +490,8 @@ describe("Grimoire MCP tools", () => {
     const byName = tools(copy.root, adapter);
     const run = (name: string, input: Record<string, unknown>) => byName.get(name)?.run(input);
 
+    expect(await run("grimoire_build", {})).toMatchObject({ routes: "fresh" });
+    expect(adapter.calls.routes).toBe(1);
     expect(await run("grimoire_file", { file: "src/app/orders/routes.ts" })).toMatchObject({
       type: "file",
     });
@@ -437,10 +519,7 @@ describe("Grimoire MCP tools", () => {
     expect(await run("grimoire_search", { text: "order", limit: 2 })).toMatchObject({
       type: "search",
     });
-    expect(await run("grimoire_check", {})).toMatchObject({ schemaVersion: 1, routes: "missing" });
-    expect(adapter.calls.routes).toBe(0);
-
-    expect(await run("grimoire_build", {})).toMatchObject({ routes: "fresh" });
+    expect(await run("grimoire_check", {})).toMatchObject({ schemaVersion: 1, routes: "fresh" });
     expect(adapter.calls.routes).toBe(1);
     expect(await run("grimoire_route", { method: "post", path: "/api/orders" })).toMatchObject({
       type: "route",
@@ -455,7 +534,14 @@ describe("Grimoire MCP tools", () => {
   });
 
   it("turns Grimoire errors into tool errors with the code and the fix", async () => {
-    const byName = tools(fixture().root, createShopAdapter());
+    const copy = fixture();
+    const adapter = createShopAdapter();
+    const byName = tools(copy.root, adapter);
+
+    await expect(
+      byName.get("grimoire_file")?.run({ file: "src/app/orders/routes.ts" }),
+    ).rejects.toThrow(/^GR9007: The book has not been built yet\./);
+    await byName.get("grimoire_build")?.run({});
 
     await expect(byName.get("grimoire_flow")?.run({ flow: "catalog/returns" })).rejects.toThrow(
       /^GR9004: No flow catalog\/returns\..* Fix: /,

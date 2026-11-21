@@ -16,6 +16,6 @@
  *   `BookManifest.boot`); with `cached` the old ones are kept and reported
  *   `stale`.
  */
-export { buildBook, defaultRouteInputs, loadBook } from "./build";
+export { buildBook, checkBook, defaultRouteInputs, loadBook, type BookCheck } from "./build";
 export { packagesOf, renderModuleSummary } from "./render";
 export { writeBook } from "./write";

@@ -155,7 +155,13 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   process plus start-up. Check separately why CLI start-up is about 1.8 s (`warlock --help` alone takes about 3 s).
 - Acceptance: a spec that scry never calls `buildCollectedFiles`/`scanProofs` or writes; a spec for the stale note; the
   same timing script (kept with the eval) shows the in-process time on this app; answers identical to today's.
-- Status: open.
+- Status: done on branch `t195-scry-read-only`, not merged or released. `build` writes
+  `grimoire/book/.cache/derived.json`; `scry` and the MCP tools read it (`workspace/stored.ts`), new code GR9007 when
+  the book is not built. Measured on a copy of the same app, 56 benchmark queries, one process each, time around the
+  answer: median 6,573 ms → 1,104 ms (p90 6,816 → 1,147), 56/56 answers identical. What is left of the 1.1 s: change
+  check 0.33 s (facts load + scan), `derived.json` load 0.3 s (72 MB, of which book maps 59 MB), search 0.2 s.
+  Grimoire typecheck clean, 678/678 tests pass. Follow-ups: load book maps only for queries that need them; CLI
+  start-up about 1.8 s.
 
 ## From the 5.62.0 release
 

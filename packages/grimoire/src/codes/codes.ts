@@ -802,6 +802,14 @@ export const GRIMOIRE_CODE_LIST = [
     "Read the command's help (`warlock scry --help`) and pass the argument in that form.",
     USE,
   ),
+  define(
+    "GR9007",
+    "usage",
+    "error",
+    "The book is not built",
+    "Run `warlock grimoire build`, then ask again. `warlock scry` only reads the book; it never builds it.",
+    USE,
+  ),
 ] as const;
 
 /** One registered code, as a union. */

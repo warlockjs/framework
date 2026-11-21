@@ -57,7 +57,7 @@ routes file, a file it imports, a config file, a mail, job, event or notificatio
 - `warlock grimoire build` and `warlock grimoire check` boot the app only when the route facts are stale or missing.
   When the app does not boot, they go on with the cached route facts and print a `GR8002` warning.
 - `warlock scry` and the MCP tools never boot the app. They use the cached route facts and add a note when they are
-  stale. The first `warlock scry --route` (or `grimoire_route`) of a project with no route facts reads them once.
+  stale. A route question of a project with no route facts stops with `GR9002`; run `warlock grimoire build` first.
 - An app with several sites (`src/web/$sites/<site>`) loads only `src/config/web.ts` for file questions, because the
   sites' base paths shape the page routes.
 
@@ -139,6 +139,17 @@ It writes the list of the changelog entries stamped with that release between th
 
 One question at a time. Text by default, `--json` for the result object. Paths may use either separator and may be
 absolute.
+
+`scry` only reads. It answers from the book the last `warlock grimoire build` left in `grimoire/book/` and never
+rebuilds it, never boots the app and never writes a file, so a call on a large app takes a fraction of a second. Run
+`warlock grimoire build` after you finish editing. While the code, test or written files differ from the book, every
+answer ends with a note (in `--json`, the `notes` list), and the answer is the stored one:
+
+```
+note      book is stale (12 files changed); run warlock grimoire build
+```
+
+A project whose book was never built (or was built by another version) stops with `GR9007`.
 
 ### A file
 
@@ -317,6 +328,7 @@ GR9003  No feature has the id "billing". Features: auth, catalog, orders.
 | `GR9003` | No feature has that id.                                                                            |
 | `GR9004` | No flow has that id.                                                                               |
 | `GR9006` | The question is missing, asks two things at once, or has the wrong form.                           |
+| `GR9007` | The book was never built, or was built by another version: run `warlock grimoire build`.           |
 
 ## MCP tools
 
@@ -348,10 +360,10 @@ of `stat` results (the size and modified time of the code and test files, the fo
 file, the manifest and the test results file; no file is read) and answers from the kept book when the stamp is the
 same. A change to a code file, a written file or the manifest opens the book again on the next call, so answers never
 go stale. On a large app this turns a call that reopened the book (seconds) into a stat pass over the files (a fraction of a
-second). `warlock scry` as a one-off command opens the book once per process; the kept book helps long-running processes.
+second). The read tools open the stored book the way `warlock scry` does: they never rebuild it, and say in `notes` when it is behind the files. `warlock scry` as a one-off command opens the stored book once per process; the kept book helps long-running processes.
 
-The read tools and `grimoire_build` may refresh the book, which is a git-ignored cache, so they do not count as
-writes. `grimoire_build` reads the routes again when they changed (under `warlock mcp` this boots the app once, the
+The read tools write nothing. `grimoire_build` refreshes the book, which is a git-ignored cache, so it does not count as
+a write. `grimoire_build` reads the routes again when they changed (under `warlock mcp` this boots the app once, the
 `warlock inspect` way). `grimoire_release` writes a project file, so the server refuses it unless it runs with
 `--allow-writes`.
 

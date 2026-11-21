@@ -182,16 +182,12 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
   const scry: CLICommand = command({
     name: "scry [file]",
     description:
-      'Grimoire (experimental): ask about a file, --impact <file>, --route "<METHOD path>", --feature <id>, --flow <feature>/<flow> or --search "<text>"; --json for JSON',
+      'Grimoire (experimental): ask the stored book about a file, --impact <file>, --route "<METHOD path>", --feature <id>, --flow <feature>/<flow> or --search "<text>"; --json for JSON. Reads only; run warlock grimoire build after editing',
     preAction: async ({ options: flags }) => {
       scry.commandPreload = undefined;
 
-      // The first route question of a project with no route facts reads them once.
-      const preload = await preloadFor(
-        async () =>
-          flags.route !== undefined &&
-          !(await (await import("./actions")).hasRouteFacts(process.cwd())),
-      );
+      // scry only reads the stored book: it never boots the app (a multi-site app still loads its web config).
+      const preload = await preloadFor(async () => false);
 
       if (preload) scry.commandPreload = preload;
     },

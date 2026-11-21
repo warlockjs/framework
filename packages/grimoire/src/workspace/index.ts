@@ -5,7 +5,8 @@
  * 2. `buildBook(root, adapter, { routes })`;
  * 3. `matchApps`, `resolveOwnership`, `scanProofs`, `readTestResults`;
  * 4. `buildCollectedFiles`, `annotationsFrom`;
- * 5. when `write` is not `false`: `writeBook` and `writeCollectedFiles`.
+ * 5. when `write` is not `false`: `writeBook`, `writeCollectedFiles` and the derived file
+ *    (`derived.ts`) that `openStoredGrimoire` reads instead of computing 1–4.
  *
  * A second run with nothing changed calls no adapter method and writes no file.
  */
@@ -14,6 +15,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { matchApps } from "../apps";
 import { buildBook, writeBook } from "../book";
+import { grimoireVersion } from "../book/build";
 import {
   annotationsFrom,
   buildCollectedFiles,
@@ -28,6 +30,7 @@ import { toPosixPath } from "../paths";
 import { scanProofs } from "../proves";
 import { readTestResults, resultsFileLabel } from "../test-results";
 import { parseGrimoire } from "../written";
+import { writeDerived } from "./derived";
 
 /** The current sha256 of each test file: the manifest's, else read now (missing files are left out). */
 async function testFileHashes(
@@ -119,24 +122,28 @@ export async function runGrimoire(
   }
 
   const host = (await adapter.host?.(root)) ?? null;
+  const snapshot: GrimoireSnapshot = {
+    root,
+    written,
+    structure,
+    book,
+    ownership,
+    apps,
+    proofs,
+    proofFindings,
+    results,
+    resultsFile,
+    collected,
+    annotations,
+    routes: book.routes,
+    host,
+  };
+
+  // The derived half is kept for the read-only commands (`warlock scry`).
+  if (write) await writeDerived(root, snapshot, grimoireVersion(), options.testResultsFile);
 
   return {
-    snapshot: {
-      root,
-      written,
-      structure,
-      book,
-      ownership,
-      apps,
-      proofs,
-      proofFindings,
-      results,
-      resultsFile,
-      collected,
-      annotations,
-      routes: book.routes,
-      host,
-    },
+    snapshot,
     rebuilt,
     changed,
     book: bookWrite,

@@ -59,6 +59,12 @@ npx warlock scry --feature catalog                                  # the whole 
 npx warlock scry --flow catalog/new-arrivals                        # one flow, step by step
 ```
 
+`scry` only reads the book the last `warlock grimoire build` left; it never rebuilds it. After you
+finish editing files, run `npx warlock grimoire build`. When code, test or written files differ from
+the book, the answer is the stored one and ends with
+`note book is stale (12 files changed); run warlock grimoire build` (in `--json`, the `notes` list):
+build, then ask again. A project with no book stops with `GR9007`.
+
 Add `--json` for machine-readable output. `--impact` lists API routes, pages, flows and features,
 including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`
 prints every line. `--search` also reads a flow's summary, story, cases and criteria (`AC-5` works), ranks features and flows above files, and groups hits by type; a hit found by written text shows the part that matched in brackets. Read the flows it names and run their tests after
@@ -71,7 +77,7 @@ in `grimoire/book/app/auth/controllers/login.controller.json`.
 
 | Command                                     | Does                                                                                                                                   |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `warlock grimoire build`                    | Builds or refreshes the book. `scry` and `check` do it when it is stale                                                                |
+| `warlock grimoire build`                    | Builds or refreshes the book (and its derived data). Run it after you finish editing; `scry` only reads and never builds               |
 | `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`); skipped when the folder is already current (`--force` writes it) |
 | `warlock grimoire build --site --product`   | Writes the business export: the Product map only, no file paths, test names or per-file answers                                        |
 | `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error; `--all` lists every warning                          |
@@ -114,6 +120,7 @@ From `@warlock.js/grimoire` (no dependency on core or web):
 - `openGrimoire` loads everything once (it runs `parseGrimoire`, `buildBook`, `matchApps`,
   `resolveOwnership`, `scanProofs`, `readTestResults`, `buildCollectedFiles`, then `writeBook`
   and `writeCollectedFiles`), and returns a snapshot.
+- `openStoredGrimoire(root, adapter)` is the read-only open behind `scry` (the stored snapshot, `behind` set when files moved; `GR9007` when never built) and `checkBook()` is `buildBook`'s change check with nothing rebuilt or written.
 - `scry` answers a query from the snapshot; `formatScryResult` prints it; `parseScryQuery` reads
   CLI arguments into a query.
 - `checkGrimoire` runs every rule; `formatCheckReport` prints the report. Each finding has a code

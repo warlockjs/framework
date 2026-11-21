@@ -31,9 +31,17 @@ import { bookEntryPaths, projectPath, toPosixPath } from "../paths";
 const byText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
 const sortedUnique = (items: Iterable<string>): string[] => [...new Set(items)].sort(byText);
 
-/** Notes every answer carries: how fresh the route facts are. */
+/** Notes every answer carries: whether the stored book is behind the files, and how fresh the route facts are. */
 function notesOf(snapshot: GrimoireSnapshot, needsRoutes: boolean): ScryNotes {
   const notes: string[] = [];
+
+  if (snapshot.behind !== undefined) {
+    const count = snapshot.behind.changed;
+
+    notes.push(
+      `book is stale (${count} ${count === 1 ? "file" : "files"} changed); run warlock grimoire build`,
+    );
+  }
 
   if (snapshot.routes === "stale") notes.push("route facts are stale; run warlock grimoire build");
   if (snapshot.routes === "missing" && needsRoutes) {

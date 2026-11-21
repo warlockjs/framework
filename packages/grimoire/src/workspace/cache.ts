@@ -20,6 +20,7 @@ import type { GrimoireSnapshot, OpenGrimoireOptions } from "../contracts/snapsho
 import { GRIMOIRE_PATHS } from "../paths";
 import { resolveResultsFile } from "../test-results";
 import { openGrimoire } from "./index";
+import { openStoredGrimoire } from "./stored";
 
 /** The written folders whose every file is part of the stamp. */
 const WRITTEN_TREES = [
@@ -273,4 +274,16 @@ export function openGrimoireCached(
   options: OpenGrimoireOptions = {},
 ): Promise<GrimoireSnapshot> {
   return openedBooks.open(root, adapter, options);
+}
+
+/** The same cache over the read-only open (`openStoredGrimoire`): never builds, never writes. */
+export const storedBooks: BookCache = createBookCache(openStoredGrimoire);
+
+/** `openStoredGrimoire` that keeps the book in memory while nothing changed. */
+export function openStoredGrimoireCached(
+  root: string,
+  adapter: BookAdapter,
+  options: OpenGrimoireOptions = {},
+): Promise<GrimoireSnapshot> {
+  return storedBooks.open(root, adapter, { ...options, write: false });
 }

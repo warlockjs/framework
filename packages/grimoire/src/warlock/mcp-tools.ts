@@ -163,15 +163,14 @@ export function createGrimoireMcpTools(
       writes: false,
       run: async (input) => {
         try {
-          const [{ parseFlowText, scry }, { openGrimoireCached }, compact] = await Promise.all([
-            scryParts(),
-            import("../workspace/cache"),
-            import("../scry/compact"),
-          ]);
+          const [{ parseFlowText, scry }, { openStoredGrimoireCached }, compact] =
+            await Promise.all([
+              scryParts(),
+              import("../workspace/cache"),
+              import("../scry/compact"),
+            ]);
           const query = { type: "flow" as const, ...parseFlowText(text(input, "flow")) };
-          const snapshot = await openGrimoireCached(root, await loadAdapter(), {
-            routes: "cached",
-          });
+          const snapshot = await openStoredGrimoireCached(root, await loadAdapter());
           const result = scry(snapshot, query);
 
           if (result.type !== "flow") return result;

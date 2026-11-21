@@ -38,11 +38,12 @@ export {
 export { fileGraph, importClosure, importerClosure, type FileGraph } from "./graph";
 
 export { parseGrimoire, type ParseGrimoireResult } from "./written";
-export { buildBook, loadBook, writeBook } from "./book";
+export { buildBook, checkBook, loadBook, writeBook, type BookCheck } from "./book";
 export { resolveOwnership } from "./ownership";
 export { matchApps } from "./apps";
 export { buildCollectedFiles, writeCollectedFiles, type CollectedInput } from "./bookmap";
 export { openGrimoire } from "./workspace";
+export { openStoredGrimoire } from "./workspace/stored";
 export { scanProofs, scanProofsInText, type ScanProofsResult } from "./proves";
 export { checkGrimoire, formatCheckReport } from "./check";
 export { collectRelease, renderCollectedList, writeRelease } from "./releases";
