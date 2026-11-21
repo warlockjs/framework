@@ -6,7 +6,7 @@
 
 ### Changed
 
-- `warlock scry` and the MCP read tools only read. They answer from the book the last `warlock grimoire build` left on disk and no longer rebuild it, boot the app or write a file. Each call used to run the whole pipeline (book maps, owners, proofs, a write comparison); it now runs one change check and reads the stored book. When code, test or written files differ from the book, the answer is still the stored one and ends with `note book is stale (12 files changed); run warlock grimoire build` (in `--json`, the `notes` list).
+- `warlock scry` and the MCP read tools only read. They answer from the book the last `warlock grimoire build` left on disk and no longer rebuild it, boot the app or write a file. Each call used to run the whole pipeline (book maps, owners, proofs, a write comparison); it now runs one change check and reads the stored book. When code, test or written files differ from the book, the answer is still the stored one and ends with `note book is stale (12 files changed); run warlock grimoire build` (in `--json`, the `notes` list). `grimoire_check` reads the stored book the same way.
 - `warlock grimoire build` and `warlock grimoire check` now also write `grimoire/book/.cache/derived.json` (owners, apps, proofs, test results, book maps, annotations). It is a git-ignored cache.
 - `warlock scry --route` no longer boots the app to read missing route facts; it stops with `GR9002` and tells you to run `warlock grimoire build`.
 

@@ -44,6 +44,10 @@ export async function openStoredGrimoire(
     throw notBuilt("The book's derived data is missing or was written by another version.");
   }
 
+  if (derived.builtAt !== checked.book.manifest.builtAt) {
+    throw notBuilt("The book's derived data does not match its manifest (a build did not finish).");
+  }
+
   const moved = movedInputs(derived.inputs, await derivedInputs(root, options.testResultsFile));
   const changed = checked.changed.length + moved;
 

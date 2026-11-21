@@ -232,18 +232,18 @@ export function createGrimoireMcpTools(
     {
       name: "grimoire_check",
       description:
-        "Run the Grimoire check: written names that point at nothing, files without a header or feature, criteria without tests, version and changelog problems. Findings on proposed work are marked expected. Read-only; uses cached route facts.",
+        "Run the Grimoire check: written names that point at nothing, files without a header or feature, criteria without tests, version and changelog problems. Findings on proposed work are marked expected. Read-only; checks the stored book (run warlock grimoire build after editing).",
       input: inputSchema({}),
       writes: false,
       run: async () => {
         try {
-          const [{ openGrimoireCached }, { checkGrimoire }] = await Promise.all([
+          const [{ openStoredGrimoireCached }, { checkGrimoire }] = await Promise.all([
             import("../workspace/cache"),
             import("../check"),
           ]);
 
           return checkGrimoire(
-            await openGrimoireCached(root, await loadAdapter(), { routes: "cached" }),
+            await openStoredGrimoireCached(root, await loadAdapter()),
           );
         } catch (error) {
           return toolError(error);

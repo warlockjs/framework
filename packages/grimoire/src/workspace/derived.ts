@@ -26,7 +26,7 @@ import { resolveResultsFile } from "../test-results";
 export const DERIVED_PATH = `${GRIMOIRE_PATHS.book}/.cache/derived.json`;
 
 /** Bump when the shape below changes: an older file is treated as missing. */
-export const DERIVED_SCHEMA_VERSION = 1;
+export const DERIVED_SCHEMA_VERSION = 2;
 
 /** The written folders whose every file is part of the fingerprint. */
 const WRITTEN_TREES = [
@@ -56,6 +56,8 @@ export type DerivedSnapshot = {
 export type StoredDerived = {
   schemaVersion: number;
   grimoireVersion: string;
+  /** `manifest.builtAt` of the book this was derived from: a build that stopped between the two writes leaves a mismatch. */
+  builtAt: string;
   /** Project-relative POSIX path → `size:mtimeMs`, of every written file and the test results file. */
   inputs: Record<string, string>;
   snapshot: DerivedSnapshot;
@@ -140,6 +142,7 @@ export async function writeDerived(
   const stored: StoredDerived = {
     schemaVersion: DERIVED_SCHEMA_VERSION,
     grimoireVersion: version,
+    builtAt: snapshot.book.manifest.builtAt,
     inputs: await derivedInputs(root, testResultsFile),
     snapshot: {
       written: snapshot.written,
@@ -171,6 +174,9 @@ export async function readDerived(root: string, version: string): Promise<Stored
     stored === null ||
     stored.schemaVersion !== DERIVED_SCHEMA_VERSION ||
     stored.grimoireVersion !== version ||
+    typeof stored.builtAt !== "string" ||
+    typeof stored.inputs !== "object" ||
+    stored.inputs === null ||
     typeof stored.snapshot !== "object" ||
     stored.snapshot === null
   ) {

@@ -3,7 +3,7 @@
  * expensive step runs, nothing is written, a moved file gives a note, and a
  * book that was never built gives `GR9007`.
  */
-import { readdirSync, rmSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createShopAdapter } from "../../tests/fixtures/shop-facts";
@@ -169,5 +169,32 @@ describe("openStoredGrimoire", () => {
 
     await runGrimoire(copy.root, adapter, { routes: "fresh", write: false });
     await expect(openStoredGrimoire(copy.root, adapter)).rejects.toMatchObject({ code: "GR9007" });
+  });
+
+  it("fails with GR9007 when the derived data is corrupt, from an older schema, or from another build", async () => {
+    copy = copyFixture();
+    const adapter = createShopAdapter();
+    const file = path.join(copy.root, ...DERIVED_PATH.split("/"));
+
+    await runGrimoire(copy.root, adapter, { routes: "fresh" });
+
+    const good = readFileSync(file, "utf8");
+    const stored = JSON.parse(good) as Record<string, unknown>;
+
+    for (const broken of [
+      "{ not json",
+      JSON.stringify({ ...stored, schemaVersion: 1 }),
+      JSON.stringify({ ...stored, grimoireVersion: "0.0.0" }),
+      JSON.stringify({ ...stored, builtAt: "1999-01-01T00:00:00.000Z" }),
+      JSON.stringify({ ...stored, snapshot: null }),
+    ]) {
+      writeFileSync(file, broken);
+      await expect(openStoredGrimoire(copy.root, adapter)).rejects.toMatchObject({
+        code: "GR9007",
+      });
+    }
+
+    writeFileSync(file, good);
+    expect((await openStoredGrimoire(copy.root, adapter)).behind).toBeUndefined();
   });
 });

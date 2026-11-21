@@ -19,6 +19,7 @@ import type { BookAdapter } from "../contracts/adapter";
 import type { GrimoireSnapshot, OpenGrimoireOptions } from "../contracts/snapshot";
 import { GRIMOIRE_PATHS } from "../paths";
 import { resolveResultsFile } from "../test-results";
+import { DERIVED_PATH } from "./derived";
 import { openGrimoire } from "./index";
 import { openStoredGrimoire } from "./stored";
 
@@ -143,6 +144,7 @@ async function takeStamp(
   const singles = [
     path.join(root, ...GRIMOIRE_PATHS.bookManifest.split("/")),
     path.join(root, ...GRIMOIRE_PATHS.bookRoutes.split("/")),
+    path.join(root, ...DERIVED_PATH.split("/")),
     resolveResultsFile(root, testResultsFile),
     path.join(root, "package.json"),
   ];
