@@ -20,7 +20,9 @@ describe("parseScryQuery", () => {
       path: "/chat",
       site: "admin",
     });
-    expect(() => parseScryQuery([], { route: "GET /chat", site: true })).toThrow(/--site needs a value/);
+    expect(() => parseScryQuery([], { route: "GET /chat", site: true })).toThrow(
+      /--site needs a value/,
+    );
   });
 
   it("reads every query form", () => {

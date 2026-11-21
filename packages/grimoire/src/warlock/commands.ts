@@ -200,7 +200,8 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
       { text: "--impact", description: "What a change to this file reaches", type: "string" },
       {
         text: "--route",
-        description: 'One route or page URL: "<METHOD> <path>" (GET and HEAD also find pages and screens)',
+        description:
+          'One route or page URL: "<METHOD> <path>" (GET and HEAD also find pages and screens)',
         type: "string",
       },
       { text: "--site", description: "--route: only the page of this site or app", type: "string" },

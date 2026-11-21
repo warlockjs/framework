@@ -242,20 +242,21 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   the full pipeline on every CLI call: the in-memory cache only helps a long-lived process (MCP, dev tab). Steps
   timed by a script that calls the same functions in order:
 
-  | Step | ms |
-  |---|---|
-  | `buildCollectedFiles` (book maps, indexes) | 3,290-3,500 |
-  | `matchApps` + `resolveOwnership` | 1,030 |
-  | `scanProofs` (reads 3,279 test files) | 770-810 |
-  | `writeBook` + `writeCollectedFiles` (writes nothing, compares) | 490 |
-  | `buildBook` (scan + fingerprint) | 310 |
-  | the search itself | 210 |
-  | facts load, `parseGrimoire`, rest | about 300 |
-  | in process total | 6,000-6,750 |
-  | CLI start-up before the command runs | about 1,800 |
-  | whole `npx warlock scry` call | 8,660-8,900 |
+  | Step                                                           | ms          |
+  | -------------------------------------------------------------- | ----------- |
+  | `buildCollectedFiles` (book maps, indexes)                     | 3,290-3,500 |
+  | `matchApps` + `resolveOwnership`                               | 1,030       |
+  | `scanProofs` (reads 3,279 test files)                          | 770-810     |
+  | `writeBook` + `writeCollectedFiles` (writes nothing, compares) | 490         |
+  | `buildBook` (scan + fingerprint)                               | 310         |
+  | the search itself                                              | 210         |
+  | facts load, `parseGrimoire`, rest                              | about 300   |
+  | in process total                                               | 6,000-6,750 |
+  | CLI start-up before the command runs                           | about 1,800 |
+  | whole `npx warlock scry` call                                  | 8,660-8,900 |
 
   Also: a read command writes (compares) the book on every call (`write` defaults to true).
+
 - Decision (owner, 2026-11-21): `scry` only reads; it never rebuilds or writes the book. Rebuilding is
   `warlock grimoire build`, which agents run after they finish their edits (skill: "after editing, run
   `warlock grimoire build`"). Today the skill says the opposite (`use-the-grimoire/SKILL.md:74`: "`scry` and `check`

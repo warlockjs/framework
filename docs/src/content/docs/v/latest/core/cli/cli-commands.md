@@ -280,21 +280,21 @@ warlock migrate --sql --compact          # ...minus comments and blank lines
 warlock migrate --path src/app/orders/models/order/migrations
 ```
 
-| Flag             | Type    | Description                                                                 |
-| ---------------- | ------- | --------------------------------------------------------------------------- |
-| `--fresh, -f`    | boolean | Drop all tables and re-run migrations from scratch.                         |
-| `--rollback, -r` | boolean | Roll back migrations, dropping all tables.                                  |
-| `--yes, -y`      | boolean | With `--fresh` or `--rollback`: confirm without asking. See below.          |
-| `--force`        | boolean | Same as `--yes`.                                                            |
+| Flag              | Type    | Description                                                                                                                        |
+| ----------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `--fresh, -f`     | boolean | Drop all tables and re-run migrations from scratch.                                                                                |
+| `--rollback, -r`  | boolean | Roll back migrations, dropping all tables.                                                                                         |
+| `--yes, -y`       | boolean | With `--fresh` or `--rollback`: confirm without asking. See below.                                                                 |
+| `--force`         | boolean | Same as `--yes`.                                                                                                                   |
 | `--prune-missing` | boolean | With `--fresh` or `--rollback`: delete the records of executed migrations whose file no longer exists, instead of failing on them. |
-| `--path, -p`     | string  | Path to a specific migration file or folder. Defaults to running all.       |
-| `--timeout, -t`  | number  | Abort a migration that runs longer than this many seconds (off by default). |
-| `--list, -l`     | boolean | Migration state: executed migrations, then what will run next.              |
-| `--pending`      | boolean | Only what will run next, in execution order. Sets an exit code — see below. |
-| `--all, -a`      | boolean | List _every_ migration file in the app, executed or not.                    |
-| `--sql, -s`      | boolean | Export migrations as phase-ordered SQL files instead of executing them.     |
-| `--pending-only` | boolean | With `--sql`, export only pending migrations. Otherwise exports all.        |
-| `--compact, -c`  | boolean | With `--sql`, strips generated comments and blank lines.                    |
+| `--path, -p`      | string  | Path to a specific migration file or folder. Defaults to running all.                                                              |
+| `--timeout, -t`   | number  | Abort a migration that runs longer than this many seconds (off by default).                                                        |
+| `--list, -l`      | boolean | Migration state: executed migrations, then what will run next.                                                                     |
+| `--pending`       | boolean | Only what will run next, in execution order. Sets an exit code — see below.                                                        |
+| `--all, -a`       | boolean | List _every_ migration file in the app, executed or not.                                                                           |
+| `--sql, -s`       | boolean | Export migrations as phase-ordered SQL files instead of executing them.                                                            |
+| `--pending-only`  | boolean | With `--sql`, export only pending migrations. Otherwise exports all.                                                               |
+| `--compact, -c`   | boolean | With `--sql`, strips generated comments and blank lines.                                                                           |
 
 The minimal preload — only `database` and `logger` connectors — keeps migrations fast.
 

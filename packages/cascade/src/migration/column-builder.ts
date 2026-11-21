@@ -139,7 +139,6 @@ export class ColumnBuilder {
    * ```
    */
   public default(value: string | number | boolean): this {
-
     this.definition.defaultValue = value;
     this.definition.isRawDefault = true;
     return this;

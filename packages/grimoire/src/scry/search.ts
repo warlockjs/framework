@@ -208,10 +208,7 @@ function candidates(snapshot: GrimoireSnapshot): Candidate[] {
     ...facts.mobile.flatMap((app) => app.screens.map((screen) => screen.file)),
   ]);
 
-  const add = (
-    hit: Candidate["hit"],
-    extra: Partial<Omit<Candidate, "hit">> = {},
-  ): void => {
+  const add = (hit: Candidate["hit"], extra: Partial<Omit<Candidate, "hit">> = {}): void => {
     list.push({
       hit,
       name: extra.name ?? hit.id,

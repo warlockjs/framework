@@ -21,14 +21,14 @@ function snapshotOf(fixture: Fixture): GrimoireSnapshot {
     id: located(app),
     layouts: [],
     screens: [],
-    pages: [...new Set((fixture.blocks ?? []).filter((row) => row.app === app).map((r) => r.page))].map(
-      (page) => ({
-        id: page,
-        blocks: (fixture.blocks ?? [])
-          .filter((row) => row.app === app && row.page === page)
-          .map((row) => ({ block: row.block, flow: row.flow ?? null })),
-      }),
-    ),
+    pages: [
+      ...new Set((fixture.blocks ?? []).filter((row) => row.app === app).map((r) => r.page)),
+    ].map((page) => ({
+      id: page,
+      blocks: (fixture.blocks ?? [])
+        .filter((row) => row.app === app && row.page === page)
+        .map((row) => ({ block: row.block, flow: row.flow ?? null })),
+    })),
   }));
 
   return {
@@ -204,7 +204,9 @@ describe("scry search ranking", () => {
       files: [{ file: "src/home/x.tsx" }, { file: "src/home/y.tsx" }],
       pages: [{ file: "src/home/y.tsx", route: "/" }],
     });
-    const ids = search(snapshot, "home").hits.filter((hit) => hit.type === "file").map((h) => h.id);
+    const ids = search(snapshot, "home")
+      .hits.filter((hit) => hit.type === "file")
+      .map((h) => h.id);
 
     expect(ids).toEqual(["src/home/y.tsx", "src/home/x.tsx"]);
   });

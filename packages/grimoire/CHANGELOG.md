@@ -2,7 +2,7 @@
 
 `@warlock.js/grimoire` is new in 5.55.0 and experimental: its file layout, `GR` codes and API may change in any release until it is marked stable.
 
-## 5.63.0
+## 5.63.0 - 2026-11-22
 
 ### Added
 

@@ -248,10 +248,7 @@ async function runMigrateAction(options: CommandActionData) {
  * after the summary; elsewhere it prompts, takes `--yes`/`--force`, and exits 1
  * when there is no terminal to ask.
  */
-async function confirmDestructiveRollback(
-  yes: boolean,
-  pruneMissing?: boolean,
-): Promise<boolean> {
+async function confirmDestructiveRollback(yes: boolean, pruneMissing?: boolean): Promise<boolean> {
   try {
     const proceed = await confirmRollback({
       all: true,

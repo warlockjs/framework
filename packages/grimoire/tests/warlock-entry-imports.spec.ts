@@ -68,6 +68,7 @@ describe("the ./warlock entry", () => {
       "src/codes/codes.ts",
       "src/codes/index.ts",
       "src/paths/index.ts",
+      "src/scry/error.ts",
       "src/warlock/adapter.ts",
       "src/warlock/commands.ts",
       "src/warlock/index.ts",

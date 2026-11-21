@@ -46,13 +46,13 @@ describe("rawDefaultSql() with a bare word", () => {
 
 describe("ColumnBuilder.default()", () => {
   it("accepts a bare word: document databases ignore column defaults, the SQL drivers check it", () => {
-    expect(build().default("active").definition).toMatchObject({
+    expect(build().default("active").getDefinition()).toMatchObject({
       defaultValue: "active",
       isRawDefault: true,
     });
   });
 
   it("keeps defaultString() quoted", () => {
-    expect(build().defaultString("agency").definition.isRawDefault).toBe(false);
+    expect(build().defaultString("agency").getDefinition().isRawDefault).toBe(false);
   });
 });

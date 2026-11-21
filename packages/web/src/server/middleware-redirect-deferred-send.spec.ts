@@ -6,7 +6,7 @@ vi.mock("../shared", () => ({
 }));
 
 import { connectPageContext, type PageRouteEntry } from "./execute-page-request";
-import { renderPageRequest } from "./render-page";
+import { renderPageRequest, type RenderedPage } from "./render-page";
 import { createCoreHttp } from "./__fixtures__/core-http";
 
 beforeEach(() => {
@@ -30,8 +30,10 @@ describe("a page middleware that returns the redirected core Response", () => {
           layout: {},
           page: {
             route: { path: "/staff" },
-            middleware: [(({ response }: { response: typeof http.response }) =>
-              response.redirect("/login")) as never],
+            middleware: [
+              (({ response }: { response: typeof http.response }) =>
+                response.redirect("/login")) as never,
+            ],
             default: () => null,
           },
         },
@@ -43,7 +45,9 @@ describe("a page middleware that returns the redirected core Response", () => {
       });
 
       expect(http.reply.redirects).toEqual([{ url: "/login", statusCode: 302 }]);
-      expect("bundle" in rendered ? rendered.bundle?.shortCircuit?.responseSent : true).toBe(true);
+      const circuit = (rendered as RenderedPage).bundle?.shortCircuit;
+
+      expect(circuit?.stage === "middleware" && circuit.responseSent).toBe(true);
     },
   );
 });
