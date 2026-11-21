@@ -4,6 +4,12 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.63.0
+
+### Fixed
+
+- The scaffolded database configs explain that the shared test HTTP server reads worker 1's database (`<name>_test_1`) and point to `createTestHttpServer()` for tests in other workers.
+
 ## 5.55.0 - 2026-11-17
 
 ### Added
