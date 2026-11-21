@@ -5,7 +5,6 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 ## Owner decisions waiting
 
 - Next-major items (T-007, T-009, T-033) wait for 6.0.
-- T-196: index on-screen (locale) text for `scry --search` now, or wait for an app to ask.
 
 ## Next release
 
@@ -55,8 +54,13 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
 ### T-201 [bug] Unconfirmed: the shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
 
 - Evidence named: scaffold `src/test-global-setup.ts`, scaffold `src/config/database.ts`, `packages/core/src/tests/reset-test-database.ts:49-60`.
-- Needs: a repro in a fresh scaffold with two workers before a fix.
-- Status: being reproduced (5.63.0).
+- Checked 2026-11-22: confirmed as name resolution. The main-process server has no `VITEST_POOL_ID`, so it reads
+  `<db>_test_1`; worker N writes `<db>_test_N` (scaffold `src/config/database*.ts`, `reset-test-database.ts:49-60`).
+  Spec in `packages/core/src/tests/reset-test-database.spec.ts`. 5.63.0 documents it (scaffold comment, testing page).
+- Open: a real fix needs a design: one shared server cannot serve several worker databases. Options: the server
+  picks the data source per request from a worker header the request helpers send, or the scaffold starts one server
+  per worker. Workaround: `createTestHttpServer()` per test file.
+- Status: documented in 5.63.0; behaviour fix open.
 
 ### T-202 [bug] Unconfirmed: the 403 page renders inside the root layout without the layout's loader data
 
@@ -65,9 +69,10 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
 
 ### T-203 [bug] Unconfirmed: `.apk` files from `public/` are served with an empty `Content-Type`
 
-- Needs: a curl repro on a clean app; find whether core's static layer (`packages/core/src/http/lazy-static.ts`) or
-  `@fastify/static` drops the type.
-- Status: being reproduced (5.63.0).
+- Checked 2026-11-22: not reproduced. `packages/core/src/http/lazy-static-mime.spec.ts` serves `downloads/x.apk`
+  through `registerLazyStatic` and gets `application/vnd.android.package-archive` (`@fastify/static` 10.1.5 via
+  `@fastify/send` 4.1.1); core sets no content type. Likely the reporter's proxy or a custom header.
+- Status: not reproduced; spec kept. Close unless the reporter shows a repro on a clean app.
 
 ## From the 2026-11-21 scry field report
 
@@ -209,7 +214,7 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   code files the fix changed). Whole quote: today's BM25F 13/51 at hit@20; exact-value tier alone 17/51 (+0.061 RR, CI
   0.008 to 0.128, 4 gained, 0 lost); locale field 17/51 but full-title commit queries drop 72 → 69 (CI -0.046 to
   -0.005). The gain is in exact quotes only (n=26: 8 → 12); the whole bug-report line gains nothing.
-- Status: owner decision: build the exact-value tier only (small, measured gain of 4/51), or wait for an app to ask.
+- Status: waiting. Owner decision (2026-11-22): keep it for now; build when an app asks (start with the exact-value tier).
 
 ### T-197 [feature] `scry --search`: files borrow the words of the flows and features that own them
 
