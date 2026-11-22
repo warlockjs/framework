@@ -2,6 +2,22 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+## Not released: agent test (2026-11-22)
+
+### T-205 [chore] Agent test: `scry` (5.63.1) against grep for finding the files to change
+
+- Source: owner, 2026-11-22 (the agent test agreed after 5.63.0; owner asked to run it unattended and mail the result
+  with a recommendation, plus advice on faster, lower-token, scope-safe agent work).
+- What: 10 localization tasks from held-out app commits (book built before each fix), Sonnet with and without scry, 2
+  repetitions (Haiku as an extra arm if budget allows); tool calls, grep calls, tokens, cost, time, first-file accuracy,
+  recall. Brief: `findings/agent-test/BRIEF.md` (git-ignored); report `findings/agent-test/REPORT.md`.
+- Acceptance: report with per-task tables, medians, paired CIs and a verdict; owner mailed.
+- Done 2026-11-22: 60 runs (Sonnet 2 x 10 x 2 arms, Haiku 1 x 10 x 2), $7.22; no run edited a file or read outside its
+  tree. Sonnet medians grep-only -> with scry: tool calls 10 -> 8, grep-like 5.5 -> 4.5, reads 4 -> 1, cost $0.178 ->
+  $0.119, first file right 50% -> 65%, mean recall 0.44 -> 0.50, mean precision 0.29 -> 0.40. Clear of zero: grep calls,
+  output tokens, precision. Haiku mostly ignored scry. Owner mailed with the recommendation; follow-up is T-206.
+- Verified: medians recomputed from `findings/agent-test/results.json`.
+
 ## 5.63.1 (2026-11-22)
 
 Source: the same app findings page (F4).

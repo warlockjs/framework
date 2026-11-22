@@ -5,6 +5,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 ## Owner decisions waiting
 
 - Next-major items (T-007, T-009, T-033) wait for 6.0.
+- T-206: build the scry output and guidance changes the agent test points to.
 
 ## Next release
 
@@ -17,15 +18,21 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 Source for T-198..T-203: an app findings page, https://claude.ai/artifact/FJ9uNFjxfnijeXb6fYo97J (app on 5.62.0 with
 PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the reporter ran their repros on 5.62.0.
 
-### T-205 [chore] Agent test: `scry` (5.63.1) against grep for finding the files to change
+### T-206 [decision] scry: put "changes together" files in `--search` output and make agents use it
 
-- Source: owner, 2026-11-22 (the agent test agreed after 5.63.0; owner asked to run it unattended and mail the result
-  with a recommendation, plus advice on faster, lower-token, scope-safe agent work).
-- What: 10 localization tasks from held-out app commits (book built before each fix), Sonnet with and without scry, 2
-  repetitions (Haiku as an extra arm if budget allows); tool calls, grep calls, tokens, cost, time, first-file accuracy,
-  recall. Brief: `findings/agent-test/BRIEF.md` (git-ignored); report `findings/agent-test/REPORT.md`.
-- Acceptance: report with per-task tables, medians, paired CIs and a verdict; owner mailed.
-- Status: running (2026-11-22).
+- Source: T-205 agent test, 2026-11-22 (`findings/agent-test/REPORT.md`, git-ignored). Owner go-ahead needed.
+- Evidence: with scry, Sonnet used fewer grep calls (5.5 -> 4.5) and file reads (4 -> 1), cost $0.178 -> $0.119 and
+  precision 0.29 -> 0.40, but recall barely moved (0.44 -> 0.50, CI spans zero): agents stop at the top hits and never
+  ran `--impact` (0 of 18 scry calls). Haiku called scry in 3 of 10 runs (ignored the `CLAUDE.md` note). Time was equal,
+  so a warm daemon or vector search would not help.
+- Proposal (grimoire, minor):
+  - `--search` lists the files that change with the top hits (from the impact graph).
+  - It prints a "weak match, use grep" note when the top score is low.
+  - It ranks spec, locale and type files below code.
+  - The skill and the generated agent guidance open with "`scry --search` first, then `--impact` on the top hit".
+  - Re-run the T-205 test (about $8, 1 hour), adding an arm with the Grimoire MCP tools in place of the CLI.
+- Acceptance: re-run shows recall up with no loss in precision or cost.
+- Status: waiting for the owner.
 
 ### T-201 [bug] The shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
 
