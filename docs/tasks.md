@@ -17,6 +17,16 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 Source for T-198..T-203: an app findings page, https://claude.ai/artifact/FJ9uNFjxfnijeXb6fYo97J (app on 5.62.0 with
 PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the reporter ran their repros on 5.62.0.
 
+### T-205 [chore] Agent test: `scry` (5.63.1) against grep for finding the files to change
+
+- Source: owner, 2026-11-22 (the agent test agreed after 5.63.0; owner asked to run it unattended and mail the result
+  with a recommendation, plus advice on faster, lower-token, scope-safe agent work).
+- What: 10 localization tasks from held-out app commits (book built before each fix), Sonnet with and without scry, 2
+  repetitions (Haiku as an extra arm if budget allows); tool calls, grep calls, tokens, cost, time, first-file accuracy,
+  recall. Brief: `findings/agent-test/BRIEF.md` (git-ignored); report `findings/agent-test/REPORT.md`.
+- Acceptance: report with per-task tables, medians, paired CIs and a verdict; owner mailed.
+- Status: running (2026-11-22).
+
 ### T-201 [bug] The shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
 
 - Evidence named: scaffold `src/test-global-setup.ts`, scaffold `src/config/database.ts`, `packages/core/src/tests/reset-test-database.ts:49-60`.
