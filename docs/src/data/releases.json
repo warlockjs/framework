@@ -1,4 +1,16 @@
 {
+  "5.63.1": {
+    "publishedAt": "2026-11-22T00:23:11.316Z",
+    "matrix": "none",
+    "headline": "PostgreSQL `date` columns read back as their calendar day on servers ahead of UTC, and `clientOptions.types` reaches the pool.",
+    "highlights": [
+      "PostgreSQL `date` and `date[]` columns read as a `Date` at UTC midnight of their day, whatever the Node process time zone; `timestamp` and `timestamptz` are unchanged.",
+      "A `types` object in the PostgreSQL `clientOptions` replaces Cascade's built-in parsers instead of being overwritten."
+    ],
+    "upgradeNotes": [
+      "On servers ahead of UTC, `date` values edited and saved before the upgrade were stored a day early; check edited dates. Workarounds (`pg.types.setTypeParser(1082, …)`, `TZ=UTC`) can be removed."
+    ]
+  },
   "5.63.0": {
     "publishedAt": "2026-11-21T23:05:29.879Z",
     "matrix": "none",

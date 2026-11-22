@@ -8,7 +8,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Next release
 
-- 5.63.1: T-204 (PostgreSQL `date` columns). 5.63.0 shipped T-188..T-195, T-197 (closed), T-198..T-200, T-202, T-203 (closed).
+- 5.63.1 shipped T-204 (PostgreSQL `date` columns). 5.63.0 shipped T-188..T-195, T-197 (closed), T-198..T-200, T-202, T-203 (closed).
 - 5.62.0 shipped T-185, T-186 and T-187 (see `tasks.completed.md`).
 - 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
 
@@ -16,21 +16,6 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 Source for T-198..T-203: an app findings page, https://claude.ai/artifact/FJ9uNFjxfnijeXb6fYo97J (app on 5.62.0 with
 PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the reporter ran their repros on 5.62.0.
-
-### T-204 [bug] PostgreSQL `date` columns read back as server-local midnight; `clientOptions.types` is discarded
-
-- Source: same app findings page (F4, added 2026-11-22 after 5.63.0 was dispatched); repro run by the reporter on
-  cascade 5.62.0 with PostgreSQL 18.7: under `TZ=Africa/Cairo` a `date` of `2026-08-24` reads back as
-  `2026-08-23T21:00:00.000Z`; a custom 1082 parser in `clientOptions.types` is never called.
-- Evidence (re-read on `main` at `e87c03a20`): `packages/cascade/src/drivers/postgres/postgres-driver.ts:98-116`
-  (`createPostgresTypes` overrides only int8), `:466` (`poolConfig.types = createPostgresTypes(pg.types)` always,
-  overwriting `clientOptions.types`); `postgres-type-converters.ts:29` (`[1082, toDate]` never runs: pg already
-  returned a `Date`). The session `TimeZone` is pinned to UTC; the Node process zone is not.
-- Fix: parse `date` (1082, and the 1182 array) as UTC midnight in `createPostgresTypes` (keep `infinity` and BC values
-  on pg's parser); when the app passes `clientOptions.types`, use it instead of the built-in overrides.
-- Acceptance: spec with `TZ` ahead of UTC (or the parser called directly under a forced offset): `2026-08-24` reads as
-  `2026-08-24T00:00:00.000Z`; a custom `types` object is used; docs (PostgreSQL driver page), CHANGELOG.
-- Status: open (5.63.1).
 
 ### T-201 [bug] The shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
 

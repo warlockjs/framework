@@ -2,6 +2,25 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+## 5.63.1 (2026-11-22)
+
+Source: the same app findings page (F4).
+
+### T-204 [bug] PostgreSQL `date` columns read back as server-local midnight; `clientOptions.types` is discarded
+
+- Source: same app findings page (F4, added 2026-11-22 after 5.63.0 was dispatched); repro run by the reporter on
+  cascade 5.62.0 with PostgreSQL 18.7: under `TZ=Africa/Cairo` a `date` of `2026-08-24` reads back as
+  `2026-08-23T21:00:00.000Z`; a custom 1082 parser in `clientOptions.types` is never called.
+- Evidence (re-read on `main` at `e87c03a20`): `packages/cascade/src/drivers/postgres/postgres-driver.ts:98-116`
+  (`createPostgresTypes` overrides only int8), `:466` (`poolConfig.types = createPostgresTypes(pg.types)` always,
+  overwriting `clientOptions.types`); `postgres-type-converters.ts:29` (`[1082, toDate]` never runs: pg already
+  returned a `Date`). The session `TimeZone` is pinned to UTC; the Node process zone is not.
+- Fix: parse `date` (1082, and the 1182 array) as UTC midnight in `createPostgresTypes` (keep `infinity` and BC values
+  on pg's parser); when the app passes `clientOptions.types`, use it instead of the built-in overrides.
+- Acceptance: spec with `TZ` ahead of UTC (or the parser called directly under a forced offset): `2026-08-24` reads as
+  `2026-08-24T00:00:00.000Z`; a custom `types` object is used; docs (PostgreSQL driver page), CHANGELOG.
+- Shipped: 5.63.1 (`2b963e495`, tag `v5.63.1`, run 44964391841). Verified by `packages/cascade/src/drivers/postgres/postgres-date.spec.ts` and one full pass.
+
 ## 5.63.0 (2026-11-22)
 
 Sources: the 2026-11-21 scry field report and benchmark (T-188..T-197) and an app findings page,

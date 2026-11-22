@@ -140,6 +140,63 @@
   ],
   "releases": [
     {
+      "version": "5.63.1",
+      "id": "v5-63-1",
+      "date": "November 22, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "PostgreSQL <code>date</code> columns read back as their calendar day on servers ahead of UTC, and <code>clientOptions.types</code> reaches the pool.",
+      "highlights": [
+        "PostgreSQL <code>date</code> and <code>date[]</code> columns read as a <code>Date</code> at UTC midnight of their day, whatever the Node process time zone; <code>timestamp</code> and <code>timestamptz</code> are unchanged.",
+        "A <code>types</code> object in the PostgreSQL <code>clientOptions</code> replaces Cascade's built-in parsers instead of being overwritten."
+      ],
+      "upgradeNotes": [
+        "On servers ahead of UTC, <code>date</code> values edited and saved before the upgrade were stored a day early; check edited dates. Workarounds (<code>pg.types.setTypeParser(1082, …)</code>, <code>TZ=UTC</code>) can be removed."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.63.1-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "PostgreSQL <code>date</code> and <code>date[]</code> columns read back as a <code>Date</code> at UTC midnight of their calendar day, instead of midnight in the Node process time zone (a <code>date</code> of <code>2026-08-24</code> under <code>TZ=Africa/Cairo</code> used to read as <code>2026-08-23T21:00:00.000Z</code>). <code>infinity</code>, <code>-infinity</code> and BC dates stay on <code>pg</code>'s parser; <code>timestamp</code> and <code>timestamptz</code> are unchanged."
+            },
+            {
+              "type": "Fixed",
+              "html": "A <code>types</code> object passed in <code>clientOptions</code> now reaches the PostgreSQL pool and replaces Cascade's built-in parsers; it used to be overwritten."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>warlock release-notes</code> includes the 5.63.1 notes (PostgreSQL <code>date</code> columns read as their calendar day; <code>clientOptions.types</code> is kept)."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.63.0",
       "id": "v5-63-0",
       "date": "November 21, 2026",
