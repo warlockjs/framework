@@ -399,7 +399,7 @@
   font-size: 13.5px;
 }
 .pm-crumbs li:not(:last-child)::after {
-  margin-left: 8px;
+  margin-inline-start: 8px;
   content: "›";
 }
 .pm-title {
@@ -482,7 +482,7 @@
 .pm-step::before {
   position: absolute;
   top: 0;
-  left: 0;
+  inset-inline-start: 0;
   display: grid;
   width: 32px;
   height: 32px;
@@ -497,7 +497,7 @@
   position: absolute;
   top: 36px;
   bottom: -12px;
-  left: 15px;
+  inset-inline-start: 15px;
   width: 2px;
   background: var(--border);
   content: "";
@@ -596,8 +596,8 @@
 .pm-timeline {
   display: grid;
   gap: 22px;
-  padding-left: 22px;
-  border-left: 2px solid var(--border);
+  padding-inline-start: 22px;
+  border-inline-start: 2px solid var(--border);
   list-style: none;
 }
 .pm-release {
@@ -608,7 +608,7 @@
 .pm-release::before {
   position: absolute;
   top: 6px;
-  left: -29px;
+  inset-inline-start: -29px;
   width: 12px;
   height: 12px;
   border: 2px solid var(--brand);
@@ -725,7 +725,7 @@
 .pm-tech-steps {
   display: grid;
   gap: 10px;
-  padding-left: 20px;
+  padding-inline-start: 20px;
 }
 .pm-error {
   display: grid;
@@ -782,4 +782,40 @@
   .pm-card:focus-within {
     transform: none;
   }
+}
+
+/* Hero actions, blocks under a place, What's new */
+.pm-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pm-place-blocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block-start: 4px;
+  list-style: none;
+}
+.pm-place-blocks li {
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 20px;
+}
+.pm-whatsnew-features {
+  display: grid;
+  gap: 14px;
+}
+.pm-whatsnew-feature {
+  display: grid;
+  gap: 6px;
+}
+.pm-whatsnew .pm-changes li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
 }

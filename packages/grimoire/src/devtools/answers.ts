@@ -306,6 +306,8 @@ export type ProductFlowCard = {
 /** Where a reader sees a feature or flow in an app. */
 export type ProductAppearance = {
   app: string;
+  /** The app's heading, or `null` when its README gives none (the id is shown then). */
+  appTitle: string | null;
   type: "page" | "screen" | "layout";
   /** Page or screen folder, or layout id. */
   id: string;
@@ -323,6 +325,32 @@ export type ProductRelease = {
   release: string | null;
   date: string | null;
   changes: { word: ChangeWord; flow: string | null; text: string }[];
+};
+
+/** The changes of one feature in a release, in plain words. */
+export type ProductWhatsNewFeature = {
+  id: string;
+  title: string;
+  /** `flow` is the flow's title, or `null` for a change of the feature as a whole. */
+  changes: { word: ChangeWord; flow: string | null; text: string }[];
+};
+
+/** One release of `GET /product/whats-new`. */
+export type ProductWhatsNewRelease = {
+  /** The release name (`5.64.0`), or `null` for the changes not yet in a release. */
+  release: string | null;
+  date: string | null;
+  /** The first paragraph of the release's brief, or `null`. */
+  brief: string | null;
+  features: ProductWhatsNewFeature[];
+};
+
+/** `GET /product/whats-new`: the changes per release, newest first. Unreleased changes only for the signed-in view. */
+export type ProductWhatsNewAnswer = {
+  releases: ProductWhatsNewRelease[];
+  /** Whether the answer carries developer detail (never through a share link). */
+  developer: boolean;
+  host: BookHost | null;
 };
 
 /** Open work on a feature. */

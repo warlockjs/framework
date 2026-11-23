@@ -33,7 +33,7 @@ still never boots your app.
 
 ## What it shows
 
-The tab opens with a bar of eight views: Product map, Overview, Features, Apps, Tasks, Releases, Check and Modules. The Product map is the view for readers who do not read code; see [the product map](/v/latest/grimoire/guides/10-product-map/). The one you are
+The tab opens with a bar of nine views: Product map, Bird view, Overview, Features, Apps, Tasks, Releases, Check and Modules. The Product map is the view for readers who do not read code; see [the product map](/v/latest/grimoire/guides/10-product-map/). The Bird view is described [below](#the-bird-view). The one you are
 in is marked, and small counts show how much each holds. Detail views (a feature, a flow, a page, a task, a release, a
 file) belong to the view they came from and show a breadcrumb back to it, such as Features, then `auth`, then the flow.
 
@@ -53,16 +53,17 @@ failed view says what failed, why and what to do next, with a button to try agai
 
 | View            | What it shows                                                                                                                                                                                                                                                |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Overview        | Cards for the features by status, flows, apps, pages and screens, open and waiting tasks, check errors and warnings, and the size of the book; the route facts with the build hint when they are old or missing; recent releases and the top check problems. |
+| Bird view       | Every criterion against every language: test status, screenshots and approval. See [The Bird view](#the-bird-view). |
+| Overview        | Cards for the features by status, flows, apps, pages and screens, every open task (with how many of them wait for approval), check errors and warnings, and the size of the book; the route facts with the build hint when they are old or missing; recent releases and the top check problems. |
 | Features        | Every feature as a card with its status, version, flow count and flow names. Filter by status or text, sort by name, status, flows or last update; the count reads "12 of 30 features".                                                                      |
 | Feature         | A page of tabs: see [The feature page](#the-feature-page).                                                                                                                                                                                                   |
 | Flow            | See [The flow page](#the-flow-page).                                                                                                                                                                                                                         |
-| Apps            | One card per written app (site or mobile) with its root and counts. Pages and screens are grouped by the first segment of their route, with a text filter and a confirmed, inferred or unmarked status per row.                                              |
+| Apps            | One card per written app (site or mobile) with its root and counts. Pages and screens are grouped by the first segment of their route (a group of more than 6 pages starts closed), with a text filter and a confirmed, inferred or unmarked status per row.                                              |
 | Page or screen  | Its blocks (with the layout's), who sees each, what each changes with, the files in the book, and a graph of the page and its blocks.                                                                                                                        |
 | Tasks, Releases | The open, waiting and done tasks from the index (a task waiting for approval is listed only under waiting) with a filter, and each release with what it collected, grouped by feature.                                                                       |
 | Check           | The findings of `warlock grimoire check`, grouped by code. See [The Check tab](#the-check-tab).                                                                                                                                                              |
 | File, route     | The book entry: exports, imports, importers, owner, flows, routes, and a graph of the file's neighbours; or a route with the files behind it.                                                                                                                |
-| Modules         | Module coupling as a graph, with the modules listed by how many imports tie them to others.                                                                                                                                                                  |
+| Modules         | Module coupling, with the modules listed by how many imports tie them to others. See [The Modules view](#the-modules-view).                                                                                                                                                                  |
 
 The graphs are plain SVG with at most 60 nodes. Click a node to open it.
 
@@ -119,6 +120,56 @@ When the project has `@proves` lines but no test results were ever recorded, the
 yet" once, with the fix (add `grimoireReporter()`, run the tests, or set the panel option `testResultsFile`), and tagged
 criteria read "tagged" instead of "not-run". Text in `` `backticks` `` shows as code.
 
+## The Bird view
+
+The Bird view is one table of the whole product: features, then flows, then acceptance criteria down the side, and one
+column per language of the app across the top. The design-system feature comes first. A feature and a flow are
+collapsible; the ones with a failing, changed or rejected cell open by themselves.
+
+Each cell shows the state in words and a glyph (colour is never the only signal), and a small thumbnail of the captured
+screenshot when the criterion has a `@shows` scene in that language. The states, worst first:
+
+| State                  | Meaning                                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| Rejected               | A change was rejected and is still in the code.                                          |
+| Failing                | A proving test failed, or the scene failed in this language.                             |
+| Changed, not approved  | The screenshot, the criterion or its flow differs from the approved baseline.            |
+| Needs a new run        | A proving test changed since its last result.                                            |
+| Not run yet            | No result yet for the test, or the scene has no capture in this language.               |
+| No test                | The criterion has no `@proves` test.                                                     |
+| Passing                | Everything that applies is green and approved.                                           |
+
+A criterion written for one app (`AC-2 [web]`) shows the app as a chip, and a flow that differs by app lists those apps
+on its row. A criterion that was approved and is no longer written stays as a struck-through "removed" row, marked
+changed, until you approve the removal.
+
+Open a cell for the side-by-side panel: the approved image on the left, the captured image on the right, the test status,
+and a plain sentence for each change not approved (for a changed criterion, its text before and after). In development
+the panel has **Approve** and **Reject** (with an optional reason). Both write `grimoire/approved/` the same way
+`warlock grimoire approve` and `reject` do, then the view reloads. If the write fails, the panel stays open and says what
+failed and what to do. The buttons are not shown in a production dashboard, in the static export or through a share link.
+A flow's own changes (a case that was added or removed) open from the "Review the flow's changes" button on its row.
+
+The box above the table jumps to a feature, a flow or a criterion: it matches a feature id or title, a flow reference
+or title, and an `AC-n` number (`AC-1` does not match `AC-10`). A match opens its rows, and the filter stays in the
+address (`#grimoire/bird-view?q=AC-3`).
+
+It works with no screenshots and no baseline: the cells then show the test status only. With no baseline a note says
+"Nothing approved yet" and, in development, offers **Approve all**, which creates the baseline from the current state.
+With the screenshot mode `off` a note says so. The tab's count is the number of failing, changed and rejected cells plus
+the changes to whole flows.
+
+The static export (`warlock grimoire build --site`) includes the Bird view and the images it shows, read-only. The business
+export (`--site --product`) and share links do not: the table names the test status of every criterion.
+
+## The Modules view
+
+Module coupling is drawn as a graph while the app is small. Above 40 modules the view opens on a matrix of the 20 most
+connected modules instead, since a graph of that many names overlaps: each cell counts the imports from the module on its
+row to the module in its column, and a **Graph** button switches to the drawing. Labels are cut from the right and the
+full path is in each node's tooltip. Sites, mobile apps and other roots outside `src/app` sit on an inner ring, apart from
+the `src/app` modules. A module with more than 500 files shows its file count in its label.
+
 ## The Check tab
 
 The tab shows the headline "0 errors · 12 warnings in 3 kinds", then one card per code with its count, the fix written
@@ -130,7 +181,7 @@ ranks the codes (errors first, then the largest count) and links to the filtered
 
 ## On a phone
 
-At 390 px wide the tab has no horizontal page scroll. The tab bar scrolls sideways and keeps the open tab in view; tables
+At 390 px wide the tab has no horizontal page scroll. Under 640 px the tab bar wraps onto two rows, so every tab stays visible; tables
 become cards that name each column; ids never wrap; graphs scroll inside their card and label only small graphs (point at
 a node for its name); the flow page keeps a small header with its title in view, and the previous and next links sit at the
 bottom. It follows the dashboard's light and dark colours.
@@ -192,9 +243,11 @@ Served at `/__warlock/api/grimoire`, all `GET`:
 | `/flows/:feature/:flow/steps/:index/files?set=&offset=&limit=`                             | One page (up to 200) of a step's files; `set` is `direct`, `feature`, `reachable` (default) or `type-only`.                                                  |
 | `/check`                                                                                   | The whole report; with `code`, `feature`, `flow`, `severity`, `state`, `offset` or `limit` one page of matching findings.                                    |
 | `/check/groups`                                                                            | The check by code: count, expected count, title, fix and features.                                                                                           |
-| `/product`, `/product/features/:feature`, `/product/flows/:feature/:flow`                  | The product map answers.                                                                                                                                     |
+| `/product`, `/product/whats-new`, `/product/features/:feature`, `/product/flows/:feature/:flow` | The product map answers.                                                                                                                                     |
 | `/tasks`, `/releases`, `/releases/:release`                                                | Tasks index, releases, one release.                                                                                                                          |
-| `/graph/file?path=`, `/graph/feature/:feature`, `/graph/page?app=&page=`, `/graph/modules` | `{ nodes, edges }`, at most 60 nodes.                                                                                                                        |
+| `/graph/file?path=`, `/graph/feature/:feature`, `/graph/page?app=&page=`, `/graph/modules` | `{ nodes, edges }`, at most 60 nodes. Module nodes carry `title`, `group` (`modules` or `roots`) and `files`.                                                |
+| `/matrix`                                                                                  | The Bird view: languages, mode, baseline, features, flows, criteria and cells, every drift item, and `development` (whether Approve and Reject work).          |
+| `POST /approve`, `POST /reject`                                                            | Development only, never through a share link. Body `{ ids, note? }`; answer `{ done }`.                                                                      |
 
 An unknown item answers `404` with a message, and a missing parameter `400`.
 

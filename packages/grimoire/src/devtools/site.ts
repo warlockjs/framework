@@ -13,8 +13,9 @@ import type { WrittenFlow } from "../contracts/written";
 import { GRIMOIRE_PATHS, projectPath, toPosixPath } from "../paths";
 import { stampOf } from "../workspace/cache";
 import * as data from "./data";
+import { matrix, matrixImagePaths } from "./matrix";
 import { featureGraph, fileGraph, pageGraph } from "./graphs";
-import { productFeature, productFlow, productMap } from "./product-map";
+import { productFeature, productFlow, productMap, productWhatsNew } from "./product-map";
 import { createSnapshotSource } from "./snapshot-source";
 
 /** Options of `exportGrimoireSite()`. */
@@ -74,6 +75,8 @@ export function buildSiteData(snapshot: GrimoireSnapshot) {
     // The page is meant to be shared: it does not name where the project sits on this machine.
     check: { ...data.check(snapshot), root: "." },
     "graph/modules": data.graphOfModules(snapshot),
+    // The page is read-only: no Approve or Reject buttons.
+    matrix: { ...matrix(snapshot), development: false },
   };
   // The static page is the signed-in view: developer detail stays, and no monitor reports errors.
   const productOptions = { shared: false, errors: null } as const;
@@ -81,6 +84,10 @@ export function buildSiteData(snapshot: GrimoireSnapshot) {
   const groups = attempt(() => data.checkGroups(snapshot));
 
   if (productAnswer !== undefined) routes.product = productAnswer;
+
+  const whatsNew = attempt(() => productWhatsNew(snapshot, productOptions));
+
+  if (whatsNew !== undefined) routes["product/whats-new"] = whatsNew;
 
   if (groups !== undefined) routes["check/groups"] = groups;
 
@@ -204,6 +211,10 @@ export function buildProductSiteData(snapshot: GrimoireSnapshot) {
   const map = attempt(() => productMap(snapshot, options));
 
   if (map !== undefined) routes.product = map;
+
+  const whatsNew = attempt(() => productWhatsNew(snapshot, options));
+
+  if (whatsNew !== undefined) routes["product/whats-new"] = whatsNew;
 
   for (const feature of snapshot.written.features) {
     const answer = attempt(() => productFeature(snapshot, feature.id, options));
@@ -509,7 +520,11 @@ export async function exportGrimoireSiteDetailed(
 
   await mkdir(absolute, { recursive: true });
   await writeFile(path.join(absolute, "index.html"), html);
-  await copyScreenshots(root, absolute, collectScreenshotPaths(snapshot.written));
+  // The business export carries no bird-view, so it does not carry the captured and approved images either.
+  await copyScreenshots(root, absolute, [
+    ...collectScreenshotPaths(snapshot.written),
+    ...(product ? [] : matrixImagePaths(matrix(snapshot))),
+  ]);
 
   return { outDir, upToDate: false };
 }

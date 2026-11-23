@@ -29,10 +29,20 @@ Everything on it comes from the files your agent already writes in `grimoire/`. 
 - **What changed.** A timeline with one node per version, unreleased changes first (marked "Unreleased"), then
   the newest release. Under each version the changes are grouped by type (Added, Changed, Fixed, Removed), each with
   its sentence in plain text. Reference ids written at the end of a sentence in brackets, such as `(AC-6, T-089)` or
-  `(QA 1.5.6)`, are shown after it as small chips in the tab; the read-only share link leaves them out. Ordinary
-  brackets in the sentence stay where they are.
+  `(QA 1.5.6)`, are left out of the sentence on every screen of the map, since the map is written for people who do not
+  read the code; ordinary brackets in the sentence stay where they are.
 - **A flow page.** The story step by step in the user's words, what proves it works, the "what if" cases (what is
-  handled and what does not apply), where you see it, and links to the previous and next flow.
+  handled and what does not apply), where you see it, and links to the previous and next flow. The line under the title
+  names who the flow is for and the version it began in (for example "free · since version 1.0"). Each case is asked as a
+  plain question: "What if the input is not valid?", "What if the server cannot be reached?", "What if the server fails?";
+  a case with your own label shows the label. A case that a check proves says "Checked by 2 checks", never an `AC` id.
+- **Where you see it.** One row per page or screen, under a heading with the app's title (its id when the app has no
+  heading). The blocks that show the flow are listed under the page, and a screenshot they share is shown once.
+- **What's new.** A button at the top of the map opens the changes of each release, newest first: the release's name and
+  date, the first paragraph of its brief, then the changes under the feature they belong to, in plain words. A release
+  has its own address, `#grimoire/product/whats-new/5.2.0`. Changes not yet in a release show first, only in the
+  signed-in view; a share link and the business export list released changes only. A release needs a heading in
+  `grimoire/releases/` or a stamped section in a feature's changelog (`warlock grimoire release --stamp` writes both).
 
 ## The health strip
 
