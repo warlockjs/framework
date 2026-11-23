@@ -9,6 +9,25 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 - T-208: drift controls (rule checks, `grimoire guard`, locked tests, protected areas).
 - T-207: approved screenshots per criterion and language, design-system feature, bird-view (phases 1-4).
 
+## Suggested plan for T-206..T-208 (one session, one minor, once the owner says go)
+
+Follow the multi-agent workflow (plan, Sonnet implementers by file area, one Opus reviewer/fixer/releaser).
+
+0. Design (one Opus agent): where approved screenshots live, the inputs the guard compares and the lint rule list.
+   Write the shared brief.
+1. Wave 1, in parallel, with no shared files:
+   - A: scry output and guidance (T-206);
+   - B: `grimoire guard` plus the scaffold lint rules (T-208 items 1-2);
+   - C: the bird-view UI (T-207 phase 1).
+2. The owner reviews C on the devtools preview (AGENTS.md "Devtools preview").
+3. Wave 2: screenshots per criterion and language, then approved baselines (T-207 phases 2-3; `changed` is the
+   default mode).
+4. One review, one typecheck and one test pass through `heavy-run`, then the release. Re-run the T-205 agent test for
+   T-206. Its scripts are in `findings/agent-test/scripts/` (git-ignored); rebuild the trees with `prep-tree.sh`,
+   outside the repository.
+
+Later sessions: T-207 phase 4 (design-system feature and its components page) and T-208 items 3-7.
+
 ## Next release
 
 - 5.63.1 shipped T-204 (PostgreSQL `date` columns). 5.63.0 shipped T-188..T-195, T-197 (closed), T-198..T-200, T-202, T-203 (closed).
