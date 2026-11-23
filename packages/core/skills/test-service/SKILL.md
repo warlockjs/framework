@@ -142,7 +142,6 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
-    globalSetup: "./src/test-global-setup.ts", // ← HTTP server (see test-http skill)
     setupFiles: ["./src/test-setup.ts"], // ← runs setupTest before EACH test file
     environment: "node",
     globals: false,
@@ -626,10 +625,13 @@ const name = process.env.VITEST ? workerDatabaseName("app_test") : "app";
 - Servers from `createTestHttpServer()` that a file did not `close()` are closed
   before the next file, so their routes and ports do not leak. App modules
   (`loadAppModules`) load once per worker and are reused.
-- The global `startHttpTestServer()` server runs in Vitest's main process with its
-  own connections and fakes. Worker lifetime does not touch it, so keep requests
-  through it independent of the worker database, or use `createTestHttpServer()`
-  in the worker for tests that read the same database the assertions use.
+- The request helpers (`testGet`, `actingAs`, ...) send to an HTTP server that starts
+  in the worker on first use, so it reads the worker's own database and records in the
+  worker's fakes; the runtime closes it with the file. A global `startHttpTestServer()`
+  server (main process, no worker id) reads worker 1's database: run such a suite with
+  `maxWorkers: 1`.
+- `recommendedTestWorkers()` stays within `WARLOCK_TEST_DATABASES` (the number of test
+  databases you created) when that variable is set.
 - `isolate: false` shares module state between files of a worker: singletons,
   `vi.mock()` of app modules and module-level caches survive. Restore mocks in
   `afterEach`, and clear module state in `resetBetweenFiles`, or use

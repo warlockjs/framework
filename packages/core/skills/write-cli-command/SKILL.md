@@ -97,6 +97,8 @@ preload: {
 
 Connector names: `"logger"`, `"mailer"`, `"http"`, `"database"`, `"cache"`, `"storage"`, `"communicator"` (herald), `"socket"`. Pass `connectors: true` to start every `Early`-phase connector — `http` and `socket` are `Late` phase and stay off unless you list them explicitly.
 
+`preload: { …, tolerant: true }` keeps a failed preload step (a config file that throws, a bootstrap that cannot finish) from ending the command: the error prints as a warning, reaches the action as `data.preloadError`, and later preload steps do not run. Use it only for a command with a fallback of its own (a cached answer); the default is exit code 1.
+
 Picking the right preload matters: `migrate` only needs database + logger, but `seed` runs full `bootstrap: true` because seeds touch app models. Inspect `@warlock.js/core/src/cli/commands/*.ts` for canonical pairings.
 
 ## Inside `action` — `CommandActionData`

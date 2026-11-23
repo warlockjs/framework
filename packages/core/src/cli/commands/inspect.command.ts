@@ -26,7 +26,13 @@ export const inspectCommand = command({
     );
     inspectCommand.commandPreload = sections.every((section) => section === "files")
       ? undefined
-      : { runtimeStrategy: "development", config: true, env: true, bootstrap: true };
+      : {
+          runtimeStrategy: "development",
+          config: true,
+          env: true,
+          bootstrap: true,
+          tolerant: true,
+        };
   },
   options: [
     {

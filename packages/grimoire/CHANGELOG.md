@@ -2,6 +2,13 @@
 
 `@warlock.js/grimoire` is new in 5.55.0 and experimental: its file layout, `GR` codes and API may change in any release until it is marked stable.
 
+## 5.64.0
+
+### Fixed
+
+- `warlock grimoire build`, `grimoire check` and `inspect` go on when the app's config or bootstrap fails during the command's preload, so `build` and `check` reach the cached-routes fallback (`GR8002`) instead of exiting first.
+- The book lists the code files at the top of a mobile app folder (`App.tsx`, `index.ts`); tool configs (`babel.config.js`) and type shims (`*.d.ts`) stay out.
+
 ## 5.63.0 - 2026-11-22
 
 ### Added

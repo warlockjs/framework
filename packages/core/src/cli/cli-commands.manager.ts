@@ -618,17 +618,26 @@ export class CLICommandsManager {
       try {
         await this.loadPreloaders(command);
       } catch (error) {
-        // A preload failure (a bad import in a config file, a connector that
-        // throws on boot, a missing module export) happens BEFORE the command's
-        // action runs — there is no run loop to recover into, so it is ALWAYS
-        // fatal, persistent command (dev/start) or not. Surface the real cause
-        // and the offending file, then exit. This MUST stay outside the
-        // command-execute try/catch below: letting a preload rejection escape
-        // turned `warlock dev` into a silent hang — the unhandled rejection slid
-        // past while the already-started loader worker thread kept the process
-        // alive, freezing just after the banner with no error printed.
-        displayBootError(command.name, error as Error);
-        process.exit(1);
+        if (command.commandPreload.tolerant) {
+          // The command has a fallback of its own (cached facts, a static
+          // answer): it reads `preloadError` and decides.
+          data.preloadError = error as Error;
+          console.warn(
+            `Preload for "${command.name}" failed, continuing: ${(error as Error).message}`,
+          );
+        } else {
+          // A preload failure (a bad import in a config file, a connector that
+          // throws on boot, a missing module export) happens BEFORE the command's
+          // action runs — there is no run loop to recover into, so it is ALWAYS
+          // fatal, persistent command (dev/start) or not. Surface the real cause
+          // and the offending file, then exit. This MUST stay outside the
+          // command-execute try/catch below: letting a preload rejection escape
+          // turned `warlock dev` into a silent hang — the unhandled rejection slid
+          // past while the already-started loader worker thread kept the process
+          // alive, freezing just after the banner with no error printed.
+          displayBootError(command.name, error as Error);
+          process.exit(1);
+        }
       }
     }
 

@@ -14,7 +14,7 @@ warlock inspect --json                   # the full report, schemaVersion 1
 warlock inspect --json --section routes  # only some sections
 ```
 
-Except for `--section files`, which reads source without booting, it boots exactly like [`warlock doctor`](./doctor.md): every connector boots (that is where routes register) and **none starts**, so no database, cache or socket connection opens and no port binds. App modules are imported, so whatever they do at import time happens, as in `warlock dev`.
+Except for `--section files`, which reads source without booting, it boots exactly like [`warlock doctor`](./doctor.md): every connector boots (that is where routes register) and **none starts**, so no database, cache or socket connection opens and no port binds. App modules are imported, so whatever they do at import time happens, as in `warlock dev`. When the app's own config or bootstrap fails before that, the command still runs and lists the failure as a warning in the report; the sections that need the booted app may then be empty.
 
 | Flag            | Type    | Description                                                                                     |
 | --------------- | ------- | ----------------------------------------------------------------------------------------------- |

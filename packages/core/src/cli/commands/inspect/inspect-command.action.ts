@@ -92,9 +92,12 @@ export function formatInspectSummary(report: InspectReport): string[] {
  * `inspectApp()`. With `--json`, stdout carries exactly the report and the
  * boot's progress lines go to stderr.
  *
- * @param data Parsed CLI args: `options.json`, `options.section`.
+ * @param data Parsed CLI args: `options.json`, `options.section`; `preloadError` when the app's own boot failed (the report lists it as a warning).
  */
-export async function inspectCommandAction({ options }: CommandActionData): Promise<void> {
+export async function inspectCommandAction({
+  options,
+  preloadError,
+}: CommandActionData): Promise<void> {
   // Parsed first, so a typo fails before the app boots.
   const sections = parseInspectSections(stringOption(options.section));
   const json = options.json === true;
@@ -104,7 +107,19 @@ export async function inspectCommandAction({ options }: CommandActionData): Prom
     : json
       ? await withConsoleOnStderr(() => bootForInspect())
       : await bootForInspect();
-  const report = await inspectApp({ ...(boot ? inspectOptionsFromBoot(boot) : {}), sections });
+  const bootOptions = boot ? inspectOptionsFromBoot(boot) : {};
+  // The preload is tolerant: the app's own bootstrap failed, and what follows is read from what loaded.
+  const warnings = preloadError
+    ? [
+        {
+          code: null,
+          message: `The app did not finish booting: ${preloadError.message}`,
+          source: null,
+        },
+        ...(bootOptions.warnings ?? []),
+      ]
+    : bootOptions.warnings;
+  const report = await inspectApp({ ...bootOptions, ...(warnings ? { warnings } : {}), sections });
 
   if (json) {
     console.log(JSON.stringify(report, null, 2));

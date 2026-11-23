@@ -25,6 +25,10 @@ class FakeChokidarWatcher {
     this.handlers.get("raw")?.("change", evPath, { watchedPath });
   }
 
+  public emitError(error: unknown, filePath?: string) {
+    this.handlers.get("error")?.(error, filePath);
+  }
+
   public emitChange(absolutePath: string) {
     this.handlers.get("change")?.(absolutePath);
   }
@@ -92,5 +96,31 @@ describe("glob ignore patterns (C2:B10)", () => {
     expect(ignored("/p/node_modules/x/index.js")).toBe(true);
     expect(ignored("/p/src/a.log")).toBe(true);
     expect(ignored("/p/src/a.ts")).toBe(false);
+  });
+});
+
+describe("FilesWatcher watcher errors", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("logs a chokidar error, tells subscribers and does not throw", async () => {
+    fakeWatcher = new FakeChokidarWatcher();
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const watcher = new FilesWatcher();
+    await watcher.watch();
+
+    const seen: Array<[string, Error]> = [];
+    watcher.onFileError((filePath, error) => seen.push([filePath, error]));
+
+    const failure = Object.assign(new Error("EPERM: operation not permitted"), { code: "EPERM" });
+
+    expect(() => fakeWatcher.emitError(failure, path.join(SRC_DIR, "locked.ts"))).not.toThrow();
+    expect(() => fakeWatcher.emitError("not an Error")).not.toThrow();
+
+    expect(log.mock.calls.flat().join("\n")).toContain("EPERM: operation not permitted");
+    expect(seen).toHaveLength(2);
+    expect(seen[0]![1]).toBe(failure);
+    expect(seen[1]![1].message).toBe("not an Error");
   });
 });

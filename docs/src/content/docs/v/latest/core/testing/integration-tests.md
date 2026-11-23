@@ -16,12 +16,11 @@ We'll test a `products` controller. Substitute your own module name as you read.
 pnpm warlock add test
 ```
 
-That command drops three files into the project:
+That command drops two files into the project:
 
 ```
-src/test-global-setup.ts    ← starts the HTTP server once per vitest run
 src/test-setup.ts           ← runs setupTest in each worker
-vite.config.ts              ← wires globalSetup + setupFiles, sets the include pattern
+vite.config.ts              ← wires setupFiles, sets the include pattern
 ```
 
 It also adds `vitest`, `@vitest/coverage-v8`, `vite`, `@mongez/vite` to `devDependencies`, and registers four scripts in `package.json`:
@@ -93,6 +92,12 @@ if (process.env.VITEST) {
 }
 ```
 
+### One server per worker, or a shared one
+
+By default there is no global server. The first request helper call in a test file (`testGet`, `actingAs`, ...) starts an HTTP server inside the worker, on a free port, and the file's later calls reuse it. It reads the worker's own database, so a row created in worker 2 is visible to a request made in worker 2. The next file starts its own server.
+
+To share one server for the whole run (for example to serve web pages through Vite), start it in a `globalSetup` file with `startHttpTestServer()`, as below. While that server's port is published the helpers use it. It runs in the main process and reads the database of worker 1, so run such a suite with `maxWorkers: 1`.
+
 ### Running on a port of your own
 
 `startHttpTestServer()` binds `http.port` — the same port `warlock dev` uses. Pass one explicitly to run the suite alongside a live dev server, or to run two suites at once:
@@ -103,7 +108,7 @@ export async function setup() {
 }
 ```
 
-Or let the OS pick a free one — what `warlock add test` generates:
+Or let the OS pick a free one:
 
 ```ts title="src/test-global-setup.ts"
 export async function setup() {

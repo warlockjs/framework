@@ -7,6 +7,7 @@
 import { config } from "../config";
 import { getHttpReadyReport } from "../http/ready-report";
 import { TEST_SERVER_PORT_ENV_KEY } from "./test-server-port-channel";
+import { resolveTestServerUrl } from "./worker-test-server";
 
 /**
  * Get the test server base URL
@@ -41,7 +42,7 @@ export function getTestServerUrl(): string {
  * Uses native fetch - lightweight, no extra dependencies
  */
 export async function testRequest(path: string, options: RequestInit = {}): Promise<Response> {
-  return sendRequest(getTestServerUrl(), path, options, false);
+  return sendRequest(await resolveTestServerUrl(), path, options, false);
 }
 
 /**
@@ -53,12 +54,13 @@ export async function testRequest(path: string, options: RequestInit = {}): Prom
  * labelling it `application/json` produces a request no server can parse.
  */
 async function sendRequest(
-  baseUrl: string,
+  baseUrl: string | Promise<string>,
   path: string,
   options: RequestInit,
   serializedJson: boolean,
 ): Promise<Response> {
-  const url = path.startsWith("/") ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
+  const base = await baseUrl;
+  const url = path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
 
   // Normalised through `Headers` rather than object-spread: `RequestInit.headers`
   // may be a record, a `Headers` instance, or a list of `[name, value]` tuples,
@@ -104,7 +106,9 @@ export type TestRequestClient = {
  * const client = createTestRequestClient("http://127.0.0.1:4100");
  * await client.post("/posts", { title: "Hello" });
  */
-export function createTestRequestClient(baseUrl: string | (() => string)): TestRequestClient {
+export function createTestRequestClient(
+  baseUrl: string | (() => string | Promise<string>),
+): TestRequestClient {
   const base = () => (typeof baseUrl === "function" ? baseUrl() : baseUrl);
   const send = (method: string, path: string, body: unknown, options: RequestInit = {}) =>
     sendRequest(base(), path, { ...options, method, body: jsonBody(body) }, body !== undefined);
@@ -120,7 +124,7 @@ export function createTestRequestClient(baseUrl: string | (() => string)): TestR
   };
 }
 
-const sharedServer = createTestRequestClient(getTestServerUrl);
+const sharedServer = createTestRequestClient(() => resolveTestServerUrl());
 
 /**
  * GET request helper

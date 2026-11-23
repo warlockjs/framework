@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.64.0
+
+### Added
+
+- A command whose preload sets `tolerant: true` runs even when a preload step fails (a config file that throws, a bootstrap that cannot finish). The error is printed as a warning and reaches the action as `preloadError`; without the flag a failed preload still stops the command with exit code 1. `warlock inspect` uses it and lists the failure as a report warning.
+- `collectFiles()` takes `files`: project-relative files read next to the folders in `dirs`, such as a mobile app's `App.tsx` and `index.ts`.
+- `recommendedTestWorkers()` stays within the number of test databases when `WARLOCK_TEST_DATABASES` is set (or a count is passed as its third argument).
+- The database cache driver finds the unique index on `key` once (the one `cacheMigration` creates) and writes with one upsert when it exists. `upsert: true` forces the upsert, `upsert: false` keeps the read first, and with no index it logs a one-time hint naming `cacheMigration` and `upsert: true`.
+
+### Changed
+
+- The test request helpers (`testGet`, `testPost`, `actingAs`, ...) send to an HTTP server that starts in the same Vitest worker on the first request of a test file and closes with the file. It reads the worker's own database `<name>_<worker id>`, and mail, jobs and other fakes record in the worker. A port published by `startHttpTestServer()` in a `globalSetup` still takes precedence (that server runs in the main process and reads worker 1's database). `warlock add test` no longer creates `src/test-global-setup.ts` or a `globalSetup` entry.
+
+### Fixed
+
+- Test requests no longer read `<name>_test_1` for every worker: a user created in worker 2 is visible to a request made from worker 2.
+- `warlock dev` listens for the file watcher's `error` event: the error is logged, passed to `onFileError` subscribers, and the dev server keeps running.
+
 ## 5.63.1 - 2026-11-22
 
 ### Changed

@@ -414,12 +414,31 @@ const MOBILE_SKIPPED_FOLDERS = new Set([
  * The source folders of a mobile app: its top-level folders minus native
  * projects and build output (`android/`, `ios/` with Pods and builds can hold
  * hundreds of megabytes). Code files directly in the app folder (`App.tsx`)
- * are not read: `collectFiles` scans folders only.
+ * are not folders; {@link mobileTopFiles} lists them.
  */
 async function mobileSourceFolders(root: string, app: BookMobileApp): Promise<string[]> {
   return (await folderNames(path.join(root, ...app.root.split("/"))))
     .filter((name) => !name.startsWith(".") && !MOBILE_SKIPPED_FOLDERS.has(name))
     .map((name) => `${app.root}/${name}`);
+}
+
+/** Code files directly in a mobile app folder (`App.tsx`, `index.ts`), without tool configs and type shims. */
+async function mobileTopFiles(root: string, app: BookMobileApp): Promise<string[]> {
+  try {
+    return (await readdir(path.join(root, ...app.root.split("/")), { withFileTypes: true }))
+      .filter(
+        (entry) =>
+          entry.isFile() &&
+          !entry.name.startsWith(".") &&
+          isCodeFile(entry.name) &&
+          !entry.name.endsWith(".d.ts") &&
+          !/\.config\.[^.]+$/.test(entry.name),
+      )
+      .map((entry) => `${app.root}/${entry.name}`)
+      .sort();
+  } catch {
+    return [];
+  }
 }
 
 /** The adapter over `inspectApp()`, `collectFiles()` and the mobile app folders. */
@@ -442,7 +461,8 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
     const { collectFiles } = await import("@warlock.js/core/tooling");
     const mobile = await mobileApps(root);
     const dirs = await sourceFolders(root, mobile);
-    const collected = collectFiles(root, [], { dirs })
+    const topFiles = (await Promise.all(mobile.map((app) => mobileTopFiles(root, app)))).flat();
+    const collected = collectFiles(root, [], { dirs, files: topFiles })
       .filter((file) => isCodeFile(file.file))
       .map((file) => toBookFile(file, mobile));
 

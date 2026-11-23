@@ -13,7 +13,7 @@ This guide explains the architecture, then walks both modes end-to-end.
 ## The 30-second look
 
 ```bash
-# One command from a fresh project — drops vite.config.ts, test-global-setup.ts, test-setup.ts
+# One command from a fresh project — drops vite.config.ts and test-setup.ts
 npx warlock add test
 
 # Run the suite
@@ -315,7 +315,7 @@ Jobs are recorded, not run — call the job's handler directly to test what it d
 
 **The storage fake replaces the configured default driver too.** A `default: "r2"` (or `s3`, `spaces`) in `src/config/storage.ts` does not need the cloud SDK packages in a test run: in the test environment the connector builds the configured default on first use rather than at boot, and while the storage fake is on every driver is a local one under the temp root.
 
-**A fake records in the process that runs the code.** Mail sent while the shared HTTP server (Vitest's main process) handles a request is captured there, not in the test worker that sent the request. To assert on what a request did, serve it in the worker with [`createTestHttpServer()`](#in-process-server-with-the-production-plugins). The storage fake is the exception: its temp root is shared with the workers, so a file an HTTP request stored is visible to the test.
+**A fake records in the process that runs the code.** The request helpers send to a server in the test's own worker, so mail a controller sent is recorded by the worker's fake. A shared `globalSetup` server (Vitest's main process) records in its own process instead; to assert on what a request did there, serve it in the worker with [`createTestHttpServer()`](#in-process-server-with-the-production-plugins). The storage fake is the exception: its temp root is shared with the workers, so a file an HTTP request stored is visible to the test.
 
 #### Opting out
 
@@ -432,7 +432,7 @@ Default to unit tests — they're faster and easier to reason about. Promote to 
 
 `warlock add test` generates the files below plus `src/test-runner.ts` for awaited worker cleanup:
 
-- **`src/test-global-setup.ts`** — vitest `globalSetup`, starts/stops the HTTP server.
+- **`src/test-global-setup.ts`** — not generated. Add one (`startHttpTestServer()` in `setup`, `stopHttpTestServer()` in `teardown`) only for a suite that needs one shared server; otherwise each worker starts its own on the first request.
 - **`src/test-setup.ts`** — vitest `setupFiles`, calls `setupTest` before each integration file.
 - **`vite.config.ts`** — separates unit and integration projects; see the runtime guide below.
 
@@ -742,9 +742,8 @@ const name = process.env.VITEST ? workerDatabaseName("app_test") : "app";
   before the next file, so their routes and ports do not leak. App modules
   (`loadAppModules`) load once per worker and are reused.
 - The global `startHttpTestServer()` server runs in Vitest's main process with its
-  own connections and fakes. The main process has no worker id, so `workerDatabaseName("app_test")` gives `app_test_1` there: the server reads worker 1's database, while worker 2 writes `app_test_2`. Rows a test in worker 2 creates are invisible to requests through the shared server; use `createTestHttpServer()` for those tests. Worker lifetime does not touch it, so keep requests
-  through it independent of the worker database, or use `createTestHttpServer()`
-  in the worker for tests that read the same database the assertions use.
+  own connections and fakes. The main process has no worker id, so `workerDatabaseName("app_test")` gives `app_test_1` there: the server reads worker 1's database, while worker 2 writes `app_test_2`. Rows a test in worker 2 creates are invisible to requests through that shared server, so run a suite that needs it with `maxWorkers: 1`. The generated setup does not start one: the request helpers (`testGet`, `actingAs`, ...) send to an HTTP server that starts in the worker on first use and reads the worker's own database, and the runtime closes it with the file.
+- `recommendedTestWorkers()` stays within the number of test databases when `WARLOCK_TEST_DATABASES` is set (for example `4` after creating `app_test_1` to `app_test_4`).
 - `isolate: false` shares module state between files of a worker: singletons,
   `vi.mock()` of app modules and module-level caches survive. Restore mocks in
   `afterEach`, and clear module state in `resetBetweenFiles`, or use

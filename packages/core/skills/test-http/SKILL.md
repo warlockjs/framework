@@ -1,6 +1,6 @@
 ---
 name: test-http
-description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `startHttpTestServer({ port: 0 })`, `stopHttpTestServer`, `createTestHttpServer`, `TestHttpServer`, `createTestRequestClient`, `snapshotResponse`, `actingAs`, `AuthenticatedTestClient`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up", "ephemeral test port", "test with the real Fastify plugins", "assert mail sent by a request", "response snapshot"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — the `test-service` topic; controller shape — the `create-controller` topic; competing libs `supertest`, `light-my-request`, `nock`.'
+description: 'Integration tests against a real HTTP server — `testGet` / `testPost` / `expectJson` send to a server that starts in the same Vitest worker (its own database), or to the shared server `startHttpTestServer()` boots in globalSetup. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `startHttpTestServer({ port: 0 })`, `stopHttpTestServer`, `createTestHttpServer`, `TestHttpServer`, `createTestRequestClient`, `snapshotResponse`, `actingAs`, `AuthenticatedTestClient`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up", "ephemeral test port", "test with the real Fastify plugins", "assert mail sent by a request", "response snapshot"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — the `test-service` topic; controller shape — the `create-controller` topic; competing libs `supertest`, `light-my-request`, `nock`.'
 ---
 
 # Warlock — HTTP integration tests
@@ -36,7 +36,9 @@ describe("Users API", () => {
 });
 ```
 
-No `beforeAll`, no manual server start — the project's `src/test-global-setup.ts` brought the HTTP server up once before any test ran.
+No `beforeAll`, no manual server start. The first `testGet` / `testPost` / `actingAs` call of a test file starts an HTTP server **inside the same Vitest worker** (the app's routes, the production plugins, an OS-assigned port, the worker's own database and fakes) and the file's later calls reuse it. The runtime closes it with the file, and the next file starts its own. A row a test creates in worker 2 is therefore visible to a request made in worker 2, and mail or jobs a controller produced land in that worker's `mailFake` / `queueFake`.
+
+The server of `startHttpTestServer()` in a `globalSetup` stays available for suites that need one shared process (for example one that serves web pages through Vite): while it has published its port (`WARLOCK_TEST_SERVER_PORT`), the helpers send to it instead of the worker's server. Such a server runs in Vitest's main process, which has no worker id, so it reads the database of worker 1; run those suites with `maxWorkers: 1`.
 
 ## Signed-in requests — `actingAs(user)`
 
@@ -152,7 +154,7 @@ await startHttpTestServer({ port: 0 });
 
 ## In the worker, with the production plugins — `createTestHttpServer()`
 
-The shared server runs in Vitest's main process, so the test fakes in a worker never see what a request did there. `createTestHttpServer()` serves requests inside the worker instead, built the way production builds it: `startHttpServer()`, every plugin `registerHttpPlugins()` registers (rate limit with its cache store, CORS, multipart, cookies), the router's real route registration, an OS-assigned port.
+The shared server of `globalSetup` runs in Vitest's main process, so the test fakes in a worker never see what a request did there. The default worker server and `createTestHttpServer()` both serve requests inside the worker;  `createTestHttpServer()` adds your own `routes`, built the way production builds it: `startHttpServer()`, every plugin `registerHttpPlugins()` registers (rate limit with its cache store, CORS, multipart, cookies), the router's real route registration, an OS-assigned port.
 
 ```ts
 import { createTestHttpServer, mailFake, type TestHttpServer } from "@warlock.js/core/tests";
@@ -205,7 +207,9 @@ The snapshot is `{ status, contentType, body }`; redacted paths read `"[redacted
 
 `startHttpTestServer()` installs the test fakes too (mail, queue, cache, storage, clock, ids — see the `test-fakes` topic), honouring `tests.fakes` and its own `fakes` option. They record in the main process, so assert on request side effects with `createTestHttpServer()`; the storage fake's temp root is shared with the workers (`WARLOCK_TEST_STORAGE_ROOT`).
 
-## Project wiring — `src/test-global-setup.ts` + `vite.config.ts`
+## Project wiring — `src/test-setup.ts` + `vite.config.ts`
+
+`warlock add test` creates `src/test-setup.ts` and `vite.config.ts` without a `globalSetup`. Add one only for the shared-server case above; its content is:
 
 ```ts title="src/test-global-setup.ts"
 /**
@@ -231,7 +235,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
-    globalSetup: "./src/test-global-setup.ts", // ← starts the HTTP server
+    // globalSetup: "./src/test-global-setup.ts", // only for one shared server (see above)
     setupFiles: ["./src/test-setup.ts"], // ← setupTest + afterAll(teardownTest), per test file
     environment: "node",
     globals: false,
@@ -246,7 +250,7 @@ Both files (and this config, with `lowerStage3Decorators()` first so decorated m
 
 **So the service-layer framework is file-scoped: bootstrapped by `setupTest` and closed by the `afterAll(teardownTest)` the setup file registers, once per test file.** ⚠ **`setupTest` alone is not the whole wiring — the paired teardown is mandatory from 4.14.0**; see the `test-service` skill.
 
-**HTTP is the exception and stays in `globalSetup`**, which genuinely does run once in the main vitest process and owns a real port. **That split is the point:** one server for the whole run, one framework per test file.
+**HTTP requests go to a server in the same worker** (started on the first request), so it sees the worker's database; `globalSetup` is only for the shared-server case.
 
 ### Keep Vitest setup out of development
 
@@ -405,7 +409,7 @@ const response = await testGet("/me", { headers: authHeader });
 
 ### Setting up data via direct DB access
 
-The HTTP server runs in the main process; the test workers have their own DB connections. To seed data the HTTP server can read, either:
+With the default worker server the test and the server share the worker's database connection and database. With a shared `globalSetup` server the HTTP server runs in the main process and reads worker 1's database. To seed data the HTTP server can read, either:
 
 1. **Direct create from the test** — your worker writes via the model, the row commits, then the HTTP server reads it (both point at the same physical DB).
 

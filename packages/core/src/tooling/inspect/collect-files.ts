@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { readTsconfig, resolvePathAlias } from "get-tsconfig";
 import { parseSync, type Node } from "oxc-parser";
@@ -124,6 +124,13 @@ export type CollectFilesOptions = {
    * hidden folders (`.expo`, `.git`) inside them are skipped.
    */
   dirs?: readonly string[];
+  /**
+   * Project-relative files to read on their own, next to the folders in `dirs`
+   * (a mobile app's `App.tsx` and `index.ts` sit at the top of its folder, which
+   * is not scanned whole). A file that does not exist is skipped, and one a
+   * folder already holds is read once.
+   */
+  files?: readonly string[];
 };
 
 /** Read each source module once; never import or execute application code. */
@@ -150,6 +157,11 @@ export function collectFiles(
     }
   };
   for (const dir of options.dirs ?? ["src"]) scan(path.join(cwd, dir));
+  for (const file of options.files ?? []) {
+    const absolute = path.join(cwd, file);
+
+    if (existsSync(absolute) && statSync(absolute).isFile()) paths.push(absolute);
+  }
   const known = new Set(paths);
   paths.length = 0;
   paths.push(...[...known].sort());

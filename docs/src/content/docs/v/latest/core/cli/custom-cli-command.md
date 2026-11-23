@@ -119,6 +119,20 @@ The fields, in the order you'll reach for them:
 
 For our report command, we need DB access and that's all — so `env`, the `database` config, and the `database` connector. We skip `bootstrap` because we don't need routes or HTTP.
 
+### Continue when the preload fails
+
+A failed preload step (a config file that throws, a bootstrap that cannot finish) stops the command with exit code 1. A command that has a fallback of its own, such as one that can answer from a cache when the app does not boot, opts in with `tolerant: true`:
+
+```ts
+preload: { bootstrap: true, tolerant: true },
+action: async ({ preloadError }) => {
+  if (preloadError) console.warn(`The app did not boot: ${preloadError.message}`);
+  // answer from the cache
+},
+```
+
+The error is printed as a warning and passed to the action as `preloadError`. The preload steps after the failed one do not run.
+
 ## Step 4 — Fill in the business logic
 
 ```ts title="src/app/reports/commands/report-sales.command.ts"

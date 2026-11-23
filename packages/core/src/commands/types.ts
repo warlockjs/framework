@@ -39,6 +39,13 @@ export type CommandActionData = {
    * @example `--no-cache --port=3000` → { noCache: true, port: "3000" }
    */
   options: Record<string, string | boolean | number>;
+
+  /**
+   * The error a preload step threw, set only for a command whose preload
+   * declares `tolerant: true`. The command ran anyway; it decides whether the
+   * problem matters.
+   */
+  preloadError?: Error;
 };
 
 /**
@@ -88,6 +95,18 @@ export type CLICommandPreload = {
    * as a warning and the command continues without the config.
    */
   optionalWarlockConfig?: boolean;
+
+  /**
+   * Run the command even when a preload step fails (a config file that throws,
+   * a bootstrap that cannot finish).
+   *
+   * Meant for tooling that has a fallback of its own, for example a command
+   * that can answer from a cache when the app does not boot. The error is
+   * printed as a warning and handed to the action as `preloadError`; the steps
+   * after the failed one do not run. Commands without this flag still stop with
+   * the boot error and exit code 1.
+   */
+  tolerant?: boolean;
 
   /**
    * Set runtime strategy

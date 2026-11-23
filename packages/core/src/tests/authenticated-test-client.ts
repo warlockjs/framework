@@ -1,7 +1,6 @@
 import {
   type TestRequestClient,
   createTestRequestClient,
-  getTestServerUrl,
   type testDelete,
   type testGet,
   type testPatch,
@@ -9,6 +8,7 @@ import {
   type testPut,
   type testRequest,
 } from "./test-helpers";
+import { resolveTestServerUrl } from "./worker-test-server";
 
 /** Structural auth contract: an Auth model satisfies this without a runtime auth import. */
 export interface TestAuthenticableUser {
@@ -38,7 +38,7 @@ export type AuthenticatedTestClient = {
  */
 export async function actingAs(
   user: TestAuthenticableUser,
-  client: TestRequestClient = createTestRequestClient(getTestServerUrl),
+  client: TestRequestClient = createTestRequestClient(() => resolveTestServerUrl()),
 ): Promise<AuthenticatedTestClient> {
   if (process.env.NODE_ENV !== "test") {
     throw new Error(
