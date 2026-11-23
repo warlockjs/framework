@@ -671,6 +671,7 @@ export function parseFlow(
     notHandled: [],
     unknowns: [],
     criteria: [],
+    screenshots: null,
   };
 
   checkHeadings(

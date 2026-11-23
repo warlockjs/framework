@@ -48,6 +48,21 @@ status: waiting for approval
 - `status` is one of `open`, `waiting for approval`, `approved`, `in progress`, `blocked`, `done`, `dropped`.
 - `feature` and `flow` are optional. `flow` is a flow id inside `feature`, or `<feature>/<flow>`.
 - `Brief:` is a path relative to `grimoire/`.
+- `warlock grimoire guard` reads these optional body lines, each a comma-separated list (globs allowed):
+
+  ```md
+  - Files: src/app/shared/utils/money.ts, src/config/catalog.ts
+  - Features: orders, catalog/wishlist
+  - Locked: src/app/catalog/tests/wishlist.test.ts
+  - Touches: migrations, dependencies
+  - Removes: catalog/wishlist AC-3, catalog/wishlist case duplicate
+  ```
+
+  `Files:` lists files outside the task's feature that the change may touch. `Features:` names more features or
+  flows (`<feature>/<flow>`). `Locked:` names the acceptance tests that no one may edit. `Touches:` names the
+  protected areas the task may change. `Removes:` names the flows, criteria and cases that may go
+  (`<feature>/<flow>`, `<feature>/<flow> AC-3`, `<feature>/<flow> case duplicate`). See
+  [Drift controls](/v/latest/grimoire/guides/11-drift-controls/).
 - A done task has `status: done` and `shipped: <feature> <version>` (`shipped: catalog 2.1`).
 
 ### Move a single tasks file to the folder

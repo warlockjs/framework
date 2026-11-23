@@ -4,10 +4,15 @@ import type { GrimoireRule, GrimoireSnapshot } from "../contracts/snapshot";
 import { checkReleases } from "../releases";
 import { checkTasks } from "../tasks";
 import { checkTestResults } from "../test-results";
+import { checkApiSnapshot } from "./rules/api-snapshot";
 import { checkBookNotes } from "./rules/book-notes";
+import { checkCodeRules } from "./rules/code-rules";
 import { checkCaseCriteria, checkCriteriaTests, checkProofTargets } from "./rules/criteria";
+import { checkDrift } from "./rules/drift";
+import { checkFocusedTests } from "./rules/focused-tests";
 import { checkAppNames, checkChangelogLinks, checkRelations, checkSteps } from "./rules/links";
 import { checkScreenshots } from "./rules/screenshots";
+import { checkShows } from "./rules/shows";
 import { checkFolders, checkHeaders, checkOwners, checkUnreached } from "./rules/source-files";
 import { checkChangeWords, checkFlowVersions, checkReadmeDates } from "./rules/versions";
 
@@ -28,6 +33,11 @@ export const CHECK_RULES: readonly GrimoireRule[] = [
   checkReadmeDates,
   checkChangeWords,
   checkFlowVersions,
+  checkCodeRules,
+  checkFocusedTests,
+  checkApiSnapshot,
+  checkShows,
+  checkDrift,
 ];
 
 /** Run every rule over a snapshot. Pure; never writes. */

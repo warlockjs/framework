@@ -342,7 +342,8 @@
               "column": null
             }
           }
-        ]
+        ],
+        "screenshots": null
       },
       {
         "file": "grimoire/features/auth/flows/sign-up.md",
@@ -544,7 +545,8 @@
               "column": null
             }
           }
-        ]
+        ],
+        "screenshots": null
       }
     ],
     "versions": []
@@ -1064,7 +1066,8 @@
               "column": null
             }
           }
-        ]
+        ],
+        "screenshots": null
       },
       {
         "file": "grimoire/features/catalog/flows/new-arrivals.md",
@@ -1291,7 +1294,8 @@
               "column": null
             }
           }
-        ]
+        ],
+        "screenshots": null
       },
       {
         "file": "grimoire/features/catalog/flows/wishlist.md",
@@ -1557,7 +1561,8 @@
               "column": null
             }
           }
-        ]
+        ],
+        "screenshots": null
       }
     ],
     "versions": [
@@ -2081,7 +2086,8 @@
               "column": null
             }
           }
-        ]
+        ],
+        "screenshots": null
       }
     ],
     "versions": []

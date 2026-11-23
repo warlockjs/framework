@@ -524,6 +524,7 @@ export async function parseGrimoire(root: string): Promise<ParseGrimoireResult> 
     apps: [],
     tasks: [],
     releases: [],
+    settings: null,
     hash: "",
   };
 

@@ -410,7 +410,8 @@
                 "column": null
               }
             }
-          ]
+          ],
+          "screenshots": null
         }
       ],
       "versions": []
@@ -664,5 +665,6 @@
       "decisionNeeded": "popularity or date? Both are cheap to build."
     }
   ],
-  "releases": []
+  "releases": [],
+  "settings": null
 }

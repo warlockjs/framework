@@ -41,7 +41,7 @@ async function preloadFor(boot: () => Promise<boolean>): Promise<CLICommandPrelo
   }
 }
 
-const GRIMOIRE_ACTIONS = ["build", "check", "release"] as const;
+const GRIMOIRE_ACTIONS = ["build", "check", "release", "guard", "approve", "reject"] as const;
 
 /** Print with the stream's own write, so a boot that moves `console.log` never mixes into the answer. */
 const io = {
@@ -84,7 +84,7 @@ function explainCode(code: string) {
 }
 
 /**
- * The `grimoire <action> [release]` and `scry [file]` commands, with the
+ * The `grimoire <action> [name]` and `scry [file]` commands, with the
  * Grimoire MCP tools and the `GRnnnn` explainer attached. `cli.commands`
  * accepts this array as one entry.
  *
@@ -104,11 +104,20 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
   const context = async () => ({ root: process.cwd(), adapter: await loadAdapter(), io });
 
   const grimoire: CLICommand = command({
-    name: "grimoire <action> [release]",
+    name: "grimoire <action> [name]",
     description:
-      "Grimoire (experimental): build the book (build [--force] [--site [--product] [--out <dir>]]), check the written files (check [--all]), collect a release (release <version>); --json for JSON",
+      "Grimoire (experimental): build the book (build [--force] [--site [--product] [--out <dir>]]), check the written files (check [--all]), collect a release (release <version> [--stamp]), check a change against its task (guard [task] [--base <ref>] [--commits <range>]), approve or reject a change (approve|reject <id|feature/flow|api> [--all]); --json for JSON",
     preAction: async ({ args, options: flags }) => {
       grimoire.commandPreload = undefined;
+
+      // guard, approve and reject read the cached route facts: they never boot the app.
+      if (args[0] === "guard" || args[0] === "approve" || args[0] === "reject") {
+        const preload = await preloadFor(async () => false);
+
+        if (preload) grimoire.commandPreload = preload;
+
+        return;
+      }
 
       if (args[0] !== "build" && args[0] !== "check") return;
 
@@ -121,7 +130,7 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
     action: async ({ args, options: flags }) => {
       const actions = await import("./actions");
       const ctx = await context();
-      const [name, release] = args;
+      const [name, target] = args;
       let code: number;
 
       switch (name) {
@@ -132,7 +141,22 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
           code = await actions.runCheck(ctx, flags);
           break;
         case "release":
-          code = await actions.runRelease(ctx, release, flags);
+          code =
+            flags.stamp === true
+              ? await (await import("./release-command")).runStampRelease(ctx, target, flags)
+              : await actions.runRelease(ctx, target, flags);
+          break;
+        case "guard":
+          code = await (await import("./guard-command")).runGuard(ctx, target, flags);
+          break;
+        case "approve":
+          code =
+            target === "api"
+              ? await (await import("./api-command")).runApproveApi(ctx, flags)
+              : await (await import("./approve-command")).runApprove(ctx, target, flags);
+          break;
+        case "reject":
+          code = await (await import("./approve-command")).runReject(ctx, target, flags);
           break;
         default: {
           const { GrimoireError } = await import("../codes");
@@ -153,7 +177,8 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
       { text: "--json, -j", description: "Print the result as JSON", type: "boolean" },
       {
         text: "--all",
-        description: "check: list every finding (text output groups warnings by code)",
+        description:
+          "check: list every finding (text output groups warnings by code); approve, reject: every change not approved",
         type: "boolean",
       },
       {
@@ -176,6 +201,45 @@ export function registerGrimoireCommands(options: WarlockAdapterOptions = {}): C
       {
         text: "--out",
         description: "build --site: the folder to write the site to (project-relative)",
+        type: "string",
+      },
+      {
+        text: "--stamp",
+        description:
+          "release: move every changelog's Unreleased entries under the release (version from package.json when omitted), write the release file, then collect",
+        type: "boolean",
+      },
+      {
+        text: "--date",
+        description: "release --stamp: the release date, yyyy-mm-dd (default today)",
+        type: "string",
+      },
+      {
+        text: "--base",
+        description:
+          "guard: the git ref the change is compared with (default the merge base with the default branch)",
+        type: "string",
+      },
+      {
+        text: "--commits",
+        description:
+          "guard: a commit range (origin/main..HEAD); every commit must name its task, and the tasks it names are guarded",
+        type: "string",
+      },
+      {
+        text: "--hook",
+        description:
+          "guard: agent-hook mode, findings on stderr and exit code 2 when the change must not stop here",
+        type: "boolean",
+      },
+      {
+        text: "--lang",
+        description: "approve, reject: only the images of this language",
+        type: "string",
+      },
+      {
+        text: "--note",
+        description: "reject: why, in the owner's words",
         type: "string",
       },
     ],

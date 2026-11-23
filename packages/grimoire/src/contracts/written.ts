@@ -11,6 +11,7 @@
  * `- item` lines under the key), then Markdown with fixed headings.
  */
 import type { Located, SourceLocation } from "./location";
+import type { WrittenSettings } from "./settings";
 
 /** Status of a feature or a flow. */
 export type WrittenStatus = "proposed" | "building" | "shipped" | "retired";
@@ -175,6 +176,16 @@ export const CASE_QUESTIONS = [
 /** One fixed case question. */
 export type CaseQuestion = (typeof CASE_QUESTIONS)[number];
 
+/**
+ * The case questions a flow with a `page` step answers as well: what the user
+ * sees when the request never arrives, or fails on the server. Other flows
+ * may answer them; there they are not required.
+ */
+export const UI_CASE_QUESTIONS = ["server unreachable", "server error"] as const;
+
+/** One case question of a flow with a page step. */
+export type UiCaseQuestion = (typeof UI_CASE_QUESTIONS)[number];
+
 /** One `- <question>   <answer>` line of `## Cases`. */
 export type WrittenCase = {
   /** The question, lower-case (`double submit`), or the owner's own case label. */
@@ -240,6 +251,8 @@ export type WrittenFlow = {
   /** Every line starting with `Unknown:` anywhere in the flow. */
   unknowns: { text: string; at: SourceLocation }[];
   criteria: WrittenCriterion[];
+  /** Front matter `screenshots`: `false` opts the flow out of `@shows` captures. `null` when not written (captured). */
+  screenshots: Located<boolean> | null;
 };
 
 /** `grimoire/features/<feature>/versions/v<n>.md`: the brief before a whole-number version. */
@@ -455,6 +468,8 @@ export type WrittenGrimoire = {
   apps: WrittenApp[];
   tasks: WrittenTask[];
   releases: WrittenRelease[];
+  /** `grimoire/settings.md`, or `null` when the project has none. */
+  settings: WrittenSettings | null;
   /**
    * sha256 over the path and content of every written file, in path order.
    * The book manifest stores it to know when ownership and book maps change.

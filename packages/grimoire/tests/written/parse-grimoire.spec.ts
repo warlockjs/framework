@@ -35,6 +35,7 @@ function portable(written: WrittenGrimoire): Omit<WrittenGrimoire, "root" | "has
     apps: written.apps,
     tasks: written.tasks,
     releases: written.releases,
+    settings: written.settings,
   };
 }
 
@@ -197,6 +198,7 @@ describe("a project without a grimoire folder", () => {
         apps: [],
         tasks: [],
         releases: [],
+        settings: null,
         hash: createHash("sha256").digest("hex"),
       });
     } finally {

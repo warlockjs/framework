@@ -1,0 +1,39 @@
+# Checks every pull request against its task: files outside the task, deleted
+# proving tests, edited locked tests, protected areas, the code rules on the
+# lines the change adds, and a task id in every commit message.
+# The public API is compared only when route facts exist (`warlock grimoire build`).
+name: Grimoire guard
+
+on:
+  pull_request:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            corepack enable
+            pnpm install --frozen-lockfile
+          elif [ -f yarn.lock ]; then
+            corepack enable
+            yarn install --frozen-lockfile
+          elif [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Guard the change
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: npx warlock grimoire guard --base "$BASE" --commits "$BASE..HEAD"

@@ -81,6 +81,14 @@ case, and `ALL` matching any method. `GR2001` means no route matches that way.
 | Apps          | blocks, conditions, pages, layouts and screens that point at nothing                                       | `GR5001`–`GR5010`  |
 | Versions      | the README version or date out of step with the changelog, a release that does not match                   | `GR6001`–`GR6008`  |
 | Tasks         | a task naming a feature or flow that does not exist, or in the wrong folder                                | `GR7001`–`GR7005`  |
+| Code rules    | with `rules:` in `grimoire/settings.md`: physical directions in styles, generic error text, `kind`, `.js`  | `GR3007`–`GR3010`  |
+| Focused tests | a test focused with `.only` or skipped with `.skip`                                                        | `GR4011`, `GR4012` |
+| Shown         | a `@shows` line that names nothing, a language with no capture, a scene that failed                        | `GR4013`–`GR4016`  |
+| Approvals     | a change since the approved baseline, a rejected change that is still there                                | `GR4017`–`GR4019`  |
+| Public API    | routes that differ from the approved snapshot                                                              | `GR7013`           |
+
+`warlock grimoire guard` reports `GR7006`–`GR7012` for a change checked against its task (see
+[Drift controls](/v/latest/grimoire/guides/11-drift-controls/)).
 
 Steps and criteria of a `retired` flow are not looked up: its code is gone on purpose.
 
@@ -547,6 +555,38 @@ A file in a feature's folders is reached by no flow.
 - **What to do:** Describe the behaviour in a flow, or delete dead code.
 - **Skill:** `record-a-change`
 
+### GR3007
+
+A style uses a physical direction where a logical one is needed.
+
+- **Severity:** error
+- **What to do:** Use the logical form (`margin-inline-start`, `text-align: start`, `inset-inline-start`, `ms-4`, `text-start`, `start-0`) so right-to-left languages work. When the physical side is really meant, write `grimoire-allow logical-css: <why>` in a comment on that line.
+- **Skill:** `guard-a-change`
+
+### GR3008
+
+A user-facing error message is generic.
+
+- **Severity:** error
+- **What to do:** Say what failed and what to do next ("Could not reach the server, check your connection"), mapped from the error code. When the text is not shown to users, write `grimoire-allow specific-errors: <why>` in a comment on that line.
+- **Skill:** `guard-a-change`
+
+### GR3009
+
+A discriminator field is named `kind`.
+
+- **Severity:** error
+- **What to do:** Name the field `type`.
+- **Skill:** `guard-a-change`
+
+### GR3010
+
+A relative import path ends in `.js`.
+
+- **Severity:** error
+- **What to do:** Drop the extension: `./orders.service`, not `./orders.service.js`.
+- **Skill:** `guard-a-change`
+
 ## GR4xxx: criteria and tests
 
 ### GR4001
@@ -627,6 +667,78 @@ The reporter could not match a proving test to its result.
 
 - **Severity:** warning
 - **What to do:** Keep the `it(...)` or `test(...)` call on the line right under the `@proves` comment, with a plain string name.
+- **Skill:** `record-a-change`
+
+### GR4011
+
+A test is focused with `.only`.
+
+- **Severity:** error
+- **What to do:** Remove `.only`: it makes the runner skip every other test in the file.
+- **Skill:** `record-a-change`
+
+### GR4012
+
+A test is skipped with `.skip`.
+
+- **Severity:** warning
+- **What to do:** Remove `.skip`, or use `.skipIf(<condition>)` with the reason the test cannot run there.
+- **Skill:** `record-a-change`
+
+### GR4013
+
+A `@shows` line has the wrong form or no matching `shows()` call.
+
+- **Severity:** error
+- **What to do:** Write `// @shows <feature>/<flow> AC-<n>` on its own line, directly above `await shows(context, "<feature>/<flow> AC-<n>", …)` naming the same criterion.
+- **Skill:** `record-a-change`
+
+### GR4014
+
+A `@shows` line names a flow or criterion that does not exist.
+
+- **Severity:** error
+- **What to do:** Fix the `@shows` line and its `shows()` call to name an existing `<feature>/<flow> AC-<n>`.
+- **Skill:** `record-a-change`
+
+### GR4015
+
+A shown criterion has no capture in a language.
+
+- **Severity:** warning
+- **What to do:** Run the browser tests (`npx warlock e2e`); `GRIMOIRE_SHOTS=all` captures every flow, not only the changed ones.
+- **Skill:** `record-a-change`
+
+### GR4016
+
+A shown criterion failed in a language.
+
+- **Severity:** error
+- **What to do:** Open the capture and the error in the Bird view, fix the code or the scene, then run the browser tests again.
+- **Skill:** `record-a-change`
+
+### GR4017
+
+A capture differs from its approved version.
+
+- **Severity:** warning
+- **What to do:** Compare the two images in the Bird view; the owner approves or rejects the change (`warlock grimoire approve <id>`). List it in your report.
+- **Skill:** `record-a-change`
+
+### GR4018
+
+A flow, criterion, case or proving test changed since the last approval.
+
+- **Severity:** warning
+- **What to do:** The owner approves or rejects it in the Bird view (`warlock grimoire approve <id>`). List it in your report.
+- **Skill:** `record-a-change`
+
+### GR4019
+
+A change the owner rejected is still there.
+
+- **Severity:** error
+- **What to do:** Undo the rejected change the message names, then run the check again.
 - **Skill:** `record-a-change`
 
 ## GR5xxx: apps, pages and blocks
@@ -819,6 +931,70 @@ A task's brief does not exist.
 - **What to do:** Fix the `Brief:` path, or write the brief.
 - **Skill:** `write-a-feature`
 
+### GR7006
+
+A changed file is outside the task.
+
+- **Severity:** error
+- **What to do:** Change only the files of the task's features and its `Files:` line. When the file belongs to the change, add it to `Files:` (or its feature to `Features:`) and say why in the task.
+- **Skill:** `guard-a-change`
+
+### GR7007
+
+The change removes a flow, criterion or case the task does not name.
+
+- **Severity:** error
+- **What to do:** Restore it, or name it in the task's `Removes:` line once the owner agreed.
+- **Skill:** `guard-a-change`
+
+### GR7008
+
+The change deletes a proving test.
+
+- **Severity:** error
+- **What to do:** Restore the test, or name its criterion in `Removes:` when the criterion goes too.
+- **Skill:** `guard-a-change`
+
+### GR7009
+
+The change edits a locked test.
+
+- **Severity:** error
+- **What to do:** A locked test is the task's acceptance: change the code, not the test. Ask the owner when the test itself is wrong.
+- **Skill:** `guard-a-change`
+
+### GR7010
+
+A changed test has fewer assertions than before.
+
+- **Severity:** warning
+- **What to do:** Keep every assertion, or say in the task why one goes.
+- **Skill:** `guard-a-change`
+
+### GR7011
+
+The change touches a protected area the task does not name.
+
+- **Severity:** error
+- **What to do:** Leave the area unchanged, or name it in the task's `Touches:` line once the owner agreed (migrations, auth, public-api, config, lockfile, dependencies, or an area of the settings).
+- **Skill:** `guard-a-change`
+
+### GR7012
+
+A commit does not name its task.
+
+- **Severity:** error
+- **What to do:** Name the task id in the commit message (`T-12`).
+- **Skill:** `guard-a-change`
+
+### GR7013
+
+The public API differs from its approved snapshot.
+
+- **Severity:** warning
+- **What to do:** Once the owner agreed, approve it with `warlock grimoire approve api`; otherwise undo the change.
+- **Skill:** `guard-a-change`
+
 ## GR8xxx: building the book
 
 ### GR8001
@@ -910,5 +1086,29 @@ The book is not built.
 - **Severity:** error
 - **What to do:** Run `warlock grimoire build`, then ask again. `warlock scry` only reads the book; it never builds it.
 - **Skill:** `use-the-grimoire`
+
+### GR9008
+
+The guard has no task to check the change against.
+
+- **Severity:** error
+- **What to do:** Pass the task id (`warlock grimoire guard T-12`), pass `--commits <range>` whose commits name their tasks, or have exactly one task `in progress`.
+- **Skill:** `guard-a-change`
+
+### GR9009
+
+Git could not answer.
+
+- **Severity:** error
+- **What to do:** Run inside a git repository and pass a base that exists (`--base origin/main`); in CI, fetch the full history.
+- **Skill:** `guard-a-change`
+
+### GR9010
+
+Nothing matches the approve or reject target.
+
+- **Severity:** error
+- **What to do:** Pass a change id from the Bird view or the check, a `<feature>/<flow>`, `api`, or `--all`.
+- **Skill:** `record-a-change`
 
 {/* codes:end */}

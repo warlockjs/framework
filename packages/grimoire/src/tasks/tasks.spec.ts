@@ -82,6 +82,7 @@ describe("checkTasks", () => {
       apps: [],
       tasks,
       releases: [],
+      settings: null,
       hash: "",
     } as WrittenGrimoire;
 

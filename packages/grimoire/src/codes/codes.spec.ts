@@ -28,6 +28,7 @@ const SKILLS = new Set([
   "record-a-change",
   "describe-an-app",
   "backfill-a-grimoire",
+  "guard-a-change",
 ]);
 
 describe("the code catalog", () => {

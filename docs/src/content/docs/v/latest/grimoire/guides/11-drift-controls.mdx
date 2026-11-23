@@ -1,0 +1,195 @@
+---
+title: Drift controls
+description: Keep AI agents inside their task. The guard checks a change against its task in CI and as an agent hook; locked tests, protected areas, an approved public API, four code rules, an independent review and a task id on every commit.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental. The structure of the written files and the commands may still change
+  before they are declared stable.
+</Aside>
+
+As a project ages, agents remove, change or add things nobody asked for: a deleted test, a reworded criterion, a new
+file in another module, a physical `ml-4` after the owner said logical CSS only. Prose rules in `AGENTS.md` are read
+once. The drift controls turn the rules that keep being repeated into checks that run on every change.
+
+| Control                  | What it does                                                                                      | Where it runs                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Code rules               | Four text rules over code and style files.                                                        | `grimoire check`, the guard, CI        |
+| The guard                | The diff against its task: unasked files, removed criteria, deleted proofs, locked tests, protected areas. | CI, the agent's `Stop` hook, by hand   |
+| Locked tests             | The acceptance tests the planner wrote first; the guard flags any edit.                           | The guard                              |
+| `.only`, `.skip`, assertions | An added `.only` or `.skip` is an error; a test with fewer assertions is a warning.           | The guard, `grimoire check`            |
+| Protected areas          | Migrations, auth, config, lockfile, new dependencies and the public API change only when the task names them. | The guard                  |
+| Public API snapshot      | `grimoire/approved/api.json` makes any change to the routes deliberate.                           | `approve api`, the guard, the check    |
+| Independent review       | A reviewer who sees the task and the diff, never the author's summary.                            | The `review-a-change` skill            |
+| Task ids on commits      | Every commit message names its task; CI rejects a commit that does not.                           | The guard with `--commits`             |
+
+## The guard
+
+```bash
+npx warlock grimoire guard T-12
+```
+
+It compares the change with the task `T-12` (see [Commands](/v/latest/grimoire/guides/05-commands/#warlock-grimoire-guard-task)
+for the options and the JSON shape). The task is the argument; without it the tasks named in the commits of
+`--commits`; without those the one task whose status is `in progress`; else `GR9008`.
+
+What is in scope for a task:
+
+- the files its `feature` owns (and the features of `Features:`), and the files its `flow` reaches;
+- the tests that prove its criteria;
+- the files and globs of `Files:`;
+- `grimoire/features/<feature>/**`, the task file, `grimoire/tasks/**` and `grimoire/releases/**`.
+
+Any other changed file is `GR7006`. A task that needs a file outside its feature names it in `Files:`.
+
+| Code     | Severity | Raised when                                                                                         |
+| -------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `GR7006` | error    | A changed file is outside the task.                                                                 |
+| `GR7007` | error    | A flow, criterion or case written in `grimoire/features/` is gone, and `Removes:` does not name it. |
+| `GR7008` | error    | A `@proves` test is gone and no other test proves that criterion, and `Removes:` does not name it. |
+| `GR7009` | error    | A file in `Locked:` changed.                                                                        |
+| `GR7010` | warning  | A changed test file has fewer assertions than at the base.                                          |
+| `GR7011` | error    | A protected area changed and `Touches:` does not name it.                                           |
+| `GR7012` | error    | A commit of `--commits` names no task, or a task with no file.                                      |
+| `GR9008` | error    | No task could be found.                                                                             |
+| `GR9009` | error    | Git could not answer.                                                                               |
+
+Removals are found by reading the base version of the changed `grimoire/features/` files with `git show`, parsing them
+and comparing the flows, criteria and cases with the current ones. A deleted proof is a `@proves` line at the base that
+no test in the working tree has any more; moving a test to another file is not a deletion.
+
+Assertions are counted as `expect(`, `expect.soft(`, `expect.poll(`, `assert(`, `assert.<name>(` and `.should(`.
+Comments and strings are skipped; an assertion helper of your own is not counted.
+
+### Task body fields
+
+```md
+- Files: src/app/shared/utils/money.ts, src/config/catalog.ts
+- Features: orders, catalog/wishlist
+- Locked: src/app/catalog/tests/wishlist.test.ts
+- Touches: migrations, dependencies
+- Removes: catalog/wishlist AC-3, catalog/wishlist case duplicate
+```
+
+All optional, comma-separated. A path without a wildcard matches itself and everything under it; `**` crosses
+folders, `*` stays inside one, `{a,b}` picks one. `Removes:` accepts `<feature>`, `<feature>/<flow>`,
+`<feature>/<flow> AC-<n>` and `<feature>/<flow> case <question>`; a wider entry covers what is inside it.
+
+### Locked tests
+
+The planner writes the acceptance tests first, with their `@proves` lines, and names them in `Locked:`. The brief for
+whoever builds the task marks them read-only. Any change, rename or deletion of a locked file is `GR7009`: the code
+changes, the test does not.
+
+### Protected areas
+
+| Area           | Matches                                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| `migrations`   | `**/migrations/**`, `**/*.migration.ts`                                                  |
+| `auth`         | `src/app/auth/**`, `src/config/auth.ts`                                                  |
+| `config`       | `src/config/**`, `warlock.config.ts`, `.env.example`                                     |
+| `lockfile`     | `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock`, `bun.lockb`              |
+| `dependencies` | a `package.json` that adds or changes a dependency entry (not every edit of the file)    |
+| `public-api`   | the routes differ from `grimoire/approved/api.json`                                      |
+
+Add or replace areas in `grimoire/settings.md`; a `protected` line with a built-in name replaces that area's globs:
+
+```md
+---
+protected:
+  - payments src/app/payments/** src/config/payments.ts
+---
+```
+
+### The public API snapshot
+
+```bash
+npx warlock grimoire build
+npx warlock grimoire approve api
+```
+
+writes `grimoire/approved/api.json`: the sorted `METHOD /path` lines of the HTTP routes, with ` [auth]` added to a
+route that needs a signed-in user. `warlock grimoire check` warns (`GR7013`) when the routes differ; the guard
+raises `GR7011` unless the task names `public-api` in `Touches:`. Nothing is compared while no API was approved or no
+route facts exist (the guard reads the cached facts and never boots the app).
+
+## Code rules
+
+Turn them on with `rules:` in `grimoire/settings.md` (the scaffold does):
+
+```md
+---
+rules: [logical-css, specific-errors, type-discriminator, no-js-imports]
+---
+```
+
+- `rules:` absent: `grimoire check` runs none, and the guard runs all four on the lines a change adds. An existing app
+  gets no flood of errors, and new violations are still caught.
+- `rules:` written: `check` runs those over every file, and the guard runs the same on added lines.
+- `rules: []`: none anywhere.
+
+| Rule                 | Code     | Flags                                                                                                                                                                                                                             |
+| -------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `logical-css`        | `GR3007` | CSS `margin-left`, `padding-right`, `border-left`, `left:`, `right:`, `text-align: left`, `float: right`, `border-top-left-radius`; Tailwind classes `ml-4`, `pr-2`, `left-0`, `text-left`, `float-right`, `border-l`, `rounded-l-lg` (with variants like `md:ml-4` and negatives like `-mr-2`); style keys `marginLeft`, `textAlign: "left"`. Logical forms (`margin-inline-start`, `ms-4`, `text-start`) pass. |
+| `specific-errors`    | `GR3008` | A string whose whole text is a generic phrase: "Something went wrong", "An error occurred", "Unknown error", "Unexpected error", "حدث خطأ ما", "خطأ غير معروف" (a trailing "please try again" does not make it specific). In locale files, `error` and `oops` alone too. |
+| `type-discriminator` | `GR3009` | `kind` as a property key whose value is a string literal or a union of them (`kind: "a"`, `kind?: "a" \| "b"`). A variable named `kind` passes. |
+| `no-js-imports`      | `GR3010` | A relative `import`, `export … from`, `import()` or `require()` path ending `.js`, `.jsx`, `.mjs` or `.cjs`. Package paths (`pkg/file.js`) pass. |
+
+Skipped: `*.spec.*` and `*.test.*` files, `node_modules`, `dist`, `grimoire/`. Locale JSON files (a path with `locale`,
+`lang`, `i18n` or `translations`) are read by `specific-errors`.
+
+Escape hatch: a comment on the line or the line above, with a reason.
+
+```tsx
+// grimoire-allow logical-css: the code block reads left to right in every language
+<pre className="text-left">
+```
+
+Limits: the rules are text scanners, not a syntax tree. JSX text that contains an apostrophe, regular expression
+literals and class names built from pieces (`"m" + side + "-4"`) are read loosely, and editors show no squiggles for
+these rules; they run in `grimoire check`, the guard, CI and the agent hook.
+
+## `.only`, `.skip` and assertions
+
+`grimoire check` reports `.only` (`GR4011`, an error) and `.skip` (`GR4012`, a warning) in every test file. The guard
+raises both as errors when the change adds them. `it.skipIf(<condition>)` and calls inside comments or strings are
+not flagged. A changed test with fewer assertions than at the base is `GR7010`.
+
+## In CI and as an agent hook
+
+A new app ships both. `.github/workflows/grimoire-guard.yml` runs on every pull request with the full history:
+
+```bash
+npx warlock grimoire guard --base origin/main --commits origin/main..HEAD
+```
+
+and `.claude/settings.json` runs the guard when an agent finishes:
+
+```json
+{
+  "hooks": {
+    "Stop": [{ "hooks": [{ "type": "command", "command": "npx warlock grimoire guard --hook" }] }]
+  }
+}
+```
+
+In `--hook` mode the findings go to stderr and exit code 2 sends them back to the agent. The hook never traps an agent
+that works without a task: with no task, no git repository or an unknown base it prints a note and exits 0.
+
+`@mongez/agent-kit` writes `CLAUDE.md` and `.claude/skills/` only, so it leaves `.claude/settings.json` alone. An
+existing app adds the snippet above and copies the workflow.
+
+## Independent review
+
+The `review-a-change` skill gives a reviewer the task file and `git diff <base>...HEAD`, never the author's summary,
+and one fixed question: "List every change the task did not ask for." The reviewer then runs
+`npx warlock grimoire guard <task> --base <base>`, pastes it, and lists every drift item that is not approved
+(`GR4017`, `GR4018`, `GR4019`) by id.
+
+## Task ids on commits
+
+Every commit message names its task (`T-12`) in the subject or the body. `--commits <range>` fails a commit with no
+id, or an id that has no task file (`GR7012`); merge commits are skipped. This is a rule for an app's own repository:
+the guard checks it in CI, nothing in a package or a library needs it.
