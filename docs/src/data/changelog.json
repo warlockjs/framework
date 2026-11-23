@@ -140,6 +140,388 @@
   ],
   "releases": [
     {
+      "version": "5.64.0",
+      "id": "v5-64-0",
+      "date": "November 23, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Grimoire drift controls: <code>warlock grimoire guard</code> checks a change against its task, code rules, screenshots per criterion and language with an approved baseline, and a Bird view; <code>scry --search</code> lists the files that change together and reads Arabic; PostgreSQL full-text search takes a language.",
+      "highlights": [
+        "<code>warlock grimoire guard [task]</code> reports files outside the task, removed flows, criteria and cases, deleted <code>@proves</code> tests, edited <code>Locked:</code> tests, protected areas not named in <code>Touches:</code> and commits without a task; <code>--hook</code> runs as a Claude Code <code>Stop</code> hook that never traps an agent.",
+        "Code rules <code>logical-css</code>, <code>specific-errors</code>, <code>type-discriminator</code> and <code>no-js-imports</code> (<code>GR3007</code>-<code>GR3010</code>) in <code>grimoire check</code> and on the lines a change adds, with a <code>grimoire-allow</code> escape comment.",
+        "<code>@shows</code> scenes save one screenshot per criterion and language; <code>grimoire/approved/baseline.json</code> and <code>warlock grimoire approve</code>/<code>reject</code> mark every change since as \"changed, not approved\"; the Bird view tab shows it all in one table.",
+        "<code>scry --search</code> prints the files that change with the top hits and a <code>next: warlock scry --impact</code> line, says when a match is weak, and reads Arabic and accented text.",
+        "<code>warlock grimoire release --stamp</code> and a What's new view in the Product map; <code>whereFullText</code>/<code>whereSearch</code> take <code>{ language, weights }</code>, <code>textSearchConfig</code> and <code>whereContains</code>; API tests get an HTTP server per Vitest worker; the database cache driver works on PostgreSQL."
+      ],
+      "upgradeNotes": [
+        "Apps that ran <code>cacheMigration</code> on PostgreSQL: drop the <code>cache</code> table and run the migration again (it now creates <code>expiresAt</code>).",
+        "PostgreSQL full-text index weights must be <code>\"A\"</code> to <code>\"D\"</code>; MongoDB weights whole numbers.",
+        "Flows with a page step answer the case questions <code>server unreachable</code> and <code>server error</code> (<code>GR1012</code>).",
+        "<code>scry --search</code> text output has a <code>changes with the top hits:</code> block and a <code>next:</code> line; parse <code>--json</code>."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.64.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/grimoire",
+          "slug": "grimoire",
+          "total": 33,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 20
+            },
+            {
+              "type": "Changed",
+              "n": 10
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock scry --search</code> answers with the files that change together with the top hits. After the hits it lists, as <code>changes with the top hits:</code>, the files the top three file-mapped hits import and the files that import them inside the same feature (the same module when unowned), the spec files that import them and the tests that prove a hit flow's criteria, most shared first, at most 10, then a <code>next: warlock scry --impact &lt;file&gt;</code> line. The search result gains <code>alsoChanges</code> (<code>ScryAlsoChange</code>: <code>file</code>, <code>reason</code>, <code>via</code>), <code>weak</code> and <code>next</code>. <code>grimoire_search</code> returns the same fields."
+            },
+            {
+              "type": "Added",
+              "html": "A weak search answer. When the best hit is not a name match and holds fewer than half of the request's words, the answer ends with <code>weak match: no hit holds most of the request's words; use grep for literal text</code> and carries <code>weak: true</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock grimoire release [version] --stamp [--date yyyy-mm-dd]</code> stamps the changelogs and collects. The version defaults to the app's <code>package.json</code> version and the date to the release file's date, else today. Each feature changelog with entries under <code>## Unreleased</code> gets them moved under <code>## &lt;version&gt; (&lt;date&gt;)</code> with an empty <code>## Unreleased</code> above, a missing <code>grimoire/releases/&lt;version&gt;.md</code> is written with a one-line brief naming the changed features, and the list is collected. <code>--json</code> prints <code>{ stamped, created, collect }</code>. It stops with <code>GR9006</code> for a missing version, a date that is not <code>yyyy-mm-dd</code>, or a version section with another date. This is the only edit Warlock makes to written files, and only with <code>--stamp</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock grimoire guard [task] [--base &lt;ref&gt;] [--commits &lt;range&gt;] [--hook] [--json]</code> checks a change (the git diff against its base, including staged, unstaged and untracked files) against its task, without booting the app: <code>GR7006</code> a changed file outside the task's features, flow files, proving tests and <code>Files:</code> line; <code>GR7007</code> a flow, criterion or case removed without a <code>Removes:</code> line; <code>GR7008</code> a deleted <code>@proves</code> test; <code>GR7009</code> an edited <code>Locked:</code> test; <code>GR7010</code> a changed test with fewer assertions; <code>GR7011</code> a protected area the task does not name in <code>Touches:</code>; <code>GR7012</code> a commit of <code>--commits</code> that names no task; <code>GR9008</code> no task found; <code>GR9009</code> git could not answer. It prints the changes not approved without failing on them, exits 1 on an error, and in <code>--hook</code> mode writes to stderr and exits 2 on an error (0 when no task or no git repository is found, and when the hook input says the agent already went on once because of it, <code>stop_hook_active</code>, so the hook never keeps an agent going twice). The JSON report is the new <code>GuardReport</code> type."
+            },
+            {
+              "type": "Added",
+              "html": "Tasks can carry <code>Files:</code>, <code>Features:</code>, <code>Locked:</code>, <code>Touches:</code> and <code>Removes:</code> body lines that the guard reads."
+            },
+            {
+              "type": "Added",
+              "html": "Four code rules, <code>logical-css</code> (<code>GR3007</code>), <code>specific-errors</code> (<code>GR3008</code>), <code>type-discriminator</code> (<code>GR3009</code>) and <code>no-js-imports</code> (<code>GR3010</code>), over code, style and locale files, with the escape comment <code>grimoire-allow &lt;rule&gt;: &lt;why&gt;</code>. <code>grimoire check</code> runs the rules named in <code>rules:</code> of <code>grimoire/settings.md</code>; the guard runs all four on the lines a change adds when the key is absent."
+            },
+            {
+              "type": "Added",
+              "html": "<code>grimoire check</code> reports a test focused with <code>.only</code> (<code>GR4011</code>) or skipped with <code>.skip</code> (<code>GR4012</code>, a warning); the guard raises both to errors when a change adds them."
+            },
+            {
+              "type": "Added",
+              "html": "Protected areas (<code>DEFAULT_PROTECTED_AREAS</code>: migrations, auth, config, lockfile, dependencies, public API) change only when the task names them. <code>dependencies</code> fires only when a <code>package.json</code> adds or changes a dependency entry."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock grimoire approve api</code> writes the routes to <code>grimoire/approved/api.json</code>; <code>grimoire check</code> warns (<code>GR7013</code>) when the routes differ, and the guard reports <code>GR7011</code> for a change that does not name <code>public-api</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Skills <code>guard-a-change</code> and <code>review-a-change</code> (the reviewer gets the task and the diff, never the author's summary, and one question: \"List every change the task did not ask for\"); <code>write-a-feature</code> and <code>record-a-change</code> cover the new task fields, running the guard before you stop and listing every change that is not approved in the report."
+            },
+            {
+              "type": "Added",
+              "html": "Guide \"Drift controls\" and the <code>guard</code> section of the commands guide."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Bird view tab.</strong> One table of every feature, flow and criterion against the app's languages: the test status, the captured screenshot as a thumbnail, and the approval state of each cell, with a jump-to filter (<code>#grimoire/bird-view?q=AC-3</code>). A side-by-side panel compares the approved and the captured image and lists each change not approved, with Approve and Reject in development. It works with no screenshots and no baseline. The data is <code>GET /matrix</code> and the tab's count is <code>birdView</code> in the summary; the static export includes both, the share-safe export does not."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>What's new.</strong> <code>#grimoire/product/whats-new[/&lt;release&gt;]</code> and <code>GET /product/whats-new</code> list the releases newest first with their date, the first paragraph of the brief and the changes per feature in plain words; unreleased changes show only in the signed-in view. It is in the share routes and in both static exports."
+            },
+            {
+              "type": "Added",
+              "html": "<strong>Modules matrix.</strong> Above 40 modules the Modules view opens on a matrix of the 20 most connected modules, with a Graph button; module nodes carry <code>title</code>, <code>group</code> and <code>files</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>@shows</code> scenes: a browser test shows a criterion with <code>// @shows &lt;feature&gt;/&lt;flow&gt; AC-n</code> above <code>shows(context, \"&lt;feature&gt;/&lt;flow&gt; AC-n\", scene)</code> (new <code>shows()</code> in <code>@warlock.js/grimoire/warlock</code>). The scene runs once per language and saves one screenshot each under <code>grimoire/screenshots/captured/</code>; a failing language is recorded and <code>shows()</code> throws after every language ran. <code>changed</code> (default), <code>all</code> and <code>off</code> modes, <code>GRIMOIRE_SHOTS</code> for one run, and <code>screenshots: false</code> in a flow's front matter to opt out."
+            },
+            {
+              "type": "Added",
+              "html": "<code>grimoire/settings.md</code> (languages, screenshot mode, code rules, protected areas) is read and every snapshot carries <code>settings</code>; languages fall back to the adapter's <code>languages()</code>, which the Warlock adapter reads from <code>app.localeCodes</code> without booting the app."
+            },
+            {
+              "type": "Added",
+              "html": "The approved baseline: changes since <code>grimoire/approved/baseline.json</code> (images, flows, criteria, cases, proving tests) show as \"changed, not approved\". <code>warlock grimoire approve &lt;id|feature/flow&gt;</code> / <code>reject &lt;target&gt;</code> (<code>--all</code>, <code>--lang</code>, <code>--note</code>, <code>--json</code>) and the tab's buttons write it; <code>approve --all</code> creates it."
+            },
+            {
+              "type": "Added",
+              "html": "Check codes <code>GR4013</code> to <code>GR4019</code> for <code>@shows</code> lines, missing and failed captures, drift and rejected changes that are still there; <code>GR9010</code> for an approve or reject target nothing matches."
+            },
+            {
+              "type": "Added",
+              "html": "Flows with a <code>page</code> step answer two more case questions, <code>server unreachable</code> and <code>server error</code> (<code>UI_CASE_QUESTIONS</code>); <code>GR1012</code> asks for them there and nowhere else."
+            },
+            {
+              "type": "Added",
+              "html": "Skills teach the <code>design-system</code> feature first, <code>@shows</code> scenes, <code>screenshots: false</code> and approvals. New guide: Screenshots and approvals."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock scry --search</code> reads Arabic and accented Latin text. One tokeniser serves the query, the index and the <code>GR9006</code> check: accents and Arabic vowel marks are dropped, the tatweel is dropped, <code>ى</code> is read as <code>ي</code> and <code>ة</code> as <code>ه</code>, words split at every non-letter and non-digit in any script, camel case splits in any script, an Arabic word of five or more letters loses a leading <code>ال</code>, <code>وال</code>, <code>بال</code> or <code>لل</code>, and a few Arabic small words join <code>SCRY_STOP_WORDS</code>. <code>شحنة</code> finds <code>الشحنة</code>, <code>cafe</code> finds <code>café</code>, and an Arabic-only query no longer stops with <code>GR9006</code>. Stemming stays Latin only; <code>AC-5</code> stays one word."
+            },
+            {
+              "type": "Changed",
+              "html": "Search ranks spec, locale and type files below code: their BM25F score is multiplied by 0.6."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>use-the-grimoire</code> skill and the <code>grimoire_search</code> and <code>grimoire_impact</code> tool descriptions tell agents to search first, then run <code>--impact</code> on the top hit and read the <code>changes with</code> lines, and to use grep only for literal text or after a weak match."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Product map wording.</strong> \"Where you see it\" lists a page once with its blocks under it and heads each app with its title; the flow line shows the audience without \"For\"; every case is a plain question, including \"What if the server cannot be reached?\" and \"What if the server fails?\"; \"What changed\" and \"Checked by\" no longer show criterion or task ids."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Overview task count.</strong> The Tasks tile counts every open task, the same as the tab badge, and reads \"N open, M of them waiting for approval\"."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Modules graph.</strong> Labels are cut from the right with the full name in the node's tooltip, sites and mobile roots sit on their own ring, and a module over 500 files shows its file count."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Feature page.</strong> The neighbour graph sits above the flows."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Phone width.</strong> Under 640 px the tab bar wraps onto rows so no tab is hidden, and a group of more than 6 pages on the Apps page starts closed."
+            },
+            {
+              "type": "Changed",
+              "html": "<strong>Logical CSS.</strong> The tab's stylesheets use logical properties (<code>inline-start</code>, <code>inline-end</code>, <code>text-align: start</code>), so they mirror in right-to-left layouts."
+            },
+            {
+              "type": "Changed",
+              "html": "The devtools snapshot source and the stored open keep <code>settings</code> and <code>shots</code>, and serve a fresh snapshot after an approval or a new capture. Snapshots written by an earlier version are rebuilt once."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock grimoire build</code>, <code>grimoire check</code> and <code>inspect</code> go on when the app's config or bootstrap fails during the command's preload, so <code>build</code> and <code>check</code> reach the cached-routes fallback (<code>GR8002</code>) instead of exiting first."
+            },
+            {
+              "type": "Fixed",
+              "html": "The book lists the code files at the top of a mobile app folder (<code>App.tsx</code>, <code>index.ts</code>); tool configs (<code>babel.config.js</code>) and type shims (<code>*.d.ts</code>) stay out."
+            },
+            {
+              "type": "Fixed",
+              "html": "Editing only a top-level file of a mobile app folder (<code>App.tsx</code>, <code>index.ts</code>) now marks the book stale. The freshness fingerprint also covers the code files that sit directly in the parent folder of a nested source root, without tool configs and type shims."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 12,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 7
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "New apps start with a <code>grimoire/</code> folder: <code>settings.md</code> (languages <code>en</code> and <code>ar</code>, screenshots for changed flows, the four code rules), a <code>design-system</code> feature (direction, components and error messages flows) and a <code>contact</code> feature that describes the starter contact form, with its cases and acceptance criteria."
+            },
+            {
+              "type": "Added",
+              "html": "New apps run the guard on every pull request (<code>.github/workflows/grimoire-guard.yml</code>, full history, base and commit range) and as a Claude Code <code>Stop</code> hook (<code>.claude/settings.json</code>: <code>npx warlock grimoire guard --hook</code>)."
+            },
+            {
+              "type": "Added",
+              "html": "The <code>AGENTS.md</code> \"Drift controls\" section tells agents to run the guard before they stop, never edit a <code>Locked:</code> test, name protected areas in <code>Touches:</code>, avoid <code>.only</code> and <code>.skip</code>, name the task in every commit, and follow the code rules with their <code>grimoire-allow</code> escape comment."
+            },
+            {
+              "type": "Added",
+              "html": "The <code>git-workflow</code> skill asks for a task id (<code>T-12</code>) in every commit message, and lists the guard among the CI gates."
+            },
+            {
+              "type": "Added",
+              "html": "The starter has a development-only components page (<code>/dev/components</code>, \"not found\" in production) that renders its form controls and headings in each language, and <code>e2e/shows.e2e.ts</code> with <code>@shows</code> scenes for the contact form (success, invalid input, server unreachable, server error) and the direction of its inputs."
+            },
+            {
+              "type": "Added",
+              "html": "The starter's <code>AGENTS.md</code> explains the design-system feature, <code>@shows</code> scenes and approvals."
+            },
+            {
+              "type": "Added",
+              "html": "The starter's <code>.gitignore</code> ignores <code>/grimoire/screenshots/captured/</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The starter's database config describes the test servers: the request helpers use a server per Vitest worker for API routes, the web starter's <code>src/test-global-setup.ts</code> server serves the pages and reads worker 1's database; set <code>WARLOCK_TEST_DATABASES</code> to the number of test databases so <code>recommendedTestWorkers()</code> never starts more workers than databases."
+            },
+            {
+              "type": "Changed",
+              "html": "The project map paragraph of the starter <code>AGENTS.md</code> tells agents to search first (<code>scry --search \"&lt;the whole request&gt;\"</code>), then run <code>--impact</code> on the top hit and read the <code>changes with</code> lines, and to use grep only for literal text."
+            },
+            {
+              "type": "Fixed",
+              "html": "The starter's <code>contact</code> and <code>design-system</code> features name the web app (<code>apps: [default]</code>), so their page steps match the starter's pages instead of reporting <code>GR2002</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "The starter's brand link has no <code>aria-label</code> that hid its visible text (the accessibility check reported a label and content name mismatch)."
+            },
+            {
+              "type": "Fixed",
+              "html": "The starter's home page styles use logical properties (<code>padding-inline-start</code>, <code>inset-inline-end</code>, <code>border-inline-start</code>), so the page lays out correctly in right-to-left languages; the two places that must stay physical carry a <code>grimoire-allow</code> comment."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 10,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 6
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "A command whose preload sets <code>tolerant: true</code> runs even when a preload step fails (a config file that throws, a bootstrap that cannot finish). The error is printed as a warning and reaches the action as <code>preloadError</code>; without the flag a failed preload still stops the command with exit code 1. <code>warlock inspect</code> uses it and lists the failure as a report warning."
+            },
+            {
+              "type": "Added",
+              "html": "<code>collectFiles()</code> takes <code>files</code>: project-relative files read next to the folders in <code>dirs</code>, such as a mobile app's <code>App.tsx</code> and <code>index.ts</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>recommendedTestWorkers()</code> stays within the number of test databases when <code>WARLOCK_TEST_DATABASES</code> is set (or a count is passed as its third argument)."
+            },
+            {
+              "type": "Added",
+              "html": "The database cache driver finds the unique index on <code>key</code> once (the one <code>cacheMigration</code> creates) and writes with one upsert when it exists. <code>upsert: true</code> forces the upsert, <code>upsert: false</code> keeps the read first, and with no index it logs a one-time hint naming <code>cacheMigration</code> and <code>upsert: true</code>."
+            },
+            {
+              "type": "Added",
+              "html": "Browser tests (<code>warlock e2e</code>) can fake the server: <code>page.mockRequests(rules)</code> answers matching requests with a fixed status and body, or fails them as unreachable, until <code>page.clearMocks()</code>. <code>page.setExtraHeaders(headers)</code> sends headers with every request of the page. New <code>MockRequestRule</code> type."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock add grimoire</code> writes <code>/grimoire/screenshots/captured/</code> into <code>.gitignore</code>: the last captures of <code>@shows</code> scenes are not committed."
+            },
+            {
+              "type": "Changed",
+              "html": "The test request helpers (<code>testGet</code>, <code>testPost</code>, <code>actingAs</code>, ...) send to an HTTP server that starts in the same Vitest worker on the first request of a test file and closes with the file. It reads the worker's own database <code>&lt;name&gt;_&lt;worker id&gt;</code>, and mail, jobs and other fakes record in the worker. A port published by <code>startHttpTestServer()</code> in a <code>globalSetup</code> still takes precedence (that server runs in the main process and reads worker 1's database). In an API-only app <code>warlock add test</code> no longer creates <code>src/test-global-setup.ts</code> or a <code>globalSetup</code> entry. An app with <code>@warlock.js/web</code> keeps both: the worker's server does not start the web connector, so pages are served by the shared server, which still reads worker 1's database."
+            },
+            {
+              "type": "Fixed",
+              "html": "Test requests no longer read <code>&lt;name&gt;_test_1</code> for every worker: a user created in worker 2 is visible to a request made from worker 2 (in an app without a shared <code>globalSetup</code> server)."
+            },
+            {
+              "type": "Fixed",
+              "html": "The <code>database</code> cache driver works on PostgreSQL. <code>cacheMigration</code> created <code>expires_at</code> as a timestamp while the driver writes <code>expiresAt</code> in epoch milliseconds, an entry without a lifetime wrote <code>Infinity</code> into number columns, and a string or array value was not valid JSON for the <code>data</code> column, so every <code>set</code> failed. The migration now creates <code>expiresAt</code> as a big integer, an entry without a lifetime stores <code>null</code> for <code>ttl</code> and <code>expiresAt</code>, and SQL drivers store <code>data</code> as JSON text. An app that ran <code>cacheMigration</code> on PostgreSQL before drops the <code>cache</code> table and runs the migration again (the table could not have held entries)."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock dev</code> listens for the file watcher's <code>error</code> event: the error is logged, passed to <code>onFileError</code> subscribers, and the dev server keeps running."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>whereFullText</code>, <code>orWhereFullText</code> and <code>whereSearch</code> take an options argument <code>{ language?, weights? }</code>. On PostgreSQL <code>language</code> picks the text-search configuration (for example <code>\"simple\"</code> for non-English text) and <code>weights</code> sets the per-field weight; MongoDB <code>$text</code> ignores both. The language was always <code>english</code> before, so Arabic and other non-English words never matched."
+            },
+            {
+              "type": "Added",
+              "html": "A PostgreSQL data source option <code>textSearchConfig</code> (default <code>\"english\"</code>, unchanged) sets the default text-search configuration for full-text queries and for <code>createFullTextIndex</code> / <code>addFullText</code>, so the index expression keeps matching the query. A value that is not a plain identifier falls back to the default; this also applies to a <code>language</code> given to an index."
+            },
+            {
+              "type": "Added",
+              "html": "<code>whereContains(field, value)</code> / <code>orWhereContains</code> match a case-insensitive substring where <code>%</code>, <code>_</code> and <code>\\</code> are literal characters (PostgreSQL <code>ILIKE</code> with an <code>ESCAPE</code> clause, MongoDB an escaped case-insensitive regex)."
+            },
+            {
+              "type": "Added",
+              "html": "The integration test harnesses (<code>startPostgresHarness</code>, <code>startMongodbHarness</code>) connect to an existing server when <code>LOCAL_PG_*</code> / <code>LOCAL_MONGO_*</code> are set, instead of starting a container (<code>tests/integration/README.md</code>)."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>orWhereFullText</code> on PostgreSQL now goes through the same builder as <code>whereFullText</code> (NULL-safe vectors, same language handling), and <code>textSearch</code> uses the data source's default configuration."
+            },
+            {
+              "type": "Fixed",
+              "html": "Full-text index weights (<code>FullTextIndexOptions.weights</code>) are typed as what each driver takes, the new <code>FullTextIndexWeight</code>: the <code>setweight</code> letters <code>\"A\"</code> to <code>\"D\"</code> on PostgreSQL, whole numbers from 1 to 99999 on MongoDB. A weight of the other form is refused with a message naming the column; PostgreSQL inlined any value into the index SQL before, so a number gave invalid SQL."
+            },
+            {
+              "type": "Fixed",
+              "html": "The MongoDB query parser no longer carries an unused regex branch for <code>whereSearch</code>; <code>whereSearch</code> is <code>$text</code> there, as documented."
+            },
+            {
+              "type": "Fixed",
+              "html": "The contract's <code>textSearch</code> example no longer passes <code>{ language }</code> as if it were an option (the second argument is equality filters), and the docs and the <code>query-data</code> skill describe <code>whereSearch</code> as full-text search (stemmed whole words on PostgreSQL, <code>$text</code> on MongoDB) instead of pattern matching."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/devtools",
+          "slug": "devtools",
+          "total": 2,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "In development, a dashboard or panel route that fails on the server answers its message with a short <code>ref</code>, written to the log with the failure, and a package panel's <code>ctx.api</code> rejects with <code>status</code> and <code>ref</code> (the server's reference, else the <code>x-request-id</code> header) so the panel can show the reference to quote."
+            },
+            {
+              "type": "Fixed",
+              "html": "A closed production monitor URL hit with a request body (<code>POST</code>, <code>PUT</code>, <code>PATCH</code>, <code>DELETE</code>) is answered after the body is read, like an unknown URL: a malformed or oversized body gets the app's own <code>400</code> or <code>413</code>, not a <code>404</code> that only a dashboard path gave."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.63.1",
       "id": "v5-63-1",
       "date": "November 22, 2026",

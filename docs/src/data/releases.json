@@ -1,4 +1,22 @@
 {
+  "5.64.0": {
+    "publishedAt": "2026-11-23T09:12:36.370Z",
+    "matrix": "none",
+    "headline": "Grimoire drift controls: `warlock grimoire guard` checks a change against its task, code rules, screenshots per criterion and language with an approved baseline, and a Bird view; `scry --search` lists the files that change together and reads Arabic; PostgreSQL full-text search takes a language.",
+    "highlights": [
+      "`warlock grimoire guard [task]` reports files outside the task, removed flows, criteria and cases, deleted `@proves` tests, edited `Locked:` tests, protected areas not named in `Touches:` and commits without a task; `--hook` runs as a Claude Code `Stop` hook that never traps an agent.",
+      "Code rules `logical-css`, `specific-errors`, `type-discriminator` and `no-js-imports` (`GR3007`-`GR3010`) in `grimoire check` and on the lines a change adds, with a `grimoire-allow` escape comment.",
+      "`@shows` scenes save one screenshot per criterion and language; `grimoire/approved/baseline.json` and `warlock grimoire approve`/`reject` mark every change since as \"changed, not approved\"; the Bird view tab shows it all in one table.",
+      "`scry --search` prints the files that change with the top hits and a `next: warlock scry --impact` line, says when a match is weak, and reads Arabic and accented text.",
+      "`warlock grimoire release --stamp` and a What's new view in the Product map; `whereFullText`/`whereSearch` take `{ language, weights }`, `textSearchConfig` and `whereContains`; API tests get an HTTP server per Vitest worker; the database cache driver works on PostgreSQL."
+    ],
+    "upgradeNotes": [
+      "Apps that ran `cacheMigration` on PostgreSQL: drop the `cache` table and run the migration again (it now creates `expiresAt`).",
+      "PostgreSQL full-text index weights must be `\"A\"` to `\"D\"`; MongoDB weights whole numbers.",
+      "Flows with a page step answer the case questions `server unreachable` and `server error` (`GR1012`).",
+      "`scry --search` text output has a `changes with the top hits:` block and a `next:` line; parse `--json`."
+    ]
+  },
   "5.63.1": {
     "publishedAt": "2026-11-22T00:23:11.316Z",
     "matrix": "none",
