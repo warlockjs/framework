@@ -150,6 +150,9 @@ instead of passing `.cmd` wrappers as executables.
 | `page.waitForNetworkIdle(timeoutMs?)`                  | Wait for no in-flight HTTP requests and 300 ms of network quiet.                                                                                                                                                                      |
 | `page.assertHealthy()`                                 | Assert zero unallowlisted console errors, uncaught exceptions, HTTP statuses >=400 and failed/canceled network loads.                                                                                                                 |
 | `page.evaluate<T>(expression, timeoutMs?)`             | Evaluate in the main page context with promise support; page exceptions fail the step.                                                                                                                                                |
+| `page.mockRequests(rules)`                             | Answer matching requests with a fixed response, or fail them as unreachable, until `clearMocks()`. A rule is `{ url, status?, body?, headers? }` or `{ url, fail: "unreachable" }`; `url` is a string (substring) or a `RegExp`, the first matching rule wins and every other request reaches the network. A string `body` is sent as is, any other value as JSON. Uses the CDP `Fetch` domain. |
+| `page.clearMocks()`                                    | Stop answering requests set by `mockRequests()`.                                                                                                                                                                                      |
+| `page.setExtraHeaders(headers)`                        | Send these headers with every request of the page (for example `{ locale: "ar" }`); an empty object clears them.                                                                                                                      |
 | `step(name, action)` / `page.step(name, action)`       | Record a named action's duration and outcome without recording fill/type values.                                                                                                                                                      |
 
 Selector helpers target the main document. Frames, closed shadow roots, downloads,
@@ -163,6 +166,9 @@ Every run captures and asserts both after the spec, even on failure. A phone pag
 that expands to 448 pixels fails against **390**, even if its expanded `innerWidth`
 would otherwise hide the overflow. Use a viewport meta tag. Override defaults with
 `viewports: [{ name: "tablet", width: 768, height: 1024 }]`.
+
+A mocked failure or error status still counts as a failed request in the evidence, like a real one: list the URL
+under `allowNetworkFailures` for a scene that fakes a failing server.
 
 ## Expected failures and long-lived requests
 

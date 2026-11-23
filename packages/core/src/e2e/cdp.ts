@@ -22,6 +22,35 @@ export type CdpMethods = {
   };
   // https://chromedevtools.github.io/devtools-protocol/tot/Page/#method-captureScreenshot
   "Page.captureScreenshot": { params: { format: "png" }; result: { data: string } };
+  // https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-enable
+  "Fetch.enable": {
+    params: { patterns: { urlPattern: string }[] };
+    result: Record<string, never>;
+  };
+  // https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-disable
+  "Fetch.disable": { params: Record<string, never>; result: Record<string, never> };
+  // https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-continueRequest
+  "Fetch.continueRequest": { params: { requestId: string }; result: Record<string, never> };
+  // https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-failRequest
+  "Fetch.failRequest": {
+    params: { requestId: string; errorReason: "ConnectionRefused" };
+    result: Record<string, never>;
+  };
+  // https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-fulfillRequest
+  "Fetch.fulfillRequest": {
+    params: {
+      requestId: string;
+      responseCode: number;
+      responseHeaders: { name: string; value: string }[];
+      body: string;
+    };
+    result: Record<string, never>;
+  };
+  // https://chromedevtools.github.io/devtools-protocol/tot/Network/#method-setExtraHTTPHeaders
+  "Network.setExtraHTTPHeaders": {
+    params: { headers: Record<string, string> };
+    result: Record<string, never>;
+  };
   // https://chromedevtools.github.io/devtools-protocol/tot/Emulation/#method-setDeviceMetricsOverride
   "Emulation.setDeviceMetricsOverride": {
     params: { width: number; height: number; deviceScaleFactor: number; mobile: boolean };
@@ -60,6 +89,8 @@ export type CdpEvents = {
   "Runtime.exceptionThrown": { exceptionDetails: ExceptionDetails };
   // https://chromedevtools.github.io/devtools-protocol/tot/Log/#event-entryAdded
   "Log.entryAdded": { entry: { level: string; text: string } };
+  // https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#event-requestPaused
+  "Fetch.requestPaused": { requestId: string; request: { url: string } };
   // https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-requestWillBeSent
   "Network.requestWillBeSent": { requestId: string; request: { url: string } };
   // https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-responseReceived
