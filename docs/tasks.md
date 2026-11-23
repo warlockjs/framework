@@ -6,6 +6,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 - Next-major items (T-007, T-009, T-033) wait for 6.0.
 - T-206: build the scry output and guidance changes the agent test points to.
+- T-207: screenshots per criterion and language, with UI rule checks, for QA agents.
 
 ## Next release
 
@@ -33,6 +34,32 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
   - Re-run the T-205 test (about $8, 1 hour), adding an arm with the Grimoire MCP tools in place of the CLI.
 - Acceptance: re-run shows recall up with no loss in precision or cost.
 - Status: waiting for the owner.
+
+### T-207 [decision] Grimoire: screenshots per acceptance criterion and language, UI rule checks, client failure cases
+
+- Source: owner, 2026-11-23 (chat: QA agents should check screenshots of each flow case, in every app language,
+  including RTL layout such as text inputs aligned right in Arabic, plus failure cases like wrong credentials, rate
+  limit and server unreachable).
+- Today: flows have `## Cases` with fixed questions (`CASE_QUESTIONS`, `packages/grimoire/src/contracts/written.ts:163`:
+  invalid input, not allowed, not found, duplicate, limits, expiry, double submit, outside service down), acceptance
+  criteria `AC-n`, and `@proves` tests with pass/fail/no-test status. Screenshots are hand-attached image lines; the
+  check only verifies that the file exists (`check/rules/screenshots.ts`, GR2014). There is no per-language view, no
+  capture from tests, no link from a screenshot to a criterion, and no case for "the client cannot reach the server".
+- Proposal:
+  - Add the fixed case questions `server unreachable` and `server error` (both client side).
+  - Add a `@shows <feature>/<flow> AC-n` line on browser tests. A small Playwright helper saves
+    `grimoire/screenshots/auto/<feature>/<flow>/AC-n.<locale>.png` for each app locale, with the network mocked for
+    the failure cases.
+  - The same helper runs deterministic UI checks in each locale:
+    - `dir` matches the locale; inputs and text align to the start side;
+    - no horizontal overflow;
+    - no raw translation keys;
+    - no generic error text.
+  - `grimoire check` reports a criterion with no screenshot for a locale, and a stale screenshot.
+  - The devtools tab shows one contact sheet per flow, which a QA agent reviews against the criteria text.
+- Acceptance: on the scaffold app's login flow, each case has a screenshot in `en` and `ar`. The RTL check fails when an
+  input is left-aligned in `ar`. `grimoire check` lists the missing screenshots.
+- Status: waiting for the owner (new feature area; fresh session; one minor).
 
 ### T-201 [bug] The shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
 
