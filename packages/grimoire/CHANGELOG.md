@@ -4,20 +4,11 @@
 
 ## 5.64.0
 
-### Fixed
-
-- `warlock grimoire build`, `grimoire check` and `inspect` go on when the app's config or bootstrap fails during the command's preload, so `build` and `check` reach the cached-routes fallback (`GR8002`) instead of exiting first.
-- The book lists the code files at the top of a mobile app folder (`App.tsx`, `index.ts`); tool configs (`babel.config.js`) and type shims (`*.d.ts`) stay out.
 ### Added
-
-<!-- area A: scry search and release stamping (5.64 merge marker, remove at merge) -->
 
 - `warlock scry --search` answers with the files that change together with the top hits. After the hits it lists, as `changes with the top hits:`, the files the top three file-mapped hits import and the files that import them inside the same feature (the same module when unowned), the spec files that import them and the tests that prove a hit flow's criteria, most shared first, at most 10, then a `next: warlock scry --impact <file>` line. The search result gains `alsoChanges` (`ScryAlsoChange`: `file`, `reason`, `via`), `weak` and `next`. `grimoire_search` returns the same fields.
 - A weak search answer. When the best hit is not a name match and holds fewer than half of the request's words, the answer ends with `weak match: no hit holds most of the request's words; use grep for literal text` and carries `weak: true`.
 - `warlock grimoire release [version] --stamp [--date yyyy-mm-dd]` stamps the changelogs and collects. The version defaults to the app's `package.json` version and the date to the release file's date, else today. Each feature changelog with entries under `## Unreleased` gets them moved under `## <version> (<date>)` with an empty `## Unreleased` above, a missing `grimoire/releases/<version>.md` is written with a one-line brief naming the changed features, and the list is collected. `--json` prints `{ stamped, created, collect }`. It stops with `GR9006` for a missing version, a date that is not `yyyy-mm-dd`, or a version section with another date. This is the only edit Warlock makes to written files, and only with `--stamp`.
-
-<!-- area B: guard, code rules, locked tests, protected areas (5.64 merge marker, remove at merge) -->
-
 - `warlock grimoire guard [task] [--base <ref>] [--commits <range>] [--hook] [--json]` checks a change (the git diff against its base, including staged, unstaged and untracked files) against its task, without booting the app: `GR7006` a changed file outside the task's features, flow files, proving tests and `Files:` line; `GR7007` a flow, criterion or case removed without a `Removes:` line; `GR7008` a deleted `@proves` test; `GR7009` an edited `Locked:` test; `GR7010` a changed test with fewer assertions; `GR7011` a protected area the task does not name in `Touches:`; `GR7012` a commit of `--commits` that names no task; `GR9008` no task found; `GR9009` git could not answer. It prints the changes not approved without failing on them, exits 1 on an error, and in `--hook` mode writes to stderr and exits 2 on an error (0 when no task or no git repository is found). The JSON report is the new `GuardReport` type.
 - Tasks can carry `Files:`, `Features:`, `Locked:`, `Touches:` and `Removes:` body lines that the guard reads.
 - Four code rules, `logical-css` (`GR3007`), `specific-errors` (`GR3008`), `type-discriminator` (`GR3009`) and `no-js-imports` (`GR3010`), over code, style and locale files, with the escape comment `grimoire-allow <rule>: <why>`. `grimoire check` runs the rules named in `rules:` of `grimoire/settings.md`; the guard runs all four on the lines a change adds when the key is absent.
@@ -26,15 +17,9 @@
 - `warlock grimoire approve api` writes the routes to `grimoire/approved/api.json`; `grimoire check` warns (`GR7013`) when the routes differ, and the guard reports `GR7011` for a change that does not name `public-api`.
 - Skills `guard-a-change` and `review-a-change` (the reviewer gets the task and the diff, never the author's summary, and one question: "List every change the task did not ask for"); `write-a-feature` and `record-a-change` cover the new task fields, running the guard before you stop and listing every change that is not approved in the report.
 - Guide "Drift controls" and the `guard` section of the commands guide.
-
-<!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
-
 - **Bird view tab.** One table of every feature, flow and criterion against the app's languages: the test status, the captured screenshot as a thumbnail, and the approval state of each cell, with a jump-to filter (`#grimoire/bird-view?q=AC-3`). A side-by-side panel compares the approved and the captured image and lists each change not approved, with Approve and Reject in development. It works with no screenshots and no baseline. The data is `GET /matrix` and the tab's count is `birdView` in the summary; the static export includes both, the share-safe export does not.
 - **What's new.** `#grimoire/product/whats-new[/<release>]` and `GET /product/whats-new` list the releases newest first with their date, the first paragraph of the brief and the changes per feature in plain words; unreleased changes show only in the signed-in view. It is in the share routes and in both static exports.
 - **Modules matrix.** Above 40 modules the Modules view opens on a matrix of the 20 most connected modules, with a Graph button; module nodes carry `title`, `group` and `files`.
-
-<!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
-
 - `@shows` scenes: a browser test shows a criterion with `// @shows <feature>/<flow> AC-n` above `shows(context, "<feature>/<flow> AC-n", scene)` (new `shows()` in `@warlock.js/grimoire/warlock`). The scene runs once per language and saves one screenshot each under `grimoire/screenshots/captured/`; a failing language is recorded and `shows()` throws after every language ran. `changed` (default), `all` and `off` modes, `GRIMOIRE_SHOTS` for one run, and `screenshots: false` in a flow's front matter to opt out.
 - `grimoire/settings.md` (languages, screenshot mode, code rules, protected areas) is read and every snapshot carries `settings`; languages fall back to the adapter's `languages()`, which the Warlock adapter reads from `app.localeCodes` without booting the app.
 - The approved baseline: changes since `grimoire/approved/baseline.json` (images, flows, criteria, cases, proving tests) show as "changed, not approved". `warlock grimoire approve <id|feature/flow>` / `reject <target>` (`--all`, `--lang`, `--note`, `--json`) and the tab's buttons write it; `approve --all` creates it.
@@ -42,41 +27,24 @@
 - Flows with a `page` step answer two more case questions, `server unreachable` and `server error` (`UI_CASE_QUESTIONS`); `GR1012` asks for them there and nowhere else.
 - Skills teach the `design-system` feature first, `@shows` scenes, `screenshots: false` and approvals. New guide: Screenshots and approvals.
 
-
 ### Changed
-
-<!-- area A: scry search and release stamping (5.64 merge marker, remove at merge) -->
 
 - `warlock scry --search` reads Arabic and accented Latin text. One tokeniser serves the query, the index and the `GR9006` check: accents and Arabic vowel marks are dropped, the tatweel is dropped, `ى` is read as `ي` and `ة` as `ه`, words split at every non-letter and non-digit in any script, camel case splits in any script, an Arabic word of five or more letters loses a leading `ال`, `وال`, `بال` or `لل`, and a few Arabic small words join `SCRY_STOP_WORDS`. `شحنة` finds `الشحنة`, `cafe` finds `café`, and an Arabic-only query no longer stops with `GR9006`. Stemming stays Latin only; `AC-5` stays one word.
 - Search ranks spec, locale and type files below code: their BM25F score is multiplied by 0.6.
 - The `use-the-grimoire` skill and the `grimoire_search` and `grimoire_impact` tool descriptions tell agents to search first, then run `--impact` on the top hit and read the `changes with` lines, and to use grep only for literal text or after a weak match.
-
-<!-- area B: guard, code rules, locked tests, protected areas (5.64 merge marker, remove at merge) -->
-
-<!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
-
 - **Product map wording.** "Where you see it" lists a page once with its blocks under it and heads each app with its title; the flow line shows the audience without "For"; every case is a plain question, including "What if the server cannot be reached?" and "What if the server fails?"; "What changed" and "Checked by" no longer show criterion or task ids.
 - **Overview task count.** The Tasks tile counts every open task, the same as the tab badge, and reads "N open, M of them waiting for approval".
 - **Modules graph.** Labels are cut from the right with the full name in the node's tooltip, sites and mobile roots sit on their own ring, and a module over 500 files shows its file count.
 - **Feature page.** The neighbour graph sits above the flows.
 - **Phone width.** Under 640 px the tab bar wraps onto rows so no tab is hidden, and a group of more than 6 pages on the Apps page starts closed.
 - **Logical CSS.** The tab's stylesheets use logical properties (`inline-start`, `inline-end`, `text-align: start`), so they mirror in right-to-left layouts.
-
-<!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
-
 - The devtools snapshot source and the stored open keep `settings` and `shots`, and serve a fresh snapshot after an approval or a new capture. Snapshots written by an earlier version are rebuilt once.
-
 
 ### Fixed
 
-<!-- area A: scry search and release stamping (5.64 merge marker, remove at merge) -->
-
+- `warlock grimoire build`, `grimoire check` and `inspect` go on when the app's config or bootstrap fails during the command's preload, so `build` and `check` reach the cached-routes fallback (`GR8002`) instead of exiting first.
+- The book lists the code files at the top of a mobile app folder (`App.tsx`, `index.ts`); tool configs (`babel.config.js`) and type shims (`*.d.ts`) stay out.
 - Editing only a top-level file of a mobile app folder (`App.tsx`, `index.ts`) now marks the book stale. The freshness fingerprint also covers the code files that sit directly in the parent folder of a nested source root, without tool configs and type shims.
-
-<!-- area B: guard, code rules, locked tests, protected areas (5.64 merge marker, remove at merge) -->
-
-<!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
-
 
 ## 5.63.0 - 2026-11-22
 
