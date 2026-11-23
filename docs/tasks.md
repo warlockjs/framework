@@ -72,10 +72,12 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
        components and error messages. UI flows name it in `affects`.
      - The scaffold adds a dev-only components page that renders each component in each language and theme, and the
        design-system screenshots come from it.
-- Screenshots are optional (owner, 2026-11-23): a project setting `off` (default), `changed` or `all`. With `changed`,
-  only the flows of the features the task touched are captured, and a full pass runs before a release. A flow can
-  opt in on its own with `screenshots: true` in its front matter. The cheap checks (lint rules, guard, locked tests,
-  T-208) stay on everywhere. The bird-view works without screenshots and shows test status only.
+- Screenshots are optional (owner, 2026-11-23): a project setting `changed` (default), `all` or `off`.
+  - With `changed`, only the flows of the features the task touched are captured, and a full pass runs before a release.
+  - A capture happens only for a criterion that has a `@shows` test, so an app without such tests pays nothing.
+  - A flow can opt out with `screenshots: false` in its front matter.
+  - The cheap checks (lint rules, guard, locked tests, T-208) stay on everywhere.
+  - The bird-view works without screenshots and then shows test status only.
 - Acceptance: on the scaffold app, login's criteria show `en` and `ar` cells with screenshots. A left-aligned input in
   `ar` turns its design-system cell red. A removed case shows as "changed, not approved" until it is approved.
 - Status: waiting for the owner (new feature area; start in a fresh session).
