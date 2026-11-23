@@ -94,7 +94,12 @@ behaviour, follow its sibling skills (`write-a-feature`, `record-a-change`, `des
 
 ## Drift controls
 
-<!-- area B (5.64 merge marker): guard, locked tests, protected areas, code rules, commit task ids; replace this line -->
+- Before you stop, run `npx warlock grimoire guard` and fix what it reports (the Claude Code `Stop` hook in `.claude/settings.json` runs it too). It checks the change against its task: files outside the task's features and `Files:` line, deleted `@proves` tests, removed criteria or cases, edited locked tests, protected areas, and the code rules on the lines you add.
+- A task body can carry `Files:`, `Features:`, `Locked:`, `Touches:` and `Removes:` lines. Never edit a file named in `Locked:`: change the code, not the test. Ask the owner when the test itself looks wrong.
+- Protected areas (migrations, auth, config, lockfile, new dependencies, the public API) change only when the task names them in `Touches:`. Approve a deliberate API change with `npx warlock grimoire approve api`.
+- Never add `.only` or `.skip` to a test, and never delete an assertion to make a test pass.
+- Every commit message names its task (`T-12`); the CI job `grimoire-guard` rejects commits without one.
+- Code rules (`rules:` in `grimoire/settings.md`): logical CSS only (`ms-4`, `text-start`, `margin-inline-start`, never `ml-4`, `text-left`, `margin-left`), no generic error text ("Something went wrong"), discriminator fields named `type` (never `kind`), no `.js` in relative imports. When a physical side or a plain text is really meant, write `grimoire-allow <rule>: <why>` in a comment on that line or the line above.
 
 ## Screenshots and the design system
 

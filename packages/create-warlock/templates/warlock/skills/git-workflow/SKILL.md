@@ -77,7 +77,17 @@ Either:
 
 Both work; pick one per project and use it consistently. Project default: footer (more visible in `git log` output).
 
-### 1.7 Ticket references
+### 1.7 Name the task
+
+Every commit message names its task id (`T-12`) in the subject or the body, so a change can always be traced to the work it belongs to:
+
+```
+feat(orders): add cancellation flow (T-12)
+```
+
+The CI job `grimoire-guard` (`.github/workflows/grimoire-guard.yml`) runs `npx warlock grimoire guard --commits <base>..HEAD` on every pull request and fails a commit that names no task, or a task that has no file under `grimoire/tasks/`. Merge commits are skipped.
+
+### 1.8 Ticket references
 
 When the change traces to a ticket, reference it in the footer:
 
@@ -208,10 +218,11 @@ Every PR runs these. All must pass before merge. The exact commands match `packa
 | Coverage (recommended floor) | `npm run test:coverage`        | TBD per team policy             |
 | Dependency audit             | `npm audit --audit-level=high` | High / critical vulnerabilities |
 | Format check                 | `npm run format:check`         | Any unformatted file            |
+| Grimoire guard               | `npx warlock grimoire guard`   | Files outside the task, deleted proving tests, edited locked tests, protected areas not named, code rules on added lines, commits without a task id |
 
 Additional rules:
 
-- No `.only` / `.skip` in committed tests (lint rule or CI grep).
+- No `.only` / `.skip` in committed tests (the guard rejects added ones; `grimoire check` lists existing ones).
 - No `console.log` in committed code (lint rule).
 - No `TODO` without a ticket reference (warning, not blocker).
 
@@ -275,7 +286,7 @@ For user-facing apps, ship release notes alongside the tag — what changed, wha
 
 Before merging:
 
-- [ ] Commit message follows `<type>(<scope>): <imperative summary>`
+- [ ] Commit message follows `<type>(<scope>): <imperative summary>` and names its task (`T-12`)
 - [ ] Branch name matches `<type>/<slug>`
 - [ ] PR under ~400 lines changed (or split into staged PRs)
 - [ ] Self-reviewed before requesting review

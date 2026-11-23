@@ -179,14 +179,14 @@ a {
 
 .warlock-orbit-one {
   top: -250px;
-  right: -210px;
+  inset-inline-end: -210px;
   width: 720px;
   height: 720px;
 }
 
 .warlock-orbit-two {
   top: -135px;
-  right: -95px;
+  inset-inline-end: -95px;
   width: 490px;
   height: 490px;
 }
@@ -313,7 +313,7 @@ a {
 
 .warlock-hero-stats div {
   position: relative;
-  padding-left: 14px;
+  padding-inline-start: 14px;
 }
 
 .warlock-hero-stats div::before {
@@ -321,7 +321,7 @@ a {
   position: absolute;
   top: 2px;
   bottom: 2px;
-  left: 0;
+  inset-inline-start: 0;
   width: 1px;
   background: linear-gradient(var(--warlock-yellow), transparent);
 }
@@ -427,7 +427,7 @@ a {
 }
 
 .warlock-code-indent {
-  padding-left: 2ch;
+  padding-inline-start: 2ch;
 }
 
 .code-purple {
@@ -527,12 +527,12 @@ a {
 
 .warlock-stage-note-top {
   top: 18%;
-  right: -45px;
+  inset-inline-end: -45px;
 }
 
 .warlock-stage-note-bottom {
   bottom: 16%;
-  left: -42px;
+  inset-inline-start: -42px;
 }
 
 .warlock-trust {
@@ -603,13 +603,13 @@ a {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   border-top: 1px solid var(--warlock-line);
-  border-left: 1px solid var(--warlock-line);
+  border-inline-start: 1px solid var(--warlock-line);
 }
 
 .warlock-feature-card {
   min-height: 310px;
   padding: 36px;
-  border-right: 1px solid var(--warlock-line);
+  border-inline-end: 1px solid var(--warlock-line);
   border-bottom: 1px solid var(--warlock-line);
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.025), transparent 65%);
   transition: background 200ms ease;
@@ -940,7 +940,7 @@ a {
 .warlock-cta-mark {
   position: absolute;
   top: -160px;
-  left: 50%;
+  left: 50%; /* grimoire-allow logical-css: centred with translateX(-50%), which is physical too */
   color: rgba(255, 255, 255, 0.018);
   font-family: var(--warlock-font-sans);
   font-weight: 700;
@@ -969,7 +969,7 @@ a {
   padding: 0 18px;
   border: 1px solid var(--warlock-line);
   border-radius: 11px;
-  text-align: left;
+  text-align: left; /* grimoire-allow logical-css: code reads left to right in every language */
   background: rgba(0, 0, 0, 0.28);
 }
 

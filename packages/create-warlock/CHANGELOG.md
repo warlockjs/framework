@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 <!-- area B: code rules, guard in CI and as an agent hook (5.64 merge marker, remove at merge) -->
 
+- New apps run the guard on every pull request (`.github/workflows/grimoire-guard.yml`, full history, base and commit range) and as a Claude Code `Stop` hook (`.claude/settings.json`: `npx warlock grimoire guard --hook`).
+- The `AGENTS.md` "Drift controls" section tells agents to run the guard before they stop, never edit a `Locked:` test, name protected areas in `Touches:`, avoid `.only` and `.skip`, name the task in every commit, and follow the code rules with their `grimoire-allow` escape comment.
+- The `git-workflow` skill asks for a task id (`T-12`) in every commit message, and lists the guard among the CI gates.
+
 <!-- area C2: components page and screenshot scenes (5.64 merge marker, remove at merge) -->
 
 
@@ -29,6 +33,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 <!-- area A: starter grimoire folder (5.64 merge marker, remove at merge) -->
 
 <!-- area B: code rules, guard in CI and as an agent hook (5.64 merge marker, remove at merge) -->
+
+- The starter's home page styles use logical properties (`padding-inline-start`, `inset-inline-end`, `border-inline-start`), so the page lays out correctly in right-to-left languages; the two places that must stay physical carry a `grimoire-allow` comment.
 
 <!-- area C2: components page and screenshot scenes (5.64 merge marker, remove at merge) -->
 
