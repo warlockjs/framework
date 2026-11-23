@@ -1012,10 +1012,10 @@ importers:
   packages/devtools:
     dependencies:
       '@warlock.js/queue':
-        specifier: 5.63.1
+        specifier: 5.64.0
         version: link:../queue
       '@warlock.js/scheduler':
-        specifier: 5.63.1
+        specifier: 5.64.0
         version: link:../scheduler
     devDependencies:
       '@simplewebauthn/browser':

@@ -5480,11 +5480,10 @@ The first two are fast, need no database and no running app. Reach for the third
 
 ## Setup
 
-`warlock add test` installs the harness: `src/test-global-setup.ts` (starts the HTTP server once), `src/test-setup.ts` (boots the app runtime before every test file) and a `vite.config.ts` whose Vitest block is:
+`warlock add test` installs the harness: `src/test-setup.ts` (boots the app runtime before every test file) and a `vite.config.ts` whose Vitest block is:
 
 ```ts
 test: {
-  globalSetup: "./src/test-global-setup.ts",
   setupFiles: ["./src/test-setup.ts"],
   environment: "node",
   globals: false,

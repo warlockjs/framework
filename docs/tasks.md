@@ -5,34 +5,70 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 ## Owner decisions waiting
 
 - Next-major items (T-007, T-009, T-033, and the 6.0 halves of T-042 and T-047) wait for 6.0.
-- Owner go-ahead 2026-11-23 (background session): build every open item in one minor, 5.64.0, including T-206, T-207
-  (phases 1-4) and T-208 (items 1-7). Items parked until an app asks stay parked: T-171, T-196, the streaming half of
-  T-183. Windows-only items (T-100, T-180, T-120) get what can be done without a Windows machine.
-
-## Suggested plan for T-206..T-208 (one session, one minor, once the owner says go)
-
-Follow the multi-agent workflow (plan, Sonnet implementers by file area, one Opus reviewer/fixer/releaser).
-
-0. Design (one Opus agent): where approved screenshots live, the inputs the guard compares and the lint rule list.
-   Write the shared brief.
-1. Wave 1, in parallel, with no shared files:
-   - A: scry output and guidance (T-206);
-   - B: `grimoire guard` plus the scaffold lint rules (T-208 items 1-2);
-   - C: the bird-view UI (T-207 phase 1).
-2. The owner reviews C on the devtools preview (AGENTS.md "Devtools preview").
-3. Wave 2: screenshots per criterion and language, then approved baselines (T-207 phases 2-3; `changed` is the
-   default mode).
-4. One review, one typecheck and one test pass through `heavy-run`, then the release. Re-run the T-205 agent test for
-   T-206. Its scripts are in `findings/agent-test/scripts/` (git-ignored); rebuild the trees with `prep-tree.sh`,
-   outside the repository.
-
-Later sessions: T-207 phase 4 (design-system feature and its components page) and T-208 items 3-7.
+- Parked until an app asks: T-171, T-196, the streaming half of T-183. Windows-only items (T-100, T-180, T-120) need a
+  Windows machine or Windows CI runs.
 
 ## Next release
 
+- 5.64.0 shipped T-207, T-208, T-201 (API routes), T-209, T-210, T-182, T-181, T-168, T-172, T-147, T-138, T-139,
+  T-140 and T-036 (see `tasks.completed.md`); T-206 waits for its re-run.
 - 5.63.1 shipped T-204 (PostgreSQL `date` columns). 5.63.0 shipped T-188..T-195, T-197 (closed), T-198..T-200, T-202, T-203 (closed).
 - 5.62.0 shipped T-185, T-186 and T-187 (see `tasks.completed.md`).
 - 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
+
+## From the 5.64.0 release
+
+### T-211 [feature] Serve web pages from the per-worker test server
+
+- Source: 5.64.0 scaffold check (T-201), 2026-11-23.
+- What and why: the per-worker test server (`packages/core/src/tests/worker-test-server.ts` →
+  `createTestHttpServer({ loadAppModules: true })`) never calls `registerConfiguredConnectors()`, so the web connector is
+  not started and every page answers 404 there (`start-http-development-server.ts:242-248` is the shared server's
+  path, which does). 5.64.0 therefore keeps `src/test-global-setup.ts` for apps with `@warlock.js/web`
+  (`generations/features/test.feature.ts`), and in those apps API tests still read worker 1's database.
+- Evidence: on a fresh web scaffold without a global setup, `src/app/shared/tests/infrastructure.test.ts:20` gets
+  `{"error":{"code":"notFound",...}}` for `GET /`; with the global setup it passes (2 of 2).
+- Acceptance: the worker server can start the web connector (one Vite per worker, or a shared Vite with per-worker
+  HTTP), the starter's page test passes with two workers and no global setup, and the web scaffold drops the file.
+- Status: open.
+
+### T-212 [bug] MongoDB relations integration suite: inferred foreign keys load nothing
+
+- Source: 5.64.0 live run (T-014), 2026-11-23.
+- What: `packages/cascade/tests/integration/mongodb/relations.test.ts` fails 7 of 20 tests on a real MongoDB 7
+  (single-node replica set, `LOCAL_MONGO_URI`): `hasOne` "loads a single child by the inferred foreign key"
+  (`expected null to be an instance of RelProfile`), `hasMany` (`expected [] to have a length of 2`), the inferred
+  pivot, nested loading and `with()`. The same 7 fail on the 5.63.1 code (72debdc0a) with a fresh database, so it is not
+  a 5.64.0 regression; the suite never ran on this server before (testcontainers, T-181).
+- Acceptance: find whether the suite or the relation loader is wrong (compare the stored foreign key type with the
+  parent id), fix it with the suite green on a live MongoDB.
+- Status: open.
+
+### T-213 [bug] `warlock e2e` on a fresh scaffold: env, cache driver and the components page
+
+- Source: 5.64.0 scaffold check, 2026-11-23 (`findings/5.64/reports/scaffold-live.md`, git-ignored).
+- What:
+  - The e2e copy of the app gets no `.env`, so the starter dies with "no PostgreSQL user name specified"; then
+    `src/config/cache.ts:44` (`env("CACHE_DRIVER") || "redis"` in production) stops it with `CacheConfigurationError`.
+    The check passed only after adding `app.env` with the database and cache variables to both e2e files.
+  - Chrome needs `--no-sandbox` when the server runs as root (the harness reads `WARLOCK_E2E_BROWSER`).
+  - The design-system flows name `/dev/components` as their page, but that page answers 404 outside development and
+    the scenes drive `/`: the components page is never captured.
+  - Fresh-scaffold check warnings worth a template pass: `GR3001` x83 and `GR3002` x49 (mostly `src/app/auth`),
+    `GR4001` x8, `GR3006` x2 (`src/web/dev/components.*`); the contact form UI lives in `src/web/home/components/`,
+    outside the contact feature's `folders:`, so a contact task gets `GR7006` for editing it.
+- Acceptance: `warlock e2e` runs the starter's scenes on a fresh scaffold with the documented env only; the
+  design-system scenes capture the components page; a fresh scaffold's check has no template warnings.
+- Status: open.
+
+### T-214 [chore] Flaky spec under load: covered-click deadline in `core/src/e2e/page.spec.ts`
+
+- Source: 5.64.0 verify, 2026-11-23.
+- What: "keeps the covered reason when a later probe runs out of the deadline" fails with `expected 1 to be greater than
+  1` in two of four full core runs on a loaded server (100 ms deadline, only one probe fits); it passes 3 of 3 alone.
+- Acceptance: the spec controls time (fake clock or a probe counter that does not depend on wall time); 10 full runs
+  green.
+- Status: open.
 
 ## From the 2026-11-22 app findings page (5.62.0)
 
@@ -53,127 +89,7 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
   - The skill and the generated agent guidance open with "`scry --search` first, then `--impact` on the top hit".
   - Re-run the T-205 test (about $8, 1 hour), adding an arm with the Grimoire MCP tools in place of the CLI.
 - Acceptance: re-run shows recall up with no loss in precision or cost.
-- Status: waiting for the owner.
-
-### T-207 [decision] Grimoire: approved screenshots per criterion and language, a design-system feature, a bird-view
-
-- Source: owner, 2026-11-23 (chat).
-  - Agents (Claude or Codex) remove, change or add behaviour nobody asked for as a project ages; the owner wants a
-    visual place to catch it.
-  - In a two-language project every acceptance criterion counts once per language.
-  - RTL layout (for example inputs aligned right in Arabic) is a criterion of a design-system feature, not a test
-    special case.
-  - Better navigation between features, flows and criteria.
-- Today (5.63.1):
-  - Flows have `## Cases` (`CASE_QUESTIONS`, `packages/grimoire/src/contracts/written.ts:163`), criteria `AC-n` and
-    `@proves` tests with pass/fail/no-test status.
-  - Screenshots are hand-attached image lines, checked only for existence (`check/rules/screenshots.ts`, GR2014).
-  - The product map has feature and flow pages but no criterion-level view, no per-language result, no screenshot
-    history and no "changed since approved" state.
-- Proposal, in phases (one minor each, or one minor for 1-2):
-  1. Bird-view. One matrix in the Grimoire tab:
-     - rows: feature > flow > criterion, collapsible;
-     - columns: the app's languages (and apps where a criterion differs by app);
-     - cells: test status and a screenshot thumbnail;
-     - a jump-to search for any feature, flow or `AC-n`.
-       Built from existing data first.
-  2. Criteria times languages. Languages come from the app's config, so an agent writes each criterion once and it
-     counts once per language. A `@shows <feature>/<flow> AC-n` line on a browser test saves one screenshot per
-     language (network mocked for the failure cases). `grimoire check` lists the missing cells. Add the case
-     questions `server unreachable` and `server error`.
-  3. Approved baselines: the drift guard.
-     - Each screenshot has an approved version.
-     - A new capture that differs, a criterion or flow that disappeared, and a `@proves` test that was deleted all
-       show as "changed, not approved" in the matrix, with old and new side by side.
-     - The owner approves or rejects. The reviewer agent must list every unapproved change in its report.
-  4. Design-system feature.
-     - Skills create a `design-system` feature first in every project. Its criteria cover direction, spacing, colors,
-       components and error messages. UI flows name it in `affects`.
-     - The scaffold adds a dev-only components page that renders each component in each language and theme, and the
-       design-system screenshots come from it.
-- Screenshots are optional (owner, 2026-11-23): a project setting `changed` (default), `all` or `off`.
-  - With `changed`, only the flows of the features the task touched are captured, and a full pass runs before a release.
-  - A capture happens only for a criterion that has a `@shows` test, so an app without such tests pays nothing.
-  - A flow can opt out with `screenshots: false` in its front matter.
-  - The cheap checks (lint rules, guard, locked tests, T-208) stay on everywhere.
-  - The bird-view works without screenshots and then shows test status only.
-- Acceptance: on the scaffold app, login's criteria show `en` and `ar` cells with screenshots. A left-aligned input in
-  `ar` turns its design-system cell red. A removed case shows as "changed, not approved" until it is approved.
-- Status: waiting for the owner (new feature area; start in a fresh session).
-
-### T-208 [decision] Drift controls: turn rules into checks, lock scope and tests, guard a change against its task
-
-- Source: owner, 2026-11-23 (chat: AI agents drift on every project by removing, changing or adding things unasked;
-  add restrictions and controls).
-- Proposal, in priority order:
-  1. Repeated corrections become checks, not prose. Each rule the owner keeps repeating gets a lint rule or test in
-     the scaffold, for example:
-     - CSS logical properties only (no `left`, `ml-*`, `text-left`), so RTL works;
-     - no generic "Something went wrong";
-     - no `kind` discriminators;
-     - no `.js` imports.
-  2. `warlock grimoire guard <task>`: the diff checked against its task.
-     - A Grimoire task names its `feature` and `flow`, and Grimoire knows which files each feature owns.
-     - The guard lists changed files outside the task's features or its own `Files:` line, deleted `@proves` tests,
-       and removed criteria, cases or flows.
-     - It runs in CI and as an agent hook.
-  3. Locked tests.
-     - The planner writes the acceptance tests first; implementer briefs mark them read-only, and the guard flags
-       edits to them.
-     - A check bans `.skip` and `.only`, and flags a test change that drops assertions.
-  4. Protected areas need the task to name them: migrations, auth, public API, config, lockfile and new
-     dependencies. A public API snapshot makes any change to exports deliberate.
-  5. An independent reviewer gets the task and the diff, not the author's summary, with one fixed question: "list
-     every change the task did not ask for".
-  6. Approved visual baselines (T-207, phase 3).
-  7. Traceability: every commit names its task, and CI rejects app commits without one (app repos only; never in
-     public text).
-- Acceptance per item: shipped in the scaffold and the skills, documented, and shown on a demo diff that adds an
-  unasked file, deletes a proving test and uses `ml-4`. All three are caught.
-- Status: waiting for the owner; 1-2 first (one minor).
-
-### T-201 [bug] The shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
-
-- Evidence named: scaffold `src/test-global-setup.ts`, scaffold `src/config/database.ts`, `packages/core/src/tests/reset-test-database.ts:49-60`.
-- Checked 2026-11-22: confirmed as name resolution. The main-process server has no `VITEST_POOL_ID`, so it reads
-  `<db>_test_1`; worker N writes `<db>_test_N` (scaffold `src/config/database*.ts`, `reset-test-database.ts:49-60`).
-  Spec in `packages/core/src/tests/reset-test-database.spec.ts`. 5.63.0 documents it (scaffold comment, testing page).
-- Open: a real fix needs a design: one shared server cannot serve several worker databases. Options: the server
-  picks the data source per request from a worker header the request helpers send, or the scaffold starts one server
-  per worker. Workaround: `createTestHttpServer()` per test file.
-- Status: documented in 5.63.0; behaviour fix open.
-
-### T-209 [bug] `scry --search` drops every non-Latin letter, so Arabic queries fail with GR9006
-
-- Source: app findings page above (F5), run by the reporter on 5.63.1, 2026-11-23.
-- Evidence: `packages/grimoire/src/scry/search.ts:107` `wordsOf()` lower-cases, then `.replace(/[^a-z0-9]+/g, " ")`,
-  so Arabic (or accented Latin) text in the query and in the book becomes empty; `scry --search "شحنة تكلفة"` answers
-  GR9006 "has no letters or digits".
-- Fix: one Unicode tokeniser for the query and the indexed text (`normalize("NFKC")`, lower-case,
-  `[^\p{L}\p{N}]+` with the `u` flag); for Arabic also strip tatweel and diacritics and unify alef, ya and ta-marbuta
-  forms.
-- Acceptance: an Arabic query matches an Arabic feature title and flow text; accented Latin still matches; specs;
-  docs and CHANGELOG.
-- Status: open (5.64.0).
-
-### T-210 [bug] `whereSearch` / `whereFullText` on PostgreSQL always use the `english` configuration
-
-- Source: app findings page above (F6), run by the reporter on cascade 5.63.1 and PostgreSQL 18.7, 2026-11-23.
-- Evidence: `packages/cascade/src/query-builder/query-builder.ts:821-841` (`whereFullText(fields, query)`,
-  `orWhereFullText`, `whereSearch(field, query)` pass no language); `packages/cascade/src/drivers/postgres/postgres-query-parser.ts:1021-1046`
-  (`safeLanguage()` falls back to `"english"` and reads `data.language`, which no builder method sets). Arabic partial
-  words («الخامس», «رمان») never match «شحنة الرمان الخامسة». The index side already takes a language
-  (`postgres-sql-serializer.ts:387`, `postgres-migration-driver.ts:570`). Docs and the `query-data` skill describe
-  `whereSearch` as pattern matching; the contract's `textSearch(…, { language })` example points at a base method that
-  throws (`query-builder.ts:847-853`).
-- Fix: an options argument `{ language?, weights? }` on `whereFullText`, `orWhereFullText` and `whereSearch` (and the
-  contract); a per-data-source default text-search configuration that `createFullTextIndex` uses too, so the index
-  stays usable (default stays `english` in a minor; document `simple` for non-English apps); a PostgreSQL substring
-  helper (`whereContains`, escaping `%`, `_`, `\`); docs and skill say what `whereSearch` means on each driver; fix the
-  `textSearch` example.
-- Acceptance: the reporter's spec (`whereSearch("title", "الخامس", { language: "simple" })` emits `'simple'` twice)
-  passes; a live PostgreSQL check finds the partial Arabic word through `whereContains`; docs, skill, CHANGELOG.
-- Status: open (5.64.0).
+- Status: 5.64.0 shipped the proposal (`changes with the top hits:` block, `next:` impact line, weak-match note, spec/locale/type files ranked x0.6, agent guidance in the skill, scaffold `AGENTS.md` and MCP descriptions). Open: the acceptance re-run of the T-205 agent test on the published 5.64.0 code (the coordinator runs it after the publish and reports separately).
 
 ## From the 2026-11-21 scry field report
 
@@ -208,19 +124,6 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
 
 ## From the 5.61.0 release
 
-### T-182 [feature] Production monitor: closed URLs hit with a request body differ from an unknown URL
-
-- Source: 5.61.0 review, 2026-11-20.
-- What and why: 5.61.0 makes closed monitor URLs answer like an unknown URL for `GET` and `HEAD` (same body, headers,
-  rate-limit headers and 429). For `POST` and other methods with a body, an unknown URL can answer 400/413 from body
-  parsing before routing, while the monitor refuses before reading the body and answers 404. That difference existed
-  before 5.61.0; `devtools/security.mdx` now says so.
-- Evidence: `packages/devtools/src/production/http/mount.ts` (the gate and `notFound`), `answerUnknownUrl` in
-  `packages/core/src/router/router.ts`.
-- Acceptance: a spec sends the same malformed and oversized bodies to a closed monitor URL and an unknown URL and gets
-  the same status and body; the security page sentence is narrowed back if it matches.
-- Status: open.
-
 ### T-183 [feature] Grimoire dev tab: stream partial answers on the first open, refresh live facts after route edits
 
 - Source: 5.61.0 build (T-169, T-178), 2026-11-20.
@@ -244,26 +147,9 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   uncaught errors instead of exiting. Only gap seen: the chokidar `error` listener is commented out in
   `packages/core/src/dev-server/files-watcher.ts`; not shown to kill the process.
 - Acceptance: a repro on a Windows machine (many files saved at once, e.g. a formatter over the project) before any fix.
-- Status: needs a Windows repro.
-
-### T-181 [chore] Testcontainers-based integration suites cannot start on this server
-
-- Source: 5.60.0 live PostgreSQL run, 2026-11-19. The 7 cascade PostgreSQL suites that start their own containers
-  fail with ECONNRESET here and left 21 idle `postgres:16-alpine` containers behind (stopped and removed 2026-11-19
-  at the owner's request; Docker still lists them as "Removal In Progress" because overlay2 reports the mounts busy).
-- What: give the integration harness a way to use an existing database from env (`LOCAL_PG_*` / a Mongo URL) for every
-  suite, so live runs need one named `--network host` container and no testcontainers.
-- Status: open.
+- Status: 5.64.0 re-enabled the chokidar `error` listener (logged through `devLogError`, passed to `onFileError` subscribers, never throws). The crash itself is still not reproduced; needs a Windows repro.
 
 ## From the 2026-11-19 app reviews
-
-### T-168 [feature] Stamp releases from the app's release flow and add a "What's new" view to the Product map
-
-- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0): the app shipped two releases but its Grimoire had none, so every changelog line read "Not released yet".
-- What and why: `warlock release` (or the package version and git tags) should stamp the changelogs and write the release file; the Product map gets a "What's new" view per release.
-- Evidence: the release and changelog reading code is under `packages/grimoire/src/` (find `release` and `changelog`); the Product map "What changed" list is `packages/grimoire/ui/product-map.js:579` (T-159 redesigns it first).
-- Acceptance: after a release, the changelog lines carry the version and the Product map shows a "What's new" view; specs; docs and CHANGELOG entry.
-- Status: open; do after T-159 settles the "What changed" layout.
 
 ### T-171 [feature] Parked: requests only one app has made
 
@@ -279,69 +165,13 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
      `packages/grimoire/src/scry/query.ts:49-65`: code files only). Source: the 2026-11-21 scry field report (T-189).
 - Status: parked, one app asked. Revisit when a second app asks for the same item.
 
-### T-172 [bug] Product map and developer UI issues seen in screenshots, no runnable repro yet
-
-- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0, 1440 px and 390 px, light and dark). Each item was observed through screenshots only; none has a runnable repro, so each needs reproducing before a fix.
-- Items:
-  1. Repeated rows in "Where you see it" on a feature page (the same page listed several times, one row per block). Partly checked: the row key includes the block (`packages/grimoire/src/devtools/product-map.ts:319`); whether the UI renders the block name is unverified (`packages/grimoire/ui/product-map.js`, the appearances list). Likely fix: show the block name or group by page.
-  2. Developer feature page shows one card per finding in a very tall, ungrouped list with the neighbour graph underneath (`packages/grimoire/ui/grimoire-view.js`); the Check tab already groups the same findings. Likely fix: group by code and collapse, graph above.
-  3. Raw ids and code terms on business screens: app group headings show ids instead of titles, "For free" in the flow meta line, raw case keys in "What if...", AC/T references in "What changed" (`packages/grimoire/ui/product-map.js`, near `:255` and `:694`; T-159 touches the "What changed" part).
-  4. Overview task count ("0 open, 1 waiting") disagrees with the tab badge ("Tasks 1") when a task has the status "waiting for approval".
-  5. Modules graph unreadable on a large app (labels cut from the left and overlapping, one 2,548-file node). Design opinion: cut labels from the right, split sites from modules, offer a top-N matrix.
-  6. Phone width (390 px): the tab bar hides 5 of 8 tabs behind a fade with no hint, and the Apps page is very tall. Likely fix: a visible "more" control or a select; collapsed groups on Apps.
-- Acceptance: for each item, a repro (a spec on the view data or a screenshot test) before the fix; items 5 and 6 need an owner design call first.
-- Status: needs repro.
-
 ## 5.58.0: Grimoire flow pages, type-only reach and product map
 
 Design: `findings/5.58/ARCHITECTURE.md` (decisions D1–D28); work-package briefs in `findings/5.58/briefs/`.
 
 ## After 5.56.0: production monitor follow-ups
 
-### T-147 [chore] Real passkey sign-in in a browser
-
-- Source: 5.56.0 security review and end-to-end run, 2026-11-17.
-- What and why: passkey registration and sign-in were only tested against a fake adapter; no real WebAuthn ceremony
-  ran (headless Chromium can do it with a virtual authenticator through CDP).
-- Evidence: `packages/devtools/src/production/auth/passkeys.ts`, `findings/5.56/reports/E2E.md`.
-- Acceptance: a Playwright run with a CDP virtual authenticator registers a passkey, signs in with it, and uses it as
-  the step-up for recovery codes.
-- Status: open.
-
 ## After 5.55.0: Grimoire follow-ups
-
-### T-138 [chore] Build a book of the release gate's blog app in CI
-
-- Source: 5.55.0 build and pilot, 2026-11-16.
-- What and why: the PLAN's acceptance asks for a book of a real app, but 5.55.0 did not build one in CI. The release
-  gate already builds the blog app from the packed tarballs, so the same run can build and check its book.
-- Evidence: `tools/release/ci/blog-check.mjs`.
-- Acceptance: the release gate builds the blog app's book, runs `warlock grimoire check` on it, and fails when either
-  step fails.
-- Status: open.
-
-### T-139 [bug] Tooling commands exit before Grimoire's cached-routes fallback when the app's preload fails
-
-- Source: 5.55.0 build and pilot, 2026-11-16.
-- What and why: when the app's config or bootstrap fails during core's command preload, `warlock grimoire build` and
-  `warlock grimoire check` exit before Grimoire can fall back to cached routes (GR8002). `warlock inspect` has the same
-  problem. Core needs a way for tooling commands to catch a failed preload so they can continue.
-- Evidence: `packages/grimoire/src/warlock/commands.ts`, `packages/grimoire/src/warlock/actions.ts:61-70` (the GR8002
-  fallback); `packages/core/src/cli/cli-commands.manager.ts` (command preload).
-- Acceptance: with a broken config, `warlock grimoire build` reports GR8002 and uses cached routes when they exist; a
-  spec covers a failing bootstrap for `grimoire build`, `grimoire check` and `inspect`.
-- Status: open.
-
-### T-140 [feature] Top-level files of a mobile app folder are missing from the book
-
-- Source: 5.55.0 build and pilot, 2026-11-16.
-- What and why: `collectFiles({ dirs })` scans folders only, so a mobile app's top-level files (`App.tsx`, `index.ts`)
-  are not in the book. Add file entries or a skip list to `collectFiles`.
-- Evidence: `packages/grimoire/src/warlock/adapter.ts` (mobile source folders),
-  `packages/core/src/tooling/inspect/collect-files.ts`.
-- Acceptance: a mobile app fixture with `App.tsx` and `index.ts` at its root lists both in the book; a spec covers the
-  new file entries (or the skip list).
-- Status: open.
 
 ### T-144 [feature] Third measurement arm: the book alone
 
@@ -352,7 +182,7 @@ Design: `findings/5.58/ARCHITECTURE.md` (decisions D1–D28); work-package brief
 - Evidence: T-136; `findings/6.0/PLAN-GRIMOIRE.md`.
 - Acceptance: the measurement reports three arms (nothing, book only, book with features and skill) on the same ten
   tasks, with the numbers recorded as measured in the release summary.
-- Status: open.
+- Status: open. The coordinator runs the measurement on the published 5.64.0 code together with the T-206 re-run.
 
 ## Tasks
 
@@ -420,7 +250,7 @@ T-100 and later are checked against 5.53.1.
   `packages/ai/src/checkpoint/pg.ts`, `packages/herald/src/drivers/rabbitmq/rabbitmq-channel.ts`.
 - Acceptance: each suite runs green against real services (CI job or a documented local run); any failure becomes
   its own task.
-- Status: open. 5.54.0 ran the MongoDB and PostgreSQL hardening suites (auth, 18 pass), the auth and core Redis specs, the cache Redis driver spec and the live cascade suites (49 pass; one regression found and fixed). Not run yet: the testcontainers suites (auth token models; cascade crud, query, relations, sync, persistence), RabbitMQ, the PostgreSQL checkpoint upsert, the Redis checkpoint layout and the rebinding resolver.
+- Status: open. 5.64.0 ran on this server (containers on the host network, `LOCAL_PG_*` / `LOCAL_MONGO_*` from T-181): cascade PostgreSQL integration 13 files, 143 tests pass; cascade MongoDB 104 of 112 pass, the 7 failures are T-212 (also on 5.63 code); core database cache driver live spec passes on both (its PostgreSQL run found the bug fixed in 5.64.0). Not run yet: RabbitMQ, the PostgreSQL checkpoint upsert, the Redis checkpoint layout, the rebinding resolver, the auth token model suites.
 
 ### T-033 [decision] Captured messages: text-only `content` for multipart messages
 
@@ -435,16 +265,6 @@ T-100 and later are checked against 5.53.1.
 - Acceptance: the chosen shape with specs, docs and an upgrade note; session restore still rebuilds messages.
 - Status: open (6.0). 5.54.0 ships no shape change; the change is planned for the next major.
 - Owner decision (2026-11-16): option (b), the shape change in the next major. Not in 5.54.
-
-### T-036 [feature] Database cache driver: one upsert per `set`, lean `get`
-
-- Source: security and performance audit of 2026-11-11.
-- What and why: `DatabaseCacheDriver.set` does a read then an insert or update, and `get` hydrates a model per read.
-  A single upsert needs a unique index on `key` that the driver cannot assume today.
-- Evidence: `packages/core/src/cache/database-cache-driver.ts:85`, `:128`.
-- Acceptance: the cache migration ships the unique index; `set` uses one upsert with `conflictColumns: ["key"]`;
-  `get` reads a raw row; specs on both database drivers.
-- Status: open. 5.54.0 ships the lean row read in `get`, the opt-in `upsert: true` option (one upsert with `conflictColumns: ["key"]`) and `cacheMigration`, which creates the unique index on `key`. Still open: the default stays the read-then-write path (existing tables need the index first), the specs were not run against a real database on both drivers, and the default is not flipped.
 
 ### T-042 [feature] ORM hydration hot path
 
@@ -533,4 +353,4 @@ T-100 and later are checked against 5.53.1.
 - Acceptance: the cause is named (file-watch latency on Windows, a missed update, or the wait itself); the test passes in
   20 consecutive Windows runs, or waits on the update event instead of a fixed timeout; the identifiers checks wait for
   hydration before reading `dataset` values.
-- Status: open.
+- Status: 5.64.0: the test waits for React hydration (`__reactProps$`) before clicking and reading `dataset`, polls the server for the new revision before the browser wait, and `windows.yml` uploads `.warlock/e2e` on failure. Not yet checked on Windows: watch the next Windows runs (20 green runs closes it).

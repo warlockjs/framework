@@ -14,21 +14,25 @@ description: "Grimoire (experimental), the project map for Warlock.js apps: `war
 
 The Grimoire is experimental: its file structure and commands may still change.
 
-`grimoire/` is the map of a Warlock.js project. Warlock writes the **book** (one entry per source file, the routes, the pages and the mobile screens, in `grimoire/book/`, not in git). Agents write what the product does (`grimoire/features/`), where users meet it (`grimoire/apps/`), the work (`grimoire/tasks/`) and the releases (`grimoire/releases/`). Warlock never edits a file an agent wrote.
+`grimoire/` is the map of a Warlock.js project. Warlock writes the **book** (one entry per source file, the routes, the pages and the mobile screens, in `grimoire/book/`, not in git). Agents write what the product does (`grimoire/features/`), where users meet it (`grimoire/apps/`), the work (`grimoire/tasks/`) and the releases (`grimoire/releases/`). Warlock never edits a file an agent wrote, apart from the changelog stamp you ask for with `warlock grimoire release --stamp`.
 
 ## The 80% path
 
 1. Before searching the code, ask the map: `use-the-grimoire.md`.
 2. A new behaviour starts as a task, a brief, a feature README and a flow, before code: `write-a-feature.md`.
-3. After the change, tie tests to criteria, reshape the README, add the changelog entry, close the task, run the check, and at release time stamp the changelogs and write the brief: `record-a-change.md`.
+3. After the change, tie tests to criteria (`@proves`, and `@shows` for what the user sees), reshape the README, add the changelog entry, close the task, run the check, and at release time stamp the changelogs and write the brief: `record-a-change.md`.
 4. Pages, blocks, conditions and mobile screens: `describe-an-app.md`.
 5. The header and export comments the book copies from a file: `document-a-file.md`.
 6. A project with code but no `grimoire/` folder: `backfill-a-grimoire.md`.
+7. Keep a change inside its task (features, `Files:`, locked tests, protected areas) and run `warlock grimoire guard` before you stop: `guard-a-change.md`.
+8. Review a change from its task and its diff only, never from the author's summary: `review-a-change.md`.
 
 ## Conventions and pitfalls
 
 - Never edit `grimoire/book/`, `index.json`, `bookmap.json` or `*.bookmap.json`.
-- You write release numbers and dates into changelogs and the release brief; `warlock grimoire release` only writes the collected list.
+- `warlock grimoire release <version> --stamp` moves every `## Unreleased` entry under the release and writes a missing release file; without `--stamp` it only writes the collected list.
+- Every project has a design-system feature first (`grimoire/features/design-system/`); flows with a page step name it in `affects`.
+- Only the owner approves a changed screenshot or a removed criterion (`warlock grimoire approve`); list every change that is not approved in your report.
 - A finding marked `(expected)` belongs to `proposed` work and does not fail `warlock grimoire check`.
 - Mobile screens are listed from file names only with file-based routing; declare them when navigation is in code.
 - Do not invent intent: write `Unknown:` and ask the owner.
@@ -70,6 +74,10 @@ Start from the modules: a module is usually one feature. Then adjust.
 - Plumbing (config, shared utilities, the base layout) → no feature.
 - Mail, notifications, search: the machinery is a feature; each mail or notification belongs to
   the feature that sends it.
+
+In a project with a UI, write the `design-system` feature first (`write-a-feature`), as `inferred`:
+direction, components, error messages. Add `grimoire/settings.md` with the app's `languages`; the
+Warlock adapter would read `app.localeCodes` anyway, but the file makes the choice visible.
 
 Write the proposal as a table for the owner **before** writing files:
 
@@ -317,7 +325,10 @@ flow: catalog/new-arrivals
 Keep image files in `grimoire/screenshots/` (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`), for example
 `grimoire/screenshots/web/home.png`. Write an image line `![alt](path)` anywhere in a page, screen
 or block file, with the path relative to the Markdown file or starting with `/grimoire/screenshots/`.
-The Product map shows these as "where you see it". An image outside the folder is a warning
+The Product map shows these as "where you see it". These are images you attach by hand. The
+captures of `@shows` scenes (one per criterion and language) and their approved versions are made by
+Warlock under `grimoire/screenshots/captured/` and `approved/`: never write those paths into a page
+or block file. An image outside the folder is a warning
 (`GR1029`); a missing file is a warning (`GR2014`).
 
 ## Where a difference between apps goes
@@ -430,6 +441,95 @@ them. `npx warlock grimoire check` reports a file with no header and a file with
 - Do not copy the flow's text into the file. The flow lives in `grimoire/features/`.
 
 
+## guard-a-change  `@warlock.js/grimoire/skills/guard-a-change/SKILL.md`
+
+---
+name: guard-a-change
+description: "Keep a change inside its task and prove it with `warlock grimoire guard`: files outside the task, deleted proving tests, removed criteria, locked tests, protected areas, the public API snapshot, the code rules and a task id in every commit. Use before you stop work on a task, in CI, and when `GR7006`-`GR7013`, `GR3007`-`GR3010`, `GR4011`, `GR4012` or `GR9008` appear."
+---
+
+# Guard a change
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+Agents drift: they remove, change or add things nobody asked for. The guard compares your diff with the task and says what the task did not ask for. Run it before you stop.
+
+```bash
+npx warlock grimoire guard            # the one task in progress
+npx warlock grimoire guard T-12       # a task by number (T-12, 12 and T-012 match the same task)
+npx warlock grimoire guard T-12 --base origin/main
+npx warlock grimoire guard --base origin/main --commits origin/main..HEAD   # CI
+npx warlock grimoire guard --hook     # agent hook: findings on stderr, exit code 2 on an error
+npx warlock grimoire guard --json
+```
+
+It never boots the app. The change is the diff from the base (default: where your branch left the default branch) to the working tree, including staged, unstaged and untracked files. Exit code 0 means no error, 1 an error, and with `--hook` 2 (and 0 when it cannot run, such as no task, or when the hook already sent you back once: then finish and list what is left in your report).
+
+## What it checks
+
+| Code               | What                                                                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GR7006`           | A changed file is outside the task: not owned by its feature (or `Features:`), not a file its flow reaches, not a test proving its criteria, not in `Files:`. |
+| `GR7007`           | A flow, criterion or case in `grimoire/features/` is gone and `Removes:` does not name it.                                                                    |
+| `GR7008`           | A `@proves` test is gone and no other test proves that criterion, and `Removes:` does not name it.                                                            |
+| `GR7009`           | A file in `Locked:` was changed, renamed or deleted.                                                                                                          |
+| `GR7010`           | A changed test has fewer assertions than at the base (`expect(`, `expect.soft(`, `assert(`, `assert.x(`, `.should(`; a warning).                              |
+| `GR7011`           | A protected area changed and the task's `Touches:` does not name it.                                                                                          |
+| `GR7012`           | A commit of `--commits` names no task (`T-12`), or a task that has no file. Merge commits are skipped.                                                        |
+| `GR7013`           | `grimoire check` warns when the routes differ from the approved API (the guard raises `GR7011` for `public-api`).                                             |
+| `GR3007`-`GR3010`  | The code rules, on the lines the change adds.                                                                                                                 |
+| `GR4011`, `GR4012` | An added `.only` or `.skip` (both errors in the guard).                                                                                                       |
+| `GR9008`           | No task: pass one, name it in a commit, or have exactly one task `in progress`.                                                                               |
+| `GR9009`           | Git could not answer: run in a repository, pass a base that exists, fetch the full history in CI.                                                             |
+
+It also prints the changes that are not approved (`not approved: <n> changes`, from the approved baseline and the screenshots). They do not fail the guard; list them in your report.
+
+## The task body fields
+
+```md
+- Files: src/app/shared/utils/money.ts, src/config/catalog.ts
+- Features: orders, catalog/wishlist
+- Locked: src/app/catalog/tests/wishlist.test.ts
+- Touches: migrations, dependencies
+- Removes: catalog/wishlist AC-3, catalog/wishlist case duplicate
+```
+
+Add a line only when the owner agreed; otherwise change the code. A path with no wildcard matches itself and everything under it; `**` crosses folders, `*` stays inside one.
+
+## Protected areas
+
+`migrations`, `auth`, `config`, `lockfile`, `dependencies` and `public-api` (`DEFAULT_PROTECTED_AREAS`). `dependencies` fires only when a `package.json` adds or changes a dependency entry, not for every edit of the file. `public-api` is the difference between the routes and `grimoire/approved/api.json`; approve a deliberate change with `npx warlock grimoire approve api` (it reads the cached route facts, so run `warlock grimoire build` first). Add or replace areas in `grimoire/settings.md`:
+
+```md
+---
+protected:
+  - payments src/app/payments/** src/config/payments.ts
+---
+```
+
+## The code rules
+
+`rules:` in `grimoire/settings.md` names the rules `grimoire check` runs on every file (`CODE_RULES`: `logical-css`, `specific-errors`, `type-discriminator`, `no-js-imports`). With no `rules:` key, `check` runs none and the guard runs all four on added lines; `rules: []` turns them off.
+
+| Rule                 | Code     | Flags                                                                                                                                                                                                                                            | Write instead                                                                                                             |
+| -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `logical-css`        | `GR3007` | `margin-left`, `padding-right`, `left:`, `text-align: left`, `float: right`, `border-left`, Tailwind `ml-4` `pr-2` `left-0` `text-left` `rounded-l-lg` `border-r` (with variants and `-` prefixes), style keys `marginLeft`, `textAlign: "left"` | `margin-inline-start`, `inset-inline-start`, `text-align: start`, `ms-4`, `pe-2`, `start-0`, `text-start`, `rounded-s-lg` |
+| `specific-errors`    | `GR3008` | a string that is only "Something went wrong", "An error occurred", "Unknown error", "حدث خطأ ما"…, in code and locale files (`error` and `oops` alone in locale values)                                                                          | say what failed and what to do next, mapped from the error code                                                           |
+| `type-discriminator` | `GR3009` | `kind: "a"`, `kind?: "a" \| "b"`                                                                                                                                                                                                                 | `type: "a"`                                                                                                               |
+| `no-js-imports`      | `GR3010` | relative `import`/`export … from`/`import()` paths ending `.js`, `.jsx`, `.mjs`, `.cjs`                                                                                                                                                          | `./orders.service`                                                                                                        |
+
+Escape hatch, in a comment on the line or the line above, with a reason: `grimoire-allow logical-css: the code block reads left to right`. Spec files, `node_modules`, `dist` and `grimoire/` are skipped. The scanner reads text, not a syntax tree: JSX text with an apostrophe, regular expressions and your own assertion helpers are read loosely, and editors show no squiggles for these rules.
+
+## When it fails
+
+1. Read each finding: the file and line, then the task it is outside of.
+2. Undo what the task did not ask for. Do not edit a locked test, delete a proving test, or add `.skip`.
+3. If the file really belongs to the task, add it to `Files:` (or the feature to `Features:`) and say why in the task body, with the owner's agreement.
+4. Run the guard again until it prints `guard: ok`.
+
+In CI the scaffold's `.github/workflows/grimoire-guard.yml` runs it on every pull request; the `Stop` hook in `.claude/settings.json` runs `warlock grimoire guard --hook` when an agent finishes.
+
+
 ## record-a-change  `@warlock.js/grimoire/skills/record-a-change/SKILL.md`
 
 ---
@@ -453,6 +553,26 @@ it("returns the global list when the customer has no country", async () => {
   // …
 });
 ```
+
+A criterion about what a user sees is shown instead, by a browser scene in `e2e/*.e2e.ts`. Put the
+comment directly above a `shows()` call that repeats the same criterion:
+
+```ts
+import { shows } from "@warlock.js/grimoire/warlock";
+
+// @shows contact/send-message AC-3
+await shows(context, "contact/send-message AC-3", async ({ page, language, path }) => {
+  await page.mockRequests([{ url: "/api/contact", fail: "unreachable" }]);
+  await page.goto(path("/"));
+});
+```
+
+`shows()` runs the scene once per language and saves a screenshot each (`GRIMOIRE_SHOTS=all`
+captures every flow, not only the touched ones). A scene that throws fails that language. The owner
+approves the images with `warlock grimoire approve`; list every `GR4017` (image changed), `GR4018`
+(flow, criterion, case or proof changed) and `GR4019` (rejected change still there) of the check in
+your report, and never edit `grimoire/approved/` yourself. From code, `scanShows` reads the `@shows`
+lines of the test files and `resolveSettings` fills the defaults of `grimoire/settings.md`.
 
 - End-to-end tests prove a flow's steps. Unit tests prove a business rule ("a reset code expires
   after 10 minutes").
@@ -502,6 +622,8 @@ Add two lines: how it was verified (which tests, which criteria) and anything le
 something is left open, open a new task for it; do not leave it only in the done file. A task
 that needs the owner's answer gets `status: waiting for approval` and a `Decision needed:` line.
 
+Name the task id (`T-12`) in every commit message of the change; `warlock grimoire guard --commits <range>` fails a commit that names none.
+
 ## 5. Check
 
 ```bash
@@ -528,16 +650,30 @@ folder is not committed, so run the tests with the reporter in CI and ship the r
 deploy. To write it elsewhere, pass `grimoireReporter({ file })` and point the devtools panel at it
 with the `testResultsFile` option.
 
+Then check the change against its task, before you stop:
+
+```bash
+npx warlock grimoire guard T-12
+```
+
+It lists files outside the task, deleted proving tests, removed criteria or cases, edited locked tests, protected areas the task does not name, and the code rules on the lines you added. Fix the code rather than widening the task; add a `Files:`, `Touches:` or `Removes:` line only when the owner agreed (`guard-a-change`).
+
 Fix every line it prints. Do not finish with problems you caused. Findings on a flow or feature
 with `status: proposed` print with `(expected)` and do not fail the check: leave them until the
 code exists.
 
 ## 6. At release time
 
-Warlock does not edit your files at release. You do three things, in this order:
+Run the stamp from the app's release flow, after the version is set in `package.json`:
 
-1. **Stamp the changelogs.** In each feature that changed, move the `## Unreleased` entries under a
-   heading with the release number and date:
+```bash
+npx warlock grimoire release --stamp
+```
+
+It does three things, in this order, and prints what it did (`stamped catalog, orders → 1.4.1 (2026-11-20)`):
+
+1. **Stamps the changelogs.** In each feature that has entries under `## Unreleased`, it moves them under a
+   heading with the release number and date, and leaves an empty `## Unreleased` above:
 
    ```md
    ## Unreleased
@@ -548,7 +684,9 @@ Warlock does not edit your files at release. You do three things, in this order:
      instead of the global one (AC-2)
    ```
 
-2. **Write the release brief.** Create `grimoire/releases/1.4.1.md`:
+2. **Writes the release file** `grimoire/releases/1.4.1.md` when it is missing, with its front matter, a
+   `# Release 1.4.1` heading and a one-line brief that names the changed features. An existing release file is kept.
+   **Rewrite the brief in the owner's words**: two or three sentences on what the release means to users.
 
    ```md
    ---
@@ -561,18 +699,14 @@ Warlock does not edit your files at release. You do three things, in this order:
    Customers with no country on their account see new arrivals again.
    ```
 
-   Two or three sentences on what the release means to users.
+3. **Collects the list** between the markers under your brief. Run `npx warlock grimoire release 1.4.1` again after
+   any change to a changelog or the brief: the result is the same every time. It also says how many entries are
+   still unreleased. Do not write that list yourself.
 
-3. **Collect the list.**
-
-   ```bash
-   npx warlock grimoire release 1.4.1
-   ```
-
-   It writes the entries you stamped with that release between the markers under your brief, and
-   changes nothing else. It also says how many entries are still unreleased. Do not write that list
-   yourself, and run the command again after any change to a changelog: the result is the same
-   every time.
+The version is the app's `package.json` version unless you pass one (`release 1.4.1 --stamp`); the date is today unless
+the release file has one or you pass `--date yyyy-mm-dd`. The stamp is the only edit Warlock makes to your files, and
+only with `--stamp`. Without it you move the entries and write the release file by hand, as above, and run
+`npx warlock grimoire release 1.4.1`.
 
 `npx warlock grimoire check` reports a listed entry that has no changelog entry stamped with that
 release and date, and a release section with no release file.
@@ -580,7 +714,66 @@ release and date, and a release section with no release file.
 ## Report to the owner
 
 Say what changed in plain words, the feature version, which criteria are proven, what the check
-reported, and what is left open with its task id.
+reported, and what is left open with its task id. Paste the result of `npx warlock grimoire guard`,
+and list every change that is not approved (`warlock grimoire check` `GR4017`, `GR4018`, `GR4019`) by
+its id; leave none out.
+
+
+## review-a-change  `@warlock.js/grimoire/skills/review-a-change/SKILL.md`
+
+---
+name: review-a-change
+description: "Review a change as an independent reviewer who sees only the task and the diff, never the author's summary, and answers one question: list every change the task did not ask for. Use when asked to review work an agent or a colleague finished, before a merge."
+---
+
+# Review a change
+
+The Grimoire is experimental: its file structure and commands may still change.
+
+The reviewer is independent. It reads two things only: the task file and the diff. It does not read the author's summary, the commit messages' explanations or the author's report; they describe what the author meant, not what changed.
+
+## Input
+
+1. The task file (`grimoire/tasks/open/T-12-….md` or `grimoire/tasks/done/…`), including its `Files:`, `Features:`, `Locked:`, `Touches:` and `Removes:` lines.
+2. The diff: `git diff <base>...HEAD`, where `<base>` is the branch the change merges into (`origin/main`).
+
+## The question
+
+Ask exactly this, and answer it before anything else:
+
+> List every change the task did not ask for.
+
+Go file by file through the diff. For each hunk say which sentence or acceptance criterion of the task asks for it. A hunk no sentence asks for goes on the list: an unasked file, a removed or reworded criterion, a deleted or weakened test, a renamed export, a changed dependency, a new behaviour, a refactor. "Harmless" and "an improvement" are not reasons to leave it out.
+
+## Then
+
+1. Run the guard and paste its output:
+
+   ```bash
+   npx warlock grimoire guard <task> --base <base>
+   ```
+
+2. List every drift item that is not approved, by id, from `npx warlock grimoire check` (`GR4017` capture differs, `GR4018` structure changed, `GR4019` rejected change still there). Leave none out and do not approve any: only the owner approves.
+3. Say whether the change is ready: yes only when the list of unasked changes is empty (or each item is named in the task and approved by the owner), the guard prints `guard: ok`, and no drift item is open.
+
+## Report shape
+
+```md
+Unasked changes
+
+- <file>: <what changed>, no sentence of the task asks for it
+
+Guard
+<the pasted output>
+
+Not approved
+
+- <drift item id>
+
+Verdict: ready | not ready, because …
+```
+
+An empty "Unasked changes" section says "none" and the reviewer says which files it read.
 
 
 ## use-the-grimoire  `@warlock.js/grimoire/skills/use-the-grimoire/SKILL.md`
@@ -613,9 +806,7 @@ edits a file you wrote either.
 
 ## Start of every task
 
-1. Find the feature and flow the task is about.
-
-   Pass the whole task sentence (the commit title or the bug report), not two keywords:
+1. `scry --search "<the whole request>"`: pass the whole task sentence (the commit title or the bug report), not two keywords.
 
    ```bash
    npx warlock scry --search "new arrivals are empty for customers with no country"
@@ -623,22 +814,27 @@ edits a file you wrote either.
 
    ```text
    21.4  flow     catalog/new-arrivals              New arrivals
-   12.9  block    web-client/home/new-arrivals      catalog/new-arrivals
-   11.3  route    GET /api/products/new-arrivals    catalog.new-arrivals
     9.8  file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
+   changes with the top hits:
+     src/app/catalog/repositories/products.repository.ts   imported by new-arrivals.service.ts
+     src/app/catalog/tests/new-arrivals.test.ts            test
+   next: warlock scry --impact src/app/catalog/services/new-arrivals.service.ts
    ```
 
-   The number in front is the score: hits are in score order, best first, whatever their type.
+   The number in front is the score: hits are in score order, best first, whatever the type.
 
-2. Read the feature's `README.md`, then the flow file. They say what the behaviour should be.
-3. Ask for the flow's book map. It lists the files behind each step, the tests that prove each
+2. `scry --impact <top file>` (the `next:` line) and read the `changes with` lines: they are the files that usually change
+   with it (what it imports and what imports it inside the same feature, and its tests).
+3. Use grep only for literal text, or when the answer says `weak match`.
+4. Read the feature's `README.md`, then the flow file. They say what the behaviour should be.
+5. Ask for the flow's book map. It lists the files behind each step, the tests that prove each
    criterion and the pages that show the flow.
 
    ```bash
    npx warlock scry --flow catalog/new-arrivals
    ```
 
-4. Read only those files. Do not read a whole module to find one function.
+6. Read only those files. Do not read a whole module to find one function.
 
 ## Questions the book answers
 
@@ -661,7 +857,7 @@ build, then ask again. A project with no book stops with `GR9007`. A note
 
 Add `--json` for machine-readable output; a failed call then prints `{ "type": "error", "code", "message", "fix" }` on stdout and exits 1 (the scry MCP tools return the same JSON as their error text). `--impact` lists API routes, pages, flows and features,
 including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`
-prints every line. `--search` takes the whole sentence (the commit title or the bug report, not two keywords): hits whose name or title holds the words come first, every other hit follows by score, and the list is printed in score order with the score in front. It also reads a flow's summary, story, cases and criteria (`AC-5` works); a hit found by written text shows the part that matched in brackets. Page, screen, block and file hits carry their app, and `--app <id>` keeps one app's hits. Read the flows it names and run their tests after
+prints every line. `--search` takes the whole sentence (the commit title or the bug report, not two keywords): hits whose name or title holds the words come first, every other hit follows by score, and the list is printed in score order with the score in front. It also reads a flow's summary, story, cases and criteria (`AC-5` works); a hit found by written text shows the part that matched in brackets. Page, screen, block and file hits carry their app, and `--app <id>` keeps one app's hits. Specs, locale files and type files rank below code of an equal match. Search reads Arabic and accented Latin text too: accents, Arabic vowel marks, hamza forms and the leading article `ال` do not matter (`شحنة` finds `الشحنة`, `cafe` finds `café`). The answer's `alsoChanges` list (`changes with the top hits:`, at most 10 files) and `next` line come from the top three hits; `weak: true` (the line `weak match: …`) says no hit holds most of the request's words. Read the flows it names and run their tests after
 your change.
 
 A file's entry is also at a fixed path: `src/app/auth/controllers/login.controller.ts` is described
@@ -669,14 +865,14 @@ in `grimoire/book/app/auth/controllers/login.controller.json`.
 
 ## Commands
 
-| Command                                     | Does                                                                                                                                   |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `warlock grimoire build`                    | Builds or refreshes the book (and its derived data). Run it after you finish editing; `scry` only reads and never builds               |
-| `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`); skipped when the folder is already current (`--force` writes it) |
-| `warlock grimoire build --site --product`   | Writes the business export: the Product map only, no file paths, test names or per-file answers                                        |
-| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error; `--all` lists every warning                          |
-| `warlock grimoire release <release>`        | Writes the collected list into `grimoire/releases/<release>.md`                                                                        |
-| `warlock explain GR2001`                    | Explains a finding code                                                                                                                |
+| Command                                     | Does                                                                                                                                     |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `warlock grimoire build`                    | Builds or refreshes the book (and its derived data). Run it after you finish editing; `scry` only reads and never builds                 |
+| `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`); skipped when the folder is already current (`--force` writes it)   |
+| `warlock grimoire build --site --product`   | Writes the business export: the Product map only, no file paths, test names or per-file answers                                          |
+| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error; `--all` lists every warning                            |
+| `warlock grimoire release <release>`        | Writes the collected list into `grimoire/releases/<release>.md`; with `--stamp` it first moves `## Unreleased` entries under the version |
+| `warlock explain GR2001`                    | Explains a finding code                                                                                                                  |
 
 Every finding has a code (`GR2001`) and a fix hint. A finding marked `(expected)` belongs to work
 that is still `proposed`; it does not fail the check.
@@ -823,6 +1019,24 @@ status: waiting for approval
 - Decision needed: one wishlist per customer, or several named lists?
 ```
 
+The guard (`warlock grimoire guard`, see `guard-a-change`) reads these optional body lines, comma-separated:
+
+```md
+- Files: src/app/shared/utils/money.ts, src/config/catalog.ts
+- Features: orders, catalog/wishlist
+- Locked: src/app/catalog/tests/wishlist.test.ts
+- Touches: migrations, dependencies
+- Removes: catalog/wishlist AC-3, catalog/wishlist case duplicate
+```
+
+- `Files:` lists files (globs allowed) outside the task's feature that the change must touch.
+- `Features:` names more features (`orders`) or flows (`catalog/wishlist`) the change may touch.
+- `Locked:` names the acceptance tests the planner wrote first. Whoever builds the task never edits them.
+- `Touches:` names the protected areas the task may change: `migrations`, `auth`, `config`, `lockfile`, `dependencies`, `public-api`, or an area of `grimoire/settings.md`.
+- `Removes:` names the flow, criterion or case that is allowed to go (`<feature>/<flow>`, `<feature>/<flow> AC-3`, `<feature>/<flow> case duplicate`).
+
+Write the acceptance tests first, with their `@proves` lines, and list them in `Locked:` before handing the task to an implementer. The task's `feature` and `flow` already put that feature's files and the flow's files in scope; add `Files:` for the rest at the start, not after the guard fails.
+
 A task that waits for the owner's answer has `status: waiting for approval` and a `Decision needed:` line.
 The other statuses are `open`, `approved`, `in progress`, `blocked`, `done` and `dropped`; any other
 word is an error (`GR1004`).
@@ -831,6 +1045,16 @@ word is an error (`GR1004`).
 
 `grimoire/features/catalog/versions/v3.md`: why, what changes (which flows are new or changed),
 and what is out of scope. Keep it to one screen.
+
+## Write `design-system` first
+
+In a project that has a UI, create the `design-system` feature before any other. Its flows are the
+rules every screen follows: `direction` (inputs and text follow the reading direction, a page is
+mirrored in Arabic), `components` (every component renders in each language), `error-messages`
+(every error says what failed and what to do next), plus spacing and colours (contrast) when the
+project has rules for them. Every flow with a `page` step names `design-system` under
+`## Affects and affected by` (`- affects design-system`), so a change to a screen is checked against it.
+Its criteria are shown with `@shows` scenes (`record-a-change`).
 
 ## 3. Write or update the feature README
 
@@ -919,6 +1143,8 @@ A customer saves a product they like and finds it again later on their wishlist.
 - expiry does not apply: saved products do not expire
 - double submit two taps save once
 - outside service down does not apply: no outside service is called
+- server unreachable the save button shows "Could not reach the server, check your connection" (AC-5)
+- server error the product stays unsaved and the message says what failed (AC-5)
 
 ## Acceptance criteria
 
@@ -926,6 +1152,7 @@ A customer saves a product they like and finds it again later on their wishlist.
 - AC-2 saving twice keeps one entry
 - AC-3 a guest is sent to sign in and returns to the product
 - AC-4 [mobile] the product card has a save button
+- AC-5 a failed save says what failed and what to do next
 ```
 
 **Summary.** The paragraph under the `# Title`: one or two plain sentences saying who does what and
@@ -955,10 +1182,20 @@ When two sites, or a site and the mobile app, have a page with the same path, na
 the path in brackets: `page   /support [web-admin]`. The step then looks in that app only (its
 pages, or its screens for a mobile app). Without brackets it looks in the apps the feature lists.
 
+**Screenshots of a flow.** Criteria about what a user sees are shown in each language of the app
+(`languages` in `grimoire/settings.md`), so one criterion gives one screenshot per language. Write a
+criterion once; do not write one per language. A flow with nothing to look at (no screen, or a
+screen that cannot be captured) says `screenshots: false` in its front matter. `screenshots` is
+`false` or absent; the modes `changed`, `all` and `off` live in the settings
+(`SCREENSHOT_MODES`, default `DEFAULT_GRIMOIRE_SETTINGS.screenshots`, `changed`).
+
 **Cases.** End a case line with `(AC-n)` (or `(AC-1, AC-2)`) to link it to the criterion that
 proves it; a number the flow does not have is an error (`GR2013`). Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
 expiry, double submit, outside service down), each with a case or "does not apply" and the
-reason. A flow that skips one gets a finding, except that a flow with no writes (only pages and
+reason. A flow with a `page` step also answers the two UI questions (`UI_CASE_QUESTIONS`):
+`server unreachable` (what the user sees when the request never arrives) and `server error`
+(when the server answers with a failure); the screen of each is shown with a scene that mocks
+the request. A flow that skips one gets a finding, except that a flow with no writes (only pages and
 `GET` routes) may leave out `duplicate` and `double submit`. Do not invent cases beyond the questions unless the owner described one.
 
 **Criteria.** One per case that changes what the user gets. Number them `AC-1`, `AC-2`, … and

@@ -1479,7 +1479,7 @@ Same shape — TS validates the union; runtime picks the `default` key.
 
 - `http.rateLimit` — `@fastify/rate-limit` options (`nameSpace`, ...); `store: "cache"` counts in `@warlock.js/cache` so every server shares the limit (per-route `middleware.rateLimit()` follows it; `skipOnError` defaults to `true`, so a cache outage fails open; the `null` and `file` cache drivers are refused); `redis` needs an ioredis client; `enabled: false` disables. Static files (public folder, `router.directory()` mounts, `router.file()` routes, web build assets) are exempt unless `staticFiles: true`.
 - `socket.adapter` — adapter factory for cross-server broadcast.
-- `database` cache driver: register `cacheMigration` (from `@warlock.js/core`) in `database.migrations` to create its `cache` table with the unique index on `key` that the `upsert` option needs.
+- `database` cache driver: register `cacheMigration` (from `@warlock.js/core`) in `database.migrations` to create its `cache` table with the unique index on `key` that the driver uses for one upsert per write: with no `upsert` setting it finds the index itself and falls back to read-then-write, with a one-time hint, when it is missing (`upsert: true` forces the upsert, `upsert: false` keeps the read).
 - `cache.silenceSingleServerWarning`, `storage.silenceSingleServerWarning`, `socket.silenceSingleServerWarning` — silence the production warnings for in-memory cache, local storage, and adapter-less sockets.
 
 `http.modelValidationErrorStatus` sets the status for a Cascade model-write validation failure (a model failing its own schema on save). It defaults to `500` with an opaque body, because request input is already validated with a `422` before the model is touched. Set a `4xx` (e.g. `422`) to treat it as a client error instead; the response then carries `{ errors }`.
@@ -7750,6 +7750,10 @@ port-file handshake above when the app supports binding `0` itself.
   can match `errorText`. Strings match substrings; regexps are also accepted.
 - `allowPendingRequests: ["/events"]` exempts an intentional stream from network
   idle, without allowing its errors. `waitForNetworkIdle()` remains available.
+- `page.mockRequests(rules)` fakes the server for a failure screen: a rule is `{ url, status?, body?,
+  headers? }` or `{ url, fail: "unreachable" }`, the first matching rule wins and other requests go
+  through; `page.clearMocks()` stops it. A faked failure still counts in the evidence, so list the URL
+  under `allowNetworkFailures`. `page.setExtraHeaders({ locale: "ar" })` sends headers with every request.
 - `page.evaluate<T>(expression)` is an escape hatch for assertions in the main
   document. Selector helpers do not enter frames or closed shadow roots.
 
@@ -7958,7 +7962,7 @@ An unknown fake name or a non-boolean value fails setup with the list of known f
 
 ---
 name: test-http
-description: 'Integration tests against a real HTTP server — `startHttpTestServer()` boots one shared server in globalSetup, then `testGet` / `testPost` / `expectJson` make typed requests against it. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `startHttpTestServer({ port: 0 })`, `stopHttpTestServer`, `createTestHttpServer`, `TestHttpServer`, `createTestRequestClient`, `snapshotResponse`, `actingAs`, `AuthenticatedTestClient`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up", "ephemeral test port", "test with the real Fastify plugins", "assert mail sent by a request", "response snapshot"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — the `test-service` topic; controller shape — the `create-controller` topic; competing libs `supertest`, `light-my-request`, `nock`.'
+description: 'Integration tests against a real HTTP server — `testGet` / `testPost` / `expectJson` send to a server that starts in the same Vitest worker (its own database), or to the shared server `startHttpTestServer()` boots in globalSetup. Triggers: `startHttpTestServer`, `startHttpTestServer({ port })`, `startHttpTestServer({ port: 0 })`, `stopHttpTestServer`, `createTestHttpServer`, `TestHttpServer`, `createTestRequestClient`, `snapshotResponse`, `actingAs`, `AuthenticatedTestClient`, `testGet`, `testPost`, `testPut`, `testPatch`, `testDelete`, `expectJson`, `getTestServerUrl`, `testRequest`, `PortInUseError`, `assertPortIsAvailable`, `isPortAvailable`; "integration-test a controller", "end-to-end HTTP test", "globalSetup HTTP server", "assert status and body shape", "test server port already in use", "EADDRINUSE while running tests", "run tests while the dev server is up", "ephemeral test port", "test with the real Fastify plugins", "assert mail sent by a request", "response snapshot"; typical import `import { testGet, testPost, expectJson } from "@warlock.js/core/tests"`. Skip: pure unit tests — the `test-service` topic; controller shape — the `create-controller` topic; competing libs `supertest`, `light-my-request`, `nock`.'
 ---
 
 # Warlock — HTTP integration tests
@@ -7994,7 +7998,9 @@ describe("Users API", () => {
 });
 ```
 
-No `beforeAll`, no manual server start — the project's `src/test-global-setup.ts` brought the HTTP server up once before any test ran.
+No `beforeAll`, no manual server start. The first `testGet` / `testPost` / `actingAs` call of a test file starts an HTTP server **inside the same Vitest worker** (the app's routes, the production plugins, an OS-assigned port, the worker's own database and fakes) and the file's later calls reuse it. The runtime closes it with the file, and the next file starts its own. A row a test creates in worker 2 is therefore visible to a request made in worker 2, and mail or jobs a controller produced land in that worker's `mailFake` / `queueFake`.
+
+The server of `startHttpTestServer()` in a `globalSetup` stays available for suites that need one shared process (for example one that serves web pages through Vite): while it has published its port (`WARLOCK_TEST_SERVER_PORT`), the helpers send to it instead of the worker's server. Such a server runs in Vitest's main process, which has no worker id, so it reads the database of worker 1; run those suites with `maxWorkers: 1`.
 
 ## Signed-in requests — `actingAs(user)`
 
@@ -8110,7 +8116,7 @@ await startHttpTestServer({ port: 0 });
 
 ## In the worker, with the production plugins — `createTestHttpServer()`
 
-The shared server runs in Vitest's main process, so the test fakes in a worker never see what a request did there. `createTestHttpServer()` serves requests inside the worker instead, built the way production builds it: `startHttpServer()`, every plugin `registerHttpPlugins()` registers (rate limit with its cache store, CORS, multipart, cookies), the router's real route registration, an OS-assigned port.
+The shared server of `globalSetup` runs in Vitest's main process, so the test fakes in a worker never see what a request did there. The default worker server and `createTestHttpServer()` both serve requests inside the worker; `createTestHttpServer()` adds your own `routes`, built the way production builds it: `startHttpServer()`, every plugin `registerHttpPlugins()` registers (rate limit with its cache store, CORS, multipart, cookies), the router's real route registration, an OS-assigned port.
 
 ```ts
 import { createTestHttpServer, mailFake, type TestHttpServer } from "@warlock.js/core/tests";
@@ -8163,7 +8169,9 @@ The snapshot is `{ status, contentType, body }`; redacted paths read `"[redacted
 
 `startHttpTestServer()` installs the test fakes too (mail, queue, cache, storage, clock, ids — see the `test-fakes` topic), honouring `tests.fakes` and its own `fakes` option. They record in the main process, so assert on request side effects with `createTestHttpServer()`; the storage fake's temp root is shared with the workers (`WARLOCK_TEST_STORAGE_ROOT`).
 
-## Project wiring — `src/test-global-setup.ts` + `vite.config.ts`
+## Project wiring — `src/test-setup.ts` + `vite.config.ts`
+
+`warlock add test` creates `src/test-setup.ts` and `vite.config.ts`. In an app with `@warlock.js/web` it also creates `src/test-global-setup.ts` and its `globalSetup` line, because the worker's own server does not start the web connector (a page answers 404 there); the shared server serves the pages. In an API-only app add one only for the shared-server case above; its content is:
 
 ```ts title="src/test-global-setup.ts"
 /**
@@ -8189,7 +8197,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
-    globalSetup: "./src/test-global-setup.ts", // ← starts the HTTP server
+    // globalSetup: "./src/test-global-setup.ts", // only for one shared server (see above)
     setupFiles: ["./src/test-setup.ts"], // ← setupTest + afterAll(teardownTest), per test file
     environment: "node",
     globals: false,
@@ -8204,7 +8212,7 @@ Both files (and this config, with `lowerStage3Decorators()` first so decorated m
 
 **So the service-layer framework is file-scoped: bootstrapped by `setupTest` and closed by the `afterAll(teardownTest)` the setup file registers, once per test file.** ⚠ **`setupTest` alone is not the whole wiring — the paired teardown is mandatory from 4.14.0**; see the `test-service` skill.
 
-**HTTP is the exception and stays in `globalSetup`**, which genuinely does run once in the main vitest process and owns a real port. **That split is the point:** one server for the whole run, one framework per test file.
+**HTTP requests go to a server in the same worker** (started on the first request), so it sees the worker's database; `globalSetup` is only for the shared-server case, which a web app uses for its pages.
 
 ### Keep Vitest setup out of development
 
@@ -8363,7 +8371,7 @@ const response = await testGet("/me", { headers: authHeader });
 
 ### Setting up data via direct DB access
 
-The HTTP server runs in the main process; the test workers have their own DB connections. To seed data the HTTP server can read, either:
+With the default worker server the test and the server share the worker's database connection and database. With a shared `globalSetup` server the HTTP server runs in the main process and reads worker 1's database. To seed data the HTTP server can read, either:
 
 1. **Direct create from the test** — your worker writes via the model, the row commits, then the HTTP server reads it (both point at the same physical DB).
 
@@ -8655,7 +8663,6 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [lowerStage3Decorators(), mongezVite()],
   test: {
-    globalSetup: "./src/test-global-setup.ts", // ← HTTP server (see test-http skill)
     setupFiles: ["./src/test-setup.ts"], // ← runs setupTest before EACH test file
     environment: "node",
     globals: false,
@@ -9139,10 +9146,13 @@ const name = process.env.VITEST ? workerDatabaseName("app_test") : "app";
 - Servers from `createTestHttpServer()` that a file did not `close()` are closed
   before the next file, so their routes and ports do not leak. App modules
   (`loadAppModules`) load once per worker and are reused.
-- The global `startHttpTestServer()` server runs in Vitest's main process with its
-  own connections and fakes. Worker lifetime does not touch it, so keep requests
-  through it independent of the worker database, or use `createTestHttpServer()`
-  in the worker for tests that read the same database the assertions use.
+- The request helpers (`testGet`, `actingAs`, ...) send to an HTTP server that starts
+  in the worker on first use, so it reads the worker's own database and records in the
+  worker's fakes; the runtime closes it with the file. A global `startHttpTestServer()`
+  server (main process, no worker id) reads worker 1's database: run such a suite with
+  `maxWorkers: 1`.
+- `recommendedTestWorkers()` stays within `WARLOCK_TEST_DATABASES` (the number of test
+  databases you created) when that variable is set.
 - `isolate: false` shares module state between files of a worker: singletons,
   `vi.mock()` of app modules and module-level caches survive. Restore mocks in
   `afterEach`, and clear module state in `resetBetweenFiles`, or use
@@ -13980,7 +13990,7 @@ npx warlock explain WL3001 --json
 
 The `files` section reads every file under `src/`, without importing app modules or booting connectors. Each entry has `file`, `module`, `role`, `exports`, `imports` and `importedBy`, and for code files `lines` (line count), `about` (first sentence of the comment block at the top of the file, before any import, or `null`), `tags` (the `@tag value` lines of that comment, such as `@feature checkout`, as arrays keyed by tag name) and `exportDocs` (first sentence of the doc comment above each export that has one). Paths are relative to the project root. Modules use `src/app/<module>` or the containing top-level `src` directory. Roles follow file names and directories: controller, service, repository, model, use-case, seed, request, mail, job, event, client, migration, schema, resource, routes, page, setup, layout, root, hook, component, util, type, config and spec (a `*.use-case.ts`, `*.seed.ts`, `*.request.ts`, `*.mail.ts`, `*.job.ts`, `*.event.ts` or `*.client.ts(x)` file gets that role in any folder; a file in `use-cases/`, `seeds/`, `requests/`, `mails/`, `jobs/` or `clients/` gets it too, but the `src/app/<module>` folder itself does not count, so a module named `events` or `jobs` keeps its folders' roles); unmatched files use `source`. Non-code assets have empty exports and imports and no `lines`. These fields were added in 5.55.0 without a new `schemaVersion`; a report from an older version lacks them.
 
-A route registered as `[controller, "action"]` carries `controller` (the class name, `null` for a plain object) and `action`; both are `null` for a function handler. `collectFiles(cwd)` and `fileRole(file)` are exported from `@warlock.js/core/tooling` for tools that need the file list without a full report. `collectFiles(cwd, warnings, { dirs })` (options type `CollectFilesOptions`) scans other project-relative folders, default `["src"]`; imports resolve across all of them. `node_modules` and hidden folders (`.expo`, `.git`) are skipped. A registered package code (`GR2001`) given to `warlock explain` is answered from `warlock.config.ts` without booting.
+A route registered as `[controller, "action"]` carries `controller` (the class name, `null` for a plain object) and `action`; both are `null` for a function handler. `collectFiles(cwd)` and `fileRole(file)` are exported from `@warlock.js/core/tooling` for tools that need the file list without a full report. `collectFiles(cwd, warnings, { dirs, files })` (options type `CollectFilesOptions`) scans other project-relative folders, default `["src"]`, and reads single files given in `files` (a mobile app's `App.tsx`); imports resolve across all of them. `node_modules` and hidden folders (`.expo`, `.git`) are skipped. A registered package code (`GR2001`) given to `warlock explain` is answered from `warlock.config.ts` without booting. If the app's own config or bootstrap fails, `warlock inspect` still runs and lists the failure as a report warning.
 
 Each code file is parsed once with OXC per inspection. Export names include types, aliases, destructured bindings, `default` and `*` for star re-exports; star exports are recorded rather than expanded. Imports include type imports, side effects, re-exports and literal dynamic imports. Each import is `{ specifier, file }`: `file` is the resolved local path, or `null` for external/unresolved imports. Resolution follows inherited tsconfig path aliases, fallback targets, baseUrl, extensionless files and directory indexes within `src/`. Computed dynamic imports and CommonJS `require()` calls are not graph edges. Parse/config failures appear in `warnings`.
 
@@ -14824,6 +14834,8 @@ preload: {
 
 Connector names: `"logger"`, `"mailer"`, `"http"`, `"database"`, `"cache"`, `"storage"`, `"communicator"` (herald), `"socket"`. Pass `connectors: true` to start every `Early`-phase connector — `http` and `socket` are `Late` phase and stay off unless you list them explicitly.
 
+`preload: { …, tolerant: true }` keeps a failed preload step (a config file that throws, a bootstrap that cannot finish) from ending the command: the error prints as a warning, reaches the action as `data.preloadError`, and later preload steps do not run. Use it only for a command with a fallback of its own (a cached answer); the default is exit code 1.
+
 Picking the right preload matters: `migrate` only needs database + logger, but `seed` runs full `bootstrap: true` because seeds touch app models. Inspect `@warlock.js/core/src/cli/commands/*.ts` for canonical pairings.
 
 ## Inside `action` — `CommandActionData`
@@ -14979,7 +14991,7 @@ warlock generate                         (alias: g)      — interactive picker
 | `swagger`     | `@warlock.js/swagger`                                                                                                                                                                                                    |
 | `postman`     | `@warlock.js/postman`                                                                                                                                                                                                    |
 | `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                                                                                                                                            |
-| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts`                                                                                                                  |
+| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-setup.ts` / `vite.config.ts` (+ `test-global-setup.ts` in an app with `@warlock.js/web`)                                                                               |
 | `process`     | `@warlock.js/process` pinned to installed Core; typed config, supervisor export, recovery/shutdown lifecycle and optional devtools process panel                                                                         |
 | `devtools`    | `@warlock.js/devtools` as a dev dependency; `warlock dev` auto-loads its development dashboard at `/__warlock`                                                                                                           |
 

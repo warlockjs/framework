@@ -2,6 +2,241 @@
 
 Newest first. Each entry records the release that shipped it and how it was verified.
 
+## 5.64.0 (2026-11-23)
+
+Source: owner go-ahead 2026-11-23 (one minor for every open item) and the 2026-11-23 app findings page (T-209, T-210).
+Shipped in release v5.64.0. Verification: one full verify pass (format, lint, public text, skills, release notes, strictness, typecheck, every package's tests, docs build) with the failed steps re-run after fixes, live PostgreSQL and MongoDB suites, and a scaffolded-app check (`findings/5.64/reports/`, git-ignored).
+
+### T-207 [decision] Grimoire: approved screenshots per criterion and language, a design-system feature, a bird-view
+
+- Source: owner, 2026-11-23 (chat).
+  - Agents (Claude or Codex) remove, change or add behaviour nobody asked for as a project ages; the owner wants a
+    visual place to catch it.
+  - In a two-language project every acceptance criterion counts once per language.
+  - RTL layout (for example inputs aligned right in Arabic) is a criterion of a design-system feature, not a test
+    special case.
+  - Better navigation between features, flows and criteria.
+- Today (5.63.1):
+  - Flows have `## Cases` (`CASE_QUESTIONS`, `packages/grimoire/src/contracts/written.ts:163`), criteria `AC-n` and
+    `@proves` tests with pass/fail/no-test status.
+  - Screenshots are hand-attached image lines, checked only for existence (`check/rules/screenshots.ts`, GR2014).
+  - The product map has feature and flow pages but no criterion-level view, no per-language result, no screenshot
+    history and no "changed since approved" state.
+- Proposal, in phases (one minor each, or one minor for 1-2):
+  1. Bird-view. One matrix in the Grimoire tab:
+     - rows: feature > flow > criterion, collapsible;
+     - columns: the app's languages (and apps where a criterion differs by app);
+     - cells: test status and a screenshot thumbnail;
+     - a jump-to search for any feature, flow or `AC-n`.
+       Built from existing data first.
+  2. Criteria times languages. Languages come from the app's config, so an agent writes each criterion once and it
+     counts once per language. A `@shows <feature>/<flow> AC-n` line on a browser test saves one screenshot per
+     language (network mocked for the failure cases). `grimoire check` lists the missing cells. Add the case
+     questions `server unreachable` and `server error`.
+  3. Approved baselines: the drift guard.
+     - Each screenshot has an approved version.
+     - A new capture that differs, a criterion or flow that disappeared, and a `@proves` test that was deleted all
+       show as "changed, not approved" in the matrix, with old and new side by side.
+     - The owner approves or rejects. The reviewer agent must list every unapproved change in its report.
+  4. Design-system feature.
+     - Skills create a `design-system` feature first in every project. Its criteria cover direction, spacing, colors,
+       components and error messages. UI flows name it in `affects`.
+     - The scaffold adds a dev-only components page that renders each component in each language and theme, and the
+       design-system screenshots come from it.
+- Screenshots are optional (owner, 2026-11-23): a project setting `changed` (default), `all` or `off`.
+  - With `changed`, only the flows of the features the task touched are captured, and a full pass runs before a release.
+  - A capture happens only for a criterion that has a `@shows` test, so an app without such tests pays nothing.
+  - A flow can opt out with `screenshots: false` in its front matter.
+  - The cheap checks (lint rules, guard, locked tests, T-208) stay on everywhere.
+  - The bird-view works without screenshots and then shows test status only.
+- Acceptance: on the scaffold app, login's criteria show `en` and `ar` cells with screenshots. A left-aligned input in
+  `ar` turns its design-system cell red. A removed case shows as "changed, not approved" until it is approved.
+- Shipped: `@shows` scenes and `shows()` (one screenshot per language), `grimoire/settings.md` (languages, screenshot mode `changed`/`all`/`off`, rules, protected areas), the approved baseline `grimoire/approved/baseline.json` with drift ("changed, not approved"), `warlock grimoire approve`/`reject` and the tab's buttons, `GR4013`-`GR4019`, `GR9010`, `UI_CASE_QUESTIONS` (`GR1012`), the Bird view tab (`GET /matrix`), the design-system feature and the starter's components page. Acceptance adjusted to the starter's contact feature (no web sign-in page in the starter).
+- Verified: unit and golden specs; on a scaffolded app `GRIMOIRE_SHOTS=all warlock e2e` captured 12 images (en + ar), `approve --all` created the baseline, `text-left` on the contact input gave `GR3007` and failed `design-system/direction AC-1` in `ar` only, deleting a case gave `GR4018` until approved. Open follow-up: T-213.
+
+### T-208 [decision] Drift controls: turn rules into checks, lock scope and tests, guard a change against its task
+
+- Source: owner, 2026-11-23 (chat: AI agents drift on every project by removing, changing or adding things unasked;
+  add restrictions and controls).
+- Proposal, in priority order:
+  1. Repeated corrections become checks, not prose. Each rule the owner keeps repeating gets a lint rule or test in
+     the scaffold, for example:
+     - CSS logical properties only (no `left`, `ml-*`, `text-left`), so RTL works;
+     - no generic "Something went wrong";
+     - no `kind` discriminators;
+     - no `.js` imports.
+  2. `warlock grimoire guard <task>`: the diff checked against its task.
+     - A Grimoire task names its `feature` and `flow`, and Grimoire knows which files each feature owns.
+     - The guard lists changed files outside the task's features or its own `Files:` line, deleted `@proves` tests,
+       and removed criteria, cases or flows.
+     - It runs in CI and as an agent hook.
+  3. Locked tests.
+     - The planner writes the acceptance tests first; implementer briefs mark them read-only, and the guard flags
+       edits to them.
+     - A check bans `.skip` and `.only`, and flags a test change that drops assertions.
+  4. Protected areas need the task to name them: migrations, auth, public API, config, lockfile and new
+     dependencies. A public API snapshot makes any change to exports deliberate.
+  5. An independent reviewer gets the task and the diff, not the author's summary, with one fixed question: "list
+     every change the task did not ask for".
+  6. Approved visual baselines (T-207, phase 3).
+  7. Traceability: every commit names its task, and CI rejects app commits without one (app repos only; never in
+     public text).
+- Acceptance per item: shipped in the scaffold and the skills, documented, and shown on a demo diff that adds an
+  unasked file, deletes a proving test and uses `ml-4`. All three are caught.
+- Shipped all seven items: code rules `GR3007`-`GR3010` with `grimoire-allow`, `warlock grimoire guard` (`GR7006`-`GR7012`, `GR9008`, `GR9009`, `--hook` for a Claude Code `Stop` hook that never traps an agent, including `stop_hook_active`), locked tests and `.only`/`.skip` (`GR4011`, `GR4012`), protected areas and `warlock grimoire approve api` (`GR7013`), skills `guard-a-change` and `review-a-change`, approved visual baselines (T-207), and commit traceability (`--commits`). Scaffold: CI workflow, `.claude/settings.json` hook, `AGENTS.md` section, `git-workflow` skill.
+- Verified: specs; on a scaffolded app the demo diff (unasked file, deleted proving test, `ml-4`) gave `GR7006`, `GR7008`, `GR3007` and exit 1; `--hook` exits 0 with `stop_hook_active`, 2 without, 0 with no task.
+
+### T-201 [bug] The shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
+
+- Evidence named: scaffold `src/test-global-setup.ts`, scaffold `src/config/database.ts`, `packages/core/src/tests/reset-test-database.ts:49-60`.
+- Checked 2026-11-22: confirmed as name resolution. The main-process server has no `VITEST_POOL_ID`, so it reads
+  `<db>_test_1`; worker N writes `<db>_test_N` (scaffold `src/config/database*.ts`, `reset-test-database.ts:49-60`).
+  Spec in `packages/core/src/tests/reset-test-database.spec.ts`. 5.63.0 documents it (scaffold comment, testing page).
+- Open: a real fix needs a design: one shared server cannot serve several worker databases. Options: the server
+  picks the data source per request from a worker header the request helpers send, or the scaffold starts one server
+  per worker. Workaround: `createTestHttpServer()` per test file.
+- Shipped for API routes: the request helpers start an HTTP server inside each Vitest worker on first use (`packages/core/src/tests/worker-test-server.ts`), so a request reads the worker's own database. An app with `@warlock.js/web` keeps `src/test-global-setup.ts`, because the worker server does not start the web connector (follow-up T-211).
+- Verified: unit specs; on a scaffolded PostgreSQL app with two workers each worker's server returned only its own row (`current_database()` `scaffold_app_test_1` / `_2`); the starter page test passes with the web global setup.
+
+### T-209 [bug] `scry --search` drops every non-Latin letter, so Arabic queries fail with GR9006
+
+- Source: app findings page above (F5), run by the reporter on 5.63.1, 2026-11-23.
+- Evidence: `packages/grimoire/src/scry/search.ts:107` `wordsOf()` lower-cases, then `.replace(/[^a-z0-9]+/g, " ")`,
+  so Arabic (or accented Latin) text in the query and in the book becomes empty; `scry --search "شحنة تكلفة"` answers
+  GR9006 "has no letters or digits".
+- Fix: one Unicode tokeniser for the query and the indexed text (`normalize("NFKC")`, lower-case,
+  `[^\p{L}\p{N}]+` with the `u` flag); for Arabic also strip tatweel and diacritics and unify alef, ya and ta-marbuta
+  forms.
+- Acceptance: an Arabic query matches an Arabic feature title and flow text; accented Latin still matches; specs;
+  docs and CHANGELOG.
+- Shipped: one Unicode tokeniser (`wordsOf()` in `packages/grimoire/src/scry/search.ts`) for the query, the index and the `GR9006` check, with Arabic normalisation and light article stripping, and Arabic stop words.
+- Verified: `src/scry/search-unicode.spec.ts` and the search goldens.
+
+### T-210 [bug] `whereSearch` / `whereFullText` on PostgreSQL always use the `english` configuration
+
+- Source: app findings page above (F6), run by the reporter on cascade 5.63.1 and PostgreSQL 18.7, 2026-11-23.
+- Evidence: `packages/cascade/src/query-builder/query-builder.ts:821-841` (`whereFullText(fields, query)`,
+  `orWhereFullText`, `whereSearch(field, query)` pass no language); `packages/cascade/src/drivers/postgres/postgres-query-parser.ts:1021-1046`
+  (`safeLanguage()` falls back to `"english"` and reads `data.language`, which no builder method sets). Arabic partial
+  words («الخامس», «رمان») never match «شحنة الرمان الخامسة». The index side already takes a language
+  (`postgres-sql-serializer.ts:387`, `postgres-migration-driver.ts:570`). Docs and the `query-data` skill describe
+  `whereSearch` as pattern matching; the contract's `textSearch(…, { language })` example points at a base method that
+  throws (`query-builder.ts:847-853`).
+- Fix: an options argument `{ language?, weights? }` on `whereFullText`, `orWhereFullText` and `whereSearch` (and the
+  contract); a per-data-source default text-search configuration that `createFullTextIndex` uses too, so the index
+  stays usable (default stays `english` in a minor; document `simple` for non-English apps); a PostgreSQL substring
+  helper (`whereContains`, escaping `%`, `_`, `\`); docs and skill say what `whereSearch` means on each driver; fix the
+  `textSearch` example.
+- Acceptance: the reporter's spec (`whereSearch("title", "الخامس", { language: "simple" })` emits `'simple'` twice)
+  passes; a live PostgreSQL check finds the partial Arabic word through `whereContains`; docs, skill, CHANGELOG.
+- Shipped: `{ language, weights }` on `whereFullText`/`orWhereFullText`/`whereSearch`, the PostgreSQL `textSearchConfig` data-source option used by the index too, `whereContains`/`orWhereContains`, typed and validated full-text index weights (`FullTextIndexWeight`), docs and the `query-data` skill.
+- Verified: unit specs; live PostgreSQL 16 suite `tests/integration/postgres/full-text-5-64-live.test.ts` (partial Arabic word via `whereContains`, literal `%`/`_`, `whereSearch` with `simple`, `orWhereFullText`, index weights) green.
+
+### T-182 [feature] Production monitor: closed URLs hit with a request body differ from an unknown URL
+
+- Source: 5.61.0 review, 2026-11-20.
+- What and why: 5.61.0 makes closed monitor URLs answer like an unknown URL for `GET` and `HEAD` (same body, headers,
+  rate-limit headers and 429). For `POST` and other methods with a body, an unknown URL can answer 400/413 from body
+  parsing before routing, while the monitor refuses before reading the body and answers 404. That difference existed
+  before 5.61.0; `devtools/security.mdx` now says so.
+- Evidence: `packages/devtools/src/production/http/mount.ts` (the gate and `notFound`), `answerUnknownUrl` in
+  `packages/core/src/router/router.ts`.
+- Acceptance: a spec sends the same malformed and oversized bodies to a closed monitor URL and an unknown URL and gets
+  the same status and body; the security page sentence is narrowed back if it matches.
+- Shipped: a closed monitor URL hit with a body defers the refusal until Fastify read the body (`preValidation`), so bad, oversized and wrongly typed bodies get the app's own 400/413/415 like an unknown URL.
+- Verified: `tests/production/http/catch-all-404.spec.ts` (with and without a catch-all, three closed routes).
+
+### T-181 [chore] Testcontainers-based integration suites cannot start on this server
+
+- Source: 5.60.0 live PostgreSQL run, 2026-11-19. The 7 cascade PostgreSQL suites that start their own containers
+  fail with ECONNRESET here and left 21 idle `postgres:16-alpine` containers behind (stopped and removed 2026-11-19
+  at the owner's request; Docker still lists them as "Removal In Progress" because overlay2 reports the mounts busy).
+- What: give the integration harness a way to use an existing database from env (`LOCAL_PG_*` / a Mongo URL) for every
+  suite, so live runs need one named `--network host` container and no testcontainers.
+- Shipped: `startPostgresHarness` / `startMongodbHarness` connect to an existing server from `LOCAL_PG_*` / `LOCAL_MONGO_*` (`packages/cascade/tests/integration/README.md`).
+- Verified: the cascade PostgreSQL integration suites (143 tests) and MongoDB suites ran on named containers on the host network. Note: containers behind the docker bridge reset every connection on this server; use `--network host`.
+
+### T-168 [feature] Stamp releases from the app's release flow and add a "What's new" view to the Product map
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0): the app shipped two releases but its Grimoire had none, so every changelog line read "Not released yet".
+- What and why: `warlock release` (or the package version and git tags) should stamp the changelogs and write the release file; the Product map gets a "What's new" view per release.
+- Evidence: the release and changelog reading code is under `packages/grimoire/src/` (find `release` and `changelog`); the Product map "What changed" list is `packages/grimoire/ui/product-map.js:579` (T-159 redesigns it first).
+- Acceptance: after a release, the changelog lines carry the version and the Product map shows a "What's new" view; specs; docs and CHANGELOG entry.
+- Shipped: `warlock grimoire release [version] --stamp [--date]` moves the unreleased feature changelog entries under the release and writes a missing release file; the Product map's What's new view (`GET /product/whats-new`, share routes and both static exports).
+- Verified: `src/releases/stamp.spec.ts`, `tests/stamp-release.spec.ts`, product-map specs.
+
+### T-172 [bug] Product map and developer UI issues seen in screenshots, no runnable repro yet
+
+- Source: app review https://claude.ai/artifact/VBTrUkTUGtkYXMp7xox8Pk (5.58.0, 1440 px and 390 px, light and dark). Each item was observed through screenshots only; none has a runnable repro, so each needs reproducing before a fix.
+- Items:
+  1. Repeated rows in "Where you see it" on a feature page (the same page listed several times, one row per block). Partly checked: the row key includes the block (`packages/grimoire/src/devtools/product-map.ts:319`); whether the UI renders the block name is unverified (`packages/grimoire/ui/product-map.js`, the appearances list). Likely fix: show the block name or group by page.
+  2. Developer feature page shows one card per finding in a very tall, ungrouped list with the neighbour graph underneath (`packages/grimoire/ui/grimoire-view.js`); the Check tab already groups the same findings. Likely fix: group by code and collapse, graph above.
+  3. Raw ids and code terms on business screens: app group headings show ids instead of titles, "For free" in the flow meta line, raw case keys in "What if...", AC/T references in "What changed" (`packages/grimoire/ui/product-map.js`, near `:255` and `:694`; T-159 touches the "What changed" part).
+  4. Overview task count ("0 open, 1 waiting") disagrees with the tab badge ("Tasks 1") when a task has the status "waiting for approval".
+  5. Modules graph unreadable on a large app (labels cut from the left and overlapping, one 2,548-file node). Design opinion: cut labels from the right, split sites from modules, offer a top-N matrix.
+  6. Phone width (390 px): the tab bar hides 5 of 8 tabs behind a fade with no hint, and the Apps page is very tall. Likely fix: a visible "more" control or a select; collapsed groups on Apps.
+- Acceptance: for each item, a repro (a spec on the view data or a screenshot test) before the fix; items 5 and 6 need an owner design call first.
+- Shipped all six items (each with a spec on the view data or the DOM): pages listed once with their blocks, findings grouped with the graph above the flows, app titles and plain case questions without ids, the task tile counts every open task, the modules graph (right-cut labels, rings, top-20 matrix above 40 modules), the phone tab bar wraps and long Apps groups start closed.
+- Verified: `src/devtools/view.spec.ts`, `product-map-view.spec.ts`, `matrix.spec.ts`.
+
+### T-147 [chore] Real passkey sign-in in a browser
+
+- Source: 5.56.0 security review and end-to-end run, 2026-11-17.
+- What and why: passkey registration and sign-in were only tested against a fake adapter; no real WebAuthn ceremony
+  ran (headless Chromium can do it with a virtual authenticator through CDP).
+- Evidence: `packages/devtools/src/production/auth/passkeys.ts`, `findings/5.56/reports/E2E.md`.
+- Acceptance: a Playwright run with a CDP virtual authenticator registers a passkey, signs in with it, and uses it as
+  the step-up for recovery codes.
+- Shipped: `packages/devtools/tests/production/passkey-browser.spec.ts` with a CDP virtual authenticator (`core/src/e2e/webauthn.ts`, not exported) against a real production monitor fixture: password + TOTP, passkey registration, passkey sign-in, passkey step-up for recovery codes.
+- Verified: the spec passed on this server with Chrome (the dashboard buttons are not clicked; the ceremony is real).
+
+### T-138 [chore] Build a book of the release gate's blog app in CI
+
+- Source: 5.55.0 build and pilot, 2026-11-16.
+- What and why: the PLAN's acceptance asks for a book of a real app, but 5.55.0 did not build one in CI. The release
+  gate already builds the blog app from the packed tarballs, so the same run can build and check its book.
+- Evidence: `tools/release/ci/blog-check.mjs`.
+- Acceptance: the release gate builds the blog app's book, runs `warlock grimoire check` on it, and fails when either
+  step fails.
+- Shipped: `tools/release/ci/blog-check.mjs` installs `@warlock.js/grimoire` from the tarballs and runs `warlock grimoire build` and `check` on the blog app as its last step.
+- Verified: in the 5.64.0 release gate run (blog step).
+
+### T-139 [bug] Tooling commands exit before Grimoire's cached-routes fallback when the app's preload fails
+
+- Source: 5.55.0 build and pilot, 2026-11-16.
+- What and why: when the app's config or bootstrap fails during core's command preload, `warlock grimoire build` and
+  `warlock grimoire check` exit before Grimoire can fall back to cached routes (GR8002). `warlock inspect` has the same
+  problem. Core needs a way for tooling commands to catch a failed preload so they can continue.
+- Evidence: `packages/grimoire/src/warlock/commands.ts`, `packages/grimoire/src/warlock/actions.ts:61-70` (the GR8002
+  fallback); `packages/core/src/cli/cli-commands.manager.ts` (command preload).
+- Acceptance: with a broken config, `warlock grimoire build` reports GR8002 and uses cached routes when they exist; a
+  spec covers a failing bootstrap for `grimoire build`, `grimoire check` and `inspect`.
+- Shipped: `CLICommandPreload.tolerant` and `preloadError`; `warlock grimoire build`/`check` and `inspect` continue after a failed preload, so the cached-routes fallback (`GR8002`) works.
+- Verified: `cli-commands.manager.tolerant-preload.spec.ts`, `inspect-command.test.ts`.
+
+### T-140 [feature] Top-level files of a mobile app folder are missing from the book
+
+- Source: 5.55.0 build and pilot, 2026-11-16.
+- What and why: `collectFiles({ dirs })` scans folders only, so a mobile app's top-level files (`App.tsx`, `index.ts`)
+  are not in the book. Add file entries or a skip list to `collectFiles`.
+- Evidence: `packages/grimoire/src/warlock/adapter.ts` (mobile source folders),
+  `packages/core/src/tooling/inspect/collect-files.ts`.
+- Acceptance: a mobile app fixture with `App.tsx` and `index.ts` at its root lists both in the book; a spec covers the
+  new file entries (or the skip list).
+- Shipped: `collectFiles({ files })` and the Warlock adapter list a mobile app's top-level code files; the book fingerprint covers them (`packages/grimoire/src/book/build.ts`).
+- Verified: `src/book/top-files.spec.ts`, inspect-files spec.
+
+### T-036 [feature] Database cache driver: one upsert per `set`, lean `get`
+
+- Source: security and performance audit of 2026-11-11.
+- What and why: `DatabaseCacheDriver.set` does a read then an insert or update, and `get` hydrates a model per read.
+  A single upsert needs a unique index on `key` that the driver cannot assume today.
+- Evidence: `packages/core/src/cache/database-cache-driver.ts:85`, `:128`.
+- Acceptance: the cache migration ships the unique index; `set` uses one upsert with `conflictColumns: ["key"]`;
+  `get` reads a raw row; specs on both database drivers.
+- Shipped: the driver detects the unique `key` index once and then writes with one upsert by default (`upsert: false` keeps the read first). The live spec found the driver could not write on PostgreSQL at all (`expires_at` vs `expiresAt`, `Infinity` in number columns, non-JSON strings); fixed in the same release.
+- Verified: `src/cache/database-cache-driver.live.spec.ts` green on PostgreSQL 16 and MongoDB 7.
+
 ## Not released: agent test (2026-11-22)
 
 ### T-205 [chore] Agent test: `scry` (5.63.1) against grep for finding the files to change
