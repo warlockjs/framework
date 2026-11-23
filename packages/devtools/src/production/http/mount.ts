@@ -85,6 +85,15 @@ function tokenHash(token: string): string {
 const uniformNotFound = new WeakSet<FastifyRequest>();
 
 /**
+ * Requests refused before their body was read. Fastify reads the body of such a
+ * request next, as it does for an unknown URL, and `preValidation` then answers
+ * the refusal: a malformed, oversized or unsupported body gets the app's own
+ * 400, 413 or 415 (the plugin's error handler hands those on), never a 404 that
+ * only a dashboard path would give.
+ */
+const refusedBeforeBody = new WeakSet<FastifyRequest>();
+
+/**
  * The origin the browser must send for an unsafe request: `production.origin`,
  * else the scheme and host the request was addressed to.
  */
@@ -176,6 +185,23 @@ export function mountProductionDevtools(
     return reply;
   };
 
+  /**
+   * Refuses a request in the gate with the uniform answer. A request that may
+   * carry a body is answered after Fastify has read it, so it gets the same
+   * parsing errors, in the same order and at the same cost, as an unknown URL.
+   */
+  const refuse = async (
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<FastifyReply | undefined> => {
+    if (request.method === "GET" || request.method === "HEAD") return notFound(request, reply);
+
+    uniformNotFound.add(request);
+    refusedBeforeBody.add(request);
+
+    return undefined;
+  };
+
   const streamSession = async (request: FastifyRequest): Promise<DevtoolsStreamSession> => {
     const authenticated = devtoolsRequestContext(request)?.authenticated;
 
@@ -260,14 +286,14 @@ export function mountProductionDevtools(
           open = false;
         }
 
-        if (!open) return notFound(request, reply);
+        if (!open) return refuse(request, reply);
 
         const client = resolveClient(request, production.trustedProxies);
 
-        if (production.requireHttps && client.proto !== "https") return notFound(request, reply);
+        if (production.requireHttps && client.proto !== "https") return refuse(request, reply);
 
         if (production.allowedIps.length > 0 && !ipMatches(client.ip, production.allowedIps)) {
-          return notFound(request, reply);
+          return refuse(request, reply);
         }
 
         const userAgent = request.headers["user-agent"];
@@ -299,7 +325,7 @@ export function mountProductionDevtools(
             authenticated: null,
           });
 
-          if (method !== "GET" && method !== "HEAD") return notFound(request, reply);
+          if (method !== "GET" && method !== "HEAD") return refuse(request, reply);
 
           const search = sent.includes("?") ? `?${sent.split("?").slice(1).join("?")}` : "";
 
@@ -308,7 +334,7 @@ export function mountProductionDevtools(
 
         const tab = tabOf(pattern);
 
-        if (tab !== undefined && !enabledTabs.has(tab)) return notFound(request, reply);
+        if (tab !== undefined && !enabledTabs.has(tab)) return refuse(request, reply);
 
         const rule = lookup(method, pattern);
         const access: DevtoolsRouteAccess = rule?.access ?? { type: "admin" };
@@ -318,7 +344,7 @@ export function mountProductionDevtools(
         if (access.type === "share") {
           const grant = share ? await share.authorize(request, meta) : null;
 
-          if (grant === null) return notFound(request, reply);
+          if (grant === null) return refuse(request, reply);
 
           setDevtoolsRequestContext(request, {
             client,
@@ -340,11 +366,11 @@ export function mountProductionDevtools(
               `The devtools session could not be checked and the request was refused: ${error instanceof Error ? error.message : String(error)}`,
             );
 
-            return notFound(request, reply);
+            return refuse(request, reply);
           }
 
           if (authenticated === null || !sessionAccessOk(access, authenticated.stage)) {
-            return notFound(request, reply);
+            return refuse(request, reply);
           }
 
           if (access.type === "admin" && authenticated.account.role !== "admin") {
@@ -358,13 +384,13 @@ export function mountProductionDevtools(
         if (SAFE_METHODS.has(method)) return;
 
         if (!originAllowed(request, expectedOrigin)) {
-          if (authenticated === null) return notFound(request, reply);
+          if (authenticated === null) return refuse(request, reply);
 
           throw new DevtoolsApiError("csrf.invalid");
         }
 
         if (hasBody(request) && !isJson(request)) {
-          if (pattern === SHARE_OPEN_PATTERN) return notFound(request, reply);
+          if (pattern === SHARE_OPEN_PATTERN) return refuse(request, reply);
 
           throw new DevtoolsApiError("input.invalid");
         }
@@ -376,6 +402,13 @@ export function mountProductionDevtools(
             throw new DevtoolsApiError("csrf.invalid");
           }
         }
+      });
+
+      // The refusals of the gate that waited for the body.
+      instance.addHook("preValidation", async (request, reply) => {
+        if (!refusedBeforeBody.has(request)) return;
+
+        return notFound(request, reply);
       });
 
       // ---- Headers --------------------------------------------------------

@@ -321,7 +321,7 @@ The accounts live in the app's database through Cascade. Roles are `viewer`
 and `admin`. Admins invite users with a 24-hour single-use link. Two-factor is
 required for admins by default (`twoFactor: "admins"`; or `"everyone"`, or `"off"` for nobody, which logs a boot warning; an account that has a factor is always asked for it): an
 authenticator app, or passkeys when `@simplewebauthn/server` is installed, plus
-10 recovery codes. Every closed case answers like any unknown URL of the app: through its catch-all route (a web site's `route_not_found` answer, JSON or document) or its not-found handler.
+10 recovery codes. Every closed case answers like any unknown URL of the app: through its catch-all route (a web site's `route_not_found` answer, JSON or document) or its not-found handler. A refused request with a body is answered after its body is read, so a malformed or oversized body gets the same 400 or 413 as on an unknown URL.
 
 Options under `production` (all optional, defaults in brackets):
 `enabled` [false], `path` [`DEVTOOLS_PATH`], `sampleRate` [0.1],
