@@ -7,6 +7,26 @@ Newest first. Each entry records the release that shipped it and how it was veri
 Source: owner go-ahead 2026-11-23 (one minor for every open item) and the 2026-11-23 app findings page (T-209, T-210).
 Shipped in release v5.64.0 (commit 7fb074f6e, publish run 45139988226, on npm 2026-11-23 09:12 UTC). Verification: one full verify pass (format, lint, public text, skills, release notes, strictness, typecheck, every package's tests, docs build) with the failed steps re-run after fixes, live PostgreSQL and MongoDB suites, and a scaffolded-app check (`findings/5.64/reports/`, git-ignored).
 
+### T-144 [feature] Third measurement arm: the book alone
+
+- Source: 5.55.0 build and pilot, 2026-11-16.
+- What and why: the PLAN asks whether the book alone helps. The 5.55.0 measurement (T-136) compares the book, the written
+  features and the skill together against nothing, so it cannot separate them. Add a third arm with the book only and no
+  written features, same tasks and model.
+- Evidence: T-136; `findings/6.0/PLAN-GRIMOIRE.md`.
+- Acceptance: the measurement reports three arms (nothing, book only, book with features and skill) on the same ten
+  tasks, with the numbers recorded as measured in the release summary.
+- Done 2026-11-23 on the published 5.64.0 code (`findings/5.64/reports/M-measure.md`, git-ignored; same ten tasks,
+  Sonnet x 2 reps): book only vs nothing recall +0.092 (CI +0.002 to +0.176) with 1.95 fewer grep calls; book with
+  written features and the skill vs book only recall -0.081 (CI -0.165 to -0.004). The book alone helps; the written
+  features and skill added nothing on these tasks. Haiku: no arm differs from nothing. Numbers are recorded here, not
+  in the 5.64.0 summary, which shipped before the run.
+
+## Tasks
+
+Ordered by value: security first, then performance, then features and bugs. Line numbers are as of 5.53.0; entries
+T-100 and later are checked against 5.53.1.
+
 ### T-207 [decision] Grimoire: approved screenshots per criterion and language, a design-system feature, a bird-view
 
 - Source: owner, 2026-11-23 (chat).

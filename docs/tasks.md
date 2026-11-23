@@ -11,7 +11,8 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 ## Next release
 
 - 5.64.0 shipped T-207, T-208, T-201 (API routes), T-209, T-210, T-182, T-181, T-168, T-172, T-147, T-138, T-139,
-  T-140 and T-036 (see `tasks.completed.md`); T-206 waits for its re-run.
+  T-140 and T-036 (see `tasks.completed.md`); T-144 was measured after the release. T-206's re-run did not
+  meet its acceptance (see the entry).
 - 5.63.1 shipped T-204 (PostgreSQL `date` columns). 5.63.0 shipped T-188..T-195, T-197 (closed), T-198..T-200, T-202, T-203 (closed).
 - 5.62.0 shipped T-185, T-186 and T-187 (see `tasks.completed.md`).
 - 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
@@ -89,7 +90,15 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
   - The skill and the generated agent guidance open with "`scry --search` first, then `--impact` on the top hit".
   - Re-run the T-205 test (about $8, 1 hour), adding an arm with the Grimoire MCP tools in place of the CLI.
 - Acceptance: re-run shows recall up with no loss in precision or cost.
-- Status: 5.64.0 shipped the proposal (`changes with the top hits:` block, `next:` impact line, weak-match note, spec/locale/type files ranked x0.6, agent guidance in the skill, scaffold `AGENTS.md` and MCP descriptions). Open: the acceptance re-run of the T-205 agent test on the published 5.64.0 code (the coordinator runs it after the publish and reports separately).
+- Status: 5.64.0 shipped the proposal (`changes with the top hits:` block, `next:` impact line, weak-match note, spec/locale/type files ranked x0.6, agent guidance in the skill, scaffold `AGENTS.md` and MCP descriptions). Acceptance re-run on 5.64.0, 2026-11-23 (`findings/5.64/reports/M-measure.md`, git-ignored; Sonnet 10 tasks x 4
+  arms x 2, Haiku x 1, $13.80): NOT met. CLI arm recall 0.455 vs 0.444 without (+0.011, CI -0.083 to +0.112),
+  precision 0.304, median cost $0.158 (bars: 0.50, 0.40, $0.119). Agents searched first (18 of 20 runs) but 0 of 60
+  Sonnet runs in the guidance arms called `--impact`. The MCP arm did best: recall +0.093 vs without (CI -0.0001 to
+  +0.19), 2.7 fewer tool calls and +0.073 precision vs CLI. About 7 of 20 runs per arm listed a correct file that
+  came from a `changes with` list.
+- Next (coordinator recommendation): `--search` folds the top hit's impact list into its own answer (guidance alone
+  never produced an impact call), and the agent guidance prefers the MCP tools where a client supports them; re-run
+  the same harness (`findings/agent-test-564/`) after the change.
 
 ## From the 2026-11-21 scry field report
 
@@ -172,22 +181,6 @@ Design: `findings/5.58/ARCHITECTURE.md` (decisions D1–D28); work-package brief
 ## After 5.56.0: production monitor follow-ups
 
 ## After 5.55.0: Grimoire follow-ups
-
-### T-144 [feature] Third measurement arm: the book alone
-
-- Source: 5.55.0 build and pilot, 2026-11-16.
-- What and why: the PLAN asks whether the book alone helps. The 5.55.0 measurement (T-136) compares the book, the written
-  features and the skill together against nothing, so it cannot separate them. Add a third arm with the book only and no
-  written features, same tasks and model.
-- Evidence: T-136; `findings/6.0/PLAN-GRIMOIRE.md`.
-- Acceptance: the measurement reports three arms (nothing, book only, book with features and skill) on the same ten
-  tasks, with the numbers recorded as measured in the release summary.
-- Status: open. The coordinator runs the measurement on the published 5.64.0 code together with the T-206 re-run.
-
-## Tasks
-
-Ordered by value: security first, then performance, then features and bugs. Line numbers are as of 5.53.0; entries
-T-100 and later are checked against 5.53.1.
 
 ### T-007 [decision] Coding-CLI adapters inherit the whole host environment by default
 
