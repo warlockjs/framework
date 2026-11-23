@@ -8,4 +8,4 @@ AC-2          not run   a customer with no country sees …    src/app/catalog/t
 AC-3 [mobile] no test   the device's country is used when …
 shown on  mobile home: New arrivals   web-client home: New arrivals
 history   2.1 fixed (unreleased)   2.0 added (1.0.0, 2026-10-01)
-check     0 errors, 1 warning, 0 expected
+check     0 errors, 3 warnings, 0 expected

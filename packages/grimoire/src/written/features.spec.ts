@@ -52,6 +52,8 @@ const ALL_CASES = [
   "- expiry   does not apply: f",
   "- double submit   g",
   "- outside service down   h",
+  "- server unreachable   i",
+  "- server error   j",
 ];
 
 describe("parseFlow", () => {
@@ -64,6 +66,8 @@ describe("parseFlow", () => {
       "- limits   e",
       "- expiry   does not apply: f",
       "- outside service down   h",
+      "- server unreachable   i",
+      "- server error   j",
     ];
 
     function messages(steps: string[], cases: string[]): string[] {
@@ -339,6 +343,8 @@ describe("parseFlow", () => {
         "- limits at most 200 products",
         "- expiry does not apply: saved products do not expire",
         "- outside service down does not apply",
+        "- server unreachable   i",
+        "- server error   j",
         "- payment declined   the card is refused → 402",
         "",
         "## Not handled",
@@ -372,6 +378,8 @@ describe("parseFlow", () => {
       ["limits", true, "at most 200 products"],
       ["expiry", true, "does not apply: saved products do not expire"],
       ["outside service down", true, "does not apply"],
+      ["server unreachable", false, "i"],
+      ["server error", false, "j"],
       ["payment declined", false, "the card is refused → 402"],
     ]);
     expect(flow.notHandled.map((line) => [line.name, line.text])).toEqual([
@@ -402,7 +410,7 @@ describe("parseFlow", () => {
       [
         "GR1005",
         6,
-        'the front matter key "owner" is not part of the flow template (id, since, status, who, origin).',
+        'the front matter key "owner" is not part of the flow template (id, since, status, who, origin, screenshots).',
       ],
       ["GR1019", 2, 'the flow id "wish-list" must equal its "wishlist" name.'],
       [
@@ -559,6 +567,8 @@ describe("parseFlow: summary, story and case criteria", () => {
       "- expiry   does not apply: f (AC-2)",
       "- double submit   g",
       "- outside service down   h",
+      "- server unreachable   i",
+      "- server error   j",
       "",
       "## Acceptance criteria",
       "- AC-1   one",
@@ -574,6 +584,8 @@ describe("parseFlow: summary, story and case criteria", () => {
       ["does not apply: f", ["AC-2"], true],
       ["g", [], false],
       ["h", [], false],
+      ["i", [], false],
+      ["j", [], false],
     ]);
   });
 });

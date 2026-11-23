@@ -72,9 +72,11 @@ describe("the ./warlock entry", () => {
       "src/warlock/adapter.ts",
       "src/warlock/commands.ts",
       "src/warlock/index.ts",
+      "src/warlock/languages.ts",
       "src/warlock/logo.ts",
       "src/warlock/mcp-tools.ts",
       "src/warlock/mobile-facts.ts",
+      "src/warlock/shows.ts",
     ]);
   });
 });

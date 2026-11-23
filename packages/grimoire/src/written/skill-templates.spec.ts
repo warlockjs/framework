@@ -151,7 +151,7 @@ describe("the skill templates", () => {
     ).toHaveLength(1);
     expect(flow?.steps).toHaveLength(4);
     expect(flow?.cases.filter((entry) => entry.fixed)).toHaveLength(8);
-    expect(flow?.criteria).toHaveLength(4);
+    expect(flow?.criteria).toHaveLength(5);
     expect(flow?.notHandled.map((line) => line.name)).toEqual(["double submit"]);
     expect(catalog?.changelog?.entries).toHaveLength(1);
     expect(written.apps.find((app) => app.id.value === "web-client")?.conditions).toHaveLength(4);

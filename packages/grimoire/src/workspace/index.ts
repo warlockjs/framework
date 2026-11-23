@@ -30,7 +30,8 @@ import { toPosixPath } from "../paths";
 import { scanProofs } from "../proves";
 import { readTestResults, resultsFileLabel } from "../test-results";
 import { loadShotsState } from "../shots/state";
-import { parseGrimoire, resolveSettings } from "../written";
+import { parseGrimoire } from "../written";
+import { resolveSettings } from "../written/settings";
 import { writeDerived } from "./derived";
 
 /** The current sha256 of each test file: the manifest's, else read now (missing files are left out). */

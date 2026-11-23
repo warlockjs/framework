@@ -79,6 +79,44 @@
       "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
     },
     {
+      "code": "GR1012",
+      "severity": "warning",
+      "message": "the case question \"server error\" is answered neither under Cases nor under Not handled.",
+      "at": {
+        "file": "grimoire/features/catalog/flows/browse-products.md",
+        "line": 23,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/browse-products",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/browse-products.md"
+      },
+      "hint": "Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`."
+    },
+    {
+      "code": "GR1012",
+      "severity": "warning",
+      "message": "the case question \"server unreachable\" is answered neither under Cases nor under Not handled.",
+      "at": {
+        "file": "grimoire/features/catalog/flows/browse-products.md",
+        "line": 23,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/browse-products",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/browse-products.md"
+      },
+      "hint": "Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`."
+    },
+    {
       "code": "GR4001",
       "severity": "warning",
       "message": "catalog/browse-products AC-1 has no test",
@@ -136,6 +174,44 @@
       "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
     },
     {
+      "code": "GR1012",
+      "severity": "warning",
+      "message": "the case question \"server error\" is answered neither under Cases nor under Not handled.",
+      "at": {
+        "file": "grimoire/features/catalog/flows/new-arrivals.md",
+        "line": 19,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/new-arrivals",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/new-arrivals.md"
+      },
+      "hint": "Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`."
+    },
+    {
+      "code": "GR1012",
+      "severity": "warning",
+      "message": "the case question \"server unreachable\" is answered neither under Cases nor under Not handled.",
+      "at": {
+        "file": "grimoire/features/catalog/flows/new-arrivals.md",
+        "line": 19,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/new-arrivals",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/new-arrivals.md"
+      },
+      "hint": "Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`."
+    },
+    {
       "code": "GR4001",
       "severity": "warning",
       "message": "catalog/new-arrivals AC-3 has no test",
@@ -153,6 +229,44 @@
         "file": "grimoire/features/catalog/flows/new-arrivals.md"
       },
       "hint": "Write a test with `// @proves <feature>/<flow> AC-<n>` above it, or say in the task why not."
+    },
+    {
+      "code": "GR1012",
+      "severity": "warning",
+      "message": "the case question \"server error\" is answered neither under Cases nor under Not handled.",
+      "at": {
+        "file": "grimoire/features/orders/flows/place-order.md",
+        "line": 26,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "orders",
+        "flow": "orders/place-order",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/orders/flows/place-order.md"
+      },
+      "hint": "Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`."
+    },
+    {
+      "code": "GR1012",
+      "severity": "warning",
+      "message": "the case question \"server unreachable\" is answered neither under Cases nor under Not handled.",
+      "at": {
+        "file": "grimoire/features/orders/flows/place-order.md",
+        "line": 26,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "orders",
+        "flow": "orders/place-order",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/orders/flows/place-order.md"
+      },
+      "hint": "Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`."
     },
     {
       "code": "GR4001",
@@ -269,6 +383,44 @@
       "hint": "Write one or two plain sentences under the flow's `# Title`: who does what, and what they get."
     },
     {
+      "code": "GR1012",
+      "severity": "warning",
+      "message": "the case question \"server error\" is answered neither under Cases nor under Not handled.",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 19,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`."
+    },
+    {
+      "code": "GR1012",
+      "severity": "warning",
+      "message": "the case question \"server unreachable\" is answered neither under Cases nor under Not handled.",
+      "at": {
+        "file": "grimoire/features/catalog/flows/wishlist.md",
+        "line": 19,
+        "column": null
+      },
+      "expected": true,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/wishlist",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/wishlist.md"
+      },
+      "hint": "Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`."
+    },
+    {
       "code": "GR4001",
       "severity": "warning",
       "message": "catalog/wishlist AC-1 has no test",
@@ -347,8 +499,8 @@
   ],
   "counts": {
     "errors": 0,
-    "warnings": 9,
-    "expected": 9
+    "warnings": 15,
+    "expected": 11
   },
   "ok": true,
   "routes": "fresh"

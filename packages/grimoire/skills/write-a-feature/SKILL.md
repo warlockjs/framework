@@ -148,6 +148,8 @@ A customer saves a product they like and finds it again later on their wishlist.
 - expiry does not apply: saved products do not expire
 - double submit two taps save once
 - outside service down does not apply: no outside service is called
+- server unreachable the save button shows "Could not reach the server, check your connection" (AC-5)
+- server error the product stays unsaved and the message says what failed (AC-5)
 
 ## Acceptance criteria
 
@@ -155,6 +157,7 @@ A customer saves a product they like and finds it again later on their wishlist.
 - AC-2 saving twice keeps one entry
 - AC-3 a guest is sent to sign in and returns to the product
 - AC-4 [mobile] the product card has a save button
+- AC-5 a failed save says what failed and what to do next
 ```
 
 **Summary.** The paragraph under the `# Title`: one or two plain sentences saying who does what and

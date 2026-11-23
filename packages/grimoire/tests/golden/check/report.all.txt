@@ -2,18 +2,26 @@ e2e/checkout.e2e.ts:5  GR4009  warning  5 proving tests are written but no test 
 grimoire/features/auth/flows/login.md:31  GR4001  warning  auth/login AC-1 has no test
 grimoire/features/auth/flows/sign-up.md:30  GR4001  warning  auth/sign-up AC-1 has no test
 grimoire/features/auth/flows/sign-up.md:31  GR4001  warning  auth/sign-up AC-2 has no test
+grimoire/features/catalog/flows/browse-products.md:23  GR1012  warning  the case question "server error" is answered neither under Cases nor under Not handled.
+grimoire/features/catalog/flows/browse-products.md:23  GR1012  warning  the case question "server unreachable" is answered neither under Cases nor under Not handled.
 grimoire/features/catalog/flows/browse-products.md:34  GR4001  warning  catalog/browse-products AC-1 has no test
 grimoire/features/catalog/flows/browse-products.md:35  GR4001  warning  catalog/browse-products AC-2 has no test
 grimoire/features/catalog/flows/browse-products.md:36  GR4001  warning  catalog/browse-products AC-3 has no test
+grimoire/features/catalog/flows/new-arrivals.md:19  GR1012  warning  the case question "server error" is answered neither under Cases nor under Not handled.
+grimoire/features/catalog/flows/new-arrivals.md:19  GR1012  warning  the case question "server unreachable" is answered neither under Cases nor under Not handled.
 grimoire/features/catalog/flows/new-arrivals.md:32  GR4001  warning  catalog/new-arrivals AC-3 has no test
+grimoire/features/orders/flows/place-order.md:26  GR1012  warning  the case question "server error" is answered neither under Cases nor under Not handled.
+grimoire/features/orders/flows/place-order.md:26  GR1012  warning  the case question "server unreachable" is answered neither under Cases nor under Not handled.
 grimoire/features/orders/flows/place-order.md:44  GR4001  warning  orders/place-order AC-4 has no test
 grimoire/features/catalog/flows/wishlist.md:3  GR6007  error  catalog/wishlist is since 3.0, newer than catalog 2.1  (expected)
 grimoire/features/catalog/flows/wishlist.md:12  GR2001  error  route step "POST /api/wishlist" matches no route  (expected)
 grimoire/features/catalog/flows/wishlist.md:13  GR2004  error  notification step "wishlist-price-drop" matches no notification  (expected)
 grimoire/features/catalog/flows/wishlist.md:14  GR2002  error  page step "/wishlist" matches no page or screen of the feature's apps  (expected)
 grimoire/features/catalog/flows/wishlist.md:8  GR1030  warning  the flow has no summary; write one or two sentences under the title.  (expected)
+grimoire/features/catalog/flows/wishlist.md:19  GR1012  warning  the case question "server error" is answered neither under Cases nor under Not handled.  (expected)
+grimoire/features/catalog/flows/wishlist.md:19  GR1012  warning  the case question "server unreachable" is answered neither under Cases nor under Not handled.  (expected)
 grimoire/features/catalog/flows/wishlist.md:30  GR4001  warning  catalog/wishlist AC-1 has no test  (expected)
 grimoire/features/catalog/flows/wishlist.md:31  GR4001  warning  catalog/wishlist AC-2 has no test  (expected)
 grimoire/features/catalog/flows/wishlist.md:32  GR4001  warning  catalog/wishlist AC-3 has no test  (expected)
 grimoire/features/catalog/flows/wishlist.md:33  GR4001  warning  catalog/wishlist AC-4 has no test  (expected)
-0 errors, 9 warnings, 9 expected  (routes: fresh)
+0 errors, 15 warnings, 11 expected  (routes: fresh)

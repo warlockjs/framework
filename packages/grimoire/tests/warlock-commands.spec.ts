@@ -165,7 +165,7 @@ describe("warlock grimoire check", () => {
     const io = capture();
 
     expect(await runCheck({ root: copy.root, adapter: createShopAdapter(), io })).toBe(0);
-    expect(io.stdout.at(-3)).toBe("0 errors, 9 warnings, 9 expected  (routes: fresh)");
+    expect(io.stdout.at(-3)).toBe("0 errors, 15 warnings, 11 expected  (routes: fresh)");
   });
 
   it("exits 1 on an unexpected error and prints JSON with --json", async () => {
@@ -207,7 +207,7 @@ describe("warlock grimoire check", () => {
     expect(io.stdout).toContain(
       "-  GR8002  warning  route facts could not be read: the app did not boot (src/app/orders/routes.ts: boom)",
     );
-    expect(io.stdout.at(-3)).toBe("0 errors, 11 warnings, 9 expected  (routes: stale)");
+    expect(io.stdout.at(-3)).toBe("0 errors, 17 warnings, 11 expected  (routes: stale)");
   });
 });
 

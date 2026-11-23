@@ -10,4 +10,4 @@ changes   2.1 fixed new-arrivals: a customer with no country saw an empty list â
           2.0 added new-arrivals: customers see the newest products sold in â€¦ (1.0.0, 2026-10-01)
           1.0 added browse-products: customers list products and open one (1.0.0, 2026-10-01)
 tasks     T-014 waiting for approval  Let customers save products to a wishlist
-check     0 errors, 4 warnings, 9 expected
+check     0 errors, 8 warnings, 11 expected
