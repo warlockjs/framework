@@ -6,6 +6,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 - Next-major items (T-007, T-009, T-033) wait for 6.0.
 - T-206: build the scry output and guidance changes the agent test points to.
+- T-208: drift controls (rule checks, `grimoire guard`, locked tests, protected areas).
 - T-207: approved screenshots per criterion and language, design-system feature, bird-view (phases 1-4).
 
 ## Next release
@@ -74,6 +75,37 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
 - Acceptance: on the scaffold app, login's criteria show `en` and `ar` cells with screenshots. A left-aligned input in
   `ar` turns its design-system cell red. A removed case shows as "changed, not approved" until it is approved.
 - Status: waiting for the owner (new feature area; start in a fresh session).
+
+### T-208 [decision] Drift controls: turn rules into checks, lock scope and tests, guard a change against its task
+
+- Source: owner, 2026-11-23 (chat: AI agents drift on every project by removing, changing or adding things unasked;
+  add restrictions and controls).
+- Proposal, in priority order:
+  1. Repeated corrections become checks, not prose. Each rule the owner keeps repeating gets a lint rule or test in
+     the scaffold, for example:
+     - CSS logical properties only (no `left`, `ml-*`, `text-left`), so RTL works;
+     - no generic "Something went wrong";
+     - no `kind` discriminators;
+     - no `.js` imports.
+  2. `warlock grimoire guard <task>`: the diff checked against its task.
+     - A Grimoire task names its `feature` and `flow`, and Grimoire knows which files each feature owns.
+     - The guard lists changed files outside the task's features or its own `Files:` line, deleted `@proves` tests,
+       and removed criteria, cases or flows.
+     - It runs in CI and as an agent hook.
+  3. Locked tests.
+     - The planner writes the acceptance tests first; implementer briefs mark them read-only, and the guard flags
+       edits to them.
+     - A check bans `.skip` and `.only`, and flags a test change that drops assertions.
+  4. Protected areas need the task to name them: migrations, auth, public API, config, lockfile and new
+     dependencies. A public API snapshot makes any change to exports deliberate.
+  5. An independent reviewer gets the task and the diff, not the author's summary, with one fixed question: "list
+     every change the task did not ask for".
+  6. Approved visual baselines (T-207, phase 3).
+  7. Traceability: every commit names its task, and CI rejects app commits without one (app repos only; never in
+     public text).
+- Acceptance per item: shipped in the scaffold and the skills, documented, and shown on a demo diff that adds an
+  unasked file, deletes a proving test and uses `ml-4`. All three are caught.
+- Status: waiting for the owner; 1-2 first (one minor).
 
 ### T-201 [bug] The shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
 
