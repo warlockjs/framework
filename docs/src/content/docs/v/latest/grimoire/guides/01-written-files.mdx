@@ -11,8 +11,10 @@ import { Aside } from "@astrojs/starlight/components";
 </Aside>
 
 Agents write the files under `grimoire/features/`, `grimoire/apps/`, `grimoire/tasks/` and `grimoire/releases/`.
-Each kind of file has a fixed template. Warlock reads these files and never edits them. The one exception is the
-collected list of a release file, between its two markers, which `warlock grimoire release` writes.
+Each kind of file has a fixed template. Warlock reads these files and never edits them, with two exceptions: the
+collected list of a release file, between its two markers, which `warlock grimoire release` writes, and
+`warlock grimoire release --stamp`, which moves the `## Unreleased` entries of the feature changelogs under the
+release's section and writes a missing release file, only when you pass `--stamp`.
 
 A file that does not follow its template gives a structure finding (`GR1001` to `GR1028`) with the file and line.
 Warlock still reads everything else in the file, so the other checks keep working. The full list of codes is at the
@@ -65,12 +67,12 @@ protected:
 ---
 ```
 
-| Key           | Value                                                                                                                                                                                                  |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `languages`   | the app's languages, in order. Without it the adapter's `languages()` is used (the Warlock adapter reads `app.localeCodes` without booting the app), and without that there is one unnamed language.   |
-| `screenshots` | `changed` (default), `all` or `off`. `GRIMOIRE_SHOTS` overrides it for one run. See [Screenshots and approvals](/v/latest/grimoire/guides/12-screenshots-and-approvals/).                              |
-| `rules`       | the code rules to run: `logical-css`, `specific-errors`, `type-discriminator`, `no-js-imports`. Absent: `check` runs none and `guard` runs all four on added lines. `[]`: none anywhere.              |
-| `protected`   | `- <name> <glob> [<glob>…]` lines. A built-in area name replaces its globs; a new name adds an area.                                                                                                   |
+| Key           | Value                                                                                                                                                                                                |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `languages`   | the app's languages, in order. Without it the adapter's `languages()` is used (the Warlock adapter reads `app.localeCodes` without booting the app), and without that there is one unnamed language. |
+| `screenshots` | `changed` (default), `all` or `off`. `GRIMOIRE_SHOTS` overrides it for one run. See [Screenshots and approvals](/v/latest/grimoire/guides/12-screenshots-and-approvals/).                            |
+| `rules`       | the code rules to run: `logical-css`, `specific-errors`, `type-discriminator`, `no-js-imports`. Absent: `check` runs none and `guard` runs all four on added lines. `[]`: none anywhere.             |
+| `protected`   | `- <name> <glob> [<glob>…]` lines. A built-in area name replaces its globs; a new name adds an area.                                                                                                 |
 
 A key that is not in this table is `GR1005`; a wrong value is `GR1004`.
 
@@ -199,8 +201,9 @@ No front matter. Sections, newest first:
 **Releasing.** New entries go under `## Unreleased`, with no date and no release number. At release time the agent
 writes the release file, moves the entries the release ships into a new section `## <release> (<yyyy-mm-dd>)` with
 the release file's date, then runs `warlock grimoire release <release>`. The command collects only the entries
-under that section; entries still under `## Unreleased` are left out and named in a note. Warlock never edits the
-changelog. The check reports a listed entry with no matching release and date, and a release section with no release
+under that section; entries still under `## Unreleased` are left out and named in a note. Warlock edits the
+changelog only when you ask for it with `warlock grimoire release <release> --stamp`, which makes that move for every
+feature and then collects. The check reports a listed entry with no matching release and date, and a release section with no release
 file or a different date.
 
 ### `features/<feature>/flows/<flow>.md`
@@ -257,14 +260,14 @@ A customer saves a product they like and finds it again later on their wishlist.
 - AC-5 a failed save says what failed and what to do next
 ```
 
-| Key      | Required | Value                                                         |
-| -------- | -------- | ------------------------------------------------------------- |
-| `id`     | yes      | an id, equal to the file name without `.md`                   |
-| `since`  | yes      | the feature version that introduced the flow                  |
-| `status` | yes      | `proposed`, `building`, `shipped` or `retired`                |
-| `who`    | yes      | who walks the flow: `customer`, `guest`, `admin`, `system`, … |
-| `origin` | no       | `inferred` or `confirmed`                                     |
-| `screenshots` | no  | `false` opts the flow out of `@shows` captures (default: captured) |
+| Key           | Required | Value                                                              |
+| ------------- | -------- | ------------------------------------------------------------------ |
+| `id`          | yes      | an id, equal to the file name without `.md`                        |
+| `since`       | yes      | the feature version that introduced the flow                       |
+| `status`      | yes      | `proposed`, `building`, `shipped` or `retired`                     |
+| `who`         | yes      | who walks the flow: `customer`, `guest`, `admin`, `system`, …      |
+| `origin`      | no       | `inferred` or `confirmed`                                          |
+| `screenshots` | no       | `false` opts the flow out of `@shows` captures (default: captured) |
 
 Headings: the `# ` title, `## Steps`, `## Cases` and `## Acceptance criteria` are required. `## Story`,
 `## Differs by app` and `## Not handled` are optional.

@@ -14,7 +14,10 @@ import { releaseFilePath } from "../paths";
 import { isDate } from "../written/fields";
 
 const UNRELEASED = /^##[ \t]+unreleased[ \t]*$/i;
-const HEADING = /^#{2,}[ \t]/;
+/** A section heading of a feature changelog: level 2 only (`### Added` stays inside its section). */
+const HEADING = /^##[ \t]/;
+/** A release section heading, the way the changelog parser reads it. */
+const RELEASE_HEADING = /^##[ \t]+(\S+)[ \t]+\((.+)\)$/;
 
 export type StampInput = {
   /** The release name, such as `1.4.0`. */
@@ -86,7 +89,11 @@ function stampText(
   while (body.length > 0 && (body[0] ?? "").trim() === "") body.shift();
 
   const out = [...lines.slice(0, start + 1), cr(lines[start] ?? ""), ...lines.slice(end)];
-  const at = out.findIndex((line) => line.trimEnd() === heading);
+  const at = out.findIndex((line) => {
+    const match = RELEASE_HEADING.exec(line.trimEnd());
+
+    return match !== null && match[1] === version && match[2]?.trim() === date;
+  });
 
   if (at === -1) refuse(`${file} has no "${heading}" heading to stamp.`);
 

@@ -3512,7 +3512,19 @@ const BIRD_STATES = {
 const BIRD_STATE_ORDER = ["rejected", "fail", "changed", "stale", "not-run", "no-test", "pass"];
 
 /** The target the Approve all button sends when there is no baseline yet (the baseline is created from the current state). */
-const BIRD_APPROVE_ALL = "--all";
+const BIRD_APPROVE_ALL = "all";
+
+/** What an Approve or Reject failure says: the server's message, its status and reference, and what to do next. */
+function birdFailure(verb, failure) {
+  const details = [
+    failure?.status ? `status ${failure.status}` : "",
+    failure?.ref ? `reference ${failure.ref}` : "",
+  ].filter(Boolean);
+
+  return `Could not ${verb}: ${failure?.message ?? "the server did not answer"}${
+    details.length ? ` (${details.join(", ")})` : ""
+  }. Nothing was changed. Try again, or run warlock grimoire ${verb} in a terminal.`;
+}
 
 /** What a drift item says, in plain words. */
 const BIRD_DRIFT_WORDS = {
@@ -3666,9 +3678,7 @@ function birdPanel(ctx, data, develop) {
     } catch (failure) {
       button.removeAttribute?.("disabled");
       // The dialog stays open: the failure is shown where the click happened.
-      error.textContent = `Could not ${verb}: ${failure?.message ?? "the server did not answer"}${
-        failure?.status ? ` (status ${failure.status})` : ""
-      }. Nothing was changed. Try again, or run warlock grimoire ${verb} in a terminal.`;
+      error.textContent = birdFailure(verb, failure);
     }
   }
 
@@ -3983,9 +3993,7 @@ async function birdView(ctx, query = {}) {
           });
           ctx.refresh();
         } catch (failure) {
-          error.textContent = ` Could not approve: ${failure?.message ?? "the server did not answer"}${
-            failure?.status ? ` (status ${failure.status})` : ""
-          }. Nothing was changed. Try again, or run warlock grimoire approve in a terminal.`;
+          error.textContent = ` ${birdFailure("approve", failure)}`;
         }
       },
     });

@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Full-text index weights (`FullTextIndexOptions.weights`) are typed as what each driver takes, the new `FullTextIndexWeight`: the `setweight` letters `"A"` to `"D"` on PostgreSQL, whole numbers from 1 to 99999 on MongoDB. A weight of the other form is refused with a message naming the column; PostgreSQL inlined any value into the index SQL before, so a number gave invalid SQL.
+- The MongoDB query parser no longer carries an unused regex branch for `whereSearch`; `whereSearch` is `$text` there, as documented.
 - The contract's `textSearch` example no longer passes `{ language }` as if it were an option (the second argument is equality filters), and the docs and the `query-data` skill describe `whereSearch` as full-text search (stemmed whole words on PostgreSQL, `$text` on MongoDB) instead of pattern matching.
 
 ## 5.63.1 - 2026-11-22

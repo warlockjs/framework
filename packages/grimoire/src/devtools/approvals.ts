@@ -16,7 +16,8 @@ export type ApprovalRequest = { ids: string[]; language?: string; note?: string 
 export type ApprovalAnswer = { done: string[] };
 
 function readBody(body: unknown): ApprovalRequest {
-  const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : null;
+  const record =
+    typeof body === "object" && body !== null ? (body as Record<string, unknown>) : null;
   const ids = record?.ids;
 
   if (
@@ -27,7 +28,10 @@ function readBody(body: unknown): ApprovalRequest {
     throw new GrimoirePanelError(400, "Send { ids: string[] } with at least one change id.");
   }
 
-  const request: ApprovalRequest = { ids: ids as string[] };
+  // "--all" (the command line's spelling) is the same target as "all".
+  const request: ApprovalRequest = {
+    ids: (ids as string[]).map((id) => (id === "--all" ? "all" : id)),
+  };
 
   if (record?.language !== undefined) {
     if (typeof record.language !== "string") {
@@ -38,7 +42,8 @@ function readBody(body: unknown): ApprovalRequest {
   }
 
   if (record?.note !== undefined) {
-    if (typeof record.note !== "string") throw new GrimoirePanelError(400, "note must be a string.");
+    if (typeof record.note !== "string")
+      throw new GrimoirePanelError(400, "note must be a string.");
 
     request.note = record.note;
   }

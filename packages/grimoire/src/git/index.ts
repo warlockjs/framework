@@ -26,7 +26,9 @@ export type ChangedFile = {
 /** One commit of a range. */
 export type CommitInfo = { sha: string; subject: string; body: string };
 
-type GitResult = { ok: true; stdout: string } | { ok: false; stderr: string; code: number | string | null };
+type GitResult =
+  | { ok: true; stdout: string }
+  | { ok: false; stderr: string; code: number | string | null };
 
 const MAX_BUFFER = 256 * 1024 * 1024;
 
@@ -52,7 +54,8 @@ function runGit(root: string, args: readonly string[]): Promise<GitResult> {
 
         resolve({
           ok: false,
-          stderr: failure.code === "ENOENT" ? "git is not installed or not on the PATH" : String(stderr),
+          stderr:
+            failure.code === "ENOENT" ? "git is not installed or not on the PATH" : String(stderr),
           code: failure.code ?? null,
         });
       },
@@ -124,7 +127,12 @@ export async function resolveBase(root: string, base?: string): Promise<string> 
     );
   }
 
-  const symbolic = await runGit(root, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+  const symbolic = await runGit(root, [
+    "symbolic-ref",
+    "--quiet",
+    "--short",
+    "refs/remotes/origin/HEAD",
+  ]);
   const candidates = [symbolic.ok ? symbolic.stdout.trim() : "", "main", "master"].filter(
     (name) => name !== "",
   );
@@ -146,9 +154,16 @@ function posix(file: string): string {
 function parseDiffLines(diff: string): Map<string, number[]> {
   const added = new Map<string, number[]>();
   let current: number[] | null = null;
+  // `+++ ` names the file only in a file's header: inside a hunk it is an added line that starts with `++`.
+  let header = false;
 
   for (const line of diff.split("\n")) {
-    if (line.startsWith("+++ ")) {
+    if (line.startsWith("diff --git ")) {
+      header = true;
+      continue;
+    }
+
+    if (header && line.startsWith("+++ ")) {
       const target = line.slice(4).replace(/\t.*$/, "");
 
       if (target === "/dev/null") {
@@ -164,6 +179,8 @@ function parseDiffLines(diff: string): Map<string, number[]> {
     }
 
     const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line);
+
+    if (hunk) header = false;
 
     if (hunk && current !== null) {
       const start = Number(hunk[1]);
@@ -220,7 +237,17 @@ export async function changedFiles(root: string, base: string): Promise<ChangedF
   );
   const diff = await git(
     root,
-    ["diff", "--unified=0", "-M", "--relative", "--no-prefix", "--no-color", "--no-ext-diff", base, "--"],
+    [
+      "diff",
+      "--unified=0",
+      "-M",
+      "--relative",
+      "--no-prefix",
+      "--no-color",
+      "--no-ext-diff",
+      base,
+      "--",
+    ],
     "read the changed lines",
   );
   const untracked = await git(
@@ -279,7 +306,9 @@ export async function changedFiles(root: string, base: string): Promise<ChangedF
     }
   }
 
-  return [...files.values()].sort((left, right) => (left.file < right.file ? -1 : left.file > right.file ? 1 : 0));
+  return [...files.values()].sort((left, right) =>
+    left.file < right.file ? -1 : left.file > right.file ? 1 : 0,
+  );
 }
 
 /** The text of `file` at `ref`, or `null` when it does not exist there. */
@@ -300,7 +329,15 @@ export async function showFile(root: string, ref: string, file: string): Promise
 
 /** The files under `folder` (a project-relative folder) at `ref`, sorted. */
 export async function filesAt(root: string, ref: string, folder: string): Promise<string[]> {
-  const result = await runGit(root, ["ls-tree", "-r", "-z", "--name-only", ref, "--", `${posix(folder)}/`]);
+  const result = await runGit(root, [
+    "ls-tree",
+    "-r",
+    "-z",
+    "--name-only",
+    ref,
+    "--",
+    `${posix(folder)}/`,
+  ]);
 
   if (!result.ok) return [];
 

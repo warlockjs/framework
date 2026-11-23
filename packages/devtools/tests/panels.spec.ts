@@ -27,6 +27,12 @@ function testPanel(overrides: Partial<DevtoolsPanel> = {}): DevtoolsPanel {
       { method: "POST", path: "/items", handler: ({ body }) => ({ received: body }) },
       { method: "DELETE", path: "/items", handler: () => undefined },
       {
+        path: "/broken",
+        handler: () => {
+          throw new Error("The book file is read-only.");
+        },
+      },
+      {
         path: "/missing",
         handler: () => {
           throw Object.assign(new Error("No such entry."), { statusCode: 404 });
@@ -100,6 +106,18 @@ describe("registered panels", () => {
 
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ error: "No such entry." });
+  });
+
+  it("answers a server failure with its message and a reference written to the log", async () => {
+    const warn = vi.fn();
+    const app = mount([testPanel()], { warn });
+    const response = await app.inject({ url: "/__warlock/api/test-panel/broken", ...local });
+    const body = response.json() as { error: string; ref: string };
+
+    expect(response.statusCode).toBe(500);
+    expect(body.error).toBe("The book file is read-only.");
+    expect(body.ref).toMatch(/^[A-Z2-9]{8}$/);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(body.ref));
   });
 
   it("serves the view module and listed assets, and nothing else", async () => {

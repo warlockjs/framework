@@ -393,7 +393,24 @@ export class MongoMigrationDriver implements MigrationDriverContract {
       indexOptions.default_language = options.language;
     }
     if (options?.weights) {
-      indexOptions.weights = options.weights;
+      const weights: Record<string, number> = {};
+
+      for (const [field, weight] of Object.entries(options.weights)) {
+        if (
+          typeof weight !== "number" ||
+          !Number.isInteger(weight) ||
+          weight < 1 ||
+          weight > 99999
+        ) {
+          throw new Error(
+            `The full-text weight of "${field}" is ${JSON.stringify(weight)}; MongoDB weights are whole numbers from 1 to 99999.`,
+          );
+        }
+
+        weights[field] = weight;
+      }
+
+      indexOptions.weights = weights;
     }
 
     await collection.createIndex(indexSpec, indexOptions);

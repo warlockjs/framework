@@ -72,11 +72,19 @@ function demoDiff(copy: FixtureCopy, physical: boolean): void {
   );
 }
 
-async function guard(root: string, task: string | undefined, options: Record<string, unknown> = {}) {
+async function guard(
+  root: string,
+  task: string | undefined,
+  options: Record<string, unknown> = {},
+) {
   const out: string[] = [];
   const err: string[] = [];
   const code = await runGuard(
-    { root, adapter: createShopAdapter(), io: { out: (line) => out.push(line), err: (line) => err.push(line) } },
+    {
+      root,
+      adapter: createShopAdapter(),
+      io: { out: (line) => out.push(line), err: (line) => err.push(line) },
+    },
     task,
     options,
   );
@@ -115,9 +123,18 @@ describe("warlock grimoire guard: the demo diff", () => {
     expect(report.task).toBe("T-20");
     expect(report.base).toBe(first);
     expect(report.ok).toBe(false);
-    expect(report.findings.map((finding) => finding.code).sort()).toEqual(["GR3007", "GR7006", "GR7008", "GR7008"]);
+    expect(report.findings.map((finding) => finding.code).sort()).toEqual([
+      "GR3007",
+      "GR7006",
+      "GR7008",
+      "GR7008",
+    ]);
     expect(report.changed.map((file) => file.file)).toContain("src/app/orders/utils/extra.ts");
-    expect(report.findings.every((finding) => finding.subject.task === "T-20" || finding.code === "GR7008")).toBe(true);
+    expect(
+      report.findings.every(
+        (finding) => finding.subject.task === "T-20" || finding.code === "GR7008",
+      ),
+    ).toBe(true);
     expect(report.notApproved).toEqual([]);
   });
 
@@ -126,11 +143,38 @@ describe("warlock grimoire guard: the demo diff", () => {
 
     demoDiff(copy, true);
 
-    const { code, out, err } = await guard(root, "T-20", { hook: true });
+    const { code, out, err } = await guard(root, "T-20", { hook: true, hookInput: "" });
 
     expect(code).toBe(2);
     expect(out).toEqual([]);
     expect(err.join("\n")).toContain("GR7006");
+  });
+
+  it("in hook mode lets the agent stop the second time (stop_hook_active on stdin)", async () => {
+    const { copy, root } = project();
+
+    demoDiff(copy, true);
+
+    const again = await guard(root, "T-20", {
+      hook: true,
+      hookInput: JSON.stringify({ stop_hook_active: true }),
+    });
+
+    expect(again.code).toBe(0);
+    expect(again.err.join("\n")).toContain("GR7006");
+    expect(again.err.join("\n")).toContain("already stopped this agent once");
+  });
+
+  it("counts the approved baseline and approved images as in scope", async () => {
+    const { copy, root } = project();
+
+    copy.write("grimoire/approved/api.json", "{}\n");
+    copy.write("grimoire/screenshots/approved/catalog/new-arrivals/AC-1.png", "png");
+
+    const { out } = await guard(root, "T-20", { json: true });
+    const report = JSON.parse(out.join("\n")) as GuardReport;
+
+    expect(report.findings.filter((finding) => finding.code === "GR7006")).toEqual([]);
   });
 
   it("passes once the task names the file and the removals, and the class is logical", async () => {
@@ -190,7 +234,10 @@ describe("warlock grimoire guard: the demo diff", () => {
   it("checks that every commit names its task", async () => {
     const { copy, root, first } = project();
 
-    copy.write("src/app/catalog/controllers/new-arrivals.controller.ts", `${copy.read("src/app/catalog/controllers/new-arrivals.controller.ts")}// tweak\n`);
+    copy.write(
+      "src/app/catalog/controllers/new-arrivals.controller.ts",
+      `${copy.read("src/app/catalog/controllers/new-arrivals.controller.ts")}// tweak\n`,
+    );
     git(root, "commit", "-q", "-am", "tweak the list");
 
     const bad = await guard(root, "T-20", { base: first, commits: `${first}..HEAD` });
@@ -198,7 +245,10 @@ describe("warlock grimoire guard: the demo diff", () => {
     expect(bad.code).toBe(1);
     expect(bad.out.join("\n")).toContain("GR7012");
 
-    copy.write("src/app/catalog/controllers/new-arrivals.controller.ts", `${copy.read("src/app/catalog/controllers/new-arrivals.controller.ts")}// again\n`);
+    copy.write(
+      "src/app/catalog/controllers/new-arrivals.controller.ts",
+      `${copy.read("src/app/catalog/controllers/new-arrivals.controller.ts")}// again\n`,
+    );
     git(root, "commit", "-q", "-am", "tweak the list for T-20");
 
     const early = await guard(root, "T-20", { base: first, commits: `${first}..HEAD~1` });
@@ -231,11 +281,20 @@ describe("warlock grimoire approve api", () => {
 
     expect(await runApproveApi({ root, adapter, io }, {})).toBe(0);
 
-    const approved = JSON.parse(copy.read("grimoire/approved/api.json")) as { schemaVersion: number; routes: string[] };
+    const approved = JSON.parse(copy.read("grimoire/approved/api.json")) as {
+      schemaVersion: number;
+      routes: string[];
+    };
 
     expect(approved.schemaVersion).toBe(1);
     expect(approved.routes).toEqual([...approved.routes].sort());
-    expect(approved.routes.length).toBe(new Set(shopFacts.routes?.filter((route) => !route.isPage).map((route) => `${route.method} ${route.path}`)).size);
+    expect(approved.routes.length).toBe(
+      new Set(
+        shopFacts.routes
+          ?.filter((route) => !route.isPage)
+          .map((route) => `${route.method} ${route.path}`),
+      ).size,
+    );
 
     const extra = { ...approved, routes: [...approved.routes, "GET /gone"] };
 

@@ -8,6 +8,7 @@ import { checkDrift } from "../check/rules/drift";
 import { checkShows } from "../check/rules/shows";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import type { ApprovedBaseline, ShotCapture, ShowsLine } from "../contracts/shots";
+import { approveFromPanel } from "../devtools/approvals";
 import { approveItems, rejectItems, selectDrift } from "./approve";
 import { computeDrift } from "./drift";
 import { solidPng, encodePng } from "./png.test-support";
@@ -32,9 +33,16 @@ function write(root: string, file: string, bytes: Uint8Array): void {
 const WHITE = solidPng(20, 20);
 const BLACK = solidPng(20, 20, [0, 0, 0, 255]);
 /** One pixel in a hundred differs by a little: under the channel delta. */
-const NEAR = encodePng(20, 20, (x, y) => (x === 0 && y === 0 ? [250, 250, 250, 255] : [255, 255, 255, 255]));
+const NEAR = encodePng(20, 20, (x, y) =>
+  x === 0 && y === 0 ? [250, 250, 250, 255] : [255, 255, 255, 255],
+);
 
-function capture(criterion: string, language: string, bytes: Uint8Array, outcome: "pass" | "fail" = "pass"): ShotCapture {
+function capture(
+  criterion: string,
+  language: string,
+  bytes: Uint8Array,
+  outcome: "pass" | "fail" = "pass",
+): ShotCapture {
   return {
     ref: REF,
     criterion,
@@ -101,14 +109,34 @@ async function setup(options: { rejected?: boolean } = {}): Promise<Setup> {
     proofs: [{ ref: REF, criterion: "AC-1", testFile: "src/a.test.ts", testName: "sends" }],
     shots: [approved("AC-1", "en"), approved("AC-2", "en"), approved("AC-1", "fr")],
     rejected: options.rejected
-      ? [{ id: `shot-changed:${REF}:AC-1:en`, rejectedAt: "2026-11-02T00:00:00.000Z", note: "too dark" }]
+      ? [
+          {
+            id: `shot-changed:${REF}:AC-1:en`,
+            rejectedAt: "2026-11-02T00:00:00.000Z",
+            note: "too dark",
+          },
+        ]
       : [],
   };
   const contact = flow("contact", "send-message", { criteria: ["AC-1", "AC-2", "AC-4"] });
 
   contact.cases.push(
-    { question: "invalid input", fixed: true, answer: "a", doesNotApply: false, criteria: [], at: contact.criteria[0]!.at },
-    { question: "server error", fixed: true, answer: "b", doesNotApply: false, criteria: [], at: contact.criteria[0]!.at },
+    {
+      question: "invalid input",
+      fixed: true,
+      answer: "a",
+      doesNotApply: false,
+      criteria: [],
+      at: contact.criteria[0]!.at,
+    },
+    {
+      question: "server error",
+      fixed: true,
+      answer: "b",
+      doesNotApply: false,
+      criteria: [],
+      at: contact.criteria[0]!.at,
+    },
   );
 
   const snap = snapshot({
@@ -143,8 +171,23 @@ async function setup(options: { rejected?: boolean } = {}): Promise<Setup> {
     optedOut: [],
   });
 
-  snap.settings = { file: null, languages: ["en", "ar"], languagesFrom: "settings", screenshots: "changed", rules: null, protected: [] };
-  snap.shots = { mode: "changed", shows, showsFindings: [], captures, baseline, drift, optedOut: [] };
+  snap.settings = {
+    file: null,
+    languages: ["en", "ar"],
+    languagesFrom: "settings",
+    screenshots: "changed",
+    rules: null,
+    protected: [],
+  };
+  snap.shots = {
+    mode: "changed",
+    shows,
+    showsFindings: [],
+    captures,
+    baseline,
+    drift,
+    optedOut: [],
+  };
 
   return { root, snap };
 }
@@ -187,7 +230,9 @@ describe("drift", () => {
   it("is empty with no baseline (the state loader never calls it)", async () => {
     const { snap } = await setup();
 
-    expect(checkDrift({ ...snap, shots: { ...snap.shots!, baseline: null, drift: [] } })).toEqual([]);
+    expect(checkDrift({ ...snap, shots: { ...snap.shots!, baseline: null, drift: [] } })).toEqual(
+      [],
+    );
   });
 });
 
@@ -203,7 +248,15 @@ describe("check rules over shots", () => {
 
   it("lists a missing language (GR4015) and a failed scene (GR4016)", async () => {
     const { snap } = await setup();
-    const shots = { ...snap.shots!, captures: { ...snap.shots!.captures!, captures: snap.shots!.captures!.captures.filter((c) => !(c.criterion === "AC-1" && c.language === "ar")) } };
+    const shots = {
+      ...snap.shots!,
+      captures: {
+        ...snap.shots!.captures!,
+        captures: snap.shots!.captures!.captures.filter(
+          (c) => !(c.criterion === "AC-1" && c.language === "ar"),
+        ),
+      },
+    };
     const codes = checkShows({ ...snap, shots }).map((finding) => `${finding.code}`);
 
     expect(codes.sort()).toEqual(["GR4015", "GR4016"]);
@@ -215,7 +268,17 @@ describe("check rules over shots", () => {
 
     expect(checkShows({ ...snap, shots: { ...empty, mode: "off" } })).toEqual([]);
     expect(checkShows({ ...snap, shots: { ...empty, optedOut: [REF] } })).toEqual([]);
-    expect(checkShows({ ...snap, shots: empty })).toHaveLength(4);
+    expect(checkShows({ ...snap, shots: { ...empty, mode: "all" } })).toHaveLength(4);
+  });
+
+  it("lets an approved image stand for a flow changed mode did not capture", async () => {
+    const { snap } = await setup();
+    const empty = { ...snap.shots!, captures: null };
+    const missing = checkShows({ ...snap, shots: empty }).map((finding) => finding.message);
+
+    // AC-1 and AC-2 have an approved English image; Arabic has none.
+    expect(missing).toHaveLength(2);
+    expect(missing.every((message) => message.endsWith("in ar"))).toBe(true);
   });
 });
 
@@ -226,19 +289,39 @@ describe("approve and reject", () => {
 
     expect(items.map((item) => item.id)).toEqual([`shot-added:${REF}:AC-1:ar`]);
 
-    expect(await approveItems(snap, items, "2026-11-23T11:00:00.000Z")).toEqual([`shot-added:${REF}:AC-1:ar`]);
+    expect(await approveItems(snap, items, "2026-11-23T11:00:00.000Z")).toEqual([
+      `shot-added:${REF}:AC-1:ar`,
+    ]);
 
     const baseline = await readBaseline(root);
 
-    expect(baseline?.shots.map((shot) => `${shot.criterion}.${shot.language}`).sort()).toEqual(["AC-1.ar", "AC-1.en", "AC-1.fr", "AC-2.en"]);
-    expect(readFileSync(path.join(root, "grimoire/screenshots/approved", REF, "AC-1.ar.png"))).toEqual(WHITE);
+    expect(baseline?.shots.map((shot) => `${shot.criterion}.${shot.language}`).sort()).toEqual([
+      "AC-1.ar",
+      "AC-1.en",
+      "AC-1.fr",
+      "AC-2.en",
+    ]);
+    expect(
+      readFileSync(path.join(root, "grimoire/screenshots/approved", REF, "AC-1.ar.png")),
+    ).toEqual(WHITE);
     expect(baseline?.flows.find((entry) => entry.ref === REF)?.criteria).toHaveLength(3);
   });
 
   it("approves a structure change and a removed image", async () => {
     const { root, snap } = await setup();
 
-    await approveItems(snap, selectDrift(snap, { targets: [`criterion-added:${REF}:AC-4`, `shot-removed:${REF}:AC-1:fr`, "flow-removed:shop/cart", `case-removed:${REF}:duplicate`, `proof-removed:${REF}:AC-1`] }));
+    await approveItems(
+      snap,
+      selectDrift(snap, {
+        targets: [
+          `criterion-added:${REF}:AC-4`,
+          `shot-removed:${REF}:AC-1:fr`,
+          "flow-removed:shop/cart",
+          `case-removed:${REF}:duplicate`,
+          `proof-removed:${REF}:AC-1`,
+        ],
+      }),
+    );
 
     const baseline = await readBaseline(root);
     const approved = baseline?.flows.find((entry) => entry.ref === REF);
@@ -247,7 +330,9 @@ describe("approve and reject", () => {
     expect(approved?.cases).toEqual(["invalid input"]);
     expect(baseline?.flows.map((entry) => entry.ref)).toEqual([REF]);
     expect(baseline?.shots.some((shot) => shot.language === "fr")).toBe(false);
-    expect(existsSync(path.join(root, "grimoire/screenshots/approved", REF, "AC-1.fr.png"))).toBe(false);
+    expect(existsSync(path.join(root, "grimoire/screenshots/approved", REF, "AC-1.fr.png"))).toBe(
+      false,
+    );
     expect(baseline?.proofs.map((entry) => entry.criterion)).toEqual(["AC-2"]);
   });
 
@@ -260,7 +345,11 @@ describe("approve and reject", () => {
     const rejected = await readBaseline(root);
 
     expect(rejected?.rejected).toEqual([
-      { id: `shot-changed:${REF}:AC-1:en`, rejectedAt: "2026-11-23T11:00:00.000Z", note: "too dark" },
+      {
+        id: `shot-changed:${REF}:AC-1:en`,
+        rejectedAt: "2026-11-23T11:00:00.000Z",
+        note: "too dark",
+      },
     ]);
 
     const reloaded = { ...snap, shots: { ...snap.shots!, baseline: rejected! } };
@@ -274,7 +363,9 @@ describe("approve and reject", () => {
     const { snap } = await setup();
 
     expect(() => selectDrift(snap, { targets: ["nothing/here"] })).toThrow(/Nothing to approve/);
-    expect(() => selectDrift(snap, { targets: ["shot-added:no/such:AC-1:en"] })).toThrow(/Nothing to approve/);
+    expect(() => selectDrift(snap, { targets: ["shot-added:no/such:AC-1:en"] })).toThrow(
+      /Nothing to approve/,
+    );
     expect(() => selectDrift(snap, { targets: [] })).toThrow(/Name what/);
   });
 
@@ -282,26 +373,90 @@ describe("approve and reject", () => {
     const { root, snap } = await setup();
     const fresh = { ...snap, shots: { ...snap.shots!, baseline: null, drift: [] } };
 
-    expect(await approveItems(fresh, [], "2026-11-23T11:00:00.000Z", { createWhenMissing: true })).toEqual(["baseline"]);
+    expect(
+      await approveItems(fresh, [], "2026-11-23T11:00:00.000Z", { createWhenMissing: true }),
+    ).toEqual(["baseline"]);
 
     const baseline = await readBaseline(root);
 
     expect(baseline?.flows.map((entry) => entry.ref).sort()).toEqual([REF, "shop/new"]);
-    expect(baseline?.shots.map((shot) => `${shot.criterion}.${shot.language}`).sort()).toEqual(["AC-1.ar", "AC-1.en", "AC-2.en"]);
-    expect(existsSync(path.join(root, "grimoire/screenshots/approved", REF, "AC-1.ar.png"))).toBe(true);
+    expect(baseline?.shots.map((shot) => `${shot.criterion}.${shot.language}`).sort()).toEqual([
+      "AC-1.ar",
+      "AC-1.en",
+      "AC-2.en",
+    ]);
+    expect(existsSync(path.join(root, "grimoire/screenshots/approved", REF, "AC-1.ar.png"))).toBe(
+      true,
+    );
+  });
+
+  it("never deletes or copies a file outside grimoire/screenshots", async () => {
+    const { root, snap } = await setup();
+    const outside = path.join(root, "keep.txt");
+
+    writeFileSync(outside, "keep");
+
+    const removed = snap.shots!.drift.find((item) => item.type === "shot-removed")!;
+
+    await expect(
+      approveItems(
+        snap,
+        [{ ...removed, approvedShot: "../../keep.txt" }],
+        "2026-11-23T11:00:00.000Z",
+      ),
+    ).rejects.toThrow(/not a path under/);
+    expect(existsSync(outside)).toBe(true);
+  });
+
+  it("starts from the baseline on disk, so an approval made since the snapshot is kept", async () => {
+    const { root, snap } = await setup({ rejected: true });
+    const [first, second] = snap.shots!.drift.filter(
+      (item) => item.type === "shot-changed" || item.type === "shot-added",
+    );
+
+    await approveItems(snap, [first!], "2026-11-23T11:00:00.000Z");
+    // The same (now stale) snapshot approves another item.
+    await approveItems(snap, [second!], "2026-11-23T11:00:01.000Z");
+
+    const shots = (await readBaseline(root))?.shots ?? [];
+    const keyOf = (item: { criterion: string | null; language: string | null }) =>
+      `${item.criterion}.${item.language}`;
+
+    expect(shots.map(keyOf)).toEqual(expect.arrayContaining([keyOf(first!), keyOf(second!)]));
+  });
+
+  it("creates the baseline from the panel's Approve all, sent as all or as --all", async () => {
+    for (const id of ["all", "--all"]) {
+      const { root, snap } = await setup();
+      const fresh = { ...snap, shots: { ...snap.shots!, baseline: null, drift: [] } };
+
+      expect(await approveFromPanel(fresh, { ids: [id] })).toEqual({ done: ["baseline"] });
+      expect((await readBaseline(root))?.flows.length).toBe(2);
+    }
   });
 });
 
 describe("the capture index", () => {
   it("keeps the entries a run did not run", async () => {
     const { root } = await setup();
-    const before = mergeCaptures(null, [capture("AC-1", "en", WHITE), capture("AC-1", "ar", WHITE)], "t1");
+    const before = mergeCaptures(
+      null,
+      [capture("AC-1", "en", WHITE), capture("AC-1", "ar", WHITE)],
+      "t1",
+    );
 
     await writeCaptureIndex(root, before);
 
-    const after = mergeCaptures(await readCaptureIndex(root), [capture("AC-1", "ar", BLACK, "fail")], "t2");
+    const after = mergeCaptures(
+      await readCaptureIndex(root),
+      [capture("AC-1", "ar", BLACK, "fail")],
+      "t2",
+    );
 
-    expect(after.captures.map((entry) => `${entry.language}:${entry.outcome}`)).toEqual(["ar:fail", "en:pass"]);
+    expect(after.captures.map((entry) => `${entry.language}:${entry.outcome}`)).toEqual([
+      "ar:fail",
+      "en:pass",
+    ]);
     expect(after.updatedAt).toBe("t2");
   });
 });

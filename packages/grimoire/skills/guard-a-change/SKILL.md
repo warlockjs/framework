@@ -18,24 +18,24 @@ npx warlock grimoire guard --hook     # agent hook: findings on stderr, exit cod
 npx warlock grimoire guard --json
 ```
 
-It never boots the app. The change is the diff from the base (default: where your branch left the default branch) to the working tree, including staged, unstaged and untracked files. Exit code 0 means no error, 1 an error, and with `--hook` 2 (and 0 when it cannot run, such as no task).
+It never boots the app. The change is the diff from the base (default: where your branch left the default branch) to the working tree, including staged, unstaged and untracked files. Exit code 0 means no error, 1 an error, and with `--hook` 2 (and 0 when it cannot run, such as no task, or when the hook already sent you back once: then finish and list what is left in your report).
 
 ## What it checks
 
-| Code | What |
-| --- | --- |
-| `GR7006` | A changed file is outside the task: not owned by its feature (or `Features:`), not a file its flow reaches, not a test proving its criteria, not in `Files:`. |
-| `GR7007` | A flow, criterion or case in `grimoire/features/` is gone and `Removes:` does not name it. |
-| `GR7008` | A `@proves` test is gone and no other test proves that criterion, and `Removes:` does not name it. |
-| `GR7009` | A file in `Locked:` was changed, renamed or deleted. |
-| `GR7010` | A changed test has fewer assertions than at the base (`expect(`, `expect.soft(`, `assert(`, `assert.x(`, `.should(`; a warning). |
-| `GR7011` | A protected area changed and the task's `Touches:` does not name it. |
-| `GR7012` | A commit of `--commits` names no task (`T-12`), or a task that has no file. Merge commits are skipped. |
-| `GR7013` | `grimoire check` warns when the routes differ from the approved API (the guard raises `GR7011` for `public-api`). |
-| `GR3007`-`GR3010` | The code rules, on the lines the change adds. |
-| `GR4011`, `GR4012` | An added `.only` or `.skip` (both errors in the guard). |
-| `GR9008` | No task: pass one, name it in a commit, or have exactly one task `in progress`. |
-| `GR9009` | Git could not answer: run in a repository, pass a base that exists, fetch the full history in CI. |
+| Code               | What                                                                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GR7006`           | A changed file is outside the task: not owned by its feature (or `Features:`), not a file its flow reaches, not a test proving its criteria, not in `Files:`. |
+| `GR7007`           | A flow, criterion or case in `grimoire/features/` is gone and `Removes:` does not name it.                                                                    |
+| `GR7008`           | A `@proves` test is gone and no other test proves that criterion, and `Removes:` does not name it.                                                            |
+| `GR7009`           | A file in `Locked:` was changed, renamed or deleted.                                                                                                          |
+| `GR7010`           | A changed test has fewer assertions than at the base (`expect(`, `expect.soft(`, `assert(`, `assert.x(`, `.should(`; a warning).                              |
+| `GR7011`           | A protected area changed and the task's `Touches:` does not name it.                                                                                          |
+| `GR7012`           | A commit of `--commits` names no task (`T-12`), or a task that has no file. Merge commits are skipped.                                                        |
+| `GR7013`           | `grimoire check` warns when the routes differ from the approved API (the guard raises `GR7011` for `public-api`).                                             |
+| `GR3007`-`GR3010`  | The code rules, on the lines the change adds.                                                                                                                 |
+| `GR4011`, `GR4012` | An added `.only` or `.skip` (both errors in the guard).                                                                                                       |
+| `GR9008`           | No task: pass one, name it in a commit, or have exactly one task `in progress`.                                                                               |
+| `GR9009`           | Git could not answer: run in a repository, pass a base that exists, fetch the full history in CI.                                                             |
 
 It also prints the changes that are not approved (`not approved: <n> changes`, from the approved baseline and the screenshots). They do not fail the guard; list them in your report.
 
@@ -66,12 +66,12 @@ protected:
 
 `rules:` in `grimoire/settings.md` names the rules `grimoire check` runs on every file (`CODE_RULES`: `logical-css`, `specific-errors`, `type-discriminator`, `no-js-imports`). With no `rules:` key, `check` runs none and the guard runs all four on added lines; `rules: []` turns them off.
 
-| Rule | Code | Flags | Write instead |
-| --- | --- | --- | --- |
-| `logical-css` | `GR3007` | `margin-left`, `padding-right`, `left:`, `text-align: left`, `float: right`, `border-left`, Tailwind `ml-4` `pr-2` `left-0` `text-left` `rounded-l-lg` `border-r` (with variants and `-` prefixes), style keys `marginLeft`, `textAlign: "left"` | `margin-inline-start`, `inset-inline-start`, `text-align: start`, `ms-4`, `pe-2`, `start-0`, `text-start`, `rounded-s-lg` |
-| `specific-errors` | `GR3008` | a string that is only "Something went wrong", "An error occurred", "Unknown error", "حدث خطأ ما"…, in code and locale files (`error` and `oops` alone in locale values) | say what failed and what to do next, mapped from the error code |
-| `type-discriminator` | `GR3009` | `kind: "a"`, `kind?: "a" \| "b"` | `type: "a"` |
-| `no-js-imports` | `GR3010` | relative `import`/`export … from`/`import()` paths ending `.js`, `.jsx`, `.mjs`, `.cjs` | `./orders.service` |
+| Rule                 | Code     | Flags                                                                                                                                                                                                                                            | Write instead                                                                                                             |
+| -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `logical-css`        | `GR3007` | `margin-left`, `padding-right`, `left:`, `text-align: left`, `float: right`, `border-left`, Tailwind `ml-4` `pr-2` `left-0` `text-left` `rounded-l-lg` `border-r` (with variants and `-` prefixes), style keys `marginLeft`, `textAlign: "left"` | `margin-inline-start`, `inset-inline-start`, `text-align: start`, `ms-4`, `pe-2`, `start-0`, `text-start`, `rounded-s-lg` |
+| `specific-errors`    | `GR3008` | a string that is only "Something went wrong", "An error occurred", "Unknown error", "حدث خطأ ما"…, in code and locale files (`error` and `oops` alone in locale values)                                                                          | say what failed and what to do next, mapped from the error code                                                           |
+| `type-discriminator` | `GR3009` | `kind: "a"`, `kind?: "a" \| "b"`                                                                                                                                                                                                                 | `type: "a"`                                                                                                               |
+| `no-js-imports`      | `GR3010` | relative `import`/`export … from`/`import()` paths ending `.js`, `.jsx`, `.mjs`, `.cjs`                                                                                                                                                          | `./orders.service`                                                                                                        |
 
 Escape hatch, in a comment on the line or the line above, with a reason: `grimoire-allow logical-css: the code block reads left to right`. Spec files, `node_modules`, `dist` and `grimoire/` are skipped. The scanner reads text, not a syntax tree: JSX text with an apostrophe, regular expressions and your own assertion helpers are read loosely, and editors show no squiggles for these rules.
 

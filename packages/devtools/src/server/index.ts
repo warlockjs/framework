@@ -1,5 +1,6 @@
 import type { FastifyError, FastifyInstance } from "fastify";
 import { checkDevtoolsPanels } from "../panels";
+import { createErrorRef } from "../production/errors";
 import { processesDevtoolsPanel } from "../process-panel";
 import { registerAiReportRoutes } from "./ai-report-routes";
 import { registerAiRoutes } from "./ai-routes";
@@ -38,8 +39,18 @@ export function mountDevtoolsRoutes(server: FastifyInstance, deps: MountDevtools
     async (instance) => {
       registerDevtoolsGuard(instance, deps);
 
-      instance.setErrorHandler((error: FastifyError, _request, reply) => {
-        reply.code(error.statusCode ?? 500).send({ error: error.message });
+      instance.setErrorHandler((error: FastifyError, request, reply) => {
+        const status = error.statusCode ?? 500;
+
+        if (status < 500) return reply.code(status).send({ error: error.message });
+
+        // A failure of the server itself carries a short reference, written to the log, that the dashboard shows.
+        const ref = createErrorRef();
+
+        deps.warn?.(`Devtools error ${ref} on ${request.method} ${request.url}: ${error.message}`);
+        request.log.error({ ref, err: error }, "devtools error");
+
+        return reply.code(status).send({ error: error.message, ref });
       });
 
       registerUiAssets(instance);

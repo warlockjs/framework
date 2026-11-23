@@ -15,7 +15,12 @@ import { matchesAny } from "./glob";
 import { scopeFeatures, scopeFlows } from "./scope";
 
 const TEST_FILE = /(?:\.(?:test|spec|e2e)\.[cm]?[jt]sx?$|(?:^|\/)(?:tests?|e2e|__tests__)\/)/;
-const DEPENDENCY_SECTIONS = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
+const DEPENDENCY_SECTIONS = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "optionalDependencies",
+];
 
 /** Whether a path is a test file by name or folder. */
 export function isTestPath(file: string): boolean {
@@ -28,7 +33,9 @@ function at(file: string, line: number | null): { file: string; line: number; co
 
 /** The paths of a change: each file, and the old path of a rename. */
 function pathsOf(input: GuardInput): string[] {
-  return input.changed.flatMap((change) => (change.from === null ? [change.file] : [change.file, change.from]));
+  return input.changed.flatMap((change) =>
+    change.from === null ? [change.file] : [change.file, change.from],
+  );
 }
 
 /** Whether `removes` names this feature, flow, criterion or case (a wider entry covers what is inside it). */
@@ -85,7 +92,8 @@ function allowedFiles(input: GuardInput, scope: TaskScope): Set<string> {
     if (text.base === null || !text.base.includes("@proves")) continue;
 
     for (const proof of scanProofsInText(text.base, file).proofs) {
-      if (flows.length > 0 ? flows.includes(proof.ref) : features.includes(proof.feature)) allowed.add(file);
+      if (flows.length > 0 ? flows.includes(proof.ref) : features.includes(proof.feature))
+        allowed.add(file);
     }
   }
 
@@ -97,6 +105,9 @@ function inScope(file: string, scope: TaskScope, allowed: ReadonlySet<string>): 
     allowed.has(file) ||
     file.startsWith("grimoire/tasks/") ||
     file.startsWith("grimoire/releases/") ||
+    // Written only by approve and reject, which the guard reports on its own (the changes not approved).
+    file.startsWith("grimoire/approved/") ||
+    file.startsWith("grimoire/screenshots/approved/") ||
     scopeFeatures(scope).some((feature) => file.startsWith(`grimoire/features/${feature}/`)) ||
     matchesAny(file, scope.files)
   );
@@ -133,7 +144,13 @@ function removalFindings(input: GuardInput, scope: TaskScope): GrimoireFinding[]
 
   if (base === null) return findings;
 
-  const report = (message: string, file: string, line: number, feature: string, flow: string | null): void => {
+  const report = (
+    message: string,
+    file: string,
+    line: number,
+    feature: string,
+    flow: string | null,
+  ): void => {
     findings.push(
       createFinding({ code: "GR7007", message, at: at(file, line), task: scope.id, feature, flow }),
     );
@@ -161,7 +178,13 @@ function removalFindings(input: GuardInput, scope: TaskScope): GrimoireFinding[]
 
       if (next === undefined) {
         if (!isRemoved(scope, feature.id, flow.id.value)) {
-          report(`the change removes the flow ${JSON.stringify(flow.ref)}`, flow.file, 1, feature.id, flow.ref);
+          report(
+            `the change removes the flow ${JSON.stringify(flow.ref)}`,
+            flow.file,
+            1,
+            feature.id,
+            flow.ref,
+          );
         }
 
         continue;
@@ -272,7 +295,8 @@ function assertionFindings(input: GuardInput, scope: TaskScope | null): Grimoire
   const findings: GrimoireFinding[] = [];
 
   for (const [file, text] of Object.entries(input.texts)) {
-    if (text.base === null || text.current === null || !(tests.has(file) || isTestPath(file))) continue;
+    if (text.base === null || text.current === null || !(tests.has(file) || isTestPath(file)))
+      continue;
 
     const before = countAssertions(text.base);
     const after = countAssertions(text.current);
@@ -315,7 +339,10 @@ function dependencyChanges(before: string | null, after: string | null): string[
     if (typeof now !== "object" || now === null) continue;
 
     for (const [name, version] of Object.entries(now as Record<string, unknown>)) {
-      const old = typeof was === "object" && was !== null ? (was as Record<string, unknown>)[name] : undefined;
+      const old =
+        typeof was === "object" && was !== null
+          ? (was as Record<string, unknown>)[name]
+          : undefined;
 
       if (old !== version) changes.push(`${name}@${String(version)}`);
     }
@@ -354,7 +381,9 @@ function protectedFindings(input: GuardInput, scope: TaskScope): GrimoireFinding
     }
 
     for (const change of input.changed) {
-      const file = [change.file, change.from ?? ""].find((candidate) => candidate !== "" && matchesAny(candidate, area.globs));
+      const file = [change.file, change.from ?? ""].find(
+        (candidate) => candidate !== "" && matchesAny(candidate, area.globs),
+      );
 
       if (file === undefined) continue;
 
@@ -446,7 +475,13 @@ function commitFindings(input: GuardInput): GrimoireFinding[] {
   for (const commit of input.commits) {
     if (/^Merge (?:pull request|branch|remote-tracking branch)\b/.test(commit.subject)) continue;
 
-    const ids = [...new Set([...`${commit.subject}\n${commit.body}`.matchAll(/\bT-(\d+)\b/g)].map((match) => Number(match[1])))];
+    const ids = [
+      ...new Set(
+        [...`${commit.subject}\n${commit.body}`.matchAll(/\bT-(\d+)\b/g)].map((match) =>
+          Number(match[1]),
+        ),
+      ),
+    ];
     const label = `commit ${commit.sha.slice(0, 7)} ${JSON.stringify(commit.subject)}`;
 
     if (ids.length === 0) {
@@ -487,7 +522,11 @@ export function runGuardChecks(input: GuardInput): GrimoireFinding[] {
     );
   }
 
-  findings.push(...assertionFindings(input, scope), ...addedLineFindings(input, scope), ...commitFindings(input));
+  findings.push(
+    ...assertionFindings(input, scope),
+    ...addedLineFindings(input, scope),
+    ...commitFindings(input),
+  );
 
   return findings;
 }

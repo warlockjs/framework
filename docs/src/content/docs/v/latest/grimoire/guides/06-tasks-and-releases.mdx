@@ -11,8 +11,9 @@ import { Aside } from "@astrojs/starlight/components";
 </Aside>
 
 Tasks and releases are written by agents and committed with the code, because they are the history of the
-project. Warlock reads them and checks them. It never edits an agent-written file. The only text Warlock writes
-inside one is the collected list between the markers of a release file.
+project. Warlock reads them and checks them. It never edits an agent-written file, with two exceptions: the
+collected list between the markers of a release file, and `warlock grimoire release --stamp`, which stamps the
+feature changelogs and writes a missing release file only when you pass `--stamp` (see "Stamp from the release flow" below).
 
 ## Tasks
 
@@ -63,6 +64,7 @@ status: waiting for approval
   protected areas the task may change. `Removes:` names the flows, criteria and cases that may go
   (`<feature>/<flow>`, `<feature>/<flow> AC-3`, `<feature>/<flow> case duplicate`). See
   [Drift controls](/v/latest/grimoire/guides/11-drift-controls/).
+
 - A done task has `status: done` and `shipped: <feature> <version>` (`shipped: catalog 2.1`).
 
 ### Move a single tasks file to the folder

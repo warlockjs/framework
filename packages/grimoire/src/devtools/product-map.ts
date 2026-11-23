@@ -679,12 +679,12 @@ export function productFlow(
   };
 }
 
-/** A reference id: `AC-6`, `T-089`, `QA 1.5.6`. */
+/** A reference id: `AC-6`, `T-12`, `QA 1.5.6`. */
 const REFERENCE = /^(?:[A-Z]{1,5}-\d+|QA\s+\d[\w.-]*)$/;
 /** A trailing parenthesised group (optionally followed by one end mark) at the end of a sentence. */
 const TRAILING_GROUP = /\s*\(([^()]*)\)\s*([.!?]?)\s*$/;
 
-/** A sentence without the reference ids written in trailing parentheses: `"Fixed the total (AC-6, T-089)."` gives `"Fixed the total."`. */
+/** A sentence without the reference ids written in trailing parentheses: `"Fixed the total (AC-6, T-12)."` gives `"Fixed the total."`. */
 function withoutReferences(sentence: string): string {
   let text = sentence;
 

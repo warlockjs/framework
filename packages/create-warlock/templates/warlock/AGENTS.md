@@ -99,7 +99,7 @@ When you add or change behaviour, follow its sibling skills (`write-a-feature`, 
 
 ## Drift controls
 
-- Before you stop, run `npx warlock grimoire guard` and fix what it reports (the Claude Code `Stop` hook in `.claude/settings.json` runs it too). It checks the change against its task: files outside the task's features and `Files:` line, deleted `@proves` tests, removed criteria or cases, edited locked tests, protected areas, and the code rules on the lines you add.
+- Before you stop, run `npx warlock grimoire guard` and fix what it reports (the Claude Code `Stop` hook in `.claude/settings.json` runs it too). It checks the change against its task (the one you name, else the one task `in progress`): files outside the task's features and `Files:` line, deleted `@proves` tests, removed criteria or cases, edited locked tests, protected areas, and the code rules on the lines you add. With no task to read, the hook lets you stop and only notes it, so set your task's status to `in progress` first. When the hook stopped you once and you still cannot fix a finding, it lets you stop the second time; say in your report what is left.
 - A task body can carry `Files:`, `Features:`, `Locked:`, `Touches:` and `Removes:` lines. Never edit a file named in `Locked:`: change the code, not the test. Ask the owner when the test itself looks wrong.
 - Protected areas (migrations, auth, config, lockfile, new dependencies, the public API) change only when the task names them in `Touches:`. Approve a deliberate API change with `npx warlock grimoire approve api`.
 - Never add `.only` or `.skip` to a test, and never delete an assertion to make a test pass.

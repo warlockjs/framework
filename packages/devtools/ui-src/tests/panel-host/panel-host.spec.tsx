@@ -119,6 +119,10 @@ describe("PanelHost", () => {
       "api/book/read": { body: { ok: true } },
       "POST api/book/write": { body: { saved: 1 } },
       "POST api/book/bad": { status: 422, body: { error: "The flow name is empty. Type a name." } },
+      "POST api/book/broken": {
+        status: 500,
+        body: { error: "The book file is read-only.", ref: "K7P2QX9M" },
+      },
       "DELETE api/book/gone": { status: 204 },
     });
     let seen: LegacyPanelContext | undefined;
@@ -133,6 +137,15 @@ describe("PanelHost", () => {
     await expect(seen?.api("bad", { method: "POST" })).rejects.toThrow(
       "The flow name is empty. Type a name.",
     );
+    await expect(seen?.api("broken", { method: "POST" })).rejects.toMatchObject({
+      message: "The book file is read-only.",
+      status: 500,
+      ref: "K7P2QX9M",
+    });
+    await expect(seen?.api("bad", { method: "POST" })).rejects.toMatchObject({
+      status: 422,
+      ref: null,
+    });
     await expect(seen?.api("gone", { method: "DELETE" })).resolves.toBeUndefined();
 
     const header = (method: string) =>

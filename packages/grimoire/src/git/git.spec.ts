@@ -32,7 +32,11 @@ function repo(): string {
   git(root, "config", "commit.gpgsign", "false");
   write(root, "a.ts", "one\ntwo\nthree\n");
   write(root, "b.ts", "keep\n");
-  write(root, "c.ts", "this file will be renamed with all its content kept the same\nline 2\nline 3\n");
+  write(
+    root,
+    "c.ts",
+    "this file will be renamed with all its content kept the same\nline 2\nline 3\n",
+  );
   write(root, "d/e.ts", "x\n");
   git(root, "add", ".");
   git(root, "commit", "-q", "-m", "first T-1");
@@ -73,6 +77,19 @@ describe("changedFiles", () => {
     git(root, "commit", "-q", "-am", "second T-1");
 
     expect(await changedFiles(root, base)).toEqual([
+      { file: "b.ts", status: "modified", from: null, addedLines: [2] },
+    ]);
+  });
+
+  it("reads an added line that starts with ++ as a line, not as a file header", async () => {
+    const root = repo();
+    const base = git(root, "rev-parse", "HEAD");
+
+    write(root, "a.ts", "one\n++ counter\nthree\n");
+    write(root, "b.ts", "keep\nmore\n");
+
+    expect(await changedFiles(root, base)).toEqual([
+      { file: "a.ts", status: "modified", from: null, addedLines: [2] },
       { file: "b.ts", status: "modified", from: null, addedLines: [2] },
     ]);
   });

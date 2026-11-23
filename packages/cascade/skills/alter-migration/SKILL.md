@@ -288,6 +288,8 @@ export default Migration.alter(
 );
 ```
 
+`options.weights` ranks columns by driver (`FullTextIndexWeight`): PostgreSQL takes the `setweight` letters, `{ title: "A", body: "B" }` (`"A"` ranks highest, the default); MongoDB takes whole numbers from 1 to 99999, `{ title: 10, body: 1 }`. A weight of the other form throws when the migration runs.
+
 ### Geo-spatial — `addGeoIndex` / `dropGeoIndex`
 
 ```ts

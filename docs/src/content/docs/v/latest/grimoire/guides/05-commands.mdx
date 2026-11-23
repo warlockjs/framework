@@ -183,13 +183,13 @@ warlock grimoire guard --hook         # for an agent's Stop hook
 warlock grimoire guard --json
 ```
 
-| Option                | What                                                                                                                                                      |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `[task]`              | The task id. Without it the guard uses the tasks named in the commits of `--commits`, then the one task whose status is `in progress`, else `GR9008`.     |
-| `--base <ref>`        | The ref the change is compared with. Default: the point where `HEAD` left the default branch (`origin/HEAD`, then `main`, then `master`), else `HEAD`.     |
-| `--commits <range>`   | A commit range (`origin/main..HEAD`). Every commit must name a task id (`T-12`) that has a file (`GR7012`); the tasks the commits name are guarded.        |
-| `--hook`              | Agent-hook mode: everything goes to stderr, exit code 2 on an error, 0 otherwise, also when no task or no git repository is found.                        |
-| `--json`              | Print the report as JSON.                                                                                                                                 |
+| Option              | What                                                                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[task]`            | The task id. Without it the guard uses the tasks named in the commits of `--commits`, then the one task whose status is `in progress`, else `GR9008`.                                                               |
+| `--base <ref>`      | The ref the change is compared with. Default: the point where `HEAD` left the default branch (`origin/HEAD`, then `main`, then `master`), else `HEAD`.                                                              |
+| `--commits <range>` | A commit range (`origin/main..HEAD`). Every commit must name a task id (`T-12`) that has a file (`GR7012`); the tasks the commits name are guarded.                                                                 |
+| `--hook`            | Agent-hook mode: everything goes to stderr, exit code 2 on an error, 0 otherwise, also when no task or no git repository is found and when the hook input says the agent already went on once (`stop_hook_active`). |
+| `--json`            | Print the report as JSON.                                                                                                                                                                                           |
 
 The change is every file that differs between the base and the working tree: committed, staged, unstaged and
 untracked (not ignored). The guard never boots the app and reads the route facts of the last build.
@@ -208,8 +208,20 @@ Exit codes: `0` no error, `1` at least one error, `2` an error in `--hook` mode.
   "schemaVersion": 1,
   "task": "T-20",
   "base": "9f1c2e…",
-  "changed": [{ "file": "src/app/orders/utils/extra.ts", "status": "added", "from": null, "addedLines": [1] }],
-  "findings": [{ "code": "GR7006", "severity": "error", "message": "…", "at": { "file": "…", "line": 1, "column": null }, "expected": false, "subject": { "feature": null, "flow": null, "app": null, "task": "T-20", "file": "…" }, "hint": "…" }],
+  "changed": [
+    { "file": "src/app/orders/utils/extra.ts", "status": "added", "from": null, "addedLines": [1] }
+  ],
+  "findings": [
+    {
+      "code": "GR7006",
+      "severity": "error",
+      "message": "…",
+      "at": { "file": "…", "line": 1, "column": null },
+      "expected": false,
+      "subject": { "feature": null, "flow": null, "app": null, "task": "T-20", "file": "…" },
+      "hint": "…"
+    }
+  ],
   "notApproved": [],
   "counts": { "errors": 1, "warnings": 0, "expected": 0 },
   "ok": false

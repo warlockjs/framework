@@ -22,6 +22,9 @@ export function checkShows(snapshot: GrimoireSnapshot): GrimoireFinding[] {
       capture,
     ]),
   );
+  const approved = new Set(
+    (shots.baseline?.shots ?? []).map((shot) => `${shot.ref} ${shot.criterion} ${shot.language}`),
+  );
   const seen = new Set<string>();
 
   for (const line of shots.shows) {
@@ -41,6 +44,9 @@ export function checkShows(snapshot: GrimoireSnapshot): GrimoireFinding[] {
 
       if (capture === undefined) {
         if (shots.mode === "off" || optedOut.has(line.ref)) continue;
+
+        // In `changed` mode only touched flows are captured: an approved image still stands for the others.
+        if (shots.mode !== "all" && approved.has(`${key} ${language}`)) continue;
 
         findings.push(
           createFinding({

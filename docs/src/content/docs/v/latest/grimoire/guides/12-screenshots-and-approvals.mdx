@@ -21,11 +21,11 @@ accepts or refuses it.
 the screenshot mode. Without a `languages` key the Warlock adapter reads `app.localeCodes` from `src/config/app.ts`
 without booting the app. An app with no languages has one unnamed language, and its files drop the `.<language>` part.
 
-| Mode      | What runs                                                                                    |
-| --------- | -------------------------------------------------------------------------------------------- |
-| `changed` | the scenes of the features the change touches (the default)                                  |
-| `all`     | every scene; use it before a release: `GRIMOIRE_SHOTS=all npx warlock e2e`                   |
-| `off`     | no scene runs and nothing is captured                                                        |
+| Mode      | What runs                                                                  |
+| --------- | -------------------------------------------------------------------------- |
+| `changed` | the scenes of the features the change touches (the default)                |
+| `all`     | every scene; use it before a release: `GRIMOIRE_SHOTS=all npx warlock e2e` |
+| `off`     | no scene runs and nothing is captured                                      |
 
 `GRIMOIRE_SHOTS` overrides the setting for one run. In `changed` mode the touched features are the owners of the files
 that differ from the base (committed since the base, staged, unstaged and untracked) plus the features whose
@@ -39,7 +39,7 @@ import { defineE2E } from "@warlock.js/core/e2e";
 import { shows } from "@warlock.js/grimoire/warlock";
 
 export default defineE2E({
-  app: { /* … */ },
+  app: {/* … */},
   run: async (context) => {
     // @shows contact/send-message AC-3
     await shows(context, "contact/send-message AC-3", async ({ page, language, path }) => {
@@ -81,13 +81,13 @@ exists there is no drift and the Bird view shows "not approved yet" with one "Ap
 `warlock grimoire approve --all` creates it. It is written only by `approve` and `reject` (and the tab's buttons),
 never by an agent.
 
-| Change                         | Id                                                       |
-| ------------------------------ | -------------------------------------------------------- |
-| `shot-changed`                 | `shot-changed:<feature>/<flow>:<AC-n>:<language>`        |
-| `shot-added`, `shot-removed`   | the same, with their type                                |
-| `flow-added`, `flow-removed`   | `flow-added:<feature>/<flow>`                            |
-| `criterion-added`, `criterion-removed`, `criterion-changed`, `proof-removed` | `<type>:<feature>/<flow>:<AC-n>` |
-| `case-added`, `case-removed`   | `<type>:<feature>/<flow>:<case question>`                |
+| Change                                                                       | Id                                                |
+| ---------------------------------------------------------------------------- | ------------------------------------------------- |
+| `shot-changed`                                                               | `shot-changed:<feature>/<flow>:<AC-n>:<language>` |
+| `shot-added`, `shot-removed`                                                 | the same, with their type                         |
+| `flow-added`, `flow-removed`                                                 | `flow-added:<feature>/<flow>`                     |
+| `criterion-added`, `criterion-removed`, `criterion-changed`, `proof-removed` | `<type>:<feature>/<flow>:<AC-n>`                  |
+| `case-added`, `case-removed`                                                 | `<type>:<feature>/<flow>:<case question>`         |
 
 An image is changed when its size differs, or when more than 0.1% of its pixels differ by more than 16 in any colour
 channel. `proof-removed` is a criterion that no `@proves` line names any more.
@@ -102,7 +102,9 @@ npx warlock grimoire reject <id> --note "why"
 ```
 
 In the tab, the buttons call `POST /approve` and `POST /reject` with `{ ids, language?, note? }` (`ids` are change ids,
-`<feature>/<flow>` targets, or `"all"`). Both routes work only in development and never through a share link.
+`<feature>/<flow>` targets, or `"all"`; `"--all"` is read the same). Both routes work only in development and never
+through a share link. A failure stays in the open panel with what failed, the status and, for a server failure, a
+reference that is also in the dev server's log.
 
 Approving updates the baseline and copies the capture into `grimoire/screenshots/approved/` (or deletes the approved
 image of a removed shot) and clears any rejection of the same change. Rejecting records the change and the note; while
@@ -110,15 +112,15 @@ the change is still there it stays an error.
 
 ## Check
 
-| Code                                                    | Severity | Meaning                                                                      |
-| ------------------------------------------------------- | -------- | ---------------------------------------------------------------------------- |
-| [`GR4013`](/v/latest/grimoire/guides/04-check/#gr4013)  | error    | a `@shows` line is not directly above a matching `shows()` call              |
-| [`GR4014`](/v/latest/grimoire/guides/04-check/#gr4014)  | error    | a `@shows` line names a flow or criterion that does not exist                |
-| [`GR4015`](/v/latest/grimoire/guides/04-check/#gr4015)  | warning  | a shown criterion has no capture in a language (not when the mode is `off` or the flow opted out) |
-| [`GR4016`](/v/latest/grimoire/guides/04-check/#gr4016)  | error    | a shown criterion failed in a language                                       |
-| [`GR4017`](/v/latest/grimoire/guides/04-check/#gr4017)  | warning  | a capture differs from the approved image, or has none yet                   |
-| [`GR4018`](/v/latest/grimoire/guides/04-check/#gr4018)  | warning  | a flow, criterion, case or proving test changed since the approval           |
-| [`GR4019`](/v/latest/grimoire/guides/04-check/#gr4019)  | error    | a change the owner rejected is still there                                   |
+| Code                                                   | Severity | Meaning                                                                                           |
+| ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------- |
+| [`GR4013`](/v/latest/grimoire/guides/04-check/#gr4013) | error    | a `@shows` line is not directly above a matching `shows()` call                                   |
+| [`GR4014`](/v/latest/grimoire/guides/04-check/#gr4014) | error    | a `@shows` line names a flow or criterion that does not exist                                     |
+| [`GR4015`](/v/latest/grimoire/guides/04-check/#gr4015) | warning  | a shown criterion has no capture in a language (not when the mode is `off` or the flow opted out) |
+| [`GR4016`](/v/latest/grimoire/guides/04-check/#gr4016) | error    | a shown criterion failed in a language                                                            |
+| [`GR4017`](/v/latest/grimoire/guides/04-check/#gr4017) | warning  | a capture differs from the approved image, or has none yet                                        |
+| [`GR4018`](/v/latest/grimoire/guides/04-check/#gr4018) | warning  | a flow, criterion, case or proving test changed since the approval                                |
+| [`GR4019`](/v/latest/grimoire/guides/04-check/#gr4019) | error    | a change the owner rejected is still there                                                        |
 
 An app with no `@shows` line pays nothing: no scene, no capture and no finding. Images you attach by hand to a
 written file (`![alt](path)`) are unrelated and keep working.

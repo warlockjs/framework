@@ -63,6 +63,9 @@ describe("worker test server", () => {
     worker.enableWorkerTestServer(undefined);
     await worker.resolveTestServerUrl();
     await worker.closeWorkerTestServer();
+    // A request after the teardown starts nothing until the next file's setupTest().
+    expect(worker.usesWorkerTestServer()).toBe(false);
+    worker.enableWorkerTestServer(undefined);
     await worker.resolveTestServerUrl();
 
     expect(created).toHaveLength(2);

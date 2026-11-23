@@ -2252,7 +2252,7 @@ describe("grimoire view: bird view", () => {
 
     approveAll?.fire("click");
     await vi.waitFor(() => expect(refresh).toHaveBeenCalled());
-    expect(posts).toEqual([{ path: "approve", body: { ids: ["--all"] } }]);
+    expect(posts).toEqual([{ path: "approve", body: { ids: ["all"] } }]);
   });
 
   it("says when screenshots are off", async () => {
@@ -2335,7 +2335,10 @@ describe("grimoire view: bird view", () => {
   });
 
   it("keeps the panel open and says what failed and what to do when approving fails", async () => {
-    const failure = Object.assign(new Error("The baseline file is read-only"), { status: 500 });
+    const failure = Object.assign(new Error("The baseline file is read-only"), {
+      status: 500,
+      ref: "K7P2QX9M",
+    });
     const { view, refresh } = await renderBird(matrixAnswer(), "bird-view", {
       failing: { approve: failure },
     });
@@ -2349,6 +2352,7 @@ describe("grimoire view: bird view", () => {
     dialog.findAll((node) => node.tag === "button" && node.text === "Approve")[0]?.fire("click");
     await vi.waitFor(() => expect(dialog.text).toContain("Could not approve"));
     expect(dialog.text).toContain("The baseline file is read-only");
+    expect(dialog.text).toContain("(status 500, reference K7P2QX9M)");
     expect(dialog.text).toContain("Nothing was changed");
     expect(dialog.attributes.open).toBe("");
     expect(refresh).not.toHaveBeenCalled();

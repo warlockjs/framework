@@ -42,6 +42,8 @@ type Inputs = {
   shots: ShotsState | null;
   captured: Map<string, NonNullable<ShotsState["captures"]>["captures"][number]>;
   approved: Map<string, string>;
+  /** The screenshot mode of this run (`changed`, `all` or `off`). */
+  mode: string;
   driftOf: (ref: string, criterion: string | null, language: string | null) => DriftItem[];
 };
 
@@ -68,6 +70,7 @@ function inputsOf(snapshot: GrimoireSnapshot): Inputs {
     shots,
     captured,
     approved,
+    mode: shots?.mode ?? settings.screenshots,
     // A drift item without a language (a changed criterion text, a removed proof) concerns every language of the criterion.
     driftOf: (ref, criterion, language) =>
       drift.filter(
@@ -104,10 +107,12 @@ function cellOf(inputs: Inputs, input: CellInput): MatrixCell {
   const approvedFile = inputs.approved.get(key) ?? null;
   const items = inputs.driftOf(ref, criterion, language);
   const baseline = inputs.shots?.baseline ?? null;
+  // In `changed` mode only touched flows are captured: with no capture, an approved image still stands.
+  const standing = capture === null && approvedFile !== null && inputs.mode !== "all";
   const shown: MatrixCell["shown"] =
     input.shows || (input.removed && approvedFile !== null)
       ? {
-          outcome: capture?.outcome ?? "not-run",
+          outcome: capture?.outcome ?? (standing && !input.removed ? "pass" : "not-run"),
           shot: capture?.file ?? null,
           approved: approvedFile,
           ranAt: capture?.ranAt ?? null,
@@ -207,7 +212,8 @@ function flowRow(snapshot: GrimoireSnapshot, inputs: Inputs, flow: WrittenFlow):
             criterion: criterion.id,
             language,
             test: status.get(criterion.id) ?? "no-test",
-            shows: shows.has(criterion.id),
+            // A flow with no screenshots (opted out, or the mode is off) never waits for a capture.
+            shows: !optedOut && inputs.mode !== "off" && shows.has(criterion.id),
             removed: false,
           }),
         ),
@@ -259,6 +265,16 @@ function removedFlows(
       features.push(feature);
     }
 
+    const flowDrift = inputs.driftOf(approved.ref, null, null).map((item) => item.id);
+    // The flow's removal is the change each of its cells stands for: approving a cell approves the removal.
+    const criteria = removedCriteria(inputs, approved.ref, approved, new Set()).map((row) => ({
+      ...row,
+      cells: row.cells.map((cell) => ({
+        ...cell,
+        drift: [...new Set([...flowDrift, ...cell.drift])],
+      })),
+    }));
+
     feature.flows.push({
       ref: approved.ref,
       id: flowId,
@@ -267,8 +283,8 @@ function removedFlows(
       differsIn: [],
       screenshots: true,
       removed: true,
-      criteria: removedCriteria(inputs, approved.ref, approved, new Set()),
-      drift: inputs.driftOf(approved.ref, null, null).map((item) => item.id),
+      criteria,
+      drift: flowDrift,
     });
   }
 }

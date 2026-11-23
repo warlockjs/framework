@@ -23,6 +23,7 @@ import type {
 import type { MigrationDefaults, UuidStrategy } from "../../types";
 import type { PostgresDriver } from "./postgres-driver";
 import { safeTextSearchConfig } from "./postgres-dialect";
+import { fullTextIndexWeight } from "./postgres-full-text-weight";
 import { rawDefaultSql } from "../../migration/raw-default";
 import {
   postgresTTLPurgeComment,
@@ -568,13 +569,10 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
     const quotedTable = this.driver.dialect.quoteIdentifier(table);
     const indexName = options?.name ?? `idx_${table}_fulltext_${columns.join("_")}`;
     const quotedIndexName = this.driver.dialect.quoteIdentifier(indexName);
-    const language = safeTextSearchConfig(
-      options?.language,
-      this.driver.dialect.textSearchConfig,
-    );
+    const language = safeTextSearchConfig(options?.language, this.driver.dialect.textSearchConfig);
 
     const tsvectors = columns.map((col) => {
-      const weight = options?.weights?.[col] ?? "A";
+      const weight = fullTextIndexWeight(options?.weights, col);
       return `setweight(to_tsvector('${language}', COALESCE(${this.driver.dialect.quoteIdentifier(col)}, '')), '${weight}')`;
     });
 

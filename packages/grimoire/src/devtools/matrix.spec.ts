@@ -318,6 +318,10 @@ describe("the bird-view matrix", () => {
       drift: ["flow-removed:billing/invoice"],
     });
     expect(billing?.flows[0]?.criteria[0]?.cells[0]?.state).toBe("changed");
+    // The cell's panel lists the removal, so it can be approved from there.
+    expect(billing?.flows[0]?.criteria[0]?.cells[0]?.drift).toEqual([
+      "flow-removed:billing/invoice",
+    ]);
   });
 
   it("keeps the drift of a flow itself on the flow row", () => {
@@ -367,6 +371,55 @@ describe("the bird-view matrix", () => {
       ).features[0]?.flows[0]?.screenshots,
     ).toBe(false);
     expect(matrix(project([contact()])).features[0]?.flows[0]?.screenshots).toBe(true);
+  });
+
+  it("never waits for a capture of a flow without screenshots (opted out, or the mode is off)", () => {
+    const shows = [showsLine("contact/send-message", "AC-1")];
+    const statuses = { "contact/send-message AC-1": "pass" as const };
+    const cells = (shots: ShotsState) =>
+      matrix(project([contact()], statuses, { settings: settings(["en"]), shots })).features[0]
+        ?.flows[0]?.criteria[0]?.cells;
+
+    expect(cells(shotsState({ shows }))?.[0]?.state).toBe("not-run");
+    expect(cells(shotsState({ shows, optedOut: ["contact/send-message"] }))?.[0]).toMatchObject({
+      shown: null,
+      state: "pass",
+    });
+    expect(cells(shotsState({ shows, mode: "off" }))?.[0]).toMatchObject({
+      shown: null,
+      state: "pass",
+    });
+  });
+
+  it("keeps an approved image standing when changed mode did not capture the flow", () => {
+    const shows = [showsLine("contact/send-message", "AC-1")];
+    const approvedShot = {
+      ref: "contact/send-message",
+      criterion: "AC-1",
+      language: "en",
+      file: "approved/contact/send-message/AC-1.en.png",
+      sha256: "abc",
+      approvedAt: "2026-11-20T10:00:00.000Z",
+    };
+    const flows = baseline([], [approvedShot]);
+    const cell = (mode: "changed" | "all") =>
+      matrix(
+        project(
+          [contact()],
+          { "contact/send-message AC-1": "pass" },
+          {
+            settings: settings(["en"]),
+            shots: shotsState({ shows, mode, baseline: { ...flows, flows: [] } }),
+          },
+        ),
+      ).features[0]?.flows[0]?.criteria[0]?.cells[0];
+
+    expect(cell("changed")?.shown).toMatchObject({
+      outcome: "pass",
+      shot: null,
+      approved: approvedShot.file,
+    });
+    expect(cell("all")?.shown?.outcome).toBe("not-run");
   });
 
   it("takes the mode of the screenshots state, else of the settings", () => {

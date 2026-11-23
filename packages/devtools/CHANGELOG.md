@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- In development, a dashboard or panel route that fails on the server answers its message with a short `ref`, written to the log with the failure, and a package panel's `ctx.api` rejects with `status` and `ref` (the server's reference, else the `x-request-id` header) so the panel can show the reference to quote.
 - A closed production monitor URL hit with a request body (`POST`, `PUT`, `PATCH`, `DELETE`) is answered after the body is read, like an unknown URL: a malformed or oversized body gets the app's own `400` or `413`, not a `404` that only a dashboard path gave.
 
 ## 5.62.0 - 2026-11-20

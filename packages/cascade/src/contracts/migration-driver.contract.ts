@@ -144,9 +144,16 @@ export type FullTextIndexOptions = {
   readonly name?: string;
   /** Language for text analysis */
   readonly language?: string;
-  /** Field weights for relevance scoring */
-  readonly weights?: Record<string, number>;
+  /**
+   * Field weights for relevance scoring, by column. PostgreSQL takes the
+   * `setweight` letters `"A"` (ranks highest) to `"D"`, default `"A"`; MongoDB
+   * takes numbers (1 to 99999, default 1). Each driver refuses the other's form.
+   */
+  readonly weights?: Record<string, FullTextIndexWeight>;
 };
+
+/** A full-text index weight: a PostgreSQL `setweight` letter or a MongoDB number. */
+export type FullTextIndexWeight = "A" | "B" | "C" | "D" | number;
 
 /**
  * Geo-spatial index options.

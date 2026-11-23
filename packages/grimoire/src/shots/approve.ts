@@ -17,7 +17,7 @@ import type {
 import { criterionShotName, GRIMOIRE_PATHS } from "../paths";
 import { currentFlows } from "./drift";
 import { optedOutFlows } from "./state";
-import { writeBaseline } from "./store";
+import { readBaseline, writeBaseline } from "./store";
 
 /** What to approve or reject. */
 export type ApprovalRequest = {
@@ -31,7 +31,22 @@ export type ApprovalRequest = {
 
 const FLOW_REF = /^[a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+/**
+ * A path under `grimoire/screenshots/`. The parts come from the baseline and
+ * the capture index (files in the project), so a part that is empty, `.` or
+ * `..`, or holds a separator, is refused: approving never reads, copies or
+ * deletes a file outside that folder.
+ */
 function shotsRoot(root: string, ...parts: string[]): string {
+  for (const part of parts) {
+    if (part === "" || part === "." || part === ".." || /[\\/:]/.test(part)) {
+      throw new GrimoireError(
+        "GR9010",
+        `The screenshot path ${JSON.stringify(parts.join("/"))} is not a path under ${GRIMOIRE_PATHS.screenshots}; correct ${GRIMOIRE_PATHS.baseline} or run the browser tests again.`,
+      );
+    }
+  }
+
   return path.join(root, ...GRIMOIRE_PATHS.screenshots.split("/"), ...parts);
 }
 
@@ -48,14 +63,19 @@ export function selectDrift(snapshot: GrimoireSnapshot, request: ApprovalRequest
   const chosen = new Map<string, DriftItem>();
 
   if (request.targets.length === 0) {
-    throw new GrimoireError("GR9010", "Name what to approve: a change id, a <feature>/<flow>, or --all.");
+    throw new GrimoireError(
+      "GR9010",
+      "Name what to approve: a change id, a <feature>/<flow>, or --all.",
+    );
   }
 
   for (const target of request.targets) {
     const matches =
       target === "all"
         ? drift
-        : drift.filter((entry) => entry.id === target || (FLOW_REF.test(target) && entry.ref === target));
+        : drift.filter(
+            (entry) => entry.id === target || (FLOW_REF.test(target) && entry.ref === target),
+          );
     const narrowed =
       request.language === undefined
         ? matches
@@ -103,7 +123,14 @@ async function baselineFromCurrent(
       !optedOut.has(capture.ref)
     ) {
       baseline.shots.push(
-        await approveImage(root, capture.ref, capture.criterion, capture.language, capture.file, now),
+        await approveImage(
+          root,
+          capture.ref,
+          capture.criterion,
+          capture.language,
+          capture.file,
+          now,
+        ),
       );
     }
   }
@@ -180,11 +207,15 @@ export async function approveItems(
   options: { createWhenMissing?: boolean } = {},
 ): Promise<string[]> {
   const root = snapshot.root;
-  const existing = snapshot.shots?.baseline ?? null;
+  // Read from disk: the panel's snapshot may be a moment old, and an approval made since must not be lost.
+  const existing = (await readBaseline(root)) ?? snapshot.shots?.baseline ?? null;
 
   if (existing === null) {
     if (options.createWhenMissing !== true) {
-      throw new GrimoireError("GR9010", "Nothing is approved yet; approve everything first (--all).");
+      throw new GrimoireError(
+        "GR9010",
+        "Nothing is approved yet; approve everything first (--all).",
+      );
     }
 
     await writeBaseline(root, await baselineFromCurrent(root, snapshot, now));
@@ -213,7 +244,10 @@ export async function approveItems(
         const capture = captures.get(`${item.ref} ${item.criterion} ${item.language}`);
 
         if (capture?.file == null) {
-          throw new GrimoireError("GR9010", `The capture for ${item.id} is missing; run the browser tests again.`);
+          throw new GrimoireError(
+            "GR9010",
+            `The capture for ${item.id} is missing; run the browser tests again.`,
+          );
         }
 
         const shot = await approveImage(
@@ -228,7 +262,11 @@ export async function approveItems(
         baseline.shots = [
           ...baseline.shots.filter(
             (entry) =>
-              !(entry.ref === shot.ref && entry.criterion === shot.criterion && entry.language === shot.language),
+              !(
+                entry.ref === shot.ref &&
+                entry.criterion === shot.criterion &&
+                entry.language === shot.language
+              ),
           ),
           shot,
         ];
@@ -241,7 +279,11 @@ export async function approveItems(
 
         baseline.shots = baseline.shots.filter(
           (entry) =>
-            !(entry.ref === item.ref && entry.criterion === item.criterion && entry.language === item.language),
+            !(
+              entry.ref === item.ref &&
+              entry.criterion === item.criterion &&
+              entry.language === item.language
+            ),
         );
         break;
       case "flow-added":
@@ -268,7 +310,9 @@ export async function approveItems(
       }
       case "criterion-removed":
         if (approvedFlow) {
-          approvedFlow.criteria = approvedFlow.criteria.filter((entry) => entry.id !== item.criterion);
+          approvedFlow.criteria = approvedFlow.criteria.filter(
+            (entry) => entry.id !== item.criterion,
+          );
         }
         break;
       case "case-added":
@@ -280,7 +324,8 @@ export async function approveItems(
         }
         break;
       case "case-removed":
-        if (approvedFlow) approvedFlow.cases = approvedFlow.cases.filter((entry) => entry !== item.case);
+        if (approvedFlow)
+          approvedFlow.cases = approvedFlow.cases.filter((entry) => entry !== item.case);
         break;
       case "proof-removed":
         removedProofs.add(`${item.ref} ${item.criterion}`);
@@ -317,7 +362,7 @@ export async function rejectItems(
   note: string | null,
   now = new Date().toISOString(),
 ): Promise<string[]> {
-  const existing = snapshot.shots?.baseline ?? null;
+  const existing = (await readBaseline(snapshot.root)) ?? snapshot.shots?.baseline ?? null;
 
   if (existing === null) {
     throw new GrimoireError("GR9010", "Nothing is approved yet, so there is no change to reject.");

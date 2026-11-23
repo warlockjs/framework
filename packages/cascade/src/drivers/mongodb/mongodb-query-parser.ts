@@ -1171,16 +1171,6 @@ export class MongoQueryParser {
       case "orWhereFullText":
         return { $text: { $search: op.data.query } };
 
-      case "whereSearch":
-        return {
-          [op.data.field]: {
-            // Search text is the most user-facing input in the whole API —
-            // always a literal, never a pattern.
-            $regex: escapeRegex(String(op.data.query)),
-            $options: "i",
-          },
-        };
-
       case "where:not":
       case "orWhere:not": {
         const nestedNot = this.buildCallbackCondition(op.data.callback);

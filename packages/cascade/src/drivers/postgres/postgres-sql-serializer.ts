@@ -1,5 +1,6 @@
 import type { SqlDialectContract } from "../sql/sql-dialect.contract";
 import { safeTextSearchConfig } from "./postgres-dialect";
+import { fullTextIndexWeight } from "./postgres-full-text-weight";
 import type { PendingOperation } from "../../migration/migration";
 import { SQLSerializer } from "../../migration/sql-serializer";
 import { rawDefaultSql } from "../../migration/raw-default";
@@ -388,7 +389,7 @@ export class PostgresSQLSerializer extends SQLSerializer {
     const language = safeTextSearchConfig(options?.language, this.dialect.textSearchConfig);
 
     const tsvectors = columns.map((col) => {
-      const weight = options?.weights?.[col] ?? "A";
+      const weight = fullTextIndexWeight(options?.weights, col);
       return `setweight(to_tsvector('${language}', COALESCE(${this.dialect.quoteIdentifier(col)}, '')), '${weight}')`;
     });
 

@@ -49,12 +49,14 @@ export function usesWorkerTestServer(): boolean {
 export async function resolveTestServerUrl(): Promise<string> {
   if (!usesWorkerTestServer()) return getTestServerUrl();
 
-  current ??= startWorkerServer();
+  const starting = (current ??= startWorkerServer());
 
   try {
-    return (await current).url;
+    return (await starting).url;
   } catch (error) {
-    current = undefined;
+    // Only the failed start is forgotten: a newer one started meanwhile stays.
+    if (current === starting) current = undefined;
+
     throw error;
   }
 }
@@ -82,6 +84,8 @@ async function startWorkerServer(): Promise<TestHttpServer> {
 export async function closeWorkerTestServer(): Promise<void> {
   const running = current;
 
+  // The runtime is gone: a late request (an `afterAll` after the teardown) must not start a server nobody closes.
+  enabled = false;
   current = undefined;
 
   if (!running) return;

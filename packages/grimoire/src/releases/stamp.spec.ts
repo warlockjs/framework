@@ -213,6 +213,50 @@ describe("planStamp", () => {
     );
   });
 
+  it("moves every unreleased line, ### subheadings included, and finds a heading with extra spaces", () => {
+    const text = [
+      "## Unreleased",
+      "### Fixed",
+      "- 2.2  fixed  late fix",
+      "### Added",
+      "- 2.3  added  late entry",
+      "",
+      "##  1.4.0  (2026-11-24)",
+      "- 2.1  added  earlier entry",
+      "",
+    ].join("\n");
+    const plan = planStamp({
+      version: "1.4.0",
+      date: "2026-11-24",
+      written: written([
+        feature(
+          "catalog",
+          "Catalog",
+          [
+            { release: null, date: null },
+            { release: "1.4.0", date: "2026-11-24" },
+          ],
+          2,
+        ),
+      ]),
+      texts: { "grimoire/features/catalog/CHANGELOG.md": text },
+    });
+
+    expect(plan.changelogs[0]?.text).toBe(
+      [
+        "## Unreleased",
+        "",
+        "##  1.4.0  (2026-11-24)",
+        "### Fixed",
+        "- 2.2  fixed  late fix",
+        "### Added",
+        "- 2.3  added  late entry",
+        "- 2.1  added  earlier entry",
+        "",
+      ].join("\n"),
+    );
+  });
+
   it("stamps nothing and still plans the release file when no changelog has unreleased entries", () => {
     const plan = planStamp({
       version: "1.4.0",

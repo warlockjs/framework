@@ -14,16 +14,16 @@ As a project ages, agents remove, change or add things nobody asked for: a delet
 file in another module, a physical `ml-4` after the owner said logical CSS only. Prose rules in `AGENTS.md` are read
 once. The drift controls turn the rules that keep being repeated into checks that run on every change.
 
-| Control                  | What it does                                                                                      | Where it runs                          |
-| ------------------------ | ------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| Code rules               | Four text rules over code and style files.                                                        | `grimoire check`, the guard, CI        |
-| The guard                | The diff against its task: unasked files, removed criteria, deleted proofs, locked tests, protected areas. | CI, the agent's `Stop` hook, by hand   |
-| Locked tests             | The acceptance tests the planner wrote first; the guard flags any edit.                           | The guard                              |
-| `.only`, `.skip`, assertions | An added `.only` or `.skip` is an error; a test with fewer assertions is a warning.           | The guard, `grimoire check`            |
-| Protected areas          | Migrations, auth, config, lockfile, new dependencies and the public API change only when the task names them. | The guard                  |
-| Public API snapshot      | `grimoire/approved/api.json` makes any change to the routes deliberate.                           | `approve api`, the guard, the check    |
-| Independent review       | A reviewer who sees the task and the diff, never the author's summary.                            | The `review-a-change` skill            |
-| Task ids on commits      | Every commit message names its task; CI rejects a commit that does not.                           | The guard with `--commits`             |
+| Control                      | What it does                                                                                                  | Where it runs                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Code rules                   | Four text rules over code and style files.                                                                    | `grimoire check`, the guard, CI      |
+| The guard                    | The diff against its task: unasked files, removed criteria, deleted proofs, locked tests, protected areas.    | CI, the agent's `Stop` hook, by hand |
+| Locked tests                 | The acceptance tests the planner wrote first; the guard flags any edit.                                       | The guard                            |
+| `.only`, `.skip`, assertions | An added `.only` or `.skip` is an error; a test with fewer assertions is a warning.                           | The guard, `grimoire check`          |
+| Protected areas              | Migrations, auth, config, lockfile, new dependencies and the public API change only when the task names them. | The guard                            |
+| Public API snapshot          | `grimoire/approved/api.json` makes any change to the routes deliberate.                                       | `approve api`, the guard, the check  |
+| Independent review           | A reviewer who sees the task and the diff, never the author's summary.                                        | The `review-a-change` skill          |
+| Task ids on commits          | Every commit message names its task; CI rejects a commit that does not.                                       | The guard with `--commits`           |
 
 ## The guard
 
@@ -48,7 +48,7 @@ Any other changed file is `GR7006`. A task that needs a file outside its feature
 | -------- | -------- | --------------------------------------------------------------------------------------------------- |
 | `GR7006` | error    | A changed file is outside the task.                                                                 |
 | `GR7007` | error    | A flow, criterion or case written in `grimoire/features/` is gone, and `Removes:` does not name it. |
-| `GR7008` | error    | A `@proves` test is gone and no other test proves that criterion, and `Removes:` does not name it. |
+| `GR7008` | error    | A `@proves` test is gone and no other test proves that criterion, and `Removes:` does not name it.  |
 | `GR7009` | error    | A file in `Locked:` changed.                                                                        |
 | `GR7010` | warning  | A changed test file has fewer assertions than at the base.                                          |
 | `GR7011` | error    | A protected area changed and `Touches:` does not name it.                                           |
@@ -85,14 +85,14 @@ changes, the test does not.
 
 ### Protected areas
 
-| Area           | Matches                                                                                  |
-| -------------- | ---------------------------------------------------------------------------------------- |
-| `migrations`   | `**/migrations/**`, `**/*.migration.ts`                                                  |
-| `auth`         | `src/app/auth/**`, `src/config/auth.ts`                                                  |
-| `config`       | `src/config/**`, `warlock.config.ts`, `.env.example`                                     |
-| `lockfile`     | `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock`, `bun.lockb`              |
-| `dependencies` | a `package.json` that adds or changes a dependency entry (not every edit of the file)    |
-| `public-api`   | the routes differ from `grimoire/approved/api.json`                                      |
+| Area           | Matches                                                                               |
+| -------------- | ------------------------------------------------------------------------------------- |
+| `migrations`   | `**/migrations/**`, `**/*.migration.ts`                                               |
+| `auth`         | `src/app/auth/**`, `src/config/auth.ts`                                               |
+| `config`       | `src/config/**`, `warlock.config.ts`, `.env.example`                                  |
+| `lockfile`     | `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock`, `bun.lockb`           |
+| `dependencies` | a `package.json` that adds or changes a dependency entry (not every edit of the file) |
+| `public-api`   | the routes differ from `grimoire/approved/api.json`                                   |
 
 Add or replace areas in `grimoire/settings.md`; a `protected` line with a built-in name replaces that area's globs:
 
@@ -130,12 +130,12 @@ rules: [logical-css, specific-errors, type-discriminator, no-js-imports]
 - `rules:` written: `check` runs those over every file, and the guard runs the same on added lines.
 - `rules: []`: none anywhere.
 
-| Rule                 | Code     | Flags                                                                                                                                                                                                                             |
-| -------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rule                 | Code     | Flags                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `logical-css`        | `GR3007` | CSS `margin-left`, `padding-right`, `border-left`, `left:`, `right:`, `text-align: left`, `float: right`, `border-top-left-radius`; Tailwind classes `ml-4`, `pr-2`, `left-0`, `text-left`, `float-right`, `border-l`, `rounded-l-lg` (with variants like `md:ml-4` and negatives like `-mr-2`); style keys `marginLeft`, `textAlign: "left"`. Logical forms (`margin-inline-start`, `ms-4`, `text-start`) pass. |
-| `specific-errors`    | `GR3008` | A string whose whole text is a generic phrase: "Something went wrong", "An error occurred", "Unknown error", "Unexpected error", "حدث خطأ ما", "خطأ غير معروف" (a trailing "please try again" does not make it specific). In locale files, `error` and `oops` alone too. |
-| `type-discriminator` | `GR3009` | `kind` as a property key whose value is a string literal or a union of them (`kind: "a"`, `kind?: "a" \| "b"`). A variable named `kind` passes. |
-| `no-js-imports`      | `GR3010` | A relative `import`, `export … from`, `import()` or `require()` path ending `.js`, `.jsx`, `.mjs` or `.cjs`. Package paths (`pkg/file.js`) pass. |
+| `specific-errors`    | `GR3008` | A string whose whole text is a generic phrase: "Something went wrong", "An error occurred", "Unknown error", "Unexpected error", "حدث خطأ ما", "خطأ غير معروف" (a trailing "please try again" does not make it specific). In locale files, `error` and `oops` alone too.                                                                                                                                         |
+| `type-discriminator` | `GR3009` | `kind` as a property key whose value is a string literal or a union of them (`kind: "a"`, `kind?: "a" \| "b"`). A variable named `kind` passes.                                                                                                                                                                                                                                                                  |
+| `no-js-imports`      | `GR3010` | A relative `import`, `export … from`, `import()` or `require()` path ending `.js`, `.jsx`, `.mjs` or `.cjs`. Package paths (`pkg/file.js`) pass.                                                                                                                                                                                                                                                                 |
 
 Skipped: `*.spec.*` and `*.test.*` files, `node_modules`, `dist`, `grimoire/`. Locale JSON files (a path with `locale`,
 `lang`, `i18n` or `translations`) are read by `specific-errors`.
@@ -176,7 +176,10 @@ and `.claude/settings.json` runs the guard when an agent finishes:
 ```
 
 In `--hook` mode the findings go to stderr and exit code 2 sends them back to the agent. The hook never traps an agent
-that works without a task: with no task, no git repository or an unknown base it prints a note and exits 0.
+that works without a task: with no task, no git repository or an unknown base it prints a note and exits 0. It never
+keeps an agent going twice either: when the hook input on stdin says the agent already went on once because of it
+(`stop_hook_active`), the guard prints the findings again and exits 0, so a finding the agent may not fix itself (a
+locked test, a wrong `Files:` line) is left for the reviewer instead of looping.
 
 `@mongez/agent-kit` writes `CLAUDE.md` and `.claude/skills/` only, so it leaves `.claude/settings.json` alone. An
 existing app adds the snippet above and copies the workflow.

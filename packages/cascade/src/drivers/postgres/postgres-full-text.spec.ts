@@ -13,7 +13,9 @@ function queryFor(textSearchConfig?: string) {
 
 describe("PostgreSQL full-text search language", () => {
   it("uses the given language for both the vector and the query", () => {
-    const { query, bindings } = queryFor().whereSearch("title", "الخامس", { language: "simple" }).parse();
+    const { query, bindings } = queryFor()
+      .whereSearch("title", "الخامس", { language: "simple" })
+      .parse();
 
     expect(query).toContain("to_tsvector('simple'");
     expect(query).toContain("plainto_tsquery('simple'");
@@ -92,6 +94,24 @@ describe("createFullTextIndex uses the same default", () => {
 
   it("falls back to english", () => {
     expect(JSON.stringify(index(new PostgresDialect()))).toContain("to_tsvector('english'");
+  });
+
+  it("uses the weight letters and refuses any other weight", () => {
+    const weighted = (weights: Record<string, unknown>) =>
+      new PostgresSQLSerializer(new PostgresDialect()).serialize(
+        {
+          type: "createFullTextIndex",
+          payload: { columns: ["title", "body"], options: { weights } },
+        } as never,
+        "shipments",
+      );
+
+    const sql = JSON.stringify(weighted({ body: "B" }));
+
+    expect(sql).toContain("'A') || setweight(");
+    expect(sql).toContain("'B')");
+    expect(() => weighted({ title: 5 })).toThrow(/letters "A" \(ranks highest\) to "D"/);
+    expect(() => weighted({ title: "A'); DROP TABLE x; --" })).toThrow(/PostgreSQL weights/);
   });
 
   it("falls back to the data source default, so the index matches the query", () => {

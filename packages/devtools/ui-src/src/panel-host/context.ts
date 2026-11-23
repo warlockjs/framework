@@ -5,7 +5,8 @@ import type { LegacyPanelContext } from "./types";
 
 /**
  * Calls a panel's data route with the 5.55.0 behaviour: JSON in and out,
- * `Error(message)` on failure. Writes carry the session's CSRF token.
+ * `Error(message)` on failure, with `status` and `ref` (the server's error
+ * reference or `x-request-id`, else `null`). Writes carry the session's CSRF token.
  */
 export async function panelFetch(url: string, init: RequestInit = {}): Promise<unknown> {
   const method = (init.method ?? "GET").toUpperCase();
@@ -35,12 +36,14 @@ export async function panelFetch(url: string, init: RequestInit = {}): Promise<u
   if (!response.ok && response.status !== 204) {
     let message = response.statusText || `Request failed (${response.status})`;
     let coded = false;
+    let ref: string | null = response.headers.get("x-request-id");
 
     try {
-      const body = (await response.json()) as { error?: string; code?: string };
+      const body = (await response.json()) as { error?: string; code?: string; ref?: string };
 
       message = body.error || message;
       coded = body.code !== undefined;
+      if (typeof body.ref === "string" && body.ref !== "") ref = body.ref;
     } catch {
       // The answer has no JSON body.
     }
@@ -49,7 +52,7 @@ export async function panelFetch(url: string, init: RequestInit = {}): Promise<u
       window.dispatchEvent(new CustomEvent(NOT_FOUND_EVENT, { detail: { path: url } }));
     }
 
-    throw Object.assign(new Error(message), { status: response.status });
+    throw Object.assign(new Error(message), { status: response.status, ref });
   }
 
   return response.status === 204 ? undefined : response.json();

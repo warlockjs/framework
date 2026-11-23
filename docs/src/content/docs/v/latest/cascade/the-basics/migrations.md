@@ -308,7 +308,7 @@ Every key is optional — include only what the migration changes. The `AlterSch
 
 **Specialized indexes**
 
-- `addFullText` / `dropFullText` — full-text search indexes.
+- `addFullText` / `dropFullText` — full-text search indexes. `options.weights` ranks columns: the letters `"A"` (highest, the default) to `"D"` on PostgreSQL, whole numbers from 1 to 99999 on MongoDB; a weight of the other form throws.
 - `addGeoIndex` / `dropGeoIndex` — geo-spatial.
 - `addVectorIndex` / `dropVectorIndex` — `[{ column, options: { dimensions, similarity } }]`.
 - `addTTLIndex` / `dropTTLIndex` — `[{ column, expireAfterSeconds }]` (MongoDB-primary; auto-expire documents). On PostgreSQL a scheduler job purges expired rows every minute in batches of up to 5,000 rows (at most 100 batches per run, so a large backlog is cleared over several runs), and a run is skipped while the previous one is still deleting.
