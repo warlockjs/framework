@@ -191,3 +191,42 @@ describe("closed monitor URLs on a plain core app", () => {
     expect(JSON.parse(response.body).error).toBe(JSON.parse(reference.body).error);
   });
 });
+
+describe("closed monitor URLs hit with a request body", () => {
+  const JSON_TYPE = { origin: ORIGIN, "content-type": "application/json" };
+  const bodies: [string, string, Record<string, string>][] = [
+    ["a malformed JSON body", "{not json", JSON_TYPE],
+    ["an oversized body", JSON.stringify({ data: "x".repeat(1_100_000) }), JSON_TYPE],
+    ["an unsupported content type", "<a/>", { origin: ORIGIN, "content-type": "application/xml" }],
+    ["a valid JSON body", JSON.stringify({ a: 1 }), JSON_TYPE],
+  ];
+
+  /** Fastify closes the connection after a body it could not read: that header is not part of the answer. */
+  function answer(response: LightMyRequestResponse, path: string) {
+    const {
+      headers: { connection: _connection, ...headers },
+      ...rest
+    } = shape(response, path);
+
+    return { ...rest, headers };
+  }
+
+  describe.each([
+    ["with a catch-all route", { catchAll: true, rateLimit: 100 }],
+    ["without a catch-all route", {}],
+  ] as const)("%s", (_label, config) => {
+    it.each(bodies)(
+      "answers %s like an unknown URL, to a closed route and to an unknown dashboard route",
+      async (_name, payload, headers) => {
+        const t = await createApp(config);
+        const reference = await t.inject({ method: "POST", url: UNKNOWN, payload, headers });
+
+        for (const route of ["/api/auth/login", "/api/nothing-here", "/api/share/open"]) {
+          const closed = await t.inject({ method: "POST", url: `${PATH}${route}`, payload, headers });
+
+          expect(answer(closed, `${PATH}${route}`), route).toEqual(answer(reference, UNKNOWN));
+        }
+      },
+    );
+  });
+});

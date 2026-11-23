@@ -4,6 +4,12 @@ All notable changes to `@warlock.js/devtools` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.64.0
+
+### Fixed
+
+- A closed production monitor URL hit with a request body (`POST`, `PUT`, `PATCH`, `DELETE`) is answered after the body is read, like an unknown URL: a malformed or oversized body gets the app's own `400` or `413`, not a `404` that only a dashboard path gave.
+
 ## 5.62.0 - 2026-11-20
 
 ### Fixed

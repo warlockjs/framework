@@ -33,10 +33,11 @@ methods go to the catch-all route only, and without one the app's not-found hand
 requests cannot tell the dashboard exists. The login page is the one public exception, and only while the gate above is
 open.
 
-One difference stays for requests with a body (`POST`, `PUT`, `PATCH`): the dashboard refuses them before the body is
-read, so a malformed or oversized body gets the `404` above, where an unknown URL with a catch-all for that method answers
-Fastify's `400` or `413` from parsing the body. Such a probe can tell that something answers at the path, never more:
-sign-in and the second factor still apply.
+A request with a body (`POST`, `PUT`, `PATCH`, `DELETE`) that the dashboard refuses is answered after Fastify has read the
+body, the way it is for an unknown URL. A malformed or oversized body to a closed dashboard URL gets the same `400` or
+`413` as the same body sent to an unknown URL, and a body that parses gets the `404` or catch-all answer above. The
+dashboard never answers before the body is read, so the status, the body, the headers and the cost of the request do not
+tell a closed dashboard path from an unknown one.
 
 ## Threats and controls
 

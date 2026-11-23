@@ -18,6 +18,9 @@
 //      /__warlock is a 404 in production
 //   8. deploy in parts: `--role=worker` binds no port, `--role=api` serves
 //      /api/posts and 404s a page
+//   9. Grimoire: `warlock add grimoire --no-install`, then `warlock grimoire
+//      build` and `warlock grimoire check` must both exit 0 (the GR codes of a
+//      failure are printed)
 //
 // Inputs (env):
 //   BLOG_DIR, WARLOCK_VERSION, MODE (tarballs | registry), TARBALL_DIR (tarballs),
@@ -52,6 +55,7 @@ const FAMILY_SIZE = new Set(
 ).size;
 const DEVTOOLS_PACKAGE = "@warlock.js/devtools";
 const DEVTOOLS_PATH = "/__warlock";
+const GRIMOIRE_PACKAGE = "@warlock.js/grimoire";
 
 const SECOND = 1_000;
 const MINUTE = 60 * SECOND;
@@ -587,7 +591,7 @@ function readTarballSpecs(tarballDir, version) {
     specs[packageNameFromTarball(file, version)] = `file:${toPosix(path.join(tarballDir, file))}`;
   }
 
-  for (const required of ["@warlock.js/core", DEVTOOLS_PACKAGE]) {
+  for (const required of ["@warlock.js/core", DEVTOOLS_PACKAGE, GRIMOIRE_PACKAGE]) {
     if (!specs[required]) {
       throw new Error(`no tarball for ${required} in ${tarballDir}`);
     }
@@ -617,8 +621,10 @@ function rewritePackageJson(blogDir, specFor, overrides) {
   pkg.devDependencies = {
     ...(pkg.devDependencies ?? {}),
     [DEVTOOLS_PACKAGE]: specFor(DEVTOOLS_PACKAGE),
+    [GRIMOIRE_PACKAGE]: specFor(GRIMOIRE_PACKAGE),
   };
   rewritten[DEVTOOLS_PACKAGE] = pkg.devDependencies[DEVTOOLS_PACKAGE];
+  rewritten[GRIMOIRE_PACKAGE] = pkg.devDependencies[GRIMOIRE_PACKAGE];
 
   // pnpm 11 ignores package.json `pnpm.*` settings (pnpm CHANGELOG, "pnpm no
   // longer reads settings from the pnpm field"); kept because the brief asks
@@ -741,7 +747,7 @@ function verifyInstalledFamily(blogDir, version) {
     }
   }
 
-  for (const required of ["core", "devtools"]) {
+  for (const required of ["core", "devtools", "grimoire"]) {
     if (!topLevel[required]) {
       throw new Error(`@warlock.js/${required} is not installed in ${scopeDir}`);
     }
@@ -930,6 +936,42 @@ async function typecheck(context, details) {
   );
 
   details.typecheck = "tsc --noEmit: 0 errors";
+}
+
+// ─── step 9: Grimoire book ───────────────────────────────────────────────────
+
+/** The distinct `GRnnnn` codes a command printed, in order of first appearance. */
+function grimoireCodes(output) {
+  return [...new Set(String(output).match(/\bGR\d{4}\b/g) ?? [])];
+}
+
+/** Runs one `warlock grimoire <action>`; a failure names the GR codes it printed. */
+async function runGrimoire(context, action) {
+  try {
+    return await runWarlock(context, `warlock-grimoire-${action}`, ["grimoire", action]);
+  } catch (error) {
+    const message = errorMessage(error);
+    const codes = grimoireCodes(message);
+
+    throw new Error(
+      `warlock grimoire ${action} failed${codes.length > 0 ? ` (${codes.join(", ")})` : " (no GR code in the output)"}\n${message}`,
+    );
+  }
+}
+
+async function checkGrimoire(context, details) {
+  const added = await runWarlock(context, "warlock-add-grimoire", [
+    "add",
+    "grimoire",
+    "--no-install",
+  ]);
+
+  if (!/registerGrimoireCommands/.test(added)) {
+    throw new Error(`warlock add grimoire did not register the commands\n${tail(added)}`);
+  }
+
+  details.build = tail(await runGrimoire(context, "build"));
+  details.check = tail(await runGrimoire(context, "check"));
 }
 
 // ─── step 5: database ────────────────────────────────────────────────────────
@@ -1596,6 +1638,9 @@ async function main() {
     );
     await runStep(evidence, "deploy in parts: --role=api", (details) =>
       checkApiRole(context, details),
+    );
+    await runStep(evidence, "grimoire: build and check", (details) =>
+      checkGrimoire(context, details),
     );
 
     evidence.result = "passed";
