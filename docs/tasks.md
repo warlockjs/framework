@@ -4,10 +4,10 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Owner decisions waiting
 
-- Next-major items (T-007, T-009, T-033) wait for 6.0.
-- T-206: build the scry output and guidance changes the agent test points to.
-- T-208: drift controls (rule checks, `grimoire guard`, locked tests, protected areas).
-- T-207: approved screenshots per criterion and language, design-system feature, bird-view (phases 1-4).
+- Next-major items (T-007, T-009, T-033, and the 6.0 halves of T-042 and T-047) wait for 6.0.
+- Owner go-ahead 2026-11-23 (background session): build every open item in one minor, 5.64.0, including T-206, T-207
+  (phases 1-4) and T-208 (items 1-7). Items parked until an app asks stay parked: T-171, T-196, the streaming half of
+  T-183. Windows-only items (T-100, T-180, T-120) get what can be done without a Windows machine.
 
 ## Suggested plan for T-206..T-208 (one session, one minor, once the owner says go)
 
@@ -142,6 +142,38 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
   picks the data source per request from a worker header the request helpers send, or the scaffold starts one server
   per worker. Workaround: `createTestHttpServer()` per test file.
 - Status: documented in 5.63.0; behaviour fix open.
+
+### T-209 [bug] `scry --search` drops every non-Latin letter, so Arabic queries fail with GR9006
+
+- Source: app findings page above (F5), run by the reporter on 5.63.1, 2026-11-23.
+- Evidence: `packages/grimoire/src/scry/search.ts:107` `wordsOf()` lower-cases, then `.replace(/[^a-z0-9]+/g, " ")`,
+  so Arabic (or accented Latin) text in the query and in the book becomes empty; `scry --search "شحنة تكلفة"` answers
+  GR9006 "has no letters or digits".
+- Fix: one Unicode tokeniser for the query and the indexed text (`normalize("NFKC")`, lower-case,
+  `[^\p{L}\p{N}]+` with the `u` flag); for Arabic also strip tatweel and diacritics and unify alef, ya and ta-marbuta
+  forms.
+- Acceptance: an Arabic query matches an Arabic feature title and flow text; accented Latin still matches; specs;
+  docs and CHANGELOG.
+- Status: open (5.64.0).
+
+### T-210 [bug] `whereSearch` / `whereFullText` on PostgreSQL always use the `english` configuration
+
+- Source: app findings page above (F6), run by the reporter on cascade 5.63.1 and PostgreSQL 18.7, 2026-11-23.
+- Evidence: `packages/cascade/src/query-builder/query-builder.ts:821-841` (`whereFullText(fields, query)`,
+  `orWhereFullText`, `whereSearch(field, query)` pass no language); `packages/cascade/src/drivers/postgres/postgres-query-parser.ts:1021-1046`
+  (`safeLanguage()` falls back to `"english"` and reads `data.language`, which no builder method sets). Arabic partial
+  words («الخامس», «رمان») never match «شحنة الرمان الخامسة». The index side already takes a language
+  (`postgres-sql-serializer.ts:387`, `postgres-migration-driver.ts:570`). Docs and the `query-data` skill describe
+  `whereSearch` as pattern matching; the contract's `textSearch(…, { language })` example points at a base method that
+  throws (`query-builder.ts:847-853`).
+- Fix: an options argument `{ language?, weights? }` on `whereFullText`, `orWhereFullText` and `whereSearch` (and the
+  contract); a per-data-source default text-search configuration that `createFullTextIndex` uses too, so the index
+  stays usable (default stays `english` in a minor; document `simple` for non-English apps); a PostgreSQL substring
+  helper (`whereContains`, escaping `%`, `_`, `\`); docs and skill say what `whereSearch` means on each driver; fix the
+  `textSearch` example.
+- Acceptance: the reporter's spec (`whereSearch("title", "الخامس", { language: "simple" })` emits `'simple'` twice)
+  passes; a live PostgreSQL check finds the partial Arabic word through `whereContains`; docs, skill, CHANGELOG.
+- Status: open (5.64.0).
 
 ## From the 2026-11-21 scry field report
 
