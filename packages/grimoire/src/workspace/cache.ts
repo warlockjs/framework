@@ -30,6 +30,8 @@ const WRITTEN_TREES = [
   GRIMOIRE_PATHS.releases,
   GRIMOIRE_PATHS.tasks,
   GRIMOIRE_PATHS.screenshots,
+  GRIMOIRE_PATHS.approved,
+  GRIMOIRE_PATHS.settings,
 ];
 
 const STAT_BATCH = 256;
@@ -67,6 +69,9 @@ async function filesUnder(folder: string): Promise<string[]> {
     try {
       entries = await readdir(current, { withFileTypes: true });
     } catch {
+      // A written file that is not a folder (`settings.md`) is listed as it is.
+      if (await stat(current).then((info) => info.isFile(), () => false)) found.push(current);
+
       return;
     }
 

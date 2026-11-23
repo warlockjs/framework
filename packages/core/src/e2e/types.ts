@@ -127,6 +127,22 @@ export type E2EEvidence = {
   processes: ProcessEvidence[];
   errors: string[];
 };
+/**
+ * One rule of `page.mockRequests()`. A request whose URL matches `url` (a
+ * string is a substring, a `RegExp` is tested) gets the rule's answer; the
+ * first matching rule wins and any other request goes to the network.
+ */
+export type MockRequestRule = {
+  url: Pattern;
+  /** Answer with this status (default 200) and `body`. */
+  status?: number;
+  /** A string is sent as it is; any other value as JSON (`content-type: application/json` unless `headers` sets one). */
+  body?: unknown;
+  headers?: Record<string, string>;
+  /** Fail the request as if the server were unreachable (connection refused). Ignores `status` and `body`. */
+  fail?: "unreachable";
+};
+
 export type NetworkAllowance = { url: Pattern; status?: number; errorText?: Pattern };
 export type E2EContext = FixtureContext & {
   page: BrowserPage;

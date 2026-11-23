@@ -27,6 +27,13 @@
 
 <!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
 
+- `@shows` scenes: a browser test shows a criterion with `// @shows <feature>/<flow> AC-n` above `shows(context, "<feature>/<flow> AC-n", scene)` (new `shows()` in `@warlock.js/grimoire/warlock`). The scene runs once per language and saves one screenshot each under `grimoire/screenshots/captured/`; a failing language is recorded and `shows()` throws after every language ran. `changed` (default), `all` and `off` modes, `GRIMOIRE_SHOTS` for one run, and `screenshots: false` in a flow's front matter to opt out.
+- `grimoire/settings.md` (languages, screenshot mode, code rules, protected areas) is read and every snapshot carries `settings`; languages fall back to the adapter's `languages()`, which the Warlock adapter reads from `app.localeCodes` without booting the app.
+- The approved baseline: changes since `grimoire/approved/baseline.json` (images, flows, criteria, cases, proving tests) show as "changed, not approved". `warlock grimoire approve <id|feature/flow>` / `reject <target>` (`--all`, `--lang`, `--note`, `--json`) and the tab's buttons write it; `approve --all` creates it.
+- Check codes `GR4013` to `GR4019` for `@shows` lines, missing and failed captures, drift and rejected changes that are still there; `GR9010` for an approve or reject target nothing matches.
+- Flows with a `page` step answer two more case questions, `server unreachable` and `server error` (`UI_CASE_QUESTIONS`); `GR1012` asks for them there and nowhere else.
+- Skills teach the `design-system` feature first, `@shows` scenes, `screenshots: false` and approvals. New guide: Screenshots and approvals.
+
 
 ### Changed
 
@@ -37,6 +44,8 @@
 <!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
 
 <!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
+
+- The devtools snapshot source and the stored open keep `settings` and `shots`, and serve a fresh snapshot after an approval or a new capture. Snapshots written by an earlier version are rebuilt once.
 
 
 ### Fixed

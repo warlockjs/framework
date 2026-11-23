@@ -2,9 +2,10 @@
  * The files of one feature folder: `README.md`, `CHANGELOG.md`,
  * `flows/<flow>.md` and `versions/v<n>.md`.
  */
-import type { SourceLocation } from "../contracts/location";
+import type { Located, SourceLocation } from "../contracts/location";
 import {
   CASE_QUESTIONS,
+  UI_CASE_QUESTIONS,
   type ChangeWord,
   type StepType,
   type WrittenCase,
@@ -564,11 +565,13 @@ function parseStory(
   return story;
 }
 
+const KNOWN_QUESTIONS: readonly string[] = [...CASE_QUESTIONS, ...UI_CASE_QUESTIONS];
+
 function parseCases(file: string, document: WrittenDocument, sink: FindingSink): WrittenCase[] {
   const cases: WrittenCase[] = [];
 
   for (const line of bulletLines(findSection(document, "cases")?.lines ?? [])) {
-    const split = splitListLine(line.text, CASE_QUESTIONS);
+    const split = splitListLine(line.text, KNOWN_QUESTIONS);
 
     if (split === null) {
       sink.report(
@@ -648,7 +651,7 @@ export function parseFlow(
   const document = readDocument(file, text, "required", sink);
   const fields = new FrontMatterReader(document, sink);
 
-  fields.onlyKeys(["id", "since", "status", "who", "origin"], "flow");
+  fields.onlyKeys(["id", "since", "status", "who", "origin", "screenshots"], "flow");
 
   const id = fields.required("id", checks.id);
   sameAsName(id, name, "flow id", sink);
@@ -671,7 +674,7 @@ export function parseFlow(
     notHandled: [],
     unknowns: [],
     criteria: [],
-    screenshots: null,
+    screenshots: readScreenshotsFlag(fields),
   };
 
   checkHeadings(
@@ -730,8 +733,12 @@ export function parseFlow(
     ]);
 
     const readOnly = isReadOnlyFlow(flow.steps);
+    const hasPage = flow.steps.some((step) => step.type === "page");
+    const required: readonly string[] = hasPage
+      ? [...CASE_QUESTIONS, ...UI_CASE_QUESTIONS]
+      : CASE_QUESTIONS;
 
-    for (const question of CASE_QUESTIONS) {
+    for (const question of required) {
       if (readOnly && (WRITE_ONLY_QUESTIONS as readonly string[]).includes(question)) continue;
 
       if (!answered.has(question)) {
@@ -745,6 +752,18 @@ export function parseFlow(
   }
 
   return flow;
+}
+
+/** Front matter `screenshots: true|false`; `null` when not written or not a boolean (GR1004). */
+function readScreenshotsFlag(fields: FrontMatterReader): Located<boolean> | null {
+  const located = fields.scalar("screenshots", {
+    required: false,
+    check: (value) => (value === "true" || value === "false" ? null : "use true or false"),
+  });
+
+  if (located === null || (located.value !== "true" && located.value !== "false")) return null;
+
+  return { value: located.value === "true", at: located.at };
 }
 
 /** Case questions a flow with no writes may leave out. */

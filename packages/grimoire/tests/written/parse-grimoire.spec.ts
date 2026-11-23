@@ -55,12 +55,20 @@ function markdownFiles(root: string, dir = "grimoire"): string[] {
   return found;
 }
 
+/** The two case questions a flow with a page step must answer (`GR1012`); the fixtures' page flows leave them out. */
+const isUiQuestion = (finding: { code: string; message: string }): boolean =>
+  finding.code === "GR1012" && /"server (?:unreachable|error)"/.test(finding.message);
+
 describe("parseGrimoire on the shop fixture", () => {
   it("reads every written file with no structure finding", async () => {
     const { written, findings } = await parseGrimoire(shopRoot);
 
-    // The wishlist flow has no summary on purpose; it is the only finding.
-    expect(findings.map((finding) => [finding.code, finding.at?.file])).toEqual([
+    // The wishlist flow has no summary on purpose; it is the only finding besides the UI case questions.
+    expect(
+      findings
+        .filter((finding) => !isUiQuestion(finding))
+        .map((finding) => [finding.code, finding.at?.file]),
+    ).toEqual([
       ["GR1030", "grimoire/features/catalog/flows/wishlist.md"],
     ]);
     expect(written.exists).toBe(true);
@@ -70,6 +78,18 @@ describe("parseGrimoire on the shop fixture", () => {
     expect(written.apps.map((app) => app.id.value)).toEqual(["mobile", "web-admin", "web-client"]);
     expect(written.tasks.map((task) => task.id.value)).toEqual(["T-010", "T-014", "T-015"]);
     expect(written.releases.map((release) => release.release.value)).toEqual(["1.0.0"]);
+  });
+
+  it("asks the two UI case questions of every flow with a page step, and of no other flow", async () => {
+    const { written, findings } = await parseGrimoire(shopRoot);
+    const asked = new Set(findings.filter(isUiQuestion).map((finding) => finding.subject.flow));
+    const pageFlows = written.features
+      .flatMap((feature) => feature.flows)
+      .filter((flow) => flow.steps.some((step) => step.type === "page"))
+      .map((flow) => flow.ref);
+
+    expect([...asked].every((ref) => pageFlows.includes(ref as string))).toBe(true);
+    expect(findings.filter(isUiQuestion).length).toBe(asked.size * 2);
   });
 
   it("matches the golden files", async () => {
@@ -123,7 +143,7 @@ describe("parseGrimoire on real-world Markdown", () => {
   it("reads `*` bullets, tabs, tables without outer pipes, fences and continuation lines (golden)", async () => {
     const { written, findings } = await parseGrimoire(messyRoot);
 
-    expect(findings).toEqual([]);
+    expect(findings.filter((finding) => !isUiQuestion(finding))).toEqual([]);
     await expect(json(portable(written))).toMatchFileSnapshot("../golden/written/messy.json");
   });
 
@@ -137,7 +157,7 @@ describe("parseGrimoire on real-world Markdown", () => {
 
     const crlf = await parseGrimoire(fixture.root);
 
-    expect(crlf.findings).toEqual([]);
+    expect(crlf.findings.filter((finding) => !isUiQuestion(finding))).toEqual([]);
     expect(portable(crlf.written)).toEqual(portable(base.written));
   });
 });

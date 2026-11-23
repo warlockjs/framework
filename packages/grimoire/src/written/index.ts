@@ -7,3 +7,4 @@
  * whatever it could read, so the other checks keep working.
  */
 export { parseGrimoire, type ParseGrimoireResult } from "./parse-grimoire";
+export { parseSettings, resolveSettings } from "./settings";

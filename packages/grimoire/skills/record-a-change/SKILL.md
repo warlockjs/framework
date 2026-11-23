@@ -20,6 +20,26 @@ it("returns the global list when the customer has no country", async () => {
 });
 ```
 
+A criterion about what a user sees is shown instead, by a browser scene in `e2e/*.e2e.ts`. Put the
+comment directly above a `shows()` call that repeats the same criterion:
+
+```ts
+import { shows } from "@warlock.js/grimoire/warlock";
+
+// @shows contact/send-message AC-3
+await shows(context, "contact/send-message AC-3", async ({ page, language, path }) => {
+  await page.mockRequests([{ url: "/api/contact", fail: "unreachable" }]);
+  await page.goto(path("/"));
+});
+```
+
+`shows()` runs the scene once per language and saves a screenshot each (`GRIMOIRE_SHOTS=all`
+captures every flow, not only the touched ones). A scene that throws fails that language. The owner
+approves the images with `warlock grimoire approve`; list every `GR4017` (image changed), `GR4018`
+(flow, criterion, case or proof changed) and `GR4019` (rejected change still there) of the check in
+your report, and never edit `grimoire/approved/` yourself. From code, `scanShows` reads the `@shows`
+lines of the test files and `resolveSettings` fills the defaults of `grimoire/settings.md`.
+
 - End-to-end tests prove a flow's steps. Unit tests prove a business rule ("a reset code expires
   after 10 minutes").
 - One test may prove one criterion. If it needs two tags, split the test.

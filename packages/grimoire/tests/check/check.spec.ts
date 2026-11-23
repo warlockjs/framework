@@ -66,7 +66,7 @@ describe("checkGrimoire on the shop fixture", () => {
     const report = await checkCopy();
 
     expect(report.ok).toBe(true);
-    expect(report.counts).toEqual({ errors: 0, warnings: 9, expected: 9 });
+    expect(report.counts).toEqual({ errors: 0, warnings: 15, expected: 11 });
     expect(
       report.findings
         .filter((finding) => !finding.expected)
@@ -76,10 +76,16 @@ describe("checkGrimoire on the shop fixture", () => {
       "GR4001 auth/login AC-1 has no test",
       "GR4001 auth/sign-up AC-1 has no test",
       "GR4001 auth/sign-up AC-2 has no test",
+      'GR1012 the case question "server error" is answered neither under Cases nor under Not handled.',
+      'GR1012 the case question "server unreachable" is answered neither under Cases nor under Not handled.',
       "GR4001 catalog/browse-products AC-1 has no test",
       "GR4001 catalog/browse-products AC-2 has no test",
       "GR4001 catalog/browse-products AC-3 has no test",
+      'GR1012 the case question "server error" is answered neither under Cases nor under Not handled.',
+      'GR1012 the case question "server unreachable" is answered neither under Cases nor under Not handled.',
       "GR4001 catalog/new-arrivals AC-3 has no test",
+      'GR1012 the case question "server error" is answered neither under Cases nor under Not handled.',
+      'GR1012 the case question "server unreachable" is answered neither under Cases nor under Not handled.',
       "GR4001 orders/place-order AC-4 has no test",
     ]);
     expect(
@@ -92,6 +98,8 @@ describe("checkGrimoire on the shop fixture", () => {
       'GR2004 notification step "wishlist-price-drop" matches no notification',
       `GR2002 page step "/wishlist" matches no page or screen of the feature's apps`,
       "GR1030 the flow has no summary; write one or two sentences under the title.",
+      'GR1012 the case question "server error" is answered neither under Cases nor under Not handled.',
+      'GR1012 the case question "server unreachable" is answered neither under Cases nor under Not handled.',
       "GR4001 catalog/wishlist AC-1 has no test",
       "GR4001 catalog/wishlist AC-2 has no test",
       "GR4001 catalog/wishlist AC-3 has no test",
@@ -124,7 +132,7 @@ describe("checkGrimoire on the shop fixture", () => {
     });
     const report = checkGrimoire(snapshot);
 
-    expect(report.counts).toEqual({ errors: 0, warnings: 9, expected: 9 });
+    expect(report.counts).toEqual({ errors: 0, warnings: 15, expected: 11 });
     expect(
       report.findings.filter((finding) => finding.code === "GR2001" && !finding.expected),
     ).toEqual([]);

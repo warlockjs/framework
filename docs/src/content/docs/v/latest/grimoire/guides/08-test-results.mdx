@@ -28,6 +28,24 @@ it("adds a product to the wishlist", async () => {
 The format is `// @proves <feature>/<flow> AC-<n>`. One test proves one criterion. A criterion may have several
 proving tests.
 
+## Show a criterion
+
+A browser test can show a criterion instead of asserting it in code: the scene runs once per language of the app and
+saves one screenshot each. Put a `@shows` comment directly above a `shows()` call that names the same criterion:
+
+```ts
+import { shows } from "@warlock.js/grimoire/warlock";
+
+// @shows contact/send-message AC-2
+await shows(context, "contact/send-message AC-2", async ({ page, language, path }) => {
+  await page.goto(path("/"));
+});
+```
+
+`GR4013` reports a `@shows` line that is not directly above such a call, and `GR4014` one that names a flow or
+criterion that does not exist. The captures, the approved images and the changes since approval are described in
+[Screenshots and approvals](/v/latest/grimoire/guides/12-screenshots-and-approvals/).
+
 ## Add the reporter
 
 Add it to the project's `vitest.config.ts`:

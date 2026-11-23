@@ -389,6 +389,44 @@
   ],
   "findings": [
     {
+      "code": "GR1012",
+      "severity": "warning",
+      "message": "the case question \"server error\" is answered neither under Cases nor under Not handled.",
+      "at": {
+        "file": "grimoire/features/catalog/flows/new-arrivals.md",
+        "line": 19,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/new-arrivals",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/new-arrivals.md"
+      },
+      "hint": "Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`."
+    },
+    {
+      "code": "GR1012",
+      "severity": "warning",
+      "message": "the case question \"server unreachable\" is answered neither under Cases nor under Not handled.",
+      "at": {
+        "file": "grimoire/features/catalog/flows/new-arrivals.md",
+        "line": 19,
+        "column": null
+      },
+      "expected": false,
+      "subject": {
+        "feature": "catalog",
+        "flow": "catalog/new-arrivals",
+        "app": null,
+        "task": null,
+        "file": "grimoire/features/catalog/flows/new-arrivals.md"
+      },
+      "hint": "Answer the question under Cases (or `does not apply` and why), or list it under Not handled. A flow with no writes (only pages and GET, HEAD or OPTIONS routes) may leave out `duplicate` and `double submit`."
+    },
+    {
       "code": "GR4001",
       "severity": "warning",
       "message": "catalog/new-arrivals AC-3 has no test",

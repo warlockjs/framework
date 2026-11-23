@@ -32,6 +32,7 @@ import type {
 import { isCodeFile, isInsideFolder, toPosixPath } from "../paths";
 import { WARLOCK_LOGO_DATA_URI } from "./logo";
 import { collectMobileFacts, type MobileAppOption } from "./mobile-facts";
+import { readAppLanguages } from "./languages";
 
 /**
  * Reads the sections of the inspect report that need the app booted
@@ -514,6 +515,7 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
     name: "warlock",
     version: coreVersion(),
     host: (root) => warlockHost(root, coreVersion()),
+    languages: (root) => readAppLanguages(root),
     async sourceRoots(root) {
       return sourceFolders(root, await mobileApps(root));
     },

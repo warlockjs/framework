@@ -99,6 +99,10 @@ port-file handshake above when the app supports binding `0` itself.
   can match `errorText`. Strings match substrings; regexps are also accepted.
 - `allowPendingRequests: ["/events"]` exempts an intentional stream from network
   idle, without allowing its errors. `waitForNetworkIdle()` remains available.
+- `page.mockRequests(rules)` fakes the server for a failure screen: a rule is `{ url, status?, body?,
+  headers? }` or `{ url, fail: "unreachable" }`, the first matching rule wins and other requests go
+  through; `page.clearMocks()` stops it. A faked failure still counts in the evidence, so list the URL
+  under `allowNetworkFailures`. `page.setExtraHeaders({ locale: "ar" })` sends headers with every request.
 - `page.evaluate<T>(expression)` is an escape hatch for assertions in the main
   document. Selector helpers do not enter frames or closed shadow roots.
 

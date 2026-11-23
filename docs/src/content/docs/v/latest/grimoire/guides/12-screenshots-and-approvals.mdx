@@ -1,0 +1,124 @@
+---
+title: Screenshots and approvals
+description: Show a criterion with a browser scene that runs once per language and saves a screenshot each, then approve or reject the changes since the approved baseline.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="Experimental">
+  Grimoire is experimental. The structure of the written files and the commands may still change
+  before they are declared stable.
+</Aside>
+
+A criterion that is about what a user sees is better shown than asserted. A `@shows` scene runs in the app's browser
+tests once per language and saves one screenshot each. The owner approves the images, and everything that changes
+afterwards (an image, a flow, a criterion, a case, a proving test) shows as "changed, not approved" until the owner
+accepts or refuses it.
+
+## Settings
+
+`grimoire/settings.md` ([written files](/v/latest/grimoire/guides/01-written-files/#settingsmd)) names the languages and
+the screenshot mode. Without a `languages` key the Warlock adapter reads `app.localeCodes` from `src/config/app.ts`
+without booting the app. An app with no languages has one unnamed language, and its files drop the `.<language>` part.
+
+| Mode      | What runs                                                                                    |
+| --------- | -------------------------------------------------------------------------------------------- |
+| `changed` | the scenes of the features the change touches (the default)                                  |
+| `all`     | every scene; use it before a release: `GRIMOIRE_SHOTS=all npx warlock e2e`                   |
+| `off`     | no scene runs and nothing is captured                                                        |
+
+`GRIMOIRE_SHOTS` overrides the setting for one run. In `changed` mode the touched features are the owners of the files
+that differ from the base (committed since the base, staged, unstaged and untracked) plus the features whose
+`grimoire/features/<id>/` files changed. When git or the book cannot answer, every scene runs: nothing is skipped
+silently. A flow whose front matter says `screenshots: false` is never captured.
+
+## Show a criterion
+
+```ts
+import { defineE2E } from "@warlock.js/core/e2e";
+import { shows } from "@warlock.js/grimoire/warlock";
+
+export default defineE2E({
+  app: { /* … */ },
+  run: async (context) => {
+    // @shows contact/send-message AC-3
+    await shows(context, "contact/send-message AC-3", async ({ page, language, path }) => {
+      await page.mockRequests([{ url: "/api/contact", fail: "unreachable" }]);
+      await page.goto(path("/"));
+      await page.waitFor({ selector: ".warlock-form-status.is-error" });
+    });
+  },
+});
+```
+
+The comment is the source of truth, like `@proves`. It must be on its own line directly above a `shows(` call whose
+second argument is the same `<feature>/<flow> AC-<n>` (`GR4013` otherwise); a flow or criterion that does not exist is
+`GR4014`.
+
+`shows(context, ref, scene, options?)` runs `scene({ page, language, path, step })` once per language:
+
+- it sends the language with every request (the `locale` header, which the app resolves like any request locale) and
+  `path(p)` gives the URL path of `p` in that language (`/ar/about` under the `prefix` locale routing strategy);
+- a scene that throws fails that language only; every language still runs, the capture index is written, and then
+  `shows()` throws one error naming each failed language, so `warlock e2e` fails;
+- after a passing scene it saves the screenshot to
+  `grimoire/screenshots/captured/<feature>/<flow>/<AC-n>.<language>.png` (in the project root, never in the disposable
+  copy of the app) and records it in `captured/index.json` with its sha256, viewport and time;
+- `options.mask` is a list of selectors hidden just before the capture, for text that changes on every run;
+  `options.viewport` sets a viewport first.
+
+A run replaces the entries of the scenes and languages it ran and keeps the others, so a `changed` run never forgets
+the rest. A mocked failure counts as a failed request in the run's evidence: list the URL under `allowNetworkFailures`.
+
+Core's `page.mockRequests(rules)` answers a matching request with `{ status, body, headers }` or fails it with
+`{ fail: "unreachable" }`; `page.clearMocks()` stops it (`shows()` clears the mocks after each language).
+`page.setExtraHeaders(headers)` sends headers with every request.
+
+## The approved baseline
+
+`grimoire/approved/baseline.json` holds the approved flows, criteria, cases, proving tests and images. Until it
+exists there is no drift and the Bird view shows "not approved yet" with one "Approve all" action;
+`warlock grimoire approve --all` creates it. It is written only by `approve` and `reject` (and the tab's buttons),
+never by an agent.
+
+| Change                         | Id                                                       |
+| ------------------------------ | -------------------------------------------------------- |
+| `shot-changed`                 | `shot-changed:<feature>/<flow>:<AC-n>:<language>`        |
+| `shot-added`, `shot-removed`   | the same, with their type                                |
+| `flow-added`, `flow-removed`   | `flow-added:<feature>/<flow>`                            |
+| `criterion-added`, `criterion-removed`, `criterion-changed`, `proof-removed` | `<type>:<feature>/<flow>:<AC-n>` |
+| `case-added`, `case-removed`   | `<type>:<feature>/<flow>:<case question>`                |
+
+An image is changed when its size differs, or when more than 0.1% of its pixels differ by more than 16 in any colour
+channel. `proof-removed` is a criterion that no `@proves` line names any more.
+
+## Approve and reject
+
+```sh
+npx warlock grimoire approve <id>                     # one change
+npx warlock grimoire approve contact/send-message     # every change of a flow
+npx warlock grimoire approve --all                    # everything
+npx warlock grimoire reject <id> --note "why"
+```
+
+In the tab, the buttons call `POST /approve` and `POST /reject` with `{ ids, language?, note? }` (`ids` are change ids,
+`<feature>/<flow>` targets, or `"all"`). Both routes work only in development and never through a share link.
+
+Approving updates the baseline and copies the capture into `grimoire/screenshots/approved/` (or deletes the approved
+image of a removed shot) and clears any rejection of the same change. Rejecting records the change and the note; while
+the change is still there it stays an error.
+
+## Check
+
+| Code                                                    | Severity | Meaning                                                                      |
+| ------------------------------------------------------- | -------- | ---------------------------------------------------------------------------- |
+| [`GR4013`](/v/latest/grimoire/guides/04-check/#gr4013)  | error    | a `@shows` line is not directly above a matching `shows()` call              |
+| [`GR4014`](/v/latest/grimoire/guides/04-check/#gr4014)  | error    | a `@shows` line names a flow or criterion that does not exist                |
+| [`GR4015`](/v/latest/grimoire/guides/04-check/#gr4015)  | warning  | a shown criterion has no capture in a language (not when the mode is `off` or the flow opted out) |
+| [`GR4016`](/v/latest/grimoire/guides/04-check/#gr4016)  | error    | a shown criterion failed in a language                                       |
+| [`GR4017`](/v/latest/grimoire/guides/04-check/#gr4017)  | warning  | a capture differs from the approved image, or has none yet                   |
+| [`GR4018`](/v/latest/grimoire/guides/04-check/#gr4018)  | warning  | a flow, criterion, case or proving test changed since the approval           |
+| [`GR4019`](/v/latest/grimoire/guides/04-check/#gr4019)  | error    | a change the owner rejected is still there                                   |
+
+An app with no `@shows` line pays nothing: no scene, no capture and no finding. Images you attach by hand to a
+written file (`![alt](path)`) are unrelated and keep working.

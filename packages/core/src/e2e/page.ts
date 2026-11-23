@@ -12,6 +12,7 @@ import {
   matches,
   type E2EEvidence,
   type E2ESpec,
+  type MockRequestRule,
   type PayloadEvidence,
   type Viewport,
 } from "./types";
@@ -100,6 +101,8 @@ export class BrowserPage {
   private pendingRequests = new Map<string, string>();
   private requestUrls = new Map<string, string>();
   private lastNetworkActivity = Date.now();
+  private mockRules: MockRequestRule[] = [];
+  private mockListening = false;
 
   constructor(
     private cdp: CdpConnection,
@@ -596,6 +599,80 @@ export class BrowserPage {
         timeoutMs,
       ),
     );
+  }
+
+  /**
+   * Answer matching requests with a fixed response, or fail them as if the
+   * server were unreachable, until `clearMocks()`. Rules replace the ones set
+   * before; the first matching rule wins and other requests reach the network.
+   * A mocked failure or an error status still counts as a failed request in
+   * the run's evidence, so list it under `allowNetworkFailures`.
+   */
+  async mockRequests(rules: readonly MockRequestRule[]): Promise<void> {
+    await this.step(`mockRequests ${rules.length}`, async () => {
+      this.mockRules = [...rules];
+
+      if (!this.mockListening) {
+        this.mockListening = true;
+        this.cdp.on("Fetch.requestPaused", ({ requestId, request }) => {
+          void this.answerPaused(requestId, request.url);
+        });
+      }
+
+      await this.cdp.command("Fetch.enable", { patterns: [{ urlPattern: "*" }] });
+    });
+  }
+
+  /** Stop answering requests set by `mockRequests()`. */
+  async clearMocks(): Promise<void> {
+    await this.step("clearMocks", async () => {
+      this.mockRules = [];
+      await this.cdp.command("Fetch.disable", {});
+    });
+  }
+
+  /** Send these headers with every request of the page (an empty object clears them). */
+  async setExtraHeaders(headers: Record<string, string>): Promise<void> {
+    await this.step(`setExtraHeaders ${Object.keys(headers).join(",")}`, async () => {
+      await this.cdp.command("Network.setExtraHTTPHeaders", { headers });
+    });
+  }
+
+  private async answerPaused(requestId: string, url: string): Promise<void> {
+    const rule = this.mockRules.find((candidate) => matches(candidate.url, url));
+
+    try {
+      if (!rule) {
+        await this.cdp.command("Fetch.continueRequest", { requestId });
+      } else if (rule.fail) {
+        await this.cdp.command("Fetch.failRequest", {
+          requestId,
+          errorReason: "ConnectionRefused",
+        });
+      } else {
+        const text =
+          typeof rule.body === "string"
+            ? rule.body
+            : rule.body === undefined
+              ? ""
+              : JSON.stringify(rule.body);
+        const headers = {
+          ...(typeof rule.body === "string" || rule.body === undefined
+            ? {}
+            : { "content-type": "application/json" }),
+          ...rule.headers,
+        };
+
+        await this.cdp.command("Fetch.fulfillRequest", {
+          requestId,
+          responseCode: rule.status ?? 200,
+          responseHeaders: Object.entries(headers).map(([name, value]) => ({ name, value })),
+          body: Buffer.from(text).toString("base64"),
+        });
+      }
+    } catch {
+      // The page navigated away or closed: the paused request no longer exists.
+    }
   }
 
   assertHealthy(): void {

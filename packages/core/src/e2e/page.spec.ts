@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CdpConnection } from "./cdp";
 import { fakeCdp, type FakeCommand } from "./fake-cdp.test-support";
 import { boxesStable, BrowserPage } from "./page";
@@ -300,5 +300,65 @@ describe("accessibility scans", () => {
     );
     await page.assertAccessible({ selector: "main", tags: ["wcag2aa"] });
     expect(evidence.accessibility?.[0].incomplete).toHaveLength(1);
+  });
+});
+
+describe("mocked requests and extra headers", () => {
+  const paused = (requestId: string, url: string) => ({ requestId, request: { url } });
+  const commandsOf = (endpoint: { commands: FakeCommand[] }, method: string) =>
+    endpoint.commands.filter((command) => command.method === method);
+
+  it("fulfils a matching request with JSON and continues the others", async () => {
+    const { page, endpoint } = await setup();
+
+    await page.mockRequests([{ url: "/api/contact", status: 500, body: { error: "down" } }]);
+    expect(commandsOf(endpoint, "Fetch.enable")).toHaveLength(1);
+
+    endpoint.event("Fetch.requestPaused", paused("a", "http://app/api/contact"));
+    endpoint.event("Fetch.requestPaused", paused("b", "http://app/other"));
+
+    await vi.waitFor(() => {
+      expect(commandsOf(endpoint, "Fetch.fulfillRequest")).toHaveLength(1);
+      expect(commandsOf(endpoint, "Fetch.continueRequest")).toHaveLength(1);
+    });
+
+    const fulfilled = commandsOf(endpoint, "Fetch.fulfillRequest")[0]!;
+
+    expect(fulfilled.params).toMatchObject({
+      requestId: "a",
+      responseCode: 500,
+      responseHeaders: [{ name: "content-type", value: "application/json" }],
+    });
+    expect(Buffer.from(String(fulfilled.params.body), "base64").toString()).toBe('{"error":"down"}');
+    expect(commandsOf(endpoint, "Fetch.continueRequest")[0]!.params).toEqual({ requestId: "b" });
+  });
+
+  it("fails a request as unreachable and stops answering after clearMocks", async () => {
+    const { page, endpoint } = await setup();
+
+    await page.mockRequests([{ url: /\/api\//, fail: "unreachable" }]);
+    endpoint.event("Fetch.requestPaused", paused("a", "http://app/api/contact"));
+
+    await vi.waitFor(() => expect(commandsOf(endpoint, "Fetch.failRequest")).toHaveLength(1));
+    expect(commandsOf(endpoint, "Fetch.failRequest")[0]!.params).toEqual({
+      requestId: "a",
+      errorReason: "ConnectionRefused",
+    });
+
+    await page.clearMocks();
+    expect(commandsOf(endpoint, "Fetch.disable")).toHaveLength(1);
+
+    endpoint.event("Fetch.requestPaused", paused("b", "http://app/api/contact"));
+    await vi.waitFor(() => expect(commandsOf(endpoint, "Fetch.continueRequest")).toHaveLength(1));
+  });
+
+  it("sends extra headers with every request", async () => {
+    const { page, endpoint } = await setup();
+
+    await page.setExtraHeaders({ locale: "ar" });
+
+    expect(commandsOf(endpoint, "Network.setExtraHTTPHeaders")[0]!.params).toEqual({
+      headers: { locale: "ar" },
+    });
   });
 });

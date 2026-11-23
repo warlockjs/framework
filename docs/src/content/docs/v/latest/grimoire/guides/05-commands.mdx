@@ -196,8 +196,22 @@ differ, and the guard reports `GR7011` for a change that does not name `public-a
 
 ## `warlock grimoire approve <target>` and `reject <target>`
 
-The owner accepts or refuses a change since the approved baseline: a new capture, a removed criterion, case or flow,
-a deleted proving test. See [Screenshots and approvals](/v/latest/grimoire/guides/12-screenshots-and-approvals/).
+The owner accepts or refuses a change since the approved baseline: a new or changed capture, a removed image, a new or
+removed flow, criterion or case, a criterion that lost its proving test.
+
+```sh
+npx warlock grimoire approve shot-changed:contact/send-message:AC-2:ar   # one change, by its id
+npx warlock grimoire approve contact/send-message --lang ar              # every change of a flow, one language's images
+npx warlock grimoire approve --all                                       # everything; creates the baseline the first time
+npx warlock grimoire reject contact/send-message --note "the button is too small"
+```
+
+The target is a change id (the ids are in the `check` messages and the Bird view), a `<feature>/<flow>`, or `--all`.
+`--lang` keeps only the images of one language. A target nothing matches is `GR9010`. Text output prints one line per
+change and then `approved <n>` (or `rejected <n>`); `--json` prints `{ "done": [...] }`. `approve --all` with no
+baseline creates it from the current state. Approving copies the capture to `grimoire/screenshots/approved/` and
+updates `grimoire/approved/baseline.json`. See
+[Screenshots and approvals](/v/latest/grimoire/guides/12-screenshots-and-approvals/).
 
 ## `warlock scry`
 

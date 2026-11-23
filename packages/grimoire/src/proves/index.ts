@@ -8,3 +8,16 @@
  * one test (that is `GR4005`). Lines inside block comments are ignored.
  */
 export { scanProofs, scanProofsInText, type ScanProofsResult } from "./scan-proofs";
+
+/**
+ * Reading `// @shows <feature>/<flow> AC-<n>` lines from browser test files:
+ * the line sits directly above a `shows()` call that names the same criterion
+ * (`GR4013` otherwise); a line naming no flow or criterion is `GR4014`.
+ */
+export {
+  knownCriteria,
+  scanShows,
+  scanShowsInText,
+  type KnownCriteria,
+  type ScanShowsResult,
+} from "./scan-shows";

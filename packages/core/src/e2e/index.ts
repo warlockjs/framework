@@ -15,6 +15,7 @@ export type {
   E2EEvidence,
   E2ESpec,
   FixtureContext,
+  MockRequestRule,
   NetworkAllowance,
   NetworkFailure,
   Pattern,

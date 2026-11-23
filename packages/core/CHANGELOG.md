@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Test requests no longer read `<name>_test_1` for every worker: a user created in worker 2 is visible to a request made from worker 2.
 - `warlock dev` listens for the file watcher's `error` event: the error is logged, passed to `onFileError` subscribers, and the dev server keeps running.
+- Browser tests (`warlock e2e`) can fake the server: `page.mockRequests(rules)` answers matching requests with a fixed status and body, or fails them as unreachable, until `page.clearMocks()`. `page.setExtraHeaders(headers)` sends headers with every request of the page. New `MockRequestRule` type.
+- `warlock add grimoire` writes `/grimoire/screenshots/captured/` into `.gitignore`: the last captures of `@shows` scenes are not committed.
 
 ## 5.63.1 - 2026-11-22
 

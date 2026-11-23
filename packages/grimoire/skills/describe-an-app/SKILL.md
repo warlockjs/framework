@@ -142,7 +142,10 @@ flow: catalog/new-arrivals
 Keep image files in `grimoire/screenshots/` (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`), for example
 `grimoire/screenshots/web/home.png`. Write an image line `![alt](path)` anywhere in a page, screen
 or block file, with the path relative to the Markdown file or starting with `/grimoire/screenshots/`.
-The Product map shows these as "where you see it". An image outside the folder is a warning
+The Product map shows these as "where you see it". These are images you attach by hand. The
+captures of `@shows` scenes (one per criterion and language) and their approved versions are made by
+Warlock under `grimoire/screenshots/captured/` and `approved/`: never write those paths into a page
+or block file. An image outside the folder is a warning
 (`GR1029`); a missing file is a warning (`GR2014`).
 
 ## Where a difference between apps goes

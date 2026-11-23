@@ -155,6 +155,8 @@ const CASES: Case[] = [
     file: BROWSE,
     line: "## Cases",
     subject: { feature: "catalog", flow: "catalog/browse-products" },
+    // The fixture's page flows leave out the two UI case questions.
+    baseCount: 8,
   },
   {
     code: "GR1013",

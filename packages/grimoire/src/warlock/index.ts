@@ -28,3 +28,4 @@ export {
   type CollectMobileFactsOptions,
   type MobileAppOption,
 } from "./mobile-facts";
+export { shows, type ShowsOptions, type ShowsScene } from "./shows";

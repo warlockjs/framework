@@ -21,6 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 <!-- area C2: components page and screenshot scenes (5.64 merge marker, remove at merge) -->
 
+- The starter has a development-only components page (`/dev/components`, "not found" in production) that renders its form controls and headings in each language, and `e2e/shows.e2e.ts` with `@shows` scenes for the contact form (success, invalid input, server unreachable, server error) and the direction of its inputs.
+- The starter's `AGENTS.md` explains the design-system feature, `@shows` scenes and approvals.
+- The starter's `.gitignore` ignores `/grimoire/screenshots/captured/`.
+
 
 ### Changed
 

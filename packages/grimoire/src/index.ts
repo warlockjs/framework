@@ -37,14 +37,20 @@ export {
 } from "./front-matter";
 export { fileGraph, importClosure, importerClosure, type FileGraph } from "./graph";
 
-export { parseGrimoire, type ParseGrimoireResult } from "./written";
+export { parseGrimoire, resolveSettings, type ParseGrimoireResult } from "./written";
 export { buildBook, checkBook, loadBook, writeBook, type BookCheck } from "./book";
 export { resolveOwnership } from "./ownership";
 export { matchApps } from "./apps";
 export { buildCollectedFiles, writeCollectedFiles, type CollectedInput } from "./bookmap";
 export { openGrimoire } from "./workspace";
 export { openStoredGrimoire } from "./workspace/stored";
-export { scanProofs, scanProofsInText, type ScanProofsResult } from "./proves";
+export {
+  scanProofs,
+  scanProofsInText,
+  scanShows,
+  type ScanProofsResult,
+  type ScanShowsResult,
+} from "./proves";
 export { checkGrimoire, formatCheckReport } from "./check";
 export { collectRelease, renderCollectedList, writeRelease } from "./releases";
 export { criterionStatus, readTestResults, type CriterionTestResult } from "./test-results";
