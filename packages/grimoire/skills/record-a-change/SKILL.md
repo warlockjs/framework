@@ -68,6 +68,8 @@ Add two lines: how it was verified (which tests, which criteria) and anything le
 something is left open, open a new task for it; do not leave it only in the done file. A task
 that needs the owner's answer gets `status: waiting for approval` and a `Decision needed:` line.
 
+Name the task id (`T-12`) in every commit message of the change; `warlock grimoire guard --commits <range>` fails a commit that names none.
+
 ## 5. Check
 
 ```bash
@@ -93,6 +95,14 @@ Migrations, seeds, commands, the main file, layouts, roots and test helpers only
 folder is not committed, so run the tests with the reporter in CI and ship the results file with the
 deploy. To write it elsewhere, pass `grimoireReporter({ file })` and point the devtools panel at it
 with the `testResultsFile` option.
+
+Then check the change against its task, before you stop:
+
+```bash
+npx warlock grimoire guard T-12
+```
+
+It lists files outside the task, deleted proving tests, removed criteria or cases, edited locked tests, protected areas the task does not name, and the code rules on the lines you added. Fix the code rather than widening the task; add a `Files:`, `Touches:` or `Removes:` line only when the owner agreed (`guard-a-change`).
 
 Fix every line it prints. Do not finish with problems you caused. Findings on a flow or feature
 with `status: proposed` print with `(expected)` and do not fail the check: leave them until the
@@ -146,4 +156,6 @@ release and date, and a release section with no release file.
 ## Report to the owner
 
 Say what changed in plain words, the feature version, which criteria are proven, what the check
-reported, and what is left open with its task id.
+reported, and what is left open with its task id. Paste the result of `npx warlock grimoire guard`,
+and list every change that is not approved (`warlock grimoire check` `GR4017`, `GR4018`, `GR4019`) by
+its id; leave none out.

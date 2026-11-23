@@ -141,7 +141,58 @@ It writes the list of the changelog entries stamped with that release between th
 
 Checks the change (the git diff against a base) against its task: files outside the task's features, removed flows,
 criteria and cases, deleted proving tests, edited locked tests, protected areas and the code rules on the lines the
-change adds. See [Drift controls](/v/latest/grimoire/guides/11-drift-controls/).
+change adds. See [Drift controls](/v/latest/grimoire/guides/11-drift-controls/) for what each finding means.
+
+```bash
+warlock grimoire guard                # the one task in progress
+warlock grimoire guard T-12           # T-12, 12 and T-012 name the same task
+warlock grimoire guard T-12 --base origin/main
+warlock grimoire guard --base origin/main --commits origin/main..HEAD
+warlock grimoire guard --hook         # for an agent's Stop hook
+warlock grimoire guard --json
+```
+
+| Option                | What                                                                                                                                                      |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[task]`              | The task id. Without it the guard uses the tasks named in the commits of `--commits`, then the one task whose status is `in progress`, else `GR9008`.     |
+| `--base <ref>`        | The ref the change is compared with. Default: the point where `HEAD` left the default branch (`origin/HEAD`, then `main`, then `master`), else `HEAD`.     |
+| `--commits <range>`   | A commit range (`origin/main..HEAD`). Every commit must name a task id (`T-12`) that has a file (`GR7012`); the tasks the commits name are guarded.        |
+| `--hook`              | Agent-hook mode: everything goes to stderr, exit code 2 on an error, 0 otherwise, also when no task or no git repository is found.                        |
+| `--json`              | Print the report as JSON.                                                                                                                                 |
+
+The change is every file that differs between the base and the working tree: committed, staged, unstaged and
+untracked (not ignored). The guard never boots the app and reads the route facts of the last build.
+
+Text output is one line per finding, as `warlock grimoire check` prints them (`<file>:<line>  <code>  <severity>  <message>`
+and a `fix:` line under each error), then `not approved: <n> changes` with one line per change since the approved
+baseline that nobody approved (these never fail the guard), then `guard: ok` or `guard: <n> errors`.
+
+Exit codes: `0` no error, `1` at least one error, `2` an error in `--hook` mode. `GR9009` (git could not answer) and
+`GR9008` (no task) exit `1`, and `0` in `--hook` mode.
+
+`--json` prints:
+
+```json
+{
+  "schemaVersion": 1,
+  "task": "T-20",
+  "base": "9f1c2e…",
+  "changed": [{ "file": "src/app/orders/utils/extra.ts", "status": "added", "from": null, "addedLines": [1] }],
+  "findings": [{ "code": "GR7006", "severity": "error", "message": "…", "at": { "file": "…", "line": 1, "column": null }, "expected": false, "subject": { "feature": null, "flow": null, "app": null, "task": "T-20", "file": "…" }, "hint": "…" }],
+  "notApproved": [],
+  "counts": { "errors": 1, "warnings": 0, "expected": 0 },
+  "ok": false
+}
+```
+
+`base` is the commit the change was compared with; `task` is `null` when none was found, and joins several ids with a
+comma when the commits name several.
+
+### `warlock grimoire approve api`
+
+Writes the routes the book knows to `grimoire/approved/api.json`, the approved public API. It reads the route facts of
+the last `warlock grimoire build` and never boots the app. `warlock grimoire check` warns (`GR7013`) when the routes
+differ, and the guard reports `GR7011` for a change that does not name `public-api` in `Touches:`.
 
 ## `warlock grimoire approve <target>` and `reject <target>`
 

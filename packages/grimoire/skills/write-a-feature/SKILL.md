@@ -42,6 +42,24 @@ status: waiting for approval
 - Decision needed: one wishlist per customer, or several named lists?
 ```
 
+The guard (`warlock grimoire guard`, see `guard-a-change`) reads these optional body lines, comma-separated:
+
+```md
+- Files: src/app/shared/utils/money.ts, src/config/catalog.ts
+- Features: orders, catalog/wishlist
+- Locked: src/app/catalog/tests/wishlist.test.ts
+- Touches: migrations, dependencies
+- Removes: catalog/wishlist AC-3, catalog/wishlist case duplicate
+```
+
+- `Files:` lists files (globs allowed) outside the task's feature that the change must touch.
+- `Features:` names more features (`orders`) or flows (`catalog/wishlist`) the change may touch.
+- `Locked:` names the acceptance tests the planner wrote first. Whoever builds the task never edits them.
+- `Touches:` names the protected areas the task may change: `migrations`, `auth`, `config`, `lockfile`, `dependencies`, `public-api`, or an area of `grimoire/settings.md`.
+- `Removes:` names the flow, criterion or case that is allowed to go (`<feature>/<flow>`, `<feature>/<flow> AC-3`, `<feature>/<flow> case duplicate`).
+
+Write the acceptance tests first, with their `@proves` lines, and list them in `Locked:` before handing the task to an implementer. The task's `feature` and `flow` already put that feature's files and the flow's files in scope; add `Files:` for the rest at the start, not after the guard fails.
+
 A task that waits for the owner's answer has `status: waiting for approval` and a `Decision needed:` line.
 The other statuses are `open`, `approved`, `in progress`, `blocked`, `done` and `dropped`; any other
 word is an error (`GR1004`).

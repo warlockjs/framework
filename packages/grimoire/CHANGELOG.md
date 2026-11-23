@@ -10,6 +10,15 @@
 
 <!-- area B: guard, code rules, locked tests, protected areas (5.64 merge marker, remove at merge) -->
 
+- `warlock grimoire guard [task] [--base <ref>] [--commits <range>] [--hook] [--json]` checks a change (the git diff against its base, including staged, unstaged and untracked files) against its task, without booting the app: `GR7006` a changed file outside the task's features, flow files, proving tests and `Files:` line; `GR7007` a flow, criterion or case removed without a `Removes:` line; `GR7008` a deleted `@proves` test; `GR7009` an edited `Locked:` test; `GR7010` a changed test with fewer assertions; `GR7011` a protected area the task does not name in `Touches:`; `GR7012` a commit of `--commits` that names no task; `GR9008` no task found; `GR9009` git could not answer. It prints the changes not approved without failing on them, exits 1 on an error, and in `--hook` mode writes to stderr and exits 2 on an error (0 when no task or no git repository is found). The JSON report is the new `GuardReport` type.
+- Tasks can carry `Files:`, `Features:`, `Locked:`, `Touches:` and `Removes:` body lines that the guard reads.
+- Four code rules, `logical-css` (`GR3007`), `specific-errors` (`GR3008`), `type-discriminator` (`GR3009`) and `no-js-imports` (`GR3010`), over code, style and locale files, with the escape comment `grimoire-allow <rule>: <why>`. `grimoire check` runs the rules named in `rules:` of `grimoire/settings.md`; the guard runs all four on the lines a change adds when the key is absent.
+- `grimoire check` reports a test focused with `.only` (`GR4011`) or skipped with `.skip` (`GR4012`, a warning); the guard raises both to errors when a change adds them.
+- Protected areas (`DEFAULT_PROTECTED_AREAS`: migrations, auth, config, lockfile, dependencies, public API) change only when the task names them. `dependencies` fires only when a `package.json` adds or changes a dependency entry.
+- `warlock grimoire approve api` writes the routes to `grimoire/approved/api.json`; `grimoire check` warns (`GR7013`) when the routes differ, and the guard reports `GR7011` for a change that does not name `public-api`.
+- Skills `guard-a-change` and `review-a-change` (the reviewer gets the task and the diff, never the author's summary, and one question: "List every change the task did not ask for"); `write-a-feature` and `record-a-change` cover the new task fields, running the guard before you stop and listing every change that is not approved in the report.
+- Guide "Drift controls" and the `guard` section of the commands guide.
+
 <!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
 
 <!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
