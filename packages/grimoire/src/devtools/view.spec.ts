@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,9 +13,16 @@ const viewPath = path.join(
   "grimoire-view.js",
 );
 
-async function renderView(answers: Record<string, unknown>, route = "") {
+async function renderView(
+  answers: Record<string, unknown>,
+  route = "",
+  extra: Record<string, unknown> = {},
+) {
   const { default: render } = await import(/* @vite-ignore */ pathToFileURL(viewPath).href);
   const panel = fakePanelContext(answers, route);
+
+  Object.assign(panel.context, extra);
+
   const view = (await render(panel.context)) as FakeNode;
 
   return { ...panel, view };
@@ -739,8 +747,8 @@ describe("grimoire view: no features written (book only)", () => {
     });
 
     expect(view.text).toContain("1 error, 2 warnings");
-    // Waiting tasks are counted once, as waiting.
-    expect(view.text).toContain("2 open, 1 waiting");
+    // The tile counts every open task, the same as the tab badge; waiting ones are named inside the count.
+    expect(view.text).toContain("3 open, 1 of them waiting for approval");
     expect(view.links).toContain("#grimoire/feature/auth");
   });
 });
@@ -1269,6 +1277,9 @@ describe("grimoire view: navigation", () => {
       ["", ["Overview"]],
       ["product", ["Product map"]],
       ["product/feature/auth", ["Product map"]],
+      ["product/whats-new", ["Product map"]],
+      ["bird-view", ["Bird view"]],
+      ["bird-view?q=AC-3", ["Bird view"]],
       ["features", ["Features"]],
       ["feature/auth", ["Features"]],
       ["flow/auth/login", ["Features"]],
@@ -1295,6 +1306,7 @@ describe("grimoire view: navigation", () => {
 
     expect(nav.links).toEqual([
       "#grimoire/product",
+      "#grimoire/bird-view",
       "#grimoire",
       "#grimoire/features",
       "#grimoire/apps",
@@ -1418,7 +1430,9 @@ describe("grimoire view: apps", () => {
 
   it("shows one card per app and groups its pages by the first route segment", async () => {
     const { view } = await renderView({ apps: appsAnswer }, "apps");
-    const groups = view.find("h4").map((node) => node.text);
+    const groups = view
+      .findAll((node) => node.attributes.class === "grimoire-app-group-title")
+      .map((node) => node.text);
 
     expect(view.text).toContain("4 of 4 pages and screens");
     expect(view.text).toContain("site");
@@ -1987,5 +2001,701 @@ describe("grimoire view: host and flow cards", () => {
     // A flow without counts (an older answer) still renders, with its id as the title.
     expect(cards[1]?.text).toContain("search");
     expect(cards[1]?.text).not.toContain("finding");
+  });
+});
+
+// ── Bird view ───────────────────────────────────────────────────────────────
+
+const driftItem = {
+  id: "shot-changed:contact/send-message:AC-1:ar",
+  type: "shot-changed",
+  ref: "contact/send-message",
+  criterion: "AC-1",
+  language: "ar",
+  case: null,
+  before: null,
+  after: null,
+  approvedShot: "approved/contact/send-message/AC-1.ar.png",
+  capturedShot: "captured/contact/send-message/AC-1.ar.png",
+  rejected: null,
+};
+
+const cell = (language: string, state: string, extra: Record<string, unknown> = {}) => ({
+  language,
+  test: "pass",
+  shown: null,
+  approval: null,
+  drift: [],
+  state,
+  ...extra,
+});
+
+const shownCell = (
+  language: string,
+  state: string,
+  outcome = "pass",
+  approved: string | null = null,
+) =>
+  cell(language, state, {
+    shown: {
+      outcome,
+      shot: `captured/contact/send-message/AC-1.${language}.png`,
+      approved,
+      ranAt: "2026-11-21T10:00:00.000Z",
+    },
+  });
+
+const matrixAnswer = (patch: Partial<FixtureMatrix> = {}): FixtureMatrix => ({
+  languages: ["en", "ar"],
+  mode: "changed",
+  baseline: { approvedAt: "2026-11-20T10:00:00.000Z" },
+  development: true,
+  features: [
+    {
+      id: "design-system",
+      title: "Design system",
+      designSystem: true,
+      flows: [
+        {
+          ref: "design-system/direction",
+          id: "direction",
+          title: "Direction",
+          status: "shipped",
+          differsIn: [],
+          screenshots: true,
+          removed: false,
+          drift: [],
+          criteria: [
+            {
+              id: "AC-3",
+              text: "Inputs follow the reading direction",
+              app: null,
+              removed: false,
+              cells: [cell("en", "pass"), cell("ar", "no-test", { test: "no-test" })],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "contact",
+      title: "Contact",
+      designSystem: false,
+      flows: [
+        {
+          ref: "contact/send-message",
+          id: "send-message",
+          title: "Send a message",
+          status: "shipped",
+          differsIn: ["web", "mobile"],
+          screenshots: true,
+          removed: false,
+          drift: ["case-removed:contact/send-message:server error"],
+          criteria: [
+            {
+              id: "AC-1",
+              text: "A message is sent",
+              app: null,
+              removed: false,
+              cells: [
+                shownCell("en", "pass"),
+                shownCell("ar", "changed", "pass", "approved/contact/send-message/AC-1.ar.png"),
+              ].map((item, index) =>
+                index === 1
+                  ? { ...item, approval: "changed", drift: [driftItem.id] }
+                  : { ...item, approval: "approved" },
+              ),
+            },
+            {
+              id: "AC-2",
+              text: "A wrong email is refused",
+              app: "web",
+              removed: false,
+              cells: [shownCell("en", "fail", "fail"), cell("ar", "not-run", { test: "not-run" })],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  drift: [
+    driftItem,
+    {
+      ...driftItem,
+      id: "case-removed:contact/send-message:server error",
+      type: "case-removed",
+      criterion: null,
+      language: null,
+      case: "server error",
+      approvedShot: null,
+      capturedShot: null,
+    },
+  ],
+  counts: { rejected: 0, fail: 1, changed: 1, stale: 0, "not-run": 1, "no-test": 1, pass: 2 },
+  ...patch,
+});
+
+/** A view whose `api()` records the options of every call and can fail one route. */
+async function renderBird(
+  answer: unknown,
+  route = "bird-view",
+  options: { failing?: Record<string, Error> } = {},
+) {
+  const posts: { path: string; body: unknown }[] = [];
+  const refresh = vi.fn();
+  const { default: render } = await import(/* @vite-ignore */ pathToFileURL(viewPath).href);
+  const panel = fakePanelContext({ matrix: answer }, route);
+  const read = panel.context.api;
+
+  Object.assign(panel.context, {
+    file: (src: string) => `files/${src}`,
+    refresh,
+    api: async (path = "", init?: { method?: string; body?: string }) => {
+      if (init?.method === "POST") {
+        posts.push({ path, body: JSON.parse(init.body ?? "null") });
+
+        const failure = options.failing?.[path];
+
+        if (failure) throw failure;
+
+        return { done: [] };
+      }
+
+      return read(path);
+    },
+  });
+
+  const view = (await render(panel.context)) as FakeNode;
+
+  return { view, posts, refresh };
+}
+
+const cellButtons = (view: FakeNode) =>
+  view.findAll((node) => (node.attributes.class ?? "").startsWith("grimoire-bird-cell"));
+
+describe("grimoire view: bird view", () => {
+  it("lists the features, flows and criteria against one column per language", async () => {
+    const { view } = await renderBird(matrixAnswer());
+    const headers = view.find("th").map((node) => node.text.trim());
+
+    expect(view.text).toContain("Design system");
+    expect(view.text).toContain("Send a message");
+    expect(view.text).toContain("A wrong email is refused");
+    expect(headers).toEqual(expect.arrayContaining(["Criterion", "en", "ar"]));
+    // The design system is the first feature.
+    expect(view.text.indexOf("Design system")).toBeLessThan(view.text.indexOf("Contact"));
+    expect(cellButtons(view)).toHaveLength(6);
+    expect(view.text).toContain("differs in web, mobile");
+    expect(view.text).toContain("1 change not approved");
+  });
+
+  it("says each state in words and draws the captured image as a lazy thumbnail", async () => {
+    const { view } = await renderBird(matrixAnswer());
+    const images = view.findAll((node) => node.attributes.class === "grimoire-bird-thumb");
+
+    expect(view.text).toContain("Changed, not approved");
+    expect(view.text).toContain("Failing");
+    expect(images.map((node) => node.attributes.src)).toEqual([
+      "files/captured/contact/send-message/AC-1.en.png",
+      "files/captured/contact/send-message/AC-1.ar.png",
+      "files/captured/contact/send-message/AC-1.en.png",
+    ]);
+    expect(images.every((node) => node.attributes.loading === "lazy")).toBe(true);
+  });
+
+  it("never lets an image path leave the screenshots folder", async () => {
+    const answer = matrixAnswer();
+    const first = answer.features[1]?.flows[0]?.criteria[0]?.cells[0] as {
+      shown: { shot: string };
+    };
+
+    first.shown.shot = "../../etc/passwd.png";
+
+    const { view } = await renderBird(answer);
+
+    expect(
+      view.findAll((node) => node.tag === "img" && (node.attributes.src ?? "").includes("..")),
+    ).toEqual([]);
+  });
+
+  it("shows the test status only, without images, buttons or errors, when there are no screenshots and no baseline", async () => {
+    const answer = matrixAnswer({ baseline: null, development: false, drift: [], counts: {} });
+
+    for (const feature of answer.features)
+      for (const flow of feature.flows) {
+        flow.drift = [];
+
+        for (const row of flow.criteria)
+          row.cells = row.cells.map((item) => ({
+            ...item,
+            shown: null,
+            drift: [],
+            approval: null,
+          }));
+      }
+
+    const { view } = await renderBird(answer);
+
+    expect(view.find("img")).toEqual([]);
+    expect(view.text).toContain("Nothing approved yet");
+    expect(view.findAll((node) => node.tag === "button" && node.text === "Approve all")).toEqual(
+      [],
+    );
+    expect(cellButtons(view)).toHaveLength(6);
+  });
+
+  it("offers Approve all in development when nothing is approved yet, and sends the whole-baseline target", async () => {
+    const { view, posts, refresh } = await renderBird(matrixAnswer({ baseline: null, drift: [] }));
+    const approveAll = view.findAll(
+      (node) => node.tag === "button" && node.text === "Approve all",
+    )[0];
+
+    approveAll?.fire("click");
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(posts).toEqual([{ path: "approve", body: { ids: ["--all"] } }]);
+  });
+
+  it("says when screenshots are off", async () => {
+    const { view } = await renderBird(matrixAnswer({ mode: "off" }));
+
+    expect(view.text).toContain("Screenshots are off in grimoire/settings.md");
+  });
+
+  it("opens the side-by-side panel with the approved and the captured image, and the buttons only in development", async () => {
+    const { view } = await renderBird(matrixAnswer());
+    const changed = cellButtons(view).find((node) => node.attributes.class?.includes("is-changed"));
+
+    changed?.fire("click");
+
+    const dialog = view.findAll((node) => node.tag === "dialog")[0] as FakeNode;
+    const figures = dialog.findAll((node) => node.tag === "figure");
+
+    expect(dialog.attributes.open).toBe("");
+    expect(figures.map((node) => node.find("figcaption")[0]?.text)).toEqual([
+      "Approved",
+      "Captured",
+    ]);
+    expect(figures.map((node) => node.find("img")[0]?.attributes.src)).toEqual([
+      "files/approved/contact/send-message/AC-1.ar.png",
+      "files/captured/contact/send-message/AC-1.ar.png",
+    ]);
+    expect(dialog.text).toContain("The screenshot changed (ar)");
+    expect(dialog.findAll((node) => node.tag === "button" && node.text === "Approve")).toHaveLength(
+      1,
+    );
+    expect(dialog.findAll((node) => node.tag === "button" && node.text === "Reject")).toHaveLength(
+      1,
+    );
+
+    const readOnly = await renderBird(matrixAnswer({ development: false }));
+
+    cellButtons(readOnly.view)
+      .find((node) => node.attributes.class?.includes("is-changed"))
+      ?.fire("click");
+
+    const readOnlyDialog = readOnly.view.findAll((node) => node.tag === "dialog")[0] as FakeNode;
+
+    expect(readOnlyDialog.text).toContain("The screenshot changed (ar)");
+    expect(
+      readOnlyDialog.findAll(
+        (node) => node.tag === "button" && /^(Approve|Reject)/.test(node.text),
+      ),
+    ).toEqual([]);
+  });
+
+  it("approves the cell's drift ids and reloads the matrix", async () => {
+    const { view, posts, refresh } = await renderBird(matrixAnswer());
+
+    cellButtons(view)
+      .find((node) => node.attributes.class?.includes("is-changed"))
+      ?.fire("click");
+
+    const dialog = view.findAll((node) => node.tag === "dialog")[0] as FakeNode;
+
+    dialog.findAll((node) => node.tag === "button" && node.text === "Approve")[0]?.fire("click");
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+    expect(posts).toEqual([{ path: "approve", body: { ids: [driftItem.id] } }]);
+  });
+
+  it("rejects with the note the owner typed", async () => {
+    const { view, posts } = await renderBird(matrixAnswer());
+
+    cellButtons(view)
+      .find((node) => node.attributes.class?.includes("is-changed"))
+      ?.fire("click");
+
+    const dialog = view.findAll((node) => node.tag === "dialog")[0] as FakeNode;
+
+    dialog.find("input")[0]?.fire("input", { target: { value: "wrong font" } });
+    // The note is read when the button is pressed.
+    (dialog.find("input")[0] as FakeNode & { value?: string }).value = "wrong font";
+    dialog.findAll((node) => node.tag === "button" && node.text === "Reject")[0]?.fire("click");
+    await vi.waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toEqual({ path: "reject", body: { ids: [driftItem.id], note: "wrong font" } });
+  });
+
+  it("keeps the panel open and says what failed and what to do when approving fails", async () => {
+    const failure = Object.assign(new Error("The baseline file is read-only"), { status: 500 });
+    const { view, refresh } = await renderBird(matrixAnswer(), "bird-view", {
+      failing: { approve: failure },
+    });
+
+    cellButtons(view)
+      .find((node) => node.attributes.class?.includes("is-changed"))
+      ?.fire("click");
+
+    const dialog = view.findAll((node) => node.tag === "dialog")[0] as FakeNode;
+
+    dialog.findAll((node) => node.tag === "button" && node.text === "Approve")[0]?.fire("click");
+    await vi.waitFor(() => expect(dialog.text).toContain("Could not approve"));
+    expect(dialog.text).toContain("The baseline file is read-only");
+    expect(dialog.text).toContain("Nothing was changed");
+    expect(dialog.attributes.open).toBe("");
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("opens a flow's own changes (a case that was removed) from the flow row", async () => {
+    const { view } = await renderBird(matrixAnswer());
+    const review = view.findAll(
+      (node) => node.tag === "button" && node.text === "Review the flow's changes",
+    )[0];
+
+    review?.fire("click");
+
+    const dialog = view.findAll((node) => node.tag === "dialog")[0] as FakeNode;
+
+    expect(dialog.text).toContain("A case was removed: server error");
+  });
+
+  it("filters by feature, flow or AC number and keeps the filter in the route", async () => {
+    const replaceState = vi.fn();
+
+    vi.stubGlobal("history", { replaceState });
+
+    try {
+      const { view } = await renderBird(matrixAnswer());
+      const input = view.find("input")[0] as FakeNode;
+
+      input.fire("input", { target: { value: "AC-3" } });
+      expect(replaceState).toHaveBeenLastCalledWith(null, "", "#grimoire/bird-view?q=AC-3");
+      expect(view.text).toContain("Inputs follow the reading direction");
+      expect(view.text).not.toContain("A wrong email is refused");
+
+      input.fire("input", { target: { value: "send-message" } });
+      expect(view.text).toContain("A wrong email is refused");
+      expect(view.text).not.toContain("Inputs follow the reading direction");
+
+      input.fire("input", { target: { value: "nothing like this" } });
+      expect(view.text).toContain('Nothing matches "nothing like this"');
+
+      input.fire("input", { target: { value: "" } });
+      expect(replaceState).toHaveBeenLastCalledWith(null, "", "#grimoire/bird-view");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("matches an AC number exactly, so AC-1 does not pull in AC-10", async () => {
+    const answer = matrixAnswer();
+    const flow = answer.features[1]?.flows[0];
+
+    flow?.criteria.push({
+      id: "AC-10",
+      text: "A tenth rule",
+      app: null,
+      removed: false,
+      cells: [cell("en", "pass"), cell("ar", "pass")],
+    });
+
+    const { view } = await renderBird(answer, "bird-view?q=AC-1");
+
+    expect(view.text).toContain("A message is sent");
+    expect(view.text).not.toContain("A tenth rule");
+  });
+
+  it("opens on the filter named in the route", async () => {
+    const { view } = await renderBird(matrixAnswer(), "bird-view?q=AC-2");
+
+    expect(view.text).toContain("A wrong email is refused");
+    expect(view.text).not.toContain("Inputs follow the reading direction");
+  });
+
+  it("counts the cells that need a look in the tab badge", async () => {
+    const { view } = await renderView(
+      { summary: { ...emptySummary, birdView: 3 }, matrix: matrixAnswer() },
+      "bird-view",
+    );
+    const tab = view.findAll(
+      (node) => node.tag === "a" && node.attributes.href === "#grimoire/bird-view",
+    )[0];
+
+    expect(tab?.text.replace(/\s+/g, " ").trim()).toBe("Bird view 3");
+  });
+
+  it("shows a removed criterion struck through and marked removed", async () => {
+    const answer = matrixAnswer();
+    const flow = answer.features[1]?.flows[0];
+
+    flow?.criteria.push({
+      id: "AC-9",
+      text: "The old rule",
+      app: null,
+      removed: true,
+      cells: [
+        cell("en", "changed", { approval: "changed" }),
+        cell("ar", "changed", { approval: "changed" }),
+      ],
+    });
+
+    const { view } = await renderBird(answer);
+    const row = view.findAll(
+      (node) => node.tag === "tr" && node.attributes.class === "is-removed",
+    )[0];
+
+    expect(row?.text).toContain("The old rule");
+    expect(row?.text).toContain("removed");
+  });
+});
+
+// ── Developer UI: tall finding lists, task counts, the modules graph, phone width ──
+
+describe("grimoire view: developer feature page", () => {
+  const finding = (code: string, index: number) => ({
+    code,
+    severity: "warning",
+    message: `finding ${code} number ${index}`,
+    at: null,
+    expected: false,
+    subject: {
+      feature: "catalog",
+      flow: "catalog/new-arrivals",
+      app: null,
+      task: null,
+      file: null,
+    },
+    hint: null,
+  });
+
+  it("lists many findings as a few collapsed groups by code, not one card each", async () => {
+    const findings = [
+      ...Array.from({ length: 30 }, (_, index) => finding("GR4008", index)),
+      ...Array.from({ length: 5 }, (_, index) => finding("GR3006", index)),
+    ];
+    const { view } = await renderView(
+      {
+        "features/catalog": { ...featurePageAnswer, findings },
+        "check/groups": { groups: [] },
+      },
+      "feature/catalog/findings",
+    );
+    const heads = view.findAll((node) => node.attributes.class === "grimoire-group-head");
+
+    expect(heads).toHaveLength(2);
+    expect(view.findAll((node) => node.attributes.class === "grimoire-finding")).toHaveLength(0);
+    expect(view.text).not.toContain("finding GR4008 number 3");
+  });
+
+  it("draws the neighbour graph above the flows", async () => {
+    const { view } = await renderView(
+      {
+        "features/catalog": featurePageAnswer,
+        "graph/feature/catalog": {
+          nodes: [
+            { id: "feature:catalog", label: "catalog", type: "center" },
+            { id: "feature:auth", label: "auth", type: "feature" },
+          ],
+          edges: [{ from: "feature:catalog", to: "feature:auth", type: "borrows" }],
+        },
+      },
+      "feature/catalog",
+    );
+    const titles = view.find("h3").map((node) => node.text);
+
+    expect(titles).toEqual([
+      "Feature map",
+      "The feature and its neighbours",
+      "Flows",
+      "Recent changes",
+    ]);
+  });
+});
+
+describe("grimoire view: task counts", () => {
+  it("counts every open task in the tile and in the badge, and names the waiting ones inside that count", async () => {
+    const task = (id: string) => ({ id });
+    const { view } = await renderView({
+      summary: {
+        ...emptySummary,
+        tasks: {
+          schemaVersion: 1,
+          open: [task("T-1"), task("T-2")],
+          waiting: [task("T-2")],
+          done: [],
+        },
+      },
+    });
+    const tile = view.findAll(
+      (node) =>
+        node.tag === "a" &&
+        node.attributes.href === "#grimoire/tasks" &&
+        (node.attributes.class ?? "").startsWith("grimoire-stat"),
+    )[0];
+    const badge = view
+      .findAll((node) => node.tag === "a" && node.attributes.href === "#grimoire/tasks")[0]
+      ?.findAll((node) => node.attributes.class === "grimoire-tab-count")[0];
+
+    expect(tile?.text).toContain("2 open, 1 of them waiting for approval");
+    expect(tile?.text.replace(/\s+/g, " ")).toContain("Tasks 2");
+    expect(badge?.text).toBe("2");
+  });
+
+  it("shows one waiting task as one open task, never as zero", async () => {
+    const { view } = await renderView({
+      summary: {
+        ...emptySummary,
+        tasks: { schemaVersion: 1, open: [{ id: "T-1" }], waiting: [{ id: "T-1" }], done: [] },
+      },
+    });
+
+    expect(view.text).toContain("1 open, 1 of them waiting for approval");
+    expect(view.text).not.toContain("0 open");
+  });
+});
+
+describe("grimoire view: modules graph on a large app", () => {
+  const modules = (count: number) => ({
+    nodes: Array.from({ length: count }, (_, index) => ({
+      id: `module:src/app/some-long-module-name-${index}`,
+      label:
+        index === 0
+          ? "src/app/some-long-module-name-0 (2,548 files)"
+          : `src/app/some-long-module-name-${index}`,
+      title: `src/app/some-long-module-name-${index} (${index === 0 ? "2,548" : 3} files)`,
+      type: "module",
+      group: index % 5 === 0 ? "roots" : "modules",
+      files: index === 0 ? 2548 : 3,
+    })),
+    edges: Array.from({ length: count - 1 }, (_, index) => ({
+      from: `module:src/app/some-long-module-name-${index}`,
+      to: `module:src/app/some-long-module-name-${index + 1}`,
+      type: "imports",
+      weight: index + 1,
+    })),
+  });
+
+  it("opens on a matrix of the 20 most connected modules above 40 modules, with the full name on each", async () => {
+    const { view } = await renderView({ "graph/modules": modules(60) }, "modules");
+    const matrix = view.findAll((node) =>
+      (node.attributes.class ?? "").includes("grimoire-modmatrix-table"),
+    )[0] as FakeNode;
+    const columns = matrix.findAll((node) => node.tag === "th" && node.attributes.scope === "col");
+
+    expect(view.find("svg")).toHaveLength(0);
+    // The first column is the corner; then 20 modules.
+    expect(columns).toHaveLength(21);
+    expect(columns[1]?.attributes.title).toContain("src/app/some-long-module-name-");
+    // Labels are cut from the right, so the start of the name stays.
+    expect(columns.slice(1).every((node) => node.text.startsWith("src/app/s"))).toBe(true);
+    expect(view.text).toContain("The 20 most connected modules");
+  });
+
+  it("switches to the graph, cuts labels from the right and keeps the full name in the title", async () => {
+    const { view } = await renderView({ "graph/modules": modules(60) }, "modules");
+    const toggle = view.findAll((node) => node.tag === "button" && node.text === "Graph")[0];
+
+    toggle?.fire("click");
+
+    const titles = view.find("title").map((node) => node.text);
+
+    expect(view.find("circle")).toHaveLength(60);
+    expect(titles).toContain("src/app/some-long-module-name-0 (2,548 files)");
+    expect(titles).toContain("src/app/some-long-module-name-7 (3 files)");
+    expect(view.text).toContain("Inner ring: sites, mobile and other roots");
+  });
+
+  it("draws a small module graph directly, labelled, with no matrix", async () => {
+    const { view } = await renderView({ "graph/modules": modules(12) }, "modules");
+    const labels = view.find("text").map((node) => node.text);
+
+    expect(view.find("circle")).toHaveLength(12);
+    expect(labels.every((label) => label.length <= 16)).toBe(true);
+    expect(labels[1]).toBe("src/app/some-lo…");
+    expect(view.findAll((node) => node.tag === "button" && node.text === "Matrix")).toEqual([]);
+  });
+});
+
+describe("grimoire view: phone width", () => {
+  const css = readFileSync(path.join(path.dirname(viewPath), "grimoire.css"), "utf8");
+
+  /** The text of every `@media (max-width: 640px) { … }` block. */
+  const phoneBlocks = () => {
+    const blocks: string[] = [];
+    let at = css.indexOf("@media (max-width: 640px)");
+
+    while (at >= 0) {
+      let depth = 0;
+      let end = css.indexOf("{", at);
+
+      for (let index = end; index < css.length; index += 1) {
+        if (css[index] === "{") depth += 1;
+        if (css[index] === "}") depth -= 1;
+        if (depth === 0) {
+          end = index;
+          break;
+        }
+      }
+
+      blocks.push(css.slice(at, end + 1));
+      at = css.indexOf("@media (max-width: 640px)", end);
+    }
+
+    return blocks;
+  };
+
+  it("wraps the tab bar onto rows under 640 px instead of hiding tabs behind a scroll fade", () => {
+    const wrapped = phoneBlocks().find((block) =>
+      /\.grimoire-tabs\s*\{[^}]*flex-wrap:\s*wrap/.test(block),
+    );
+
+    expect(wrapped).toBeDefined();
+    expect(wrapped).toMatch(/overflow-x:\s*visible/);
+    expect(wrapped).toMatch(/background-image:\s*none/);
+  });
+
+  const page = (name: string) => ({
+    id: name,
+    type: "page",
+    route: `/${name}`,
+    heading: null,
+    origin: "confirmed",
+    layout: null,
+    blocks: 1,
+  });
+  const appOf = (rows: ReturnType<typeof page>[]) => ({
+    apps: [
+      {
+        id: "web",
+        type: "site",
+        root: "src/web",
+        pages: rows.map((row) => row.id),
+        screens: [],
+        rows,
+      },
+    ],
+  });
+
+  it("starts an app group with more than 6 pages closed, and a small one open", async () => {
+    const many = Array.from({ length: 7 }, (_, index) => ({
+      ...page(`p${index}`),
+      route: `/shop/p${index}`,
+    }));
+    const few = [page("a"), page("b")].map((row) => ({ ...row, route: `/blog${row.route}` }));
+    const { view } = await renderView({ apps: appOf([...many, ...few]) }, "apps");
+    const groups = view.findAll((node) => node.tag === "details");
+    const byTitle = (title: string) =>
+      groups.find((node) => node.find("summary")[0]?.text.startsWith(title));
+
+    expect(byTitle("/shop (7)")?.attributes.open).toBeUndefined();
+    expect(byTitle("/blog (2)")?.attributes.open).toBe("");
   });
 });

@@ -9,8 +9,16 @@ import {
   productFeature,
   productFlow,
   productMap,
+  productWhatsNew,
   type ProductMapOptions,
 } from "./product-map";
+import {
+  entry,
+  feature as builtFeature,
+  flow as builtFlow,
+  snapshot as builtSnapshot,
+} from "../../tests/check/snapshot-builder";
+import type { WrittenRelease } from "../contracts/written";
 
 // The real check, counted: the answers must run it once per snapshot.
 vi.mock("../check", async (importOriginal) => {
@@ -307,5 +315,136 @@ describe("product map dates and release order", () => {
     const names = ["5.10.0", "5.9.0", "5.2.1", "5.2.0"];
 
     expect([...names].sort(compareReleases)).toEqual(["5.2.0", "5.2.1", "5.9.0", "5.10.0"]);
+  });
+});
+
+describe("product map: the app title of a place", () => {
+  it("names each appearance with its app's heading, or null when the app has none", async () => {
+    const snapshot = await open();
+    const answer = productFeature(snapshot, "catalog", signedIn);
+
+    expect(answer.appearances.length).toBeGreaterThan(0);
+
+    for (const item of answer.appearances) {
+      const app = snapshot.written.apps.find((candidate) => candidate.id.value === item.app);
+
+      expect(item.appTitle).toBe(app?.heading?.value ?? null);
+    }
+
+    const app = snapshot.written.apps.find(
+      (candidate) => candidate.id.value === answer.appearances[0]?.app,
+    );
+
+    if (app === undefined) throw new Error("no app");
+
+    app.heading = null;
+    expect(productFeature(snapshot, "catalog", signedIn).appearances[0]?.appTitle).toBeNull();
+  });
+});
+
+describe("product map: what's new", () => {
+  const location = { file: "grimoire/releases/x.md", line: 1, column: null };
+  const release = (name: string, date: string, brief: string): WrittenRelease => ({
+    file: `grimoire/releases/${name}.md`,
+    release: { value: name, at: location },
+    date: { value: date, at: location },
+    heading: null,
+    brief,
+    collected: null,
+  });
+
+  /** One feature with a stamped release, an older one that has no release file, and an unreleased change. */
+  function project() {
+    const base = builtSnapshot();
+    const checkout = builtFeature("checkout", {
+      entries: [
+        {
+          ...entry("2.0", "added", { release: "5.2.0", date: "2026-11-01" }),
+          text: "Saved cards (AC-4, T-12).",
+        },
+        {
+          ...entry("1.1", "fixed", { release: "5.1.0", date: "2026-10-01" }),
+          text: "Totals round correctly.",
+        },
+        { ...entry("2.1", "changed", {}), text: "Wallet button moved." },
+      ],
+    });
+
+    return {
+      ...base,
+      written: {
+        ...base.written,
+        features: [checkout],
+        releases: [
+          release(
+            "5.2.0",
+            "2026-11-01",
+            "# 5.2.0\n\nFaster `checkout` and fewer failed payments (T-12).\n\nSecond paragraph.",
+          ),
+        ],
+      },
+    };
+  }
+
+  it("lists the releases newest first, with the brief's first paragraph and the changes per feature", () => {
+    const answer = productWhatsNew(project(), signedIn);
+
+    expect(answer.releases.map((item) => item.release)).toEqual([null, "5.2.0", "5.1.0"]);
+    expect(answer.releases[1]).toMatchObject({
+      date: "2026-11-01",
+      brief: "Faster checkout and fewer failed payments.",
+    });
+    expect(answer.releases[1]?.features[0]?.changes).toEqual([
+      { word: "added", flow: null, text: "Saved cards." },
+    ]);
+    // A release a changelog names but no file describes still appears, with its changelog date.
+    expect(answer.releases[2]).toMatchObject({ release: "5.1.0", date: "2026-10-01", brief: null });
+    expect(answer.developer).toBe(true);
+  });
+
+  it("carries no criterion or task ids and no file paths", () => {
+    const text = JSON.stringify(productWhatsNew(project(), signedIn));
+
+    expect(text).not.toMatch(/AC-\d|T-\d|grimoire\/|\.md/);
+  });
+
+  it("leaves the unreleased changes out of a shared answer", () => {
+    const answer = productWhatsNew(project(), shared);
+
+    expect(answer.releases.map((item) => item.release)).toEqual(["5.2.0", "5.1.0"]);
+    expect(answer.developer).toBe(false);
+    expect(JSON.stringify(answer)).not.toContain("Wallet button moved.");
+  });
+
+  it("names a change with the flow's heading, and keeps an unknown flow id as written", () => {
+    const base = project();
+    const pay = builtFlow("checkout", "pay");
+
+    pay.heading = { value: "Pay by card", at: location };
+
+    const checkout = builtFeature("checkout", {
+      flows: [pay],
+      entries: [
+        {
+          ...entry("1.0", "added", { release: "5.1.0", date: "2026-10-01", flow: "pay" }),
+          text: "Cards.",
+        },
+        {
+          ...entry("1.0", "added", { release: "5.1.0", date: "2026-10-01", flow: "gone" }),
+          text: "Old.",
+        },
+      ],
+    });
+    const answer = productWhatsNew(
+      { ...base, written: { ...base.written, features: [checkout] } },
+      shared,
+    );
+    const changes = answer.releases.find((item) => item.release === "5.1.0")?.features[0]?.changes;
+
+    expect(changes?.map((item) => item.flow)).toEqual(["Pay by card", "gone"]);
+  });
+
+  it("is empty for a project with no changelog and no release", () => {
+    expect(productWhatsNew(builtSnapshot(), signedIn).releases).toEqual([]);
   });
 });

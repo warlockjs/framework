@@ -1,5 +1,5 @@
 /** The business-only static export (`build --site --product`) and the freshness skip. */
-import { readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createShopAdapter } from "../../tests/fixtures/shop-facts";
@@ -89,5 +89,89 @@ describe("the product export", () => {
     utimesSync(readme, new Date(), new Date(Date.now() + 5000));
 
     expect((await exportGrimoireSiteDetailed(snapshot.root, options)).upToDate).toBe(false);
+  });
+});
+
+describe("the bird-view in the exports", () => {
+  it("is in the developer export with its images, and not in the product export", async () => {
+    const snapshot = await open();
+    const flow = snapshot.written.features
+      .flatMap((item) => item.flows)
+      .find((item) => item.criteria.length > 0);
+    const criterion = flow?.criteria[0];
+
+    if (flow === undefined || criterion === undefined) throw new Error("no flow with a criterion");
+
+    const shot = `captured/${flow.ref}/${criterion.id}.png`;
+    const file = path.join(snapshot.root, "grimoire", "screenshots", shot);
+
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "png");
+
+    const shown = {
+      ...snapshot,
+      shots: {
+        mode: "changed" as const,
+        shows: [],
+        showsFindings: [],
+        captures: {
+          schemaVersion: 1 as const,
+          updatedAt: "2026-11-21T10:00:00.000Z",
+          captures: [
+            {
+              ref: flow.ref,
+              criterion: criterion.id,
+              language: "",
+              file: shot,
+              sha256: "abc",
+              outcome: "pass" as const,
+              error: null,
+              viewport: { name: "desktop", width: 1280, height: 800 },
+              spec: "e2e/shows.e2e.ts",
+              ranAt: "2026-11-21T10:00:00.000Z",
+            },
+          ],
+        },
+        baseline: null,
+        drift: [],
+        optedOut: [],
+      },
+    };
+
+    shown.shots.shows.push({
+      feature: flow.feature,
+      flow: flow.id.value,
+      ref: flow.ref,
+      criterion: criterion.id,
+      call: null,
+      at: { file: "e2e/shows.e2e.ts", line: 1, column: null },
+    } as never);
+
+    const full = buildSiteData(shown);
+    const matrix = full.routes.matrix as { development: boolean };
+
+    expect(matrix.development).toBe(false);
+    expect(JSON.stringify(full.routes.matrix)).toContain(shot);
+    expect(buildProductSiteData(shown).routes.matrix).toBeUndefined();
+
+    const developer = await exportGrimoireSiteDetailed(snapshot.root, {
+      snapshot: shown,
+      outDir: "out/developer",
+    });
+    const product = await exportGrimoireSiteDetailed(snapshot.root, {
+      snapshot: shown,
+      outDir: "out/business",
+      product: true,
+    });
+
+    expect(existsSync(path.join(snapshot.root, developer.outDir, "screenshots", shot))).toBe(true);
+    expect(existsSync(path.join(snapshot.root, product.outDir, "screenshots", shot))).toBe(false);
+  });
+
+  it("puts what's new in both exports", async () => {
+    const snapshot = await open();
+
+    expect(buildSiteData(snapshot).routes["product/whats-new"]).toBeDefined();
+    expect(buildProductSiteData(snapshot).routes["product/whats-new"]).toBeDefined();
   });
 });

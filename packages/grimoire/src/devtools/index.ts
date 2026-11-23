@@ -18,7 +18,14 @@ import path from "node:path";
 import type { GrimoireCheckFilter } from "./answers";
 import { approveFromPanel, rejectFromPanel } from "./approvals";
 import * as data from "./data";
-import { productFeature, productFlow, productMap, type ProductErrorSummary } from "./product-map";
+import { matrix } from "./matrix";
+import {
+  productFeature,
+  productFlow,
+  productMap,
+  productWhatsNew,
+  type ProductErrorSummary,
+} from "./product-map";
 import { createSnapshotSource } from "./snapshot-source";
 
 export { buildProductSiteData, exportGrimoireSite, exportGrimoireSiteDetailed } from "./site";
@@ -218,7 +225,12 @@ export async function grimoireDevtoolsPanel(
     files: { dir: path.join(context.root, "grimoire", "screenshots") },
     share: {
       view: new URL("../../ui/product-map.js", import.meta.url),
-      routes: ["/product", "/product/features/:feature", "/product/flows/:feature/:flow"],
+      routes: [
+        "/product",
+        "/product/whats-new",
+        "/product/features/:feature",
+        "/product/flows/:feature/:flow",
+      ],
       assets: ["product-map.css"],
       files: true,
     },
@@ -276,6 +288,10 @@ export async function grimoireDevtoolsPanel(
         handler: product((snapshot, _request, options) => productMap(snapshot, options)),
       },
       {
+        path: "/product/whats-new",
+        handler: product((snapshot, _request, options) => productWhatsNew(snapshot, options)),
+      },
+      {
         path: "/product/features/:feature",
         handler: product((snapshot, { params }, options) =>
           productFeature(snapshot, params.feature, options),
@@ -286,6 +302,11 @@ export async function grimoireDevtoolsPanel(
         handler: product((snapshot, { params }, options) =>
           productFlow(snapshot, params.feature, params.flow, options),
         ),
+      },
+      // The Bird view: never shared (it names the test status of every criterion).
+      {
+        path: "/matrix",
+        handler: answer((snapshot) => ({ ...matrix(snapshot), development })),
       },
       { path: "/apps", handler: answer((snapshot) => data.apps(snapshot)) },
       {

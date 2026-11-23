@@ -10,6 +10,7 @@
 /** The tabs: `[route, label]`. */
 const TABS = [
   ["product", "Product map"],
+  ["bird-view", "Bird view"],
   ["", "Overview"],
   ["features", "Features"],
   ["apps", "Apps"],
@@ -18,6 +19,9 @@ const TABS = [
   ["check", "Check"],
   ["modules", "Modules"],
 ];
+
+/** An app group with more pages than this starts closed on the Apps page. */
+const APP_GROUP_OPEN_LIMIT = 6;
 
 const SVG_WIDTH = 720;
 const SVG_HEIGHT = 440;
@@ -52,6 +56,8 @@ function tabOf(route) {
   switch (type) {
     case "product":
       return "product";
+    case "bird-view":
+      return "bird-view";
     case "features":
     case "feature":
     case "flow":
@@ -132,6 +138,11 @@ function nodeTarget(id) {
 /** Cut a long label from the front so the end of a path stays visible. */
 function shorten(text, max = 26) {
   return text.length > max ? `…${text.slice(text.length - max + 1)}` : text;
+}
+
+/** Cut a long label from the end, so the start of a name stays readable. The full name is in the node's `<title>`. */
+function shortenEnd(text, max = 16) {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 const NODE_COLOURS = {
@@ -802,11 +813,18 @@ function graphView(ctx, graph, title) {
 
   if (centre) place.set(centre.id, [middleX, middleY]);
 
+  // Module graph: sites, mobile and other roots sit on an inner ring, the `src/app` modules on the outer one.
+  const roots = centre ? [] : others.filter((node) => node.group === "roots");
+  const apart = roots.length > 0 && roots.length < others.length;
   const inner = centre ? Math.min(others.length, 18) : 0;
-  const rings = centre ? [others.slice(0, inner), others.slice(inner)] : [others, []];
+  const rings = centre
+    ? [others.slice(0, inner), others.slice(inner)]
+    : apart
+      ? [roots, others.filter((node) => node.group !== "roots")]
+      : [others, []];
   rings.forEach((ring, index) => {
-    const radiusX = centre ? (index === 0 ? 210 : 320) : 300;
-    const radiusY = centre ? (index === 0 ? 150 : 195) : 185;
+    const radiusX = centre ? (index === 0 ? 210 : 320) : apart ? (index === 0 ? 120 : 310) : 300;
+    const radiusY = centre ? (index === 0 ? 150 : 195) : apart ? (index === 0 ? 85 : 190) : 185;
     ring.forEach((node, position) => {
       const angle =
         (position / Math.max(ring.length, 1)) * 2 * Math.PI - Math.PI / 2 + index * 0.15;
@@ -860,13 +878,16 @@ function graphView(ctx, graph, title) {
       "text-anchor": "middle",
       fill: "var(--foreground)",
       "font-size": "11",
-      text: shorten(node.label, node.type === "center" ? 26 : 16),
+      text:
+        node.type === "module"
+          ? shortenEnd(node.label, 16)
+          : shorten(node.label, node.type === "center" ? 26 : 16),
     });
     const group = svg(
       "g",
       {},
       [
-        svg("title", { text: node.label }),
+        svg("title", { text: node.title ?? node.label }),
         circle,
         labelled || node.type === "center" ? label : "",
       ].filter((child) => child !== ""),
@@ -875,6 +896,14 @@ function graphView(ctx, graph, title) {
   }
 
   card.append(el("div", { class: "grimoire-scroll" }, [canvas]));
+  if (apart) {
+    card.append(
+      el("p", {
+        class: "grimoire-muted",
+        text: "Inner ring: sites, mobile and other roots. Outer ring: modules under src/app.",
+      }),
+    );
+  }
   if (!labelled) {
     card.append(
       el("p", {
@@ -920,8 +949,9 @@ async function overviewView(ctx, summaryRequest) {
     .sort(([a], [b]) => STATUS_ORDER.indexOf(a) - STATUS_ORDER.indexOf(b))
     .map(([status, total]) => `${total} ${status}`)
     .join(", ");
+  // `waiting` is the part of `open` that waits for the owner, so the tile counts the same tasks as the tab badge.
   const waiting = data.tasks.waiting.length;
-  const open = data.tasks.open.length - waiting;
+  const open = data.tasks.open.length;
   const routeFacts = routeFactsState(data.routes);
   const stale = routeFacts.stale;
   const out = el("div", { class: "grimoire-view" });
@@ -945,7 +975,7 @@ async function overviewView(ctx, summaryRequest) {
       stat(ctx, {
         label: "Tasks",
         value: open,
-        sub: `${open} open, ${waiting} waiting, ${data.tasks.done.length} done`,
+        sub: `${open} open, ${waiting} of them waiting for approval; ${data.tasks.done.length} done`,
         target: "tasks",
         tone: waiting ? "warn" : "",
       }),
@@ -1760,6 +1790,9 @@ async function featureView(ctx, id, tab = "") {
 
     box.append(featureHealthStrip(ctx, featureId, data, unexpected));
     box.append(section(ctx, "Feature map", [featureMapView(ctx, featureId, data.map)]));
+
+    if (graph) box.append(graphView(ctx, graph, "The feature and its neighbours"));
+
     box.append(
       section(ctx, "Flows", [
         data.flows.length
@@ -1771,8 +1804,6 @@ async function featureView(ctx, id, tab = "") {
           : ctx.empty("This feature has no flows yet."),
       ]),
     );
-
-    if (graph) box.append(graphView(ctx, graph, "The feature and its neighbours"));
 
     if (data.tasks.length) {
       box.append(
@@ -2733,34 +2764,45 @@ async function appsView(ctx) {
         ? [...groups.entries()]
             .sort(([a], [b]) => (a === "" ? -1 : b === "" ? 1 : a.localeCompare(b)))
             .map(([name, group]) =>
-              el("div", { class: "grimoire-group" }, [
-                el("h4", { text: `${name ? `/${name}` : "Top level"} (${group.length})` }),
-                table(
-                  ctx,
-                  ["Page", "Route or screen", "Title", "Layout", "Blocks", "Status"],
-                  [...group]
-                    .sort((a, b) => (a.route ?? a.id).localeCompare(b.route ?? b.id))
-                    .map((row) => [
-                      [
-                        link(
-                          ctx,
-                          row.id,
-                          `page/${encodeURIComponent(app.id)}/${encodeURIComponent(row.id)}`,
-                        ),
-                        row.type === "screen" ? [" ", pill(ctx, "screen")] : "",
-                      ],
-                      [row.route ? mono(ctx, row.route) : ""],
-                      [row.heading ?? ""],
-                      [row.layout ?? ""],
-                      [row.blocks === null ? "" : String(row.blocks)],
-                      [
-                        row.origin
-                          ? pill(ctx, row.origin, toneOf(row.origin))
-                          : muted(ctx, "unmarked"),
-                      ],
-                    ]),
-                ),
-              ]),
+              // A big group starts closed, so a phone does not open on a wall of tables; a filter opens them all.
+              el(
+                "details",
+                {
+                  class: "grimoire-group grimoire-app-group",
+                  ...(group.length <= APP_GROUP_OPEN_LIMIT || filtered ? { open: "" } : {}),
+                },
+                [
+                  el("summary", {
+                    class: "grimoire-app-group-title",
+                    text: `${name ? `/${name}` : "Top level"} (${group.length})`,
+                  }),
+                  table(
+                    ctx,
+                    ["Page", "Route or screen", "Title", "Layout", "Blocks", "Status"],
+                    [...group]
+                      .sort((a, b) => (a.route ?? a.id).localeCompare(b.route ?? b.id))
+                      .map((row) => [
+                        [
+                          link(
+                            ctx,
+                            row.id,
+                            `page/${encodeURIComponent(app.id)}/${encodeURIComponent(row.id)}`,
+                          ),
+                          row.type === "screen" ? [" ", pill(ctx, "screen")] : "",
+                        ],
+                        [row.route ? mono(ctx, row.route) : ""],
+                        [row.heading ?? ""],
+                        [row.layout ?? ""],
+                        [row.blocks === null ? "" : String(row.blocks)],
+                        [
+                          row.origin
+                            ? pill(ctx, row.origin, toneOf(row.origin))
+                            : muted(ctx, "unmarked"),
+                        ],
+                      ]),
+                  ),
+                ],
+              ),
             )
         : ctx.empty("No pages written."),
     ]);
@@ -3294,6 +3336,76 @@ async function routeView(ctx, method, path) {
   return out;
 }
 
+/** More modules than this and the default view is the matrix, not the graph. */
+const MODULES_GRAPH_LIMIT = 40;
+/** How many of the most connected modules the matrix shows. */
+const MODULES_MATRIX_SIZE = 20;
+
+/** Import counts between the most connected modules: rows import, columns are imported. */
+function modulesMatrix(ctx, graph, weight) {
+  const { el } = ctx;
+  const top = [...graph.nodes]
+    .sort(
+      (left, right) =>
+        (weight.get(right.id) ?? 0) - (weight.get(left.id) ?? 0) ||
+        (left.title ?? left.label).localeCompare(right.title ?? right.label),
+    )
+    .slice(0, MODULES_MATRIX_SIZE);
+  const ids = new Set(top.map((node) => node.id));
+  const counts = new Map();
+  let biggest = 1;
+
+  for (const edge of graph.edges) {
+    if (!ids.has(edge.from) || !ids.has(edge.to)) continue;
+
+    const value = edge.weight ?? 1;
+
+    counts.set(`${edge.from}\n${edge.to}`, value);
+    biggest = Math.max(biggest, value);
+  }
+
+  const name = (node) => node.title ?? node.label;
+
+  return el("div", { class: "grimoire-card grimoire-modmatrix" }, [
+    el("h3", { text: `The ${top.length} most connected modules` }),
+    el("p", {
+      class: "grimoire-muted",
+      text: "Each cell counts the imports from the module on its row to the module in its column. Point at a name for its full path.",
+    }),
+    el("div", { class: "grimoire-scroll" }, [
+      el("table", { class: "grimoire-table grimoire-modmatrix-table" }, [
+        el("thead", {}, [
+          el("tr", {}, [
+            el("th", { scope: "col", text: "From / to" }),
+            ...top.map((node) =>
+              el("th", { scope: "col", title: name(node), text: shortenEnd(node.label, 10) }),
+            ),
+          ]),
+        ]),
+        el(
+          "tbody",
+          {},
+          top.map((row) =>
+            el("tr", {}, [
+              el("th", { scope: "row", title: name(row), text: shortenEnd(row.label, 24) }),
+              ...top.map((column) => {
+                const value = counts.get(`${row.id}\n${column.id}`) ?? 0;
+
+                return el("td", {
+                  class: value ? "grimoire-modmatrix-cell has-imports" : "grimoire-modmatrix-cell",
+                  title: `${name(row)} imports ${name(column)} ${plural(value, "time")}`,
+                  style: value ? `--gm-level:${Math.round(10 + (value / biggest) * 60)}%` : null,
+                  text: value ? String(value) : "",
+                });
+              }),
+            ]),
+          ),
+        ),
+      ]),
+    ]),
+  ]);
+}
+
 async function modulesView(ctx) {
   const graph = await ctx.api("graph/modules");
   const { el } = ctx;
@@ -3304,15 +3416,60 @@ async function modulesView(ctx) {
       weight.set(end, (weight.get(end) ?? 0) + (edge.weight ?? 1));
   }
 
-  const items = graph.nodes.map((node) => ({ label: node.label, links: weight.get(node.id) ?? 0 }));
+  const items = graph.nodes.map((node) => ({
+    label: node.title ?? node.label,
+    links: weight.get(node.id) ?? 0,
+  }));
+  const big = graph.nodes.length > MODULES_GRAPH_LIMIT;
+  const holder = el("div", { class: "grimoire-modview" });
+  let mode = big ? "matrix" : "graph";
+
+  const toggle = el("div", { class: "grimoire-modtoggle", role: "group", "aria-label": "View" });
+  const buttons = new Map();
+
+  function show(next) {
+    mode = next;
+    holder.replaceChildren(
+      mode === "matrix" ? modulesMatrix(ctx, graph, weight) : graphView(ctx, graph, "Modules"),
+    );
+
+    for (const [key, button] of buttons) {
+      button.setAttribute("aria-pressed", String(key === mode));
+      button.setAttribute(
+        "class",
+        key === mode ? "grimoire-bird-button is-primary" : "grimoire-bird-button",
+      );
+    }
+  }
+
+  if (big) {
+    for (const [key, label] of [
+      ["matrix", "Matrix"],
+      ["graph", "Graph"],
+    ]) {
+      const button = el("button", {
+        type: "button",
+        text: label,
+        onclick: () => show(key),
+      });
+
+      buttons.set(key, button);
+      toggle.append(button);
+    }
+  }
+
+  show(mode);
 
   return el("div", { class: "grimoire-view" }, [
     heading(ctx, "Module coupling"),
     el("p", {
       class: "grimoire-muted",
-      text: "Lines are imports between modules; thicker means more imports. The most connected modules are drawn.",
+      text: big
+        ? `Imports between modules. There are ${graph.nodes.length} modules, so the matrix of the most connected ones opens first; the graph is one click away.`
+        : "Lines are imports between modules; thicker means more imports. The most connected modules are drawn.",
     }),
-    graphView(ctx, graph, "Modules"),
+    big ? toggle : "",
+    holder,
     items.length
       ? listing(ctx, {
           items,
@@ -3336,6 +3493,553 @@ async function modulesView(ctx) {
             ]),
         })
       : "",
+  ]);
+}
+
+// ── Bird view ───────────────────────────────────────────────────────────────
+
+/** The words, glyph and tone of a cell state. A colour is never the only signal: every cell prints its words. */
+const BIRD_STATES = {
+  rejected: { label: "Rejected", glyph: "✕", tone: "bad" },
+  fail: { label: "Failing", glyph: "✕", tone: "bad" },
+  changed: { label: "Changed, not approved", glyph: "≠", tone: "warn" },
+  stale: { label: "Needs a new run", glyph: "!", tone: "warn" },
+  "not-run": { label: "Not run yet", glyph: "…", tone: "warn" },
+  "no-test": { label: "No test", glyph: "–", tone: "" },
+  pass: { label: "Passing", glyph: "✓", tone: "good" },
+};
+
+const BIRD_STATE_ORDER = ["rejected", "fail", "changed", "stale", "not-run", "no-test", "pass"];
+
+/** The target the Approve all button sends when there is no baseline yet (the baseline is created from the current state). */
+const BIRD_APPROVE_ALL = "--all";
+
+/** What a drift item says, in plain words. */
+const BIRD_DRIFT_WORDS = {
+  "shot-changed": "The screenshot changed",
+  "shot-added": "A new screenshot was captured",
+  "shot-removed": "The screenshot is no longer captured",
+  "flow-added": "The flow is new",
+  "flow-removed": "The flow was removed",
+  "criterion-added": "A criterion was added",
+  "criterion-removed": "A criterion was removed",
+  "criterion-changed": "The criterion text changed",
+  "case-added": "A case was added",
+  "case-removed": "A case was removed",
+  "proof-removed": "A proving test was removed",
+};
+
+/** Whether a path is a plain image path inside the screenshots folder (no scheme, no `..`), so `ctx.file()` cannot leave it. */
+function birdShotPath(src) {
+  if (typeof src !== "string" || src === "" || src.startsWith("/") || /[\\:\0?#]/.test(src))
+    return false;
+
+  return (
+    src.split("/").every((part) => part !== "" && part !== "." && part !== "..") &&
+    /\.(png|jpe?g|webp|gif)$/i.test(src)
+  );
+}
+
+function birdLanguage(language) {
+  return language === "" ? "All languages" : language;
+}
+
+/** The sentence of a drift item for the side-by-side panel. */
+function birdDriftWords(item) {
+  const base = BIRD_DRIFT_WORDS[item.type] ?? item.type;
+  const named = item.case ? `${base}: ${item.case}` : base;
+
+  return item.language ? `${named} (${item.language})` : named;
+}
+
+/** How a filter text matches: an `AC-n` text matches that criterion exactly, anything else is a substring. */
+function birdMatcher(text) {
+  const needle = text.trim().toLowerCase();
+  const exactCriterion = /^ac-\d+$/.test(needle);
+
+  return {
+    empty: needle === "",
+    feature: (feature) =>
+      feature.id.toLowerCase().includes(needle) || feature.title.toLowerCase().includes(needle),
+    flow: (flow) =>
+      flow.ref.toLowerCase().includes(needle) || flow.title.toLowerCase().includes(needle),
+    criterion: (row) =>
+      exactCriterion ? row.id.toLowerCase() === needle : row.id.toLowerCase().includes(needle),
+  };
+}
+
+/** The features, flows and criteria that match a filter; a matching feature or flow keeps everything under it. */
+function birdFilter(features, text) {
+  const match = birdMatcher(text);
+
+  if (match.empty) return features;
+
+  return features.flatMap((feature) => {
+    if (match.feature(feature)) return [feature];
+
+    const flows = feature.flows.flatMap((flow) => {
+      if (match.flow(flow)) return [flow];
+
+      const criteria = flow.criteria.filter(match.criterion);
+
+      return criteria.length ? [{ ...flow, criteria }] : [];
+    });
+
+    return flows.length ? [{ ...feature, flows }] : [];
+  });
+}
+
+/** Cells per state over some flows. */
+function birdCounts(flows) {
+  const counts = {};
+
+  for (const flow of flows)
+    for (const row of flow.criteria)
+      for (const cell of row.cells) counts[cell.state] = (counts[cell.state] ?? 0) + 1;
+
+  return counts;
+}
+
+/** Pills for the states that need a look, or "all passing". */
+function birdCountPills(ctx, counts) {
+  const shown = BIRD_STATE_ORDER.filter((state) => state !== "pass" && counts[state]);
+
+  if (!shown.length)
+    return counts.pass ? pill(ctx, `${counts.pass} passing`, "good") : muted(ctx, "no criteria");
+
+  return shown.map((state) =>
+    pill(
+      ctx,
+      `${counts[state]} ${BIRD_STATES[state].label.toLowerCase()}`,
+      BIRD_STATES[state].tone,
+    ),
+  );
+}
+
+/** One image of the side-by-side panel, or the words that say there is none. */
+function birdFigure(ctx, title, src, none) {
+  const { el } = ctx;
+
+  return el("figure", { class: "grimoire-bird-figure" }, [
+    el("figcaption", { text: title }),
+    birdShotPath(src) && typeof ctx.file === "function"
+      ? el("img", { src: ctx.file(src), alt: title, loading: "lazy" })
+      : el("p", { class: "grimoire-muted grimoire-bird-none", text: none }),
+  ]);
+}
+
+/**
+ * The side-by-side panel: approved left, captured right, what changed, and
+ * (in development) Approve and Reject. A failed request keeps the panel open
+ * and says what failed.
+ */
+function birdPanel(ctx, data, develop) {
+  const { el } = ctx;
+  const body = el("div", { class: "grimoire-bird-panel-body" });
+  const dialog = el(
+    "dialog",
+    {
+      class: "grimoire-bird-panel",
+      "aria-label": "Compare",
+      onclick: (event) => {
+        if (event && event.target === dialog) dialog.close?.();
+      },
+    },
+    [body],
+  );
+  const byId = new Map((data.drift ?? []).map((item) => [item.id, item]));
+
+  async function send(action, ids, note, error, button) {
+    const verb = action === "approve" ? "approve" : "reject";
+
+    error.textContent = "";
+    button.setAttribute("disabled", "");
+
+    try {
+      await ctx.api(action, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(note ? { ids, note } : { ids }),
+      });
+      dialog.close?.();
+      ctx.refresh();
+    } catch (failure) {
+      button.removeAttribute?.("disabled");
+      // The dialog stays open: the failure is shown where the click happened.
+      error.textContent = `Could not ${verb}: ${failure?.message ?? "the server did not answer"}${
+        failure?.status ? ` (status ${failure.status})` : ""
+      }. Nothing was changed. Try again, or run warlock grimoire ${verb} in a terminal.`;
+    }
+  }
+
+  function open({ title, language, state, test, shown, drift }) {
+    const items = drift.map((id) => byId.get(id)).filter(Boolean);
+    const info = BIRD_STATES[state] ?? BIRD_STATES["no-test"];
+    const error = el("p", { class: "grimoire-error-title", role: "alert" });
+    const note = el("input", {
+      type: "text",
+      class: "grimoire-filter-input",
+      placeholder: "Why? (optional, kept with a rejection)",
+      "aria-label": "Why reject",
+    });
+    const approve = el("button", {
+      type: "button",
+      class: "grimoire-bird-button is-primary",
+      text: items.length > 1 ? `Approve ${items.length} changes` : "Approve",
+      onclick: () => send("approve", drift, "", error, approve),
+    });
+    const reject = el("button", {
+      type: "button",
+      class: "grimoire-bird-button",
+      text: items.length > 1 ? `Reject ${items.length} changes` : "Reject",
+      onclick: () => send("reject", drift, (note.value ?? "").trim(), error, reject),
+    });
+
+    body.replaceChildren(
+      el("header", { class: "grimoire-bird-panel-head" }, [
+        el("h3", { text: title }),
+        language === null ? "" : pill(ctx, birdLanguage(language)),
+        pill(ctx, info.label, info.tone),
+      ]),
+      test ? el("p", {}, ["Test: ", pill(ctx, test, toneOf(test))]) : "",
+      shown
+        ? el("div", { class: "grimoire-bird-compare" }, [
+            birdFigure(ctx, "Approved", shown.approved, "No approved image yet."),
+            birdFigure(
+              ctx,
+              "Captured",
+              shown.shot,
+              shown.outcome === "fail"
+                ? "The scene failed, so there is no capture."
+                : "Not captured yet.",
+            ),
+          ])
+        : "",
+      items.length
+        ? el("section", { class: "grimoire-bird-changes", "aria-label": "Changes not approved" }, [
+            el("h4", { text: "Changes not approved" }),
+            el(
+              "ul",
+              { class: "grimoire-list" },
+              items.map((item) =>
+                el("li", {}, [
+                  el("strong", { text: birdDriftWords(item) }),
+                  item.rejected
+                    ? [
+                        " ",
+                        pill(ctx, "rejected", "bad"),
+                        item.rejected.note ? ` ${item.rejected.note}` : "",
+                      ]
+                    : "",
+                  item.before !== null || item.after !== null
+                    ? el("p", { class: "grimoire-muted" }, [
+                        item.before !== null ? `Before: ${item.before}` : "",
+                        item.before !== null && item.after !== null ? " · " : "",
+                        item.after !== null ? `Now: ${item.after}` : "",
+                      ])
+                    : "",
+                ]),
+              ),
+            ),
+          ])
+        : el("p", { class: "grimoire-muted", text: "Nothing here is waiting for approval." }),
+      develop && items.length
+        ? el("div", { class: "grimoire-bird-actions" }, [note, approve, reject])
+        : "",
+      error,
+      el("button", {
+        type: "button",
+        class: "grimoire-bird-button",
+        text: "Close",
+        onclick: () => dialog.close?.(),
+      }),
+    );
+
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+  }
+
+  return { dialog, open };
+}
+
+/** One cell: the state in words and glyph, with the captured image as a thumbnail. */
+function birdCell(ctx, cell, label, panel, context) {
+  const { el } = ctx;
+  const info = BIRD_STATES[cell.state] ?? BIRD_STATES["no-test"];
+  const shot = cell.shown?.shot ?? null;
+
+  return el("td", { class: "grimoire-bird-td" }, [
+    el(
+      "button",
+      {
+        type: "button",
+        class: `grimoire-bird-cell is-${cell.state}`,
+        "aria-label": `${label}, ${birdLanguage(cell.language)}: ${info.label}`,
+        onclick: () =>
+          panel.open({
+            ...context,
+            language: cell.language,
+            state: cell.state,
+            test: cell.test,
+            shown: cell.shown,
+            drift: cell.drift,
+          }),
+      },
+      [
+        birdShotPath(shot) && typeof ctx.file === "function"
+          ? el("img", {
+              class: "grimoire-bird-thumb",
+              src: ctx.file(shot),
+              alt: "",
+              loading: "lazy",
+            })
+          : "",
+        el("span", { class: "grimoire-bird-state" }, [
+          el("span", { class: "grimoire-bird-glyph", "aria-hidden": "true", text: info.glyph }),
+          el("span", { text: info.label }),
+        ]),
+      ],
+    ),
+  ]);
+}
+
+function birdFlow(ctx, data, feature, flow, panel, forceOpen, develop) {
+  const { el } = ctx;
+  const counts = birdCounts([flow]);
+  const hot =
+    ["rejected", "fail", "changed"].some((state) => counts[state]) || flow.drift.length > 0;
+  const title = `${feature.title} / ${flow.title}`;
+  const head = [
+    el("span", { class: "grimoire-bird-name", text: flow.title }),
+    mono(ctx, flow.ref),
+    flow.removed ? pill(ctx, "removed", "warn") : "",
+    flow.differsIn.length ? pill(ctx, `differs in ${flow.differsIn.join(", ")}`) : "",
+    !flow.screenshots && data.mode !== "off" ? pill(ctx, "no screenshots") : "",
+    flow.drift.length
+      ? pill(ctx, `${plural(flow.drift.length, "change")} not approved`, "warn")
+      : "",
+    birdCountPills(ctx, counts),
+  ];
+  const lines = flow.criteria.map((row) =>
+    el("tr", { class: row.removed ? "is-removed" : "" }, [
+      el("th", { scope: "row", class: "grimoire-bird-rowhead" }, [
+        el("span", { class: "grimoire-mono", text: row.id }),
+        row.app ? [" ", pill(ctx, row.app)] : "",
+        row.removed ? [" ", pill(ctx, "removed", "warn")] : "",
+        el("span", { class: "grimoire-bird-text", text: row.text }),
+      ]),
+      ...row.cells.map((cell) =>
+        birdCell(ctx, cell, `${flow.ref} ${row.id}`, panel, {
+          title: `${title}, ${row.id}`,
+        }),
+      ),
+    ]),
+  );
+
+  return el("details", { class: "grimoire-bird-flow", ...(forceOpen || hot ? { open: "" } : {}) }, [
+    el("summary", { class: "grimoire-bird-summary" }, head),
+    el("div", { class: "grimoire-bird-flowbody" }, [
+      flow.drift.length
+        ? el("p", {}, [
+            el("button", {
+              type: "button",
+              class: "grimoire-bird-button",
+              text: develop ? "Review the flow's changes" : "See the flow's changes",
+              onclick: () =>
+                panel.open({
+                  title,
+                  language: null,
+                  state: "changed",
+                  test: null,
+                  shown: null,
+                  drift: flow.drift,
+                }),
+            }),
+          ])
+        : "",
+      flow.criteria.length
+        ? el("div", { class: "grimoire-scroll" }, [
+            el("table", { class: "grimoire-table grimoire-bird-table" }, [
+              el("thead", {}, [
+                el("tr", {}, [
+                  el("th", { scope: "col", text: "Criterion" }),
+                  ...data.languages.map((language) =>
+                    el("th", { scope: "col", text: language === "" ? "All" : language }),
+                  ),
+                ]),
+              ]),
+              el("tbody", {}, lines),
+            ]),
+          ])
+        : ctx.empty("This flow has no acceptance criteria."),
+      link(
+        ctx,
+        "Open the flow",
+        `flow/${encodeURIComponent(flow.ref.split("/")[0])}/${encodeURIComponent(flow.id)}`,
+      ),
+    ]),
+  ]);
+}
+
+/** The Bird view: every feature, flow and criterion against the app's languages. */
+async function birdView(ctx, query = {}) {
+  const data = await ctx.api("matrix");
+  const { el } = ctx;
+  const develop = data.development === true && ctx.shared !== true;
+  const panel = birdPanel(ctx, data, develop);
+  const results = el("div", { class: "grimoire-bird-list" });
+  const count = el("p", { class: "grimoire-muted", role: "status", "aria-live": "polite" });
+  let text = String(query.q ?? "");
+
+  const paint = () => {
+    const matches = birdFilter(data.features, text);
+    const flows = matches.flatMap((feature) => feature.flows);
+    const forceOpen = text.trim() !== "";
+
+    count.textContent = forceOpen
+      ? `${plural(flows.length, "flow")} match`
+      : `${plural(data.features.length, "feature")}, ${plural(
+          data.features.reduce((total, feature) => total + feature.flows.length, 0),
+          "flow",
+        )}`;
+    results.replaceChildren(
+      ...(matches.length
+        ? matches.map((feature) => {
+            const counts = birdCounts(feature.flows);
+            const hot = ["rejected", "fail", "changed"].some((state) => counts[state]);
+
+            return el(
+              "details",
+              { class: "grimoire-bird-feature", ...(forceOpen || hot ? { open: "" } : {}) },
+              [
+                el("summary", { class: "grimoire-bird-summary" }, [
+                  el("span", { class: "grimoire-bird-name", text: feature.title }),
+                  mono(ctx, feature.id),
+                  feature.designSystem ? pill(ctx, "design system", "info") : "",
+                  birdCountPills(ctx, counts),
+                ]),
+                el(
+                  "div",
+                  { class: "grimoire-bird-featurebody" },
+                  feature.flows.length
+                    ? feature.flows.map((flow) =>
+                        birdFlow(ctx, data, feature, flow, panel, forceOpen, develop),
+                      )
+                    : ctx.empty("This feature has no flows yet."),
+                ),
+              ],
+            );
+          })
+        : [
+            ctx.empty(
+              `Nothing matches "${text.trim()}". Try a feature, a flow or an AC number such as AC-3.`,
+            ),
+          ]),
+    );
+  };
+
+  const input = el("input", {
+    type: "search",
+    class: "grimoire-filter-input",
+    value: text,
+    placeholder: "Jump to a feature, a flow or AC-3",
+    "aria-label": "Jump to a feature, a flow or a criterion",
+    oninput: (event) => {
+      text = event?.target?.value ?? "";
+      rememberRoute(
+        ctx,
+        text.trim() ? `bird-view?q=${encodeURIComponent(text.trim())}` : "bird-view",
+      );
+      paint();
+    },
+  });
+  const banners = [];
+  const waiting = (data.drift ?? []).filter((item) => item.rejected === null).length;
+
+  if (data.mode === "off") {
+    banners.push(
+      el("p", {
+        class: "grimoire-note",
+        text: "Screenshots are off in grimoire/settings.md. The matrix shows test status only.",
+      }),
+    );
+  }
+
+  // One button that approves some ids; a failure is written next to it and the button stays usable.
+  const approveButton = (label, ids, primary) => {
+    const error = el("span", { class: "grimoire-error-title", role: "alert" });
+    const button = el("button", {
+      type: "button",
+      class: primary ? "grimoire-bird-button is-primary" : "grimoire-bird-button",
+      text: label,
+      onclick: async () => {
+        error.textContent = "";
+
+        try {
+          await ctx.api("approve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids }),
+          });
+          ctx.refresh();
+        } catch (failure) {
+          error.textContent = ` Could not approve: ${failure?.message ?? "the server did not answer"}${
+            failure?.status ? ` (status ${failure.status})` : ""
+          }. Nothing was changed. Try again, or run warlock grimoire approve in a terminal.`;
+        }
+      },
+    });
+
+    return [button, error];
+  };
+
+  if (data.baseline === null) {
+    banners.push(
+      el("p", { class: "grimoire-note" }, [
+        "Nothing approved yet: approve all to start. Until then the matrix shows test status and the latest screenshots, and nothing counts as changed. ",
+        develop ? approveButton("Approve all", [BIRD_APPROVE_ALL], true) : "",
+      ]),
+    );
+  } else if (develop && waiting > 0) {
+    banners.push(
+      el("p", { class: "grimoire-note" }, [
+        `${plural(waiting, "change")} not approved. `,
+        approveButton(
+          `Approve all ${waiting}`,
+          data.drift.filter((item) => item.rejected === null).map((item) => item.id),
+          false,
+        ),
+      ]),
+    );
+  }
+
+  paint();
+
+  return el("div", { class: "grimoire-view grimoire-bird" }, [
+    heading(ctx, "Bird view"),
+    el("p", {
+      class: "grimoire-muted",
+      text: "Every criterion against every language: its test status, and the screenshot of the scene that shows it. Open a cell to compare it with the approved image.",
+    }),
+    el(
+      "ul",
+      { class: "grimoire-bird-legend", "aria-label": "Cell states" },
+      BIRD_STATE_ORDER.map((state) =>
+        el("li", {}, [
+          pill(
+            ctx,
+            `${BIRD_STATES[state].glyph} ${BIRD_STATES[state].label}`,
+            BIRD_STATES[state].tone,
+          ),
+          " ",
+          muted(ctx, String(data.counts?.[state] ?? 0)),
+        ]),
+      ),
+    ),
+    ...banners,
+    el("div", { class: "grimoire-toolbar" }, [input, count]),
+    results,
+    panel.dialog,
   ]);
 }
 
@@ -3370,6 +4074,8 @@ async function body(ctx, summaryRequest) {
 
       return map.productMapView(ctx, parts.slice(1));
     }
+    case "bird-view":
+      return birdView(ctx, query);
     case "features":
       return featuresView(ctx);
     case "feature":
@@ -3406,6 +4112,7 @@ function describe(route) {
   const type = (route.split("?")[0] ?? "").split("/")[0] ?? "";
   const map = {
     product: ["the product map", null],
+    "bird-view": ["the bird view", null],
     features: ["the features", null],
     feature: ["the feature", ["Features", "features"]],
     flow: ["the flow", ["Features", "features"]],
@@ -3758,6 +4465,7 @@ function header(ctx, route, summaryRequest) {
         const badge = badges.get(key);
         if (badge && value !== undefined && value !== null) badge.textContent = String(value);
       };
+      set("bird-view", data.birdView || undefined);
       set("features", data.features?.features?.length);
       set("apps", data.apps?.apps);
       set("tasks", data.tasks ? data.tasks.open.length : undefined);

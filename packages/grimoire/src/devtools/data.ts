@@ -22,6 +22,7 @@ import { scry } from "../scry";
 import { compactFlow, STEP_FILE_SETS, stepFilePage } from "../scry/compact";
 import { testResultsInfo } from "../test-results";
 import { featureFileGroups, featureMap, featureProofs } from "./feature-map";
+import { attentionOf, matrix } from "./matrix";
 import { featureGraph, fileGraph, moduleGraph, pageGraph, type GrimoireGraph } from "./graphs";
 import {
   STEP_FILES_PAGE_LIMIT,
@@ -63,6 +64,8 @@ export type GrimoireSummary = {
   /** How many apps, pages, screens and releases are written (the tab's navigation and overview badges). */
   apps: { apps: number; pages: number; screens: number };
   releases: number;
+  /** The Bird view's badge: failing, changed and rejected cells, and changes to whole flows. */
+  birdView: number;
   /** Whether test results were read, from where, and how many proofs have one. */
   results: TestResultsInfo;
   /** Framework brand and the app's name and version from the adapter; `null` when the adapter reports none. */
@@ -169,6 +172,7 @@ export function summary(snapshot: GrimoireSnapshot): GrimoireSummary {
       screens: written.apps.reduce((total, app) => total + app.screens.length, 0),
     },
     releases: written.releases.length,
+    birdView: attentionOf(matrix(snapshot)),
     results: testResultsInfo(snapshot),
     host: snapshot.host ?? null,
   };

@@ -29,6 +29,10 @@
 
 <!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
 
+- **Bird view tab.** One table of every feature, flow and criterion against the app's languages: the test status, the captured screenshot as a thumbnail, and the approval state of each cell, with a jump-to filter (`#grimoire/bird-view?q=AC-3`). A side-by-side panel compares the approved and the captured image and lists each change not approved, with Approve and Reject in development. It works with no screenshots and no baseline. The data is `GET /matrix` and the tab's count is `birdView` in the summary; the static export includes both, the share-safe export does not.
+- **What's new.** `#grimoire/product/whats-new[/<release>]` and `GET /product/whats-new` list the releases newest first with their date, the first paragraph of the brief and the changes per feature in plain words; unreleased changes show only in the signed-in view. It is in the share routes and in both static exports.
+- **Modules matrix.** Above 40 modules the Modules view opens on a matrix of the 20 most connected modules, with a Graph button; module nodes carry `title`, `group` and `files`.
+
 <!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
 
 - `@shows` scenes: a browser test shows a criterion with `// @shows <feature>/<flow> AC-n` above `shows(context, "<feature>/<flow> AC-n", scene)` (new `shows()` in `@warlock.js/grimoire/warlock`). The scene runs once per language and saves one screenshot each under `grimoire/screenshots/captured/`; a failing language is recorded and `shows()` throws after every language ran. `changed` (default), `all` and `off` modes, `GRIMOIRE_SHOTS` for one run, and `screenshots: false` in a flow's front matter to opt out.
@@ -51,6 +55,13 @@
 
 <!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
 
+- **Product map wording.** "Where you see it" lists a page once with its blocks under it and heads each app with its title; the flow line shows the audience without "For"; every case is a plain question, including "What if the server cannot be reached?" and "What if the server fails?"; "What changed" and "Checked by" no longer show criterion or task ids.
+- **Overview task count.** The Tasks tile counts every open task, the same as the tab badge, and reads "N open, M of them waiting for approval".
+- **Modules graph.** Labels are cut from the right with the full name in the node's tooltip, sites and mobile roots sit on their own ring, and a module over 500 files shows its file count.
+- **Feature page.** The neighbour graph sits above the flows.
+- **Phone width.** Under 640 px the tab bar wraps onto rows so no tab is hidden, and a group of more than 6 pages on the Apps page starts closed.
+- **Logical CSS.** The tab's stylesheets use logical properties (`inline-start`, `inline-end`, `text-align: start`), so they mirror in right-to-left layouts.
+
 <!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
 
 - The devtools snapshot source and the stored open keep `settings` and `shots`, and serve a fresh snapshot after an approval or a new capture. Snapshots written by an earlier version are rebuilt once.
@@ -63,8 +74,6 @@
 - Editing only a top-level file of a mobile app folder (`App.tsx`, `index.ts`) now marks the book stale. The freshness fingerprint also covers the code files that sit directly in the parent folder of a nested source root, without tool configs and type shims.
 
 <!-- area B: guard, code rules, locked tests, protected areas (5.64 merge marker, remove at merge) -->
-
-<!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
 
 <!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
 

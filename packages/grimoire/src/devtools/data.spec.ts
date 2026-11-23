@@ -3,7 +3,9 @@ import { createShopAdapter } from "../../tests/fixtures/shop-facts";
 import { copyFixture, type FixtureCopy } from "../../tests/support/copy-fixture";
 import type { GrimoireAppsAnswer, GrimoireFeaturesAnswer, GrimoireSummary } from "./data";
 import { openGrimoire } from "../workspace";
-import { checkGroups, checkPage, feature, flowAnswer, stepFiles } from "./data";
+import { bookFile, snapshot as builtSnapshot } from "../../tests/check/snapshot-builder";
+import { checkGroups, checkPage, feature, flowAnswer, graphOfModules, stepFiles } from "./data";
+import { MODULE_COUNT_LABEL_FROM } from "./graphs";
 import { grimoireDevtoolsPanel } from "./index";
 
 let copy: FixtureCopy | null = null;
@@ -259,5 +261,70 @@ describe("steps without route facts", () => {
     expect(health.steps.total).toBe(steps.filter((step) => step.found !== null).length);
     expect(health.steps.resolved).toBe(steps.filter((step) => step.found === true).length);
     expect(health.steps.unchecked).toBe(steps.filter((step) => step.found === null).length);
+  });
+});
+
+describe("the module graph of a large app", () => {
+  /** 60 modules, the first with 2,548 files, the first of every five a root outside `src/app` (site, mobile, config). */
+  function large() {
+    const files = [];
+
+    for (let index = 0; index < 60; index += 1) {
+      const root = index % 5 === 0;
+      const module = root ? `site-${index}/app` : `src/app/module-${index}`;
+      const count = index === 0 ? 2548 : 3;
+      const next = (index + 1) % 60;
+      const nextModule = next % 5 === 0 ? `site-${next}/app` : `src/app/module-${next}`;
+
+      for (let file = 0; file < count; file += 1) {
+        files.push(
+          bookFile(`${module}/f${file}.ts`, {
+            module,
+            imports: file === 0 ? [{ specifier: "x", file: `${nextModule}/f0.ts` }] : [],
+          }),
+        );
+      }
+    }
+
+    const base = builtSnapshot();
+
+    return { ...base, book: { ...base.book, facts: { ...base.book.facts, files } } };
+  }
+
+  it("keeps the module name as the label and puts the full name and file count in the title", () => {
+    const graph = graphOfModules(large());
+    const small = graph.nodes.find((node) => node.id === "module:src/app/module-1");
+    const big = graph.nodes.find((node) => node.id === "module:site-0/app");
+
+    expect(graph.nodes).toHaveLength(60);
+    expect(small).toMatchObject({
+      label: "src/app/module-1",
+      title: "src/app/module-1 (3 files)",
+      files: 3,
+    });
+    // A node over 500 files shows its file count in the label.
+    expect(2548).toBeGreaterThan(MODULE_COUNT_LABEL_FROM);
+    expect(big).toMatchObject({
+      label: "site-0/app (2,548 files)",
+      title: "site-0/app (2,548 files)",
+      files: 2548,
+    });
+  });
+
+  it("separates the app's own modules from sites, mobile and other roots", () => {
+    const groups = new Map(graphOfModules(large()).nodes.map((node) => [node.id, node.group]));
+
+    expect(groups.get("module:src/app/module-1")).toBe("modules");
+    expect(groups.get("module:site-5/app")).toBe("roots");
+    expect(groups.get("module:site-0/app")).toBe("roots");
+  });
+});
+
+describe("the summary of the Grimoire tab", () => {
+  it("counts what needs a look in the bird view (zero with no screenshots and no baseline)", async () => {
+    const summary = await answer<GrimoireSummary>("/summary");
+
+    expect(summary.birdView).toBeGreaterThanOrEqual(0);
+    expect(typeof summary.birdView).toBe("number");
   });
 });

@@ -71,8 +71,10 @@ describe("the panel", () => {
       "product-map.css",
     ]);
     expect(panel.files?.dir).toMatch(/grimoire[\\/]screenshots$/);
+    // The Bird view and the approvals are never shared: they name test status per criterion and write files.
     expect(panel.share?.routes).toEqual([
       "/product",
+      "/product/whats-new",
       "/product/features/:feature",
       "/product/flows/:feature/:flow",
     ]);
@@ -86,9 +88,60 @@ describe("the panel", () => {
         "/flows/:feature/:flow",
         "/check",
         "/graph/modules",
+        "/matrix",
+        "/product/whats-new",
       ]),
     );
     expect(readFileSync(new URL(panel.view), "utf8")).toContain("export default renderGrimoire;");
+  });
+
+  it("answers the bird-view matrix with test status only when the project has no screenshots", async () => {
+    const { panel } = await shopPanel();
+    const answer = await call(panel, "/matrix");
+    const cells = answer.features.flatMap((feature: any) =>
+      feature.flows.flatMap((flow: any) => flow.criteria.flatMap((row: any) => row.cells)),
+    );
+
+    expect(answer.languages).toEqual([""]);
+    expect(answer.baseline).toBeNull();
+    expect(answer.development).toBe(true);
+    expect(cells.length).toBeGreaterThan(0);
+    expect(cells.every((item: any) => item.shown === null && item.approval === null)).toBe(true);
+    expect((await call(panel, "/summary")).birdView).toBeGreaterThanOrEqual(0);
+
+    const catalog = answer.features.find((feature: { id: string }) => feature.id === "catalog");
+
+    expect(catalog?.flows.map((flow: { ref: string }) => flow.ref)).toContain(
+      "catalog/new-arrivals",
+    );
+  });
+
+  it("answers the matrix as read-only in production", async () => {
+    copy = copyFixture();
+    await openGrimoire(copy.root, createShopAdapter(), { routes: "fresh" });
+
+    const panel = await grimoireDevtoolsPanel({
+      root: copy.root,
+      mode: "production",
+      adapter: createShopAdapter(),
+    });
+
+    expect((await call(panel, "/matrix")).development).toBe(false);
+  });
+
+  it("answers what's new, with no unreleased changes through a share link", async () => {
+    const { panel } = await shopPanel();
+    const route = panel.routes?.find((item) => item.path === "/product/whats-new");
+    const request = { params: {}, query: {}, body: undefined };
+    const signedIn = (await route?.handler(request)) as {
+      developer: boolean;
+      releases: { release: string | null }[];
+    };
+    const shared = (await route?.handler({ ...request, shared: true })) as typeof signedIn;
+
+    expect(signedIn.developer).toBe(true);
+    expect(shared.developer).toBe(false);
+    expect(shared.releases.every((item) => item.release !== null)).toBe(true);
   });
 
   it("answers the compact flow, step files, check pages and groups through the routes", async () => {

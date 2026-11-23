@@ -31,6 +31,8 @@ import type {
   ProductScreenshot,
   ProductStrip,
   ProductStoryStep,
+  ProductWhatsNewAnswer,
+  ProductWhatsNewRelease,
 } from "./answers";
 import { GrimoirePanelError } from "./data";
 
@@ -456,6 +458,7 @@ function appearancesOf(
 
       list.push({
         app: shown.app,
+        appTitle: app?.heading?.value ?? null,
         type: shown.type,
         id: shown.id,
         title,
@@ -672,6 +675,134 @@ export function productFlow(
       : {
           steps: (bookmap?.steps ?? []).map((step) => compactStep(snapshot, feature, step, flow)),
         },
+    host: snapshot.host ?? null,
+  };
+}
+
+/** A reference id: `AC-6`, `T-089`, `QA 1.5.6`. */
+const REFERENCE = /^(?:[A-Z]{1,5}-\d+|QA\s+\d[\w.-]*)$/;
+/** A trailing parenthesised group (optionally followed by one end mark) at the end of a sentence. */
+const TRAILING_GROUP = /\s*\(([^()]*)\)\s*([.!?]?)\s*$/;
+
+/** A sentence without the reference ids written in trailing parentheses: `"Fixed the total (AC-6, T-089)."` gives `"Fixed the total."`. */
+function withoutReferences(sentence: string): string {
+  let text = sentence;
+
+  for (;;) {
+    const match = TRAILING_GROUP.exec(text);
+
+    if (match === null) break;
+
+    const parts = (match[1] ?? "")
+      .split(/[,;]/)
+      .map((part) => part.trim())
+      .filter((part) => part !== "");
+
+    if (parts.length === 0 || !parts.every((part) => REFERENCE.test(part))) break;
+
+    text = `${text.slice(0, match.index)}${match[2] ?? ""}`;
+  }
+
+  return text.trim();
+}
+
+/** The first paragraph of a release brief as one plain line, or `null`. */
+function firstParagraph(brief: string): string | null {
+  const paragraph = brief
+    .split(/\n\s*\n/)
+    .map((part) => part.trim())
+    .find((part) => part !== "" && !part.startsWith("#"));
+
+  if (paragraph === undefined) return null;
+
+  const text = withoutReferences(paragraph.replace(/\s+/g, " ").replaceAll("`", ""));
+
+  return text === "" ? null : text;
+}
+
+/** The newest release first; the changes without a release lead. */
+function newestFirst(left: ProductWhatsNewRelease, right: ProductWhatsNewRelease): number {
+  if (left.release === null || right.release === null)
+    return Number(right.release === null) - Number(left.release === null);
+
+  return (
+    (right.date ?? "").localeCompare(left.date ?? "") ||
+    compareReleases(right.release, left.release)
+  );
+}
+
+/**
+ * `GET /product/whats-new`: the changelog entries of every feature, grouped by
+ * release and then by feature, in plain words (no criterion or task ids, no
+ * paths). A release is one a changelog names or a file in `grimoire/releases`;
+ * the changes that are in no release yet only appear in the signed-in view.
+ */
+export function productWhatsNew(
+  snapshot: GrimoireSnapshot,
+  options: ProductMapOptions,
+): ProductWhatsNewAnswer {
+  const written = new Map(snapshot.written.releases.map((item) => [item.release.value, item]));
+  const releases = new Map<string, ProductWhatsNewRelease>();
+
+  const releaseOf = (name: string | null, date: string | null): ProductWhatsNewRelease => {
+    const key = name ?? "";
+    let found = releases.get(key);
+
+    if (found === undefined) {
+      const file = name === null ? undefined : written.get(name);
+
+      found = {
+        release: name,
+        date: file?.date.value ?? date,
+        brief: file === undefined ? null : firstParagraph(file.brief),
+        features: [],
+      };
+      releases.set(key, found);
+    }
+
+    return found;
+  };
+
+  for (const item of snapshot.written.releases) releaseOf(item.release.value, item.date.value);
+
+  for (const feature of snapshot.written.features) {
+    if (feature.readme === null) continue;
+
+    const title = feature.readme.title.value;
+    const flowTitles = new Map(
+      feature.flows.map((flow) => [flow.id.value, flow.heading?.value ?? flow.id.value]),
+    );
+
+    for (const entry of feature.changelog?.entries ?? []) {
+      if (entry.release === null && options.shared) continue;
+
+      const release = releaseOf(entry.release, entry.date);
+      let group = release.features.find((item) => item.id === feature.id);
+
+      if (group === undefined) {
+        group = { id: feature.id, title, changes: [] };
+        release.features.push(group);
+      }
+
+      group.changes.push({
+        word: entry.word,
+        flow: entry.flow === null ? null : (flowTitles.get(entry.flow) ?? entry.flow),
+        text: withoutReferences(entry.text),
+      });
+    }
+  }
+
+  return {
+    releases: [...releases.values()]
+      .filter((release) => release.release !== null || release.features.length > 0)
+      .map((release) => ({
+        ...release,
+        features: [...release.features].sort((left, right) =>
+          left.title.localeCompare(right.title),
+        ),
+      }))
+      .sort(newestFirst),
+    developer: !options.shared,
     host: snapshot.host ?? null,
   };
 }

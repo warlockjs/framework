@@ -9,7 +9,17 @@ import type { GrimoireSnapshot } from "../contracts/snapshot";
 /** The most nodes a graph answer holds. */
 export const GRAPH_LIMIT = 60;
 
-export type GraphNode = { id: string; label: string; type: string };
+export type GraphNode = {
+  id: string;
+  label: string;
+  type: string;
+  /** The full name for a tooltip, when `label` is shortened or carries a count. */
+  title?: string;
+  /** Module graph: `modules` for `src/app/<module>` folders, `roots` for the other roots (sites, mobile, config). */
+  group?: "modules" | "roots";
+  /** Module graph: how many files the module holds. */
+  files?: number;
+};
 export type GraphEdge = { from: string; to: string; type: string; weight?: number };
 export type GrimoireGraph = { nodes: GraphNode[]; edges: GraphEdge[] };
 
@@ -18,12 +28,17 @@ class GraphBuilder {
   private readonly nodes = new Map<string, GraphNode>();
   private readonly edges = new Map<string, GraphEdge>();
 
-  public node(id: string, label: string, type: string): boolean {
+  public node(
+    id: string,
+    label: string,
+    type: string,
+    extra: Partial<Omit<GraphNode, "id" | "label" | "type">> = {},
+  ): boolean {
     if (this.nodes.has(id)) return true;
 
     if (this.nodes.size >= GRAPH_LIMIT) return false;
 
-    this.nodes.set(id, { id, label, type });
+    this.nodes.set(id, { id, label, type, ...extra });
 
     return true;
   }
@@ -182,6 +197,9 @@ export function pageGraph(
   return graph.build();
 }
 
+/** A module with more files than this shows its file count in the label. */
+export const MODULE_COUNT_LABEL_FROM = 500;
+
 /** Modules as nodes, weighted import edges between them; the most connected modules when there are more than the limit. */
 export function moduleGraph(snapshot: GrimoireSnapshot): GrimoireGraph {
   const moduleOf = new Map<string, string>();
@@ -217,8 +235,23 @@ export function moduleGraph(snapshot: GrimoireSnapshot): GrimoireGraph {
     .slice(0, GRAPH_LIMIT);
   const graph = new GraphBuilder();
 
-  for (const module of modules)
-    graph.node(`module:${module}`, `${module} (${sizes.get(module) ?? 0})`, "module");
+  for (const module of modules) {
+    const files = sizes.get(module) ?? 0;
+
+    // The label is the name; the file count is in the label only for a very large module, else in the tooltip.
+    graph.node(
+      `module:${module}`,
+      files > MODULE_COUNT_LABEL_FROM
+        ? `${module} (${files.toLocaleString("en-US")} files)`
+        : module,
+      "module",
+      {
+        title: `${module} (${files.toLocaleString("en-US")} ${files === 1 ? "file" : "files"})`,
+        group: module.startsWith("src/app/") ? "modules" : "roots",
+        files,
+      },
+    );
+  }
 
   for (const [key, weight] of [...weights.entries()].sort(([left], [right]) =>
     left.localeCompare(right),

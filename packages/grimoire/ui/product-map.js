@@ -333,14 +333,41 @@ function productShots(ctx, kit, list, lightbox) {
   );
 }
 
+/**
+ * One row per page or screen, not per block: the blocks that show the flow are
+ * listed under the page, and a screenshot the blocks share is shown once.
+ */
+function productPlaces(items) {
+  const places = new Map();
+
+  for (const item of items) {
+    const key = `${item.type}|${item.id}`;
+    let place = places.get(key);
+
+    if (!place) {
+      place = { ...item, blocks: [], flows: [], screenshots: [] };
+      places.set(key, place);
+    }
+
+    if (item.block && !place.blocks.includes(item.block)) place.blocks.push(item.block);
+    if (item.flow && !place.flows.includes(item.flow)) place.flows.push(item.flow);
+
+    for (const shot of item.screenshots ?? []) {
+      if (!place.screenshots.some((known) => known.src === shot.src)) place.screenshots.push(shot);
+    }
+  }
+
+  return [...places.values()];
+}
+
 function productAppearances(ctx, kit, appearances, lightbox, withFlowLinks) {
   if (!appearances || appearances.length === 0) return null;
 
   const byApp = new Map();
 
   for (const item of appearances) {
-    if (!byApp.has(item.app)) byApp.set(item.app, []);
-    byApp.get(item.app).push(item);
+    if (!byApp.has(item.app)) byApp.set(item.app, { title: item.appTitle ?? null, items: [] });
+    byApp.get(item.app).items.push(item);
   }
 
   return productSection(
@@ -349,25 +376,36 @@ function productAppearances(ctx, kit, appearances, lightbox, withFlowLinks) {
     kit.el(
       "div",
       { class: "pm-apps" },
-      [...byApp.entries()].map(([app, items]) =>
+      [...byApp.entries()].map(([app, group]) =>
         kit.el("div", { class: "pm-app" }, [
-          kit.el("h4", { text: app }),
+          kit.el("h4", { text: group.title ?? app }),
           kit.el(
             "ul",
             { class: "pm-places" },
-            items.map((item) =>
+            productPlaces(group.items).map((item) =>
               kit.el("li", { class: "pm-place" }, [
                 kit.el("div", { class: "pm-place-head" }, [
                   kit.el("strong", { text: item.title ?? item.id }),
                   item.route ? kit.el("span", { class: "pm-place-route", text: item.route }) : null,
-                  withFlowLinks && item.flow
-                    ? kit.link(
-                        `product/flow/${item.flow.split("/").map(productEncode).join("/")}`,
-                        "See the story",
-                        { class: "pm-place-flow" },
+                  ...(withFlowLinks
+                    ? item.flows.map((flow) =>
+                        kit.link(
+                          `product/flow/${flow.split("/").map(productEncode).join("/")}`,
+                          item.flows.length > 1
+                            ? `See the story of ${flow.split("/").pop()}`
+                            : "See the story",
+                          { class: "pm-place-flow" },
+                        ),
                       )
-                    : null,
+                    : []),
                 ]),
+                item.blocks.length > 0
+                  ? kit.el(
+                      "ul",
+                      { class: "pm-place-blocks", "aria-label": "Blocks that show it" },
+                      item.blocks.map((block) => kit.el("li", { text: block })),
+                    )
+                  : null,
                 productShots(ctx, kit, item.screenshots, lightbox),
               ]),
             ),
@@ -565,13 +603,16 @@ function productMapPage(ctx, kit, answer) {
         text: "What the product does, who it is for and how healthy each part is, in plain words.",
       }),
     ]),
-    share
-      ? kit.el("a", {
-          class: "pm-button pm-button--primary",
-          href: share.manageHref,
-          text: "Share this map",
-        })
-      : null,
+    kit.el("div", { class: "pm-hero-actions" }, [
+      kit.link("product/whats-new", "What's new", { class: "pm-button" }),
+      share
+        ? kit.el("a", {
+            class: "pm-button pm-button--primary",
+            href: share.manageHref,
+            text: "Share this map",
+          })
+        : null,
+    ]),
   ]);
 
   if (features.length === 0) {
@@ -826,20 +867,15 @@ function productTimeline(kit, releases) {
                   kit.el(
                     "ul",
                     { class: "pm-changes" },
-                    groups.get(word).map((change) => {
-                      const { text, refs } = productSplitRefs(change.text);
-
-                      return kit.el("li", {}, [
-                        kit.el("span", { class: "pm-change-text", text }),
-                        !kit.shared && refs.length > 0
-                          ? kit.el(
-                              "span",
-                              { class: "pm-refs" },
-                              refs.map((ref) => kit.el("code", { class: "pm-ref", text: ref })),
-                            )
-                          : null,
-                      ]);
-                    }),
+                    // Criterion and task ids are for developers: this list is for people who read the product, not the code.
+                    groups.get(word).map((change) =>
+                      kit.el("li", {}, [
+                        kit.el("span", {
+                          class: "pm-change-text",
+                          text: productSplitRefs(change.text).text,
+                        }),
+                      ]),
+                    ),
                   ),
                 ]),
               ),
@@ -847,6 +883,105 @@ function productTimeline(kit, releases) {
       ]);
     }),
   );
+}
+
+/** One release of the What's new view: its date, the brief, then the changes per feature in plain words. */
+function productWhatsNewRelease(kit, release, alone) {
+  const date = productDate(release.date);
+  const name = release.release === null ? "Not released yet" : `Version ${release.release}`;
+
+  return kit.el("li", { class: `pm-release${release.release === null ? " is-unreleased" : ""}` }, [
+    kit.el("div", { class: "pm-release-head" }, [
+      release.release === null || alone
+        ? kit.el("h3", { class: "pm-release-version", text: name })
+        : kit.el("h3", { class: "pm-release-version" }, [
+            kit.link(`product/whats-new/${productEncode(release.release)}`, name),
+          ]),
+      date ? kit.el("span", { class: "pm-muted pm-release-state", text: date }) : null,
+      release.release === null
+        ? kit.el("span", { class: "pm-chip pm-chip--soft pm-release-state", text: "Unreleased" })
+        : null,
+    ]),
+    release.brief ? kit.el("p", { class: "pm-prose", text: release.brief }) : null,
+    release.features.length === 0
+      ? kit.el("p", { class: "pm-muted", text: "No changes are listed for this version." })
+      : kit.el(
+          "div",
+          { class: "pm-whatsnew-features" },
+          release.features.map((feature) => {
+            const groups = new Map();
+
+            for (const change of feature.changes)
+              groups.set(change.word, [...(groups.get(change.word) ?? []), change]);
+
+            const words = [
+              ...PRODUCT_CHANGE_ORDER.filter((word) => groups.has(word)),
+              ...[...groups.keys()].filter((word) => !PRODUCT_CHANGE_ORDER.includes(word)),
+            ];
+
+            return kit.el("div", { class: "pm-whatsnew-feature" }, [
+              kit.el("h4", {}, [
+                kit.link(`product/feature/${productEncode(feature.id)}`, feature.title),
+              ]),
+              kit.el(
+                "ul",
+                { class: "pm-changes" },
+                words.flatMap((word) =>
+                  groups.get(word).map((change) =>
+                    kit.el("li", {}, [
+                      kit.el("span", {
+                        class: `pm-change-type pm-change--${word}`,
+                        text: PRODUCT_CHANGE[word] ?? word,
+                      }),
+                      kit.el("span", {
+                        class: "pm-change-text",
+                        text: `${change.flow ? `${change.flow}: ` : ""}${productSplitRefs(change.text).text}`,
+                      }),
+                    ]),
+                  ),
+                ),
+              ),
+            ]);
+          }),
+        ),
+  ]);
+}
+
+/** `#grimoire/product/whats-new[/<release>]`: the releases newest first, or one release. */
+function productWhatsNewPage(kit, answer, only) {
+  const releases = only
+    ? answer.releases.filter((release) => release.release === only)
+    : answer.releases;
+  const trail = [{ text: "Product map", to: "product" }];
+
+  if (only)
+    trail.push({ text: "What's new", to: "product/whats-new" }, { text: `Version ${only}` });
+  else trail.push({ text: "What's new" });
+
+  return kit.el("div", { class: "pm-page" }, [
+    productBreadcrumb(kit, trail),
+    kit.el("header", { class: "pm-title" }, [
+      kit.el("h2", { text: "What's new" }),
+      kit.el("p", {
+        class: "pm-lead",
+        text: "What changed in each release, in plain words, newest first.",
+      }),
+    ]),
+    releases.length === 0
+      ? kit.el("div", { class: "pm-empty" }, [
+          kit.el("h3", { text: only ? `No release "${only}" is written` : "No releases yet" }),
+          kit.el("p", {
+            text: only
+              ? "Open What's new for the list of releases."
+              : "When a release is stamped (warlock grimoire release --stamp), its changes are listed here.",
+          }),
+        ])
+      : kit.el(
+          "ol",
+          { class: "pm-timeline pm-whatsnew" },
+          releases.map((release) => productWhatsNewRelease(kit, release, Boolean(only))),
+        ),
+  ]);
 }
 
 /** The host the adapter reported, or `null` when there is none. */
@@ -1028,19 +1163,42 @@ function productStory(ctx, kit, story, lightbox) {
   );
 }
 
+/** The fixed case questions as the plain question a reader asks. A flow's own label is shown as written. */
+const PRODUCT_CASE_SENTENCES = {
+  "invalid input": "What if the input is not valid?",
+  "not allowed": "What if the person is not allowed to do this?",
+  "not found": "What if it cannot be found?",
+  duplicate: "What if it already exists?",
+  limits: "What if a limit is reached?",
+  expiry: "What if it has expired?",
+  "double submit": "What if it is sent twice?",
+  "outside service down": "What if an outside service is down?",
+  "server unreachable": "What if the server cannot be reached?",
+  "server error": "What if the server fails?",
+};
+
+function productCaseSentence(question) {
+  const text = String(question ?? "").trim();
+  const known = PRODUCT_CASE_SENTENCES[text.toLowerCase()];
+
+  if (known) return known;
+
+  return text === "" ? text : `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
 function productCases(kit, cases) {
   const handled = cases.filter((item) => item.handled);
   const skipped = cases.filter((item) => !item.handled);
   const item = (entry) =>
     kit.el("li", {}, [
-      kit.el("strong", { text: entry.question }),
+      kit.el("strong", { text: productCaseSentence(entry.question) }),
       kit.el("p", {
         text: entry.handled ? entry.answer : entry.answer.replace(/^does not apply\b[:\s—-]*/i, ""),
       }),
       entry.criteria.length > 0
         ? kit.el("span", {
             class: "pm-chip pm-chip--soft",
-            text: `Checked by ${entry.criteria.join(", ")}`,
+            text: `Checked by ${productPlural(entry.criteria.length, "check")}`,
           })
         : null,
     ]);
@@ -1097,7 +1255,7 @@ function productFlowPage(ctx, kit, answer, lightbox) {
         productStatusChip(kit, flow.status),
       ]),
       kit.el("p", { class: "pm-lead", text: flow.summary ?? "No summary yet." }),
-      kit.el("p", { class: "pm-muted", text: `For ${flow.who} · since version ${flow.since}` }),
+      kit.el("p", { class: "pm-muted", text: `${flow.who} · since version ${flow.since}` }),
     ]),
     kit.el("section", { class: "pm-section pm-callout", "aria-label": "Health" }, [
       productHealth(kit, answer.health),
@@ -1196,6 +1354,11 @@ export async function productMapView(ctx, parts = []) {
       }
 
       main.append(el("div", { class: "pm-page" }, body));
+    } else if (kind === "whats-new") {
+      const answer = await ctx.api("product/whats-new");
+
+      answerHost = answer.host;
+      main.append(productWhatsNewPage(kit, answer, first || null));
     } else if (kind === "flow" && first && second) {
       const answer = await ctx.api(
         `product/flows/${productEncode(first)}/${productEncode(second)}`,
@@ -1223,7 +1386,13 @@ export async function productMapView(ctx, parts = []) {
       productLoadError(
         ctx,
         kit,
-        kind === "feature" ? "this feature" : kind === "flow" ? "this flow" : "the product map",
+        kind === "feature"
+          ? "this feature"
+          : kind === "flow"
+            ? "this flow"
+            : kind === "whats-new"
+              ? "what's new"
+              : "the product map",
         error,
       ),
     );
@@ -1255,7 +1424,13 @@ export async function productMapView(ctx, parts = []) {
 async function renderProductMap(context) {
   const parts = (context.route ?? "").split("/").filter(Boolean);
 
-  if (parts[0] === "share" && (parts.length === 1 || parts[1] === "feature" || parts[1] === "flow"))
+  if (
+    parts[0] === "share" &&
+    (parts.length === 1 ||
+      parts[1] === "feature" ||
+      parts[1] === "flow" ||
+      parts[1] === "whats-new")
+  )
     parts.shift();
   if (parts[0] === "product") parts.shift();
 

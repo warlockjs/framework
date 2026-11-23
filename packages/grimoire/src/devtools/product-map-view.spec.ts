@@ -425,7 +425,8 @@ describe("product map view", () => {
     expect(text).toContain("A card is charged.");
     expect(text).toContain("Passing");
     expect(text).toContain("No test yet");
-    expect(text).toContain("Checked by AC-2");
+    expect(text).toContain("Checked by 1 check");
+    expect(text).not.toContain("AC-2");
     expect(text).toContain("Does not apply (1)");
     expect(text).toContain("no cash payments");
     expect(text).not.toContain("does not apply: ");
@@ -599,7 +600,7 @@ describe("product map: what changed", () => {
     });
   });
 
-  it("draws one node per version with groups by type and ref chips in developer mode", async () => {
+  it("draws one node per version with groups by type and no reference ids, even for developers", async () => {
     const { productMapView } = await load();
     const { context } = makeContext({ answers: { "product/features/checkout": changed } });
     const view = await productMapView(context, ["feature", "checkout"]);
@@ -607,21 +608,18 @@ describe("product map: what changed", () => {
     const types = view
       .findAll((node) => (node.attributes.class ?? "").startsWith("pm-change-type"))
       .map((node) => node.text);
-    const refs = view
-      .findAll((node) => node.attributes.class === "pm-ref")
-      .map((node) => node.text);
+    const changes = view.findAll((node) => node.attributes.class === "pm-change-text");
 
     expect(releases).toHaveLength(2);
     expect(releases[0]?.attributes.class).toContain("is-unreleased");
     expect(releases[0]?.text).toContain("Unreleased");
     expect(types.slice(0, 3)).toEqual(["Added", "Fixed", "Removed"]);
-    // Groups run Added, Fixed, Removed, so the Added change's ref comes first.
-    expect(refs).toEqual(["QA 1.5.6", "AC-6", "T-089"]);
-    expect(view.text).toContain("Totals round correctly.");
-    expect(view.text).not.toContain("(AC-6");
+    expect(view.findAll((node) => node.attributes.class === "pm-ref")).toHaveLength(0);
+    expect(changes.map((node) => node.text)).toContain("Totals round correctly.");
+    expect(view.text).not.toMatch(/AC-6|T-089|QA 1\.5\.6/);
   });
 
-  it("hides the reference chips in the shared view", async () => {
+  it("shows no reference ids in the shared view either", async () => {
     const { productMapView } = await load();
     const { context } = makeContext({
       shared: true,
@@ -631,6 +629,7 @@ describe("product map: what changed", () => {
 
     expect(view.findAll((node) => node.attributes.class === "pm-ref")).toHaveLength(0);
     expect(view.text).toContain("Totals round correctly.");
+    expect(view.text).not.toMatch(/AC-6|T-089/);
   });
 
   it("shows the app and framework in the shared footer when the adapter reports a host", async () => {
@@ -738,5 +737,225 @@ describe("the product map sorting and the changed-since filter", () => {
     expect(titles()[0]).toBe("Billing");
     since.fire("change", { target: { value: "release:5.2.0" } });
     expect(titles()).toEqual(["Billing", "Drafts"]);
+  });
+});
+
+describe("product map: plain words on business screens", () => {
+  const appearance = (block: string, flow: string, screenshots = [shot]) => ({
+    app: "web",
+    appTitle: "Web shop",
+    type: "page",
+    id: "checkout",
+    title: "Checkout",
+    route: "/checkout",
+    block,
+    flow,
+    screenshots,
+  });
+
+  it("lists a page once with its blocks under it, not one row per block", async () => {
+    const { productMapView } = await load();
+    const { context } = makeContext({
+      answers: {
+        "product/features/checkout": {
+          ...featureAnswer,
+          appearances: [
+            appearance("Card form", "checkout/pay"),
+            appearance("Order summary", "checkout/pay"),
+            appearance("Receipt", "checkout/refund"),
+          ],
+        },
+      },
+    });
+    const view = await productMapView(context, ["feature", "checkout"]);
+    const places = view.findAll((node) => node.attributes.class === "pm-place");
+    const blocks = view
+      .findAll((node) => node.attributes.class === "pm-place-blocks")[0]
+      ?.find("li")
+      .map((node) => node.text);
+
+    expect(places).toHaveLength(1);
+    expect(blocks).toEqual(["Card form", "Order summary", "Receipt"]);
+    // The screenshot the blocks share is shown once.
+    expect(places[0]?.findAll((node) => node.attributes.class === "pm-shot")).toHaveLength(1);
+    expect(view.links).toEqual(
+      expect.arrayContaining([
+        "#grimoire/product/flow/checkout/pay",
+        "#grimoire/product/flow/checkout/refund",
+      ]),
+    );
+  });
+
+  it("heads each app group with the app's title, and falls back to its id", async () => {
+    const { productMapView } = await load();
+    const titled = makeContext({
+      answers: {
+        "product/features/checkout": {
+          ...featureAnswer,
+          appearances: [appearance("Form", "checkout/pay")],
+        },
+      },
+    });
+    const untitled = makeContext({
+      answers: {
+        "product/features/checkout": {
+          ...featureAnswer,
+          appearances: [{ ...appearance("Form", "checkout/pay"), appTitle: null }],
+        },
+      },
+    });
+    const heading = async (context: unknown) =>
+      (await productMapView(context, ["feature", "checkout"]))
+        .findAll((node) => node.attributes.class === "pm-app")[0]
+        ?.find("h4")[0]?.text;
+
+    expect(await heading(titled.context)).toBe("Web shop");
+    expect(await heading(untitled.context)).toBe("web");
+  });
+
+  it("shows the audience in the flow line without a leading For", async () => {
+    const { productMapView } = await load();
+    const free = {
+      ...flowAnswer,
+      flow: { ...flowAnswer.flow, who: "free" },
+    };
+    const { context } = makeContext({ answers: { "product/flows/checkout/pay": free } });
+    const view = await productMapView(context, ["flow", "checkout", "pay"]);
+
+    expect(view.text).toContain("free · since version 1.0");
+    expect(view.text).not.toContain("For free");
+  });
+
+  it("asks every case as a plain question, including the two screen cases", async () => {
+    const { productMapView } = await load();
+    const question = (name: string) => ({
+      question: name,
+      answer: "We show a message.",
+      handled: true,
+      criteria: [],
+    });
+    const { context } = makeContext({
+      answers: {
+        "product/flows/checkout/pay": {
+          ...flowAnswer,
+          cases: [
+            question("invalid input"),
+            question("outside service down"),
+            question("server unreachable"),
+            question("server error"),
+            question("card declined"),
+          ],
+        },
+      },
+    });
+    const view = await productMapView(context, ["flow", "checkout", "pay"]);
+    const asked = view
+      .findAll((node) => node.attributes.class === "pm-cases")[0]
+      ?.find("strong")
+      .map((node) => node.text);
+
+    expect(asked).toEqual([
+      "What if the input is not valid?",
+      "What if an outside service is down?",
+      "What if the server cannot be reached?",
+      "What if the server fails?",
+      "Card declined",
+    ]);
+  });
+});
+
+describe("product map: what's new", () => {
+  const whatsNew = {
+    developer: true,
+    host: null,
+    releases: [
+      {
+        release: null,
+        date: null,
+        brief: null,
+        features: [
+          {
+            id: "checkout",
+            title: "Checkout",
+            changes: [{ word: "added", flow: "Pay by card", text: "Wallet payments." }],
+          },
+        ],
+      },
+      {
+        release: "5.2.0",
+        date: "2026-11-01",
+        brief: "Faster checkout and fewer failed payments.",
+        features: [
+          {
+            id: "checkout",
+            title: "Checkout",
+            changes: [
+              { word: "fixed", flow: null, text: "Totals round correctly." },
+              { word: "added", flow: "Pay by card", text: "Saved cards." },
+            ],
+          },
+        ],
+      },
+      { release: "5.1.0", date: "2026-10-01", brief: null, features: [] },
+    ],
+  };
+
+  it("links to it from the map", async () => {
+    const { productMapView } = await load();
+    const view = await productMapView(makeContext().context, []);
+
+    expect(view.links).toContain("#grimoire/product/whats-new");
+  });
+
+  it("lists the releases in the order given, with date, brief and the changes per feature", async () => {
+    const { productMapView } = await load();
+    const { context } = makeContext({ answers: { "product/whats-new": whatsNew } });
+    const view = await productMapView(context, ["whats-new"]);
+    const headings = view
+      .findAll((node) => node.attributes.class === "pm-release-version")
+      .map((node) => node.text.trim());
+
+    expect(headings).toEqual(["Not released yet", "Version 5.2.0", "Version 5.1.0"]);
+    expect(view.text).toContain("Faster checkout and fewer failed payments.");
+    expect(view.text).toContain("Pay by card: Saved cards.");
+    expect(view.text).toContain("No changes are listed for this version.");
+    expect(view.links).toEqual(
+      expect.arrayContaining([
+        "#grimoire/product/feature/checkout",
+        "#grimoire/product/whats-new/5.2.0",
+      ]),
+    );
+    expect(view.text).not.toMatch(/AC-\d|T-\d/);
+  });
+
+  it("opens one release from the route", async () => {
+    const { productMapView } = await load();
+    const { context } = makeContext({ answers: { "product/whats-new": whatsNew } });
+    const view = await productMapView(context, ["whats-new", "5.2.0"]);
+
+    expect(view.text).toContain("Version 5.2.0");
+    expect(view.text).not.toContain("Version 5.1.0");
+    expect(view.links).toContain("#grimoire/product/whats-new");
+  });
+
+  it("says what to do when no release is written, and when the named release is not", async () => {
+    const { productMapView } = await load();
+    const empty = makeContext({
+      answers: { "product/whats-new": { ...whatsNew, releases: [] } },
+    });
+    const missing = makeContext({ answers: { "product/whats-new": whatsNew } });
+
+    expect((await productMapView(empty.context, ["whats-new"])).text).toContain("No releases yet");
+    expect((await productMapView(missing.context, ["whats-new", "9.9.9"])).text).toContain(
+      'No release "9.9.9" is written',
+    );
+  });
+
+  it("opens from a share link route", async () => {
+    const { default: render } = await load();
+    const { context } = makeContext({ shared: true, answers: { "product/whats-new": whatsNew } });
+    const view = await render({ ...context, route: "share/whats-new" });
+
+    expect(view.text).toContain("Version 5.2.0");
   });
 });
