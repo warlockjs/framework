@@ -475,6 +475,22 @@ describe("registerGrimoireCommands", () => {
     }
   });
 
+  it("keeps going after a failed boot, so build and check can use the cached routes (GR8002)", async () => {
+    const copy = fixture();
+    const cwd = vi.spyOn(process, "cwd").mockReturnValue(copy.root);
+
+    try {
+      const [grimoire] = registerGrimoireCommands();
+
+      for (const action of ["build", "check"]) {
+        await grimoire?.commandPreAction?.({ args: [action], options: { force: true } });
+        expect(grimoire?.commandPreload).toMatchObject({ bootstrap: true, tolerant: true });
+      }
+    } finally {
+      cwd.mockRestore();
+    }
+  });
+
   it("sets no preload for release and scry file questions", async () => {
     const [grimoire, scry] = registerGrimoireCommands();
 

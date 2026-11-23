@@ -36,6 +36,7 @@ import {
 } from "./fresh-module-graph";
 import { resetTestDatabase, type ResetTestDatabaseOptions } from "./reset-test-database";
 import { closeOpenTestHttpServers } from "./open-test-servers";
+import { closeWorkerTestServer, enableWorkerTestServer } from "./worker-test-server";
 import { captureTestRouterSnapshot, resetTestRuntimeState } from "./reset-test-state";
 import {
   testRuntimeScope,
@@ -261,6 +262,7 @@ export async function setupTest(options?: TestSetupOptions): Promise<void> {
   }
 
   warnMissingImportModule(options?.importModule);
+  enableWorkerTestServer(options?.importModule);
 
   const registry = getTestLifecycleRegistry();
   const requested = readRequestedConnectors(options?.connectors);
@@ -358,6 +360,8 @@ export async function teardownTest(): Promise<void> {
     finishTestProfile();
     return;
   }
+  // The worker's request server serves one file; the next file starts its own.
+  await closeWorkerTestServer();
   if (scope.lifetime === "worker") {
     if (scope.boundary) await settled(scope.boundary);
     scope.fileOpen = false;

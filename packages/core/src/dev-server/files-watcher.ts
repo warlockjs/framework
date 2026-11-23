@@ -7,6 +7,7 @@ import nodePath from "node:path";
 import { rootPath, srcPath } from "../utils";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { Path } from "../utils/normalized-path";
+import { devLogError } from "./dev-logger";
 
 type FileWatcherEvent = "change" | "delete" | "add" | "error" | "addDir" | "unlinkDir";
 
@@ -233,12 +234,28 @@ export class FilesWatcher {
     watcher.on("unlink", (filePath) => this.triggerEvent("delete", filePath));
     watcher.on("addDir", (filePath) => this.triggerEvent("addDir", filePath));
     watcher.on("unlinkDir", (filePath) => this.triggerEvent("unlinkDir", filePath));
-    // watcher.on("error", (error: Error, filePath: string) =>
-    //   this.triggerEvent("error", filePath, error),
-    // );
+    // A watcher error (a directory that vanished, a handle limit, a path the
+    // OS refuses) is logged and handed to `onFileError` subscribers; the dev
+    // server keeps running. Without a listener Node treats the emitted `error`
+    // as uncaught and ends the process.
+    watcher.on("error", (error: unknown, filePath?: string) =>
+      this.handleWatcherError(error, filePath),
+    );
 
     // Cleanup on process exit
     process.on("SIGINT", this.onInterrupt);
+  }
+
+  private handleWatcherError(error: unknown, filePath?: string) {
+    const cause = error instanceof Error ? error : new Error(String(error));
+
+    try {
+      devLogError(`File watcher error${filePath ? ` (${filePath})` : ""}: ${cause.message}`, cause);
+      this.triggerEvent("error", filePath ?? "", cause);
+    } catch (failure) {
+      // Reporting must never be what takes the dev server down.
+      console.error("File watcher error could not be reported:", failure);
+    }
   }
 
   /**

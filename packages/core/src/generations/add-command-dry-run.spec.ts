@@ -60,12 +60,7 @@ describe("warlock add --dry-run --json", () => {
 
     expect(result).toMatchObject({ ok: true, dryRun: true, command: "add" });
     expect(result.written).toEqual(
-      expect.arrayContaining([
-        "package.json",
-        "src/test-global-setup.ts",
-        "src/test-setup.ts",
-        "vite.config.ts",
-      ]),
+      expect.arrayContaining(["package.json", "src/test-setup.ts", "vite.config.ts"]),
     );
     expect(Object.keys(result.details.devDependencies as Record<string, string>)).toContain(
       "vitest",

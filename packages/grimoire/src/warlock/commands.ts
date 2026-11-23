@@ -20,6 +20,8 @@ const BOOT: CLICommandPreload = {
   config: true,
   env: true,
   bootstrap: true,
+  // An app that does not boot still gets its cached routes (GR8002).
+  tolerant: true,
 };
 
 /** No boot, but a multi-site app's `src/config/web.ts` (its sites' base paths shape the page routes). */

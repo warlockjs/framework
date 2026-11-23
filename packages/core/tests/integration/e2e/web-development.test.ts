@@ -3,8 +3,8 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, it } from "vitest";
-import { runE2E } from "../../../src/e2e";
+import { expect, it, vi } from "vitest";
+import { type BrowserPage, runE2E } from "../../../src/e2e";
 
 const workspace = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../..");
 const field = `import { useId } from 'react';
@@ -16,6 +16,33 @@ import { Link } from '@warlock.js/web';
 import { Form } from '@mongez/react-form';
 export default function Page({data}) { return <><h1>Revision ${revision}</h1><p id="theme">{data.theme}</p><Form><Field/><Field/></Form><Form><Field/></Form><Link to="/away">Away</Link></> }
 `;
+
+/**
+ * Wait until React has hydrated every element matching `selector` (it attaches its props to the
+ * node), so a click is handled by the page's handlers and not by the server's static markup.
+ */
+async function waitForHydration(browserPage: BrowserPage, selector: string): Promise<void> {
+  await vi.waitFor(
+    async () =>
+      expect(
+        await browserPage.evaluate<boolean>(
+          `(() => { const nodes = Array.from(document.querySelectorAll(${JSON.stringify(selector)})); return nodes.length > 0 && nodes.every(node => Object.keys(node).some(key => key.startsWith('__reactProps$'))); })()`,
+        ),
+      ).toBe(true),
+    { timeout: 30_000, interval: 100 },
+  );
+}
+
+/** Read `dataset.hookId` of an input once its click handler has run. */
+async function expectHookId(browserPage: BrowserPage, id: string): Promise<void> {
+  await vi.waitFor(
+    async () =>
+      expect(
+        await browserPage.evaluate(`document.getElementById(${JSON.stringify(id)}).dataset.hookId`),
+      ).toBe(id),
+    { timeout: 30_000, interval: 100 },
+  );
+}
 
 it.each(["shared", "identifiers"])(
   "development regression: %s",
@@ -147,6 +174,10 @@ export default defineConfig({devServer:{generateTypings:false,healthCheckers:fal
                 await browserPage.waitForNetworkIdle();
                 if (revision > 0) {
                   await writeFile(join(directory, "src/web/index.page.tsx"), pageSource(revision));
+                  // The server serving the new revision is the update itself; the browser follows it.
+                  await expect
+                    .poll(async () => (await fetch(url)).text(), { timeout: 30_000 })
+                    .toContain(`Revision ${revision}`);
                   await browserPage.waitFor({
                     selector: "h1",
                     text: `Revision ${revision}`,
@@ -182,6 +213,7 @@ export default defineConfig({devServer:{generateTypings:false,healthCheckers:fal
                   const count = await browserPage.evaluate<number>(
                     "Number(document.querySelector('button').textContent.split(' ')[1])",
                   );
+                  await waitForHydration(browserPage, "button");
                   await browserPage.click("button");
                   await browserPage.waitFor({
                     selector: "button",
@@ -202,13 +234,10 @@ export default defineConfig({devServer:{generateTypings:false,healthCheckers:fal
                   expect(formIds).toHaveLength(2);
                   expect(new Set(formIds).size).toBe(2);
                 }
+                await waitForHydration(browserPage, "input");
                 for (const id of inputs) {
                   await browserPage.click(`input[id="${id}"]`);
-                  expect(
-                    await browserPage.evaluate(
-                      `document.getElementById(${JSON.stringify(id)}).dataset.hookId`,
-                    ),
-                  ).toBe(id);
+                  await expectHookId(browserPage, id);
                   expect(
                     await browserPage.evaluate(
                       `(() => { const input=document.getElementById(${JSON.stringify(id)});return !input.form || input.dataset.formHookId === input.form.id;})()`,
@@ -235,15 +264,12 @@ export default defineConfig({devServer:{generateTypings:false,healthCheckers:fal
               text: "Revision 4",
               timeoutMs: 30_000,
             });
+            await waitForHydration(browserPage, "input");
             for (const id of await browserPage.evaluate<string[]>(
               "Array.from(document.querySelectorAll('input'),input=>input.id)",
             )) {
               await browserPage.click(`input[id="${id}"]`);
-              expect(
-                await browserPage.evaluate(
-                  `document.getElementById(${JSON.stringify(id)}).dataset.hookId`,
-                ),
-              ).toBe(id);
+              await expectHookId(browserPage, id);
             }
           },
         },

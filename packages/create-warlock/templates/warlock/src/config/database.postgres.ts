@@ -5,10 +5,9 @@ import { env } from "@warlock.js/core";
 // (src/config/tests.ts), so tests run against "<DB_NAME>_test_<worker id>". Create one
 // database per worker first (for example <DB_NAME>_test_1 to _4, one per `maxWorkers`) and
 // run the migrations on each.
-// The shared HTTP server started by src/test-global-setup.ts runs in Vitest's main process, which
-// has no worker id, so it reads "<DB_NAME>_test_1" (worker 1's database). A request through it only
-// sees rows written by worker 1; for tests in other workers use createTestHttpServer(), which
-// serves from the worker and reads the worker's own database.
+// The request helpers (testGet, actingAs, ...) send to an HTTP server that starts inside the same
+// worker, so a request reads the database its own worker writes. Export the number of test databases
+// as WARLOCK_TEST_DATABASES (for example 4), so vitest never starts more workers than databases.
 const databaseName = process.env.VITEST
   ? `${env("DB_NAME", "app")}_test_${process.env.VITEST_POOL_ID ?? 1}`
   : env("DB_NAME");

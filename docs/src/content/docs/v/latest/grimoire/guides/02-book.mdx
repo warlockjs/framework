@@ -221,7 +221,7 @@ Before anything else, every command does this:
 
 1. Stat every code file under the source roots (images, fonts, certificates and other non-code files are not in the book): `src/` and the top-level folders of each mobile app, except its native
    projects and build output (`android/`, `ios/`, `build/`, `dist/`, `web-build/`, `coverage/`). `node_modules` and
-   dot folders are skipped. Code files directly in a mobile app's folder (such as `App.tsx`) are not in the book.
+   dot folders are skipped. Code files directly in a mobile app's folder (such as `App.tsx` and `index.ts`) are in the book; tool configs (`babel.config.js`, `metro.config.js`) and `*.d.ts` files are not.
 2. Hash only the files whose size or modification time differ from the manifest. A file that was only touched keeps
    its hash.
 3. If the set of files, every hash, the test file hashes and the versions all match, the book is fresh. Nothing is

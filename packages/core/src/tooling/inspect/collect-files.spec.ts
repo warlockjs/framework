@@ -336,6 +336,24 @@ describe("collectFiles dirs", () => {
     );
   });
 
+  it("reads the listed top-level files without scanning their folder", () => {
+    write("mobile/App.tsx", 'import { x } from "./app/x"; export default x;');
+    write("mobile/index.ts", "export {};");
+    write("mobile/app/x.tsx", "export const x = 1;");
+    write("mobile/scripts/tool.ts", "export {};");
+
+    const files = collectFiles(root, [], {
+      dirs: ["mobile/app"],
+      files: ["mobile/App.tsx", "mobile/index.ts", "mobile/missing.ts", "mobile/app/x.tsx"],
+    });
+    const names = files.map((file) => file.file);
+
+    expect(names).toEqual(["mobile/App.tsx", "mobile/app/x.tsx", "mobile/index.ts"]);
+    expect(files.find((file) => file.file === "mobile/App.tsx")?.imports).toEqual([
+      { specifier: "./app/x", file: "mobile/app/x.tsx" },
+    ]);
+  });
+
   it("skips node_modules and hidden folders inside a scanned folder", () => {
     write("mobile/app/x.tsx", "export const x = 1;");
     write("mobile/node_modules/react/index.js", "module.exports = {};");

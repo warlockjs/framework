@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cpuQuotaWorkers, recommendedTestWorkers } from "./test-workers";
+import { cpuQuotaWorkers, recommendedTestWorkers, testDatabaseCount } from "./test-workers";
 
 describe("CPU quota worker recommendation", () => {
   it("caps 48 visible CPUs at a 12 CPU quota", () => {
@@ -29,5 +29,20 @@ describe("CPU quota worker recommendation", () => {
         throw new Error("not Linux");
       }),
     ).toBe(4);
+  });
+});
+
+describe("test database cap", () => {
+  const cgroup = (file: string) => (file === "/proc/self/cgroup" ? "0::/" : "max 100000");
+
+  it("never recommends more workers than test databases", () => {
+    expect(recommendedTestWorkers(16, cgroup, 4)).toBe(4);
+    expect(recommendedTestWorkers(2, cgroup, 4)).toBe(2);
+  });
+
+  it("reads the count from WARLOCK_TEST_DATABASES", () => {
+    expect(testDatabaseCount({ WARLOCK_TEST_DATABASES: "3" })).toBe(3);
+    expect(testDatabaseCount({ WARLOCK_TEST_DATABASES: "0" })).toBeUndefined();
+    expect(testDatabaseCount({})).toBeUndefined();
   });
 });

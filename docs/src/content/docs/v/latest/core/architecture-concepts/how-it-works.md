@@ -14,7 +14,7 @@ But if you've ever opened your editor in a fresh checkout and wondered why type 
 
 ## The dev server's file watcher
 
-The dev server uses [`chokidar`](https://www.npmjs.com/package/chokidar) to watch `src/`, `.env*`, and `warlock.config.ts`. When a file changes, the change goes into a batch — chokidar fires fast, and the watcher debounces multiple writes (the kind your editor does during "save") into one update event. The batch then drives the HMR loop.
+The dev server uses [`chokidar`](https://www.npmjs.com/package/chokidar) to watch `src/`, `.env*`, and `warlock.config.ts`. When a file changes, the change goes into a batch — chokidar fires fast, and the watcher debounces multiple writes (the kind your editor does during "save") into one update event. The batch then drives the HMR loop. A watcher error (a folder that vanished, an OS handle limit) is logged and the dev server keeps running.
 
 The watch list is intentionally narrow. Files under `node_modules/`, `dist/`, and `.warlock/` are ignored — you don't care about them, and watching them would tank performance.
 

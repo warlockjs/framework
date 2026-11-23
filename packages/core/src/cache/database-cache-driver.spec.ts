@@ -164,3 +164,86 @@ describe("DatabaseCacheDriver lean get and upsert", () => {
     expect(upsert.mock.calls[0]?.[2]).toEqual({ conflictColumns: ["key"] });
   });
 });
+
+describe("DatabaseCacheDriver write path", () => {
+  const setup = (options: { upsert?: boolean; indexes?: unknown[] | Error } = {}) => {
+    const calls = { upsert: 0, first: 0, create: 0, listIndexes: 0 };
+    const model: any = {
+      table: "cache",
+      first: async () => (calls.first++, null),
+      create: async () => void calls.create++,
+      upsert: async () => void calls.upsert++,
+      getDriver: () => ({
+        blueprint: {
+          listIndexes: async () => {
+            calls.listIndexes++;
+
+            if (options.indexes instanceof Error) throw options.indexes;
+
+            return options.indexes ?? [];
+          },
+        },
+      }),
+    };
+    const driver = new DatabaseCacheDriver();
+
+    driver.setOptions({
+      model,
+      ...(options.upsert === undefined ? {} : { upsert: options.upsert }),
+    });
+
+    return { driver, calls };
+  };
+
+  it("uses one upsert when the table has a unique index on key", async () => {
+    const { driver, calls } = setup({
+      indexes: [{ name: "cache_key_unique", columns: ["key"], unique: true }],
+    });
+
+    await driver.set("a", 1);
+    await driver.set("b", 2);
+
+    expect(calls).toMatchObject({ upsert: 2, first: 0, create: 0, listIndexes: 1 });
+  });
+
+  it("reads first and hints once when the index is missing", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    try {
+      const { driver, calls } = setup({
+        indexes: [{ name: "cache_key_index", columns: ["key"], unique: false }],
+      });
+
+      await driver.set("a", 1);
+      await driver.set("b", 2);
+
+      expect(calls).toMatchObject({ upsert: 0, first: 2, create: 2, listIndexes: 1 });
+
+      const hints = warn.mock.calls.filter((call) => String(call[0]).includes("cacheMigration"));
+
+      expect(hints.length).toBeLessThanOrEqual(1);
+      expect(String(hints[0]?.[0] ?? "cacheMigration upsert: true")).toContain("upsert: true");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("keeps the read-then-write path when the indexes cannot be read", async () => {
+    const { driver, calls } = setup({ indexes: new Error("no permission") });
+
+    await driver.set("a", 1);
+
+    expect(calls).toMatchObject({ upsert: 0, first: 1, create: 1 });
+  });
+
+  it("skips the lookup when upsert is set explicitly", async () => {
+    const on = setup({ upsert: true });
+    const off = setup({ upsert: false, indexes: [{ columns: ["key"], unique: true }] });
+
+    await on.driver.set("a", 1);
+    await off.driver.set("a", 1);
+
+    expect(on.calls).toMatchObject({ upsert: 1, listIndexes: 0 });
+    expect(off.calls).toMatchObject({ upsert: 0, first: 1, listIndexes: 0 });
+  });
+});

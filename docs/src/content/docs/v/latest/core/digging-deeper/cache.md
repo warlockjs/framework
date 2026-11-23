@@ -97,13 +97,13 @@ An app whose `cache` table already exists adds the index itself before turning o
 
 `removeNamespace("users")` on the `database` driver removes the `users` key and every key under it (`users.id.1`, `users.list.…`), as the other drivers do, so a repository's cache invalidation clears its nested entries. `flush()` waits for the rows to be deleted before it resolves. An index on the `key` column keeps both fast.
 
-`get` reads a plain row (no model is built). For writes, `set` reads the row first and then inserts or updates it. Once the table has a **unique** index on `key`, pass `upsert: true` in the driver options and each `set` becomes one upsert (`conflictColumns: ["key"]`):
+`get` reads a plain row (no model is built). For writes, the driver looks once for a **unique** index on `key` (the one `cacheMigration` creates). When it exists, each `set` is one upsert (`conflictColumns: ["key"]`). When it does not, `set` reads the row first and then inserts or updates it, and the driver logs a one-time hint naming `cacheMigration` and `upsert: true`. Set `upsert: true` to skip the lookup, or `upsert: false` to always read first:
 
 ```ts
 database: { upsert: true },
 ```
 
-Without the unique index, leave it off: PostgreSQL refuses an upsert on a column that has no unique constraint.
+`upsert: true` needs the unique index: PostgreSQL refuses an upsert on a column that has no unique constraint.
 
 ### Driver picks at a glance
 

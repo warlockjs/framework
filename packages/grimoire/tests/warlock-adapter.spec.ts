@@ -91,6 +91,9 @@ const FILES: Record<string, string> = {
     name: "mini-mobile",
     dependencies: { "expo-router": "*" },
   }),
+  "mobile/App.tsx": "/** The app shell. */\nexport default function App() {\n  return null;\n}\n",
+  "mobile/index.ts": "export {};\n",
+  "mobile/babel.config.js": "module.exports = {};\n",
   "mobile/app/_layout.tsx": "export default function Layout() {\n  return null;\n}\n",
   "mobile/app/index.tsx": [
     "/** The home screen. */",
@@ -202,6 +205,15 @@ describe("createWarlockAdapter over a real app", () => {
 
     expect([...byFile.keys()]).toContain("mobile/app/index.tsx");
     expect([...byFile.keys()]).not.toContain("mobile/app.json");
+    // The files at the top of the app folder, without its tool configs.
+    expect([...byFile.keys()]).toEqual(
+      expect.arrayContaining(["mobile/App.tsx", "mobile/index.ts"]),
+    );
+    expect([...byFile.keys()]).not.toContain("mobile/babel.config.js");
+    expect(byFile.get("mobile/App.tsx")).toMatchObject({
+      mobileApp: "mobile",
+      about: "The app shell.",
+    });
     expect(byFile.get("src/app/orders/controllers/orders.controller.ts")).toMatchObject({
       module: "src/app/orders",
       type: "controller",

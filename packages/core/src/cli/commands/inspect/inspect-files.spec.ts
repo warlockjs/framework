@@ -52,6 +52,28 @@ describe("file inspection CLI", () => {
     }
   });
 
+  it("keeps going when the app's bootstrap failed and lists the failure as a warning", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      await inspectCommand.commandPreAction?.({ args: [], options: {} });
+      expect(inspectCommand.commandPreload).toMatchObject({ bootstrap: true, tolerant: true });
+
+      await inspectCommandAction({
+        args: [],
+        options: { section: "routes", json: true },
+        preloadError: new Error("DB_HOST is missing"),
+      });
+
+      expect(inspectApp).toHaveBeenCalledWith(
+        expect.objectContaining({
+          warnings: [expect.objectContaining({ message: expect.stringContaining("DB_HOST") })],
+        }),
+      );
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("keeps code explanations static and boots for file explanations", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     try {

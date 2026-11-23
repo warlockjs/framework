@@ -56,7 +56,7 @@ routes file, a file it imports, a config file, a mail, job, event or notificatio
 `package.json` changed.
 
 - `warlock grimoire build` and `warlock grimoire check` boot the app only when the route facts are stale or missing.
-  When the app does not boot, they go on with the cached route facts and print a `GR8002` warning.
+  When the app does not boot, they go on with the cached route facts and print a `GR8002` warning. This holds when the app's config or bootstrap fails while the command starts, not only when its routes cannot be read.
 - `warlock scry` and the MCP tools never boot the app. They use the cached route facts and add a note when they are
   stale. A route question of a project with no route facts stops with `GR9002` (a page or screen URL is still found);
   run `warlock grimoire build` first.

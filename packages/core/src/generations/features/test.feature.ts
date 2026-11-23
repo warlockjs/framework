@@ -25,39 +25,6 @@ async function usesGrimoire(): Promise<boolean> {
 }
 
 async function completeTestInstallation(options: CommandActionData) {
-  // Create test-global-setup.ts (runs once before all tests)
-  const testGlobalSetupPath = srcPath("test-global-setup.ts");
-  const testGlobalSetupExists = await fileExistsAsync(testGlobalSetupPath);
-
-  if (!testGlobalSetupExists) {
-    await putFileAsync(
-      testGlobalSetupPath,
-      `/**
- * Global Test Setup
- *
- * Runs ONCE before all test workers.
- * Starts the HTTP server for integration tests.
- *
- * port: 0 lets the OS pick a free port, so tests run while \`warlock dev\`
- * holds the configured one; the test helpers (testGet, actingAs, ...) are
- * told the bound port automatically.
- */
-import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
-
-export async function setup() {
-  await startHttpTestServer({ port: 0 });
-}
-
-export async function teardown() {
-  await stopHttpTestServer();
-}
-`,
-    );
-    console.log(`${colors.green("✓")} Created src/test-global-setup.ts`);
-  } else {
-    recordSkippedFile(testGlobalSetupPath, "exists");
-  }
-
   // Create test-setup.ts (runs before EVERY test file)
   const testSetupPath = srcPath("test-setup.ts");
   const testSetupExists = await fileExistsAsync(testSetupPath);
@@ -67,6 +34,10 @@ export async function teardown() {
       testSetupPath,
       `/**
  * Test Setup - runs before EVERY test file
+ *
+ * The request helpers (testGet, testPost, actingAs, ...) send to an HTTP server that
+ * starts inside the same Vitest worker, on first use, and reads the worker's own
+ * database. No global server is needed.
  *
  * Vitest runs setupFiles before each test file. With the generated
  * src/config/tests.ts (lifetime: "worker") the framework boots once per Vitest
@@ -200,7 +171,6 @@ export default defineConfig({
           // WARLOCK_TEST_LIFETIME=file switches both back (see src/config/tests.ts).
           isolate: process.env.WARLOCK_TEST_LIFETIME === "file",
           runner: "./src/test-runner.ts",
-          globalSetup: "./src/test-global-setup.ts",
           setupFiles: ["./src/test-setup.ts"],
           include: [
             "src/**/*.{spec,test}.ts",

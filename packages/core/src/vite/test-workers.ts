@@ -18,10 +18,26 @@ export function cpuQuotaWorkers(value: string): number | undefined {
   return Math.max(1, Math.floor(quotaNumber / periodNumber));
 }
 
-/** Limit Vitest forks to both CPU affinity and the tightest visible cgroup v2 quota. */
+/**
+ * How many test databases exist, from `WARLOCK_TEST_DATABASES`. Each Vitest
+ * worker writes its own `<name>_<worker id>` database, so more workers than
+ * databases would point a worker at a database that is not there.
+ */
+export function testDatabaseCount(env: NodeJS.ProcessEnv = process.env): number | undefined {
+  const count = Number(env.WARLOCK_TEST_DATABASES);
+
+  return Number.isInteger(count) && count > 0 ? count : undefined;
+}
+
+/**
+ * Limit Vitest forks to both CPU affinity and the tightest visible cgroup v2
+ * quota, and to the number of test databases (`WARLOCK_TEST_DATABASES`, or the
+ * `databases` argument) when that is known.
+ */
 export function recommendedTestWorkers(
   parallelism = availableParallelism(),
   read: (file: string) => string = (file) => readFileSync(file, "utf8"),
+  databases: number | undefined = testDatabaseCount(),
 ): number {
   let workers = Math.max(1, Math.floor(parallelism));
   const root = "/sys/fs/cgroup";
@@ -45,5 +61,6 @@ export function recommendedTestWorkers(
     if (directory === root) break;
     directory = path.posix.dirname(directory);
   }
+  if (databases !== undefined && databases >= 1) workers = Math.min(workers, Math.floor(databases));
   return workers;
 }

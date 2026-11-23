@@ -26,15 +26,28 @@ export type DatabaseCacheOptions = {
   /**
    * Write each entry with one upsert (`conflictColumns: ["key"]`) instead of a
    * read followed by an insert or update. Needs a unique index on the `key`
-   * column of the cache table; turn it on once the index exists.
+   * column of the cache table, which `cacheMigration` creates.
    *
-   * @default false
+   * Left unset, the driver looks for that index once and uses the upsert when
+   * it exists; otherwise it reads, then inserts or updates, and logs a one-time
+   * hint. `true` skips the lookup, `false` always reads first.
+   *
+   * @default detected
    */
   upsert?: boolean;
 };
 
 export class CacheModel extends Model {
   public static table = "cache";
+}
+
+let upsertHintShown = false;
+
+/** Whether `indexes` holds a unique index on the single column `key`. */
+function hasUniqueKeyIndex(indexes: Array<{ columns?: string[]; unique?: boolean }>): boolean {
+  return indexes.some(
+    (index) => index.unique === true && index.columns?.length === 1 && index.columns[0] === "key",
+  );
 }
 
 export class DatabaseCacheDriver
@@ -52,14 +65,59 @@ export class DatabaseCacheDriver
   public model!: typeof CacheModel;
 
   /**
+   * The answer of the one-time look for the unique index on `key`, per driver.
+   */
+  protected uniqueKeyIndex?: Promise<boolean>;
+
+  /**
    * {@inheritdoc}
    */
   public setOptions(options: DatabaseCacheOptions) {
     super.setOptions(options);
 
     this.model = options.model ?? CacheModel;
+    this.uniqueKeyIndex = undefined;
 
     return this;
+  }
+
+  /**
+   * Whether `set` writes with one upsert: `upsert: true`, or no setting and a
+   * unique index on `key` (the one `cacheMigration` creates) found in the
+   * table. A lookup that fails counts as "not found" and is not repeated.
+   */
+  protected async usesUpsert(): Promise<boolean> {
+    const setting = this.options.upsert;
+
+    if (setting !== undefined) return setting;
+
+    this.uniqueKeyIndex ??= (async () => {
+      try {
+        const model = this.model;
+        const indexes = await model.getDriver().blueprint.listIndexes(model.table);
+
+        if (hasUniqueKeyIndex(indexes)) return true;
+
+        this.showUpsertHint();
+      } catch {
+        // No driver, table or permission to read indexes: keep the read-then-write path.
+      }
+
+      return false;
+    })();
+
+    return this.uniqueKeyIndex;
+  }
+
+  /** Tell, once per process, how to get one write per `set`. */
+  protected showUpsertHint(): void {
+    if (upsertHintShown) return;
+
+    upsertHintShown = true;
+
+    console.warn(
+      `[cache] The database cache driver writes each entry with a read and an insert or update, because the "${this.model.table}" table has no unique index on "key". Add \`cacheMigration\` to your migrations and set \`upsert: true\` to write with one statement.`,
+    );
   }
 
   /**
@@ -102,7 +160,7 @@ export class DatabaseCacheDriver
 
     const expiresAt = this.getExpiresAt(ttl) || null;
 
-    if (this.options.upsert) {
+    if (await this.usesUpsert()) {
       // One statement; relies on the unique index on `key`.
       const row = { key: parsedKey, namespace, data: value, ttl, expiresAt };
 
