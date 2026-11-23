@@ -6,7 +6,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 - Next-major items (T-007, T-009, T-033) wait for 6.0.
 - T-206: build the scry output and guidance changes the agent test points to.
-- T-207: screenshots per criterion and language, with UI rule checks, for QA agents.
+- T-207: approved screenshots per criterion and language, design-system feature, bird-view (phases 1-4).
 
 ## Next release
 
@@ -35,31 +35,45 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
 - Acceptance: re-run shows recall up with no loss in precision or cost.
 - Status: waiting for the owner.
 
-### T-207 [decision] Grimoire: screenshots per acceptance criterion and language, UI rule checks, client failure cases
+### T-207 [decision] Grimoire: approved screenshots per criterion and language, a design-system feature, a bird-view
 
-- Source: owner, 2026-11-23 (chat: QA agents should check screenshots of each flow case, in every app language,
-  including RTL layout such as text inputs aligned right in Arabic, plus failure cases like wrong credentials, rate
-  limit and server unreachable).
-- Today: flows have `## Cases` with fixed questions (`CASE_QUESTIONS`, `packages/grimoire/src/contracts/written.ts:163`:
-  invalid input, not allowed, not found, duplicate, limits, expiry, double submit, outside service down), acceptance
-  criteria `AC-n`, and `@proves` tests with pass/fail/no-test status. Screenshots are hand-attached image lines; the
-  check only verifies that the file exists (`check/rules/screenshots.ts`, GR2014). There is no per-language view, no
-  capture from tests, no link from a screenshot to a criterion, and no case for "the client cannot reach the server".
-- Proposal:
-  - Add the fixed case questions `server unreachable` and `server error` (both client side).
-  - Add a `@shows <feature>/<flow> AC-n` line on browser tests. A small Playwright helper saves
-    `grimoire/screenshots/auto/<feature>/<flow>/AC-n.<locale>.png` for each app locale, with the network mocked for
-    the failure cases.
-  - The same helper runs deterministic UI checks in each locale:
-    - `dir` matches the locale; inputs and text align to the start side;
-    - no horizontal overflow;
-    - no raw translation keys;
-    - no generic error text.
-  - `grimoire check` reports a criterion with no screenshot for a locale, and a stale screenshot.
-  - The devtools tab shows one contact sheet per flow, which a QA agent reviews against the criteria text.
-- Acceptance: on the scaffold app's login flow, each case has a screenshot in `en` and `ar`. The RTL check fails when an
-  input is left-aligned in `ar`. `grimoire check` lists the missing screenshots.
-- Status: waiting for the owner (new feature area; fresh session; one minor).
+- Source: owner, 2026-11-23 (chat).
+  - Agents (Claude or Codex) remove, change or add behaviour nobody asked for as a project ages; the owner wants a
+    visual place to catch it.
+  - In a two-language project every acceptance criterion counts once per language.
+  - RTL layout (for example inputs aligned right in Arabic) is a criterion of a design-system feature, not a test
+    special case.
+  - Better navigation between features, flows and criteria.
+- Today (5.63.1):
+  - Flows have `## Cases` (`CASE_QUESTIONS`, `packages/grimoire/src/contracts/written.ts:163`), criteria `AC-n` and
+    `@proves` tests with pass/fail/no-test status.
+  - Screenshots are hand-attached image lines, checked only for existence (`check/rules/screenshots.ts`, GR2014).
+  - The product map has feature and flow pages but no criterion-level view, no per-language result, no screenshot
+    history and no "changed since approved" state.
+- Proposal, in phases (one minor each, or one minor for 1-2):
+  1. Bird-view. One matrix in the Grimoire tab:
+     - rows: feature > flow > criterion, collapsible;
+     - columns: the app's languages (and apps where a criterion differs by app);
+     - cells: test status and a screenshot thumbnail;
+     - a jump-to search for any feature, flow or `AC-n`.
+     Built from existing data first.
+  2. Criteria times languages. Languages come from the app's config, so an agent writes each criterion once and it
+     counts once per language. A `@shows <feature>/<flow> AC-n` line on a browser test saves one screenshot per
+     language (network mocked for the failure cases). `grimoire check` lists the missing cells. Add the case
+     questions `server unreachable` and `server error`.
+  3. Approved baselines: the drift guard.
+     - Each screenshot has an approved version.
+     - A new capture that differs, a criterion or flow that disappeared, and a `@proves` test that was deleted all
+       show as "changed, not approved" in the matrix, with old and new side by side.
+     - The owner approves or rejects. The reviewer agent must list every unapproved change in its report.
+  4. Design-system feature.
+     - Skills create a `design-system` feature first in every project. Its criteria cover direction, spacing, colors,
+       components and error messages. UI flows name it in `affects`.
+     - The scaffold adds a dev-only components page that renders each component in each language and theme, and the
+       design-system screenshots come from it.
+- Acceptance: on the scaffold app, login's criteria show `en` and `ar` cells with screenshots. A left-aligned input in
+  `ar` turns its design-system cell red. A removed case shows as "changed, not approved" until it is approved.
+- Status: waiting for the owner (new feature area; start in a fresh session).
 
 ### T-201 [bug] The shared test HTTP server reads `<db>_test_1` while workers write `<db>_test_<poolId>`
 
