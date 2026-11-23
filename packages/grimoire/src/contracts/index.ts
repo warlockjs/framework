@@ -6,6 +6,7 @@ export * from "./adapter";
 export * from "./book";
 export * from "./bookmap";
 export * from "./findings";
+export * from "./guard";
 export * from "./location";
 export * from "./matrix";
 export * from "./releases";
