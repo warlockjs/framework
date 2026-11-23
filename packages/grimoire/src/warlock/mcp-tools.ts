@@ -104,7 +104,7 @@ export function createGrimoireMcpTools(
     {
       name: "grimoire_impact",
       description:
-        "What a change to a file reaches: importers (direct and all), API routes, pages and screens, flows, features (owner and borrowers) and tests. Read-only.",
+        "What a change to a file reaches: importers (direct and all), API routes, pages and screens, flows, features (owner and borrowers) and tests. Run it on the top hit of grimoire_search, and read the importers and tests: they are the files that usually change with it. Read-only.",
       input: inputSchema(
         { file: { type: "string", description: "Project-relative path of the file to change." } },
         ["file"],
@@ -226,7 +226,7 @@ export function createGrimoireMcpTools(
     {
       name: "grimoire_search",
       description:
-        "Search the Grimoire with a sentence or words (pass the whole commit title or bug report, not two keywords): features, flows, blocks, pages, screens, routes, file paths, export names, header sentences, written text (summary, story, cases, criteria such as AC-5) and tasks. Hits whose name or title holds the words come first; every other hit follows by BM25F score. Hits are in score order and carry their score and app. Read-only.",
+        "Search the Grimoire with a sentence or words (pass the whole commit title or bug report, not two keywords): features, flows, blocks, pages, screens, routes, file paths, export names, header sentences, written text (summary, story, cases, criteria such as AC-5) and tasks. Hits whose name or title holds the words come first; every other hit follows by BM25F score. Hits are in score order and carry their score and app. Search first, then run grimoire_impact on the top hit: the answer's alsoChanges list names the files that usually change with the top hits, `next` is the impact command, and `weak: true` means no hit holds most of the request's words (use grep for literal text). Read-only.",
       input: inputSchema(
         {
           text: {

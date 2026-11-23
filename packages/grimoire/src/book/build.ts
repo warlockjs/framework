@@ -3,7 +3,7 @@
  * the route (boot) cache. Entries are written by `writeBook` (write.ts).
  */
 import { readFileSync } from "node:fs";
-import { rm, stat } from "node:fs/promises";
+import { readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import type { BookAdapter, BookFacts, BookFile } from "../contracts/adapter";
 import {
@@ -102,6 +102,54 @@ type Scan = {
   statMoved: boolean;
 };
 
+/**
+ * Code files that sit directly in the parent folder of a nested source root
+ * (a mobile app's `App.tsx` next to its `src` folder), which a folder walk of
+ * the roots never lists. Tool configs, type shims and dot files are left out.
+ * The project root itself is never scanned.
+ */
+async function listTopFiles(root: string, sourceRoots: readonly string[]): Promise<string[]> {
+  const parents = new Set<string>();
+
+  for (const folder of sourceRoots) {
+    const parent = path.posix.dirname(folder);
+
+    if (
+      parent === "." ||
+      parent === "/" ||
+      sourceRoots.some((item) => item === "." || isInsideFolder(parent, item))
+    ) {
+      continue;
+    }
+
+    parents.add(parent);
+  }
+
+  const found: string[] = [];
+
+  for (const parent of parents) {
+    try {
+      const entries = await readdir(path.join(root, ...parent.split("/")), { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (
+          entry.isFile() &&
+          !entry.name.startsWith(".") &&
+          isCodeFile(entry.name) &&
+          !entry.name.endsWith(".d.ts") &&
+          !/\.config\.[^.]+$/.test(entry.name)
+        ) {
+          found.push(`${parent}/${entry.name}`);
+        }
+      }
+    } catch (error) {
+      if (!isMissing(error)) throw error;
+    }
+  }
+
+  return found.sort();
+}
+
 /** Stat every code file; hash only those whose size or mtime differ from the previous manifest. */
 async function scanSourceRoots(
   root: string,
@@ -111,7 +159,10 @@ async function scanSourceRoots(
   let files: string[];
 
   try {
-    files = (await listFiles(root, sourceRoots)).filter(isCodeFile);
+    files = [
+      ...(await listFiles(root, sourceRoots)).filter(isCodeFile),
+      ...(await listTopFiles(root, sourceRoots)),
+    ];
   } catch (error) {
     throw new GrimoireError(
       "GR8001",

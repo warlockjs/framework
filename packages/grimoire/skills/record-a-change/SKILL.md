@@ -130,10 +130,16 @@ code exists.
 
 ## 6. At release time
 
-Warlock does not edit your files at release. You do three things, in this order:
+Run the stamp from the app's release flow, after the version is set in `package.json`:
 
-1. **Stamp the changelogs.** In each feature that changed, move the `## Unreleased` entries under a
-   heading with the release number and date:
+```bash
+npx warlock grimoire release --stamp
+```
+
+It does three things, in this order, and prints what it did (`stamped catalog, orders → 1.4.1 (2026-11-20)`):
+
+1. **Stamps the changelogs.** In each feature that has entries under `## Unreleased`, it moves them under a
+   heading with the release number and date, and leaves an empty `## Unreleased` above:
 
    ```md
    ## Unreleased
@@ -144,7 +150,9 @@ Warlock does not edit your files at release. You do three things, in this order:
      instead of the global one (AC-2)
    ```
 
-2. **Write the release brief.** Create `grimoire/releases/1.4.1.md`:
+2. **Writes the release file** `grimoire/releases/1.4.1.md` when it is missing, with its front matter, a
+   `# Release 1.4.1` heading and a one-line brief that names the changed features. An existing release file is kept.
+   **Rewrite the brief in the owner's words**: two or three sentences on what the release means to users.
 
    ```md
    ---
@@ -157,18 +165,14 @@ Warlock does not edit your files at release. You do three things, in this order:
    Customers with no country on their account see new arrivals again.
    ```
 
-   Two or three sentences on what the release means to users.
+3. **Collects the list** between the markers under your brief. Run `npx warlock grimoire release 1.4.1` again after
+   any change to a changelog or the brief: the result is the same every time. It also says how many entries are
+   still unreleased. Do not write that list yourself.
 
-3. **Collect the list.**
-
-   ```bash
-   npx warlock grimoire release 1.4.1
-   ```
-
-   It writes the entries you stamped with that release between the markers under your brief, and
-   changes nothing else. It also says how many entries are still unreleased. Do not write that list
-   yourself, and run the command again after any change to a changelog: the result is the same
-   every time.
+The version is the app's `package.json` version unless you pass one (`release 1.4.1 --stamp`); the date is today unless
+the release file has one or you pass `--date yyyy-mm-dd`. The stamp is the only edit Warlock makes to your files, and
+only with `--stamp`. Without it you move the entries and write the release file by hand, as above, and run
+`npx warlock grimoire release 1.4.1`.
 
 `npx warlock grimoire check` reports a listed entry that has no changelog entry stamped with that
 release and date, and a release section with no release file.

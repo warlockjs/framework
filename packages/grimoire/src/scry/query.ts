@@ -26,6 +26,7 @@ import type { GrimoireSnapshot } from "../contracts/snapshot";
 import type { WrittenFeature, WrittenFlow } from "../contracts/written";
 import { fileGraph, importClosure, importerClosure } from "../graph";
 import { bookEntryPaths, projectPath, toPosixPath } from "../paths";
+import { alsoChangesOf } from "./also-changes";
 import { searchSnapshot, wordsOf } from "./search";
 
 const byText = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
@@ -617,9 +618,19 @@ function scrySearch(
     );
   }
 
-  const { counts, hits } = searchSnapshot(snapshot, query);
+  const { counts, hits, weak } = searchSnapshot(snapshot, query);
+  const { alsoChanges, next } = alsoChangesOf(snapshot, hits);
 
-  return { type: "search", ...notesOf(snapshot, false), text: query.text, counts, hits };
+  return {
+    type: "search",
+    ...notesOf(snapshot, false),
+    text: query.text,
+    counts,
+    hits,
+    alsoChanges,
+    weak,
+    ...(next === undefined ? {} : { next }),
+  };
 }
 
 /**

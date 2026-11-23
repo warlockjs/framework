@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 <!-- area A: starter grimoire folder (5.64 merge marker, remove at merge) -->
 
+- New apps start with a `grimoire/` folder: `settings.md` (languages `en` and `ar`, screenshots for changed flows, the four code rules), a `design-system` feature (direction, components and error messages flows) and a `contact` feature that describes the starter contact form, with its cases and acceptance criteria.
+
 <!-- area B: code rules, guard in CI and as an agent hook (5.64 merge marker, remove at merge) -->
 
 - New apps run the guard on every pull request (`.github/workflows/grimoire-guard.yml`, full history, base and commit range) and as a Claude Code `Stop` hook (`.claude/settings.json`: `npx warlock grimoire guard --hook`).
@@ -29,6 +31,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 <!-- area A: starter grimoire folder (5.64 merge marker, remove at merge) -->
+
+- The project map paragraph of the starter `AGENTS.md` tells agents to search first (`scry --search "<the whole request>"`), then run `--impact` on the top hit and read the `changes with` lines, and to use grep only for literal text.
 
 <!-- area B: code rules, guard in CI and as an agent hook (5.64 merge marker, remove at merge) -->
 

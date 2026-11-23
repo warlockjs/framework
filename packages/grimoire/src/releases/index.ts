@@ -2,8 +2,9 @@
  * Releases: collecting the changelog entries the agent stamped with a release
  * into `grimoire/releases/<release>.md`, and the GR6001–GR6003 rules.
  *
- * Warlock never edits a feature changelog or the agent's brief. It writes only
- * the text between the collected-list markers of the release file.
+ * Collecting never edits a feature changelog or the agent's brief: it writes only
+ * the text between the collected-list markers of the release file. Stamping
+ * (`stamp.ts`, only on `--stamp`) is the one edit Warlock makes to written files.
  */
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -19,6 +20,8 @@ import {
   type WrittenRelease,
 } from "../contracts/written";
 import { releaseFilePath } from "../paths";
+
+export { applyStamp, planStamp, type StampInput, type StampPlan } from "./stamp";
 
 /** What `writeRelease()` returns: the contract result plus the entries it left out. */
 export type WriteReleaseOutcome = WriteReleaseResult & {
