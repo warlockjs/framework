@@ -50,6 +50,40 @@ export type CdpMethods = {
   "Network.enable": { params: Record<string, never>; result: Record<string, never> };
   // https://chromedevtools.github.io/devtools-protocol/tot/Log/#method-enable
   "Log.enable": { params: Record<string, never>; result: Record<string, never> };
+  // https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn/#method-enable
+  "WebAuthn.enable": { params: { enableUI?: boolean }; result: Record<string, never> };
+  // https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn/#method-addVirtualAuthenticator
+  "WebAuthn.addVirtualAuthenticator": {
+    params: {
+      options: {
+        protocol: "ctap2" | "u2f";
+        ctap2Version?: "ctap2_0" | "ctap2_1";
+        transport: "usb" | "nfc" | "ble" | "cable" | "internal";
+        hasResidentKey?: boolean;
+        hasUserVerification?: boolean;
+        automaticPresenceSimulation?: boolean;
+        isUserVerified?: boolean;
+      };
+    };
+    result: { authenticatorId: string };
+  };
+  // https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn/#method-getCredentials
+  "WebAuthn.getCredentials": {
+    params: { authenticatorId: string };
+    result: {
+      credentials: {
+        credentialId: string;
+        isResidentCredential: boolean;
+        rpId?: string;
+        signCount: number;
+      }[];
+    };
+  };
+  // https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn/#method-removeVirtualAuthenticator
+  "WebAuthn.removeVirtualAuthenticator": {
+    params: { authenticatorId: string };
+    result: Record<string, never>;
+  };
 };
 export type CdpEvents = {
   // https://chromedevtools.github.io/devtools-protocol/tot/Page/#event-loadEventFired

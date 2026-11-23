@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { CdpConnection, CdpTimeoutError } from "./cdp";
+import { pageConnections } from "./page-connection";
 import {
   type AccessibilityOptions,
   type AccessibilityEvidence,
@@ -107,6 +108,7 @@ export class BrowserPage {
     private evidence: E2EEvidence,
     private spec: E2ESpec,
   ) {
+    pageConnections.set(this, cdp);
     cdp.on("Page.loadEventFired", () => {
       this.loads++;
     });
