@@ -29,7 +29,8 @@ import { resolveOwnership } from "../ownership";
 import { toPosixPath } from "../paths";
 import { scanProofs } from "../proves";
 import { readTestResults, resultsFileLabel } from "../test-results";
-import { parseGrimoire } from "../written";
+import { loadShotsState } from "../shots/state";
+import { parseGrimoire, resolveSettings } from "../written";
 import { writeDerived } from "./derived";
 
 /** The current sha256 of each test file: the manifest's, else read now (missing files are left out). */
@@ -102,6 +103,10 @@ export async function runGrimoire(
   const results = await readTestResults(root, options.testResultsFile);
   const testHashes = await testFileHashes(root, book.facts.tests, book.manifest.tests);
 
+  const languages = await adapter.languages?.(root);
+  const settings = resolveSettings(written.settings, Array.isArray(languages) ? languages : []);
+  const shots = await loadShotsState(root, written, settings, book.facts.tests, proofs);
+
   const input: CollectedInput = {
     written,
     facts: book.facts,
@@ -137,6 +142,8 @@ export async function runGrimoire(
     annotations,
     routes: book.routes,
     host,
+    settings,
+    shots,
   };
 
   // The derived half is kept for the read-only commands (`warlock scry`).

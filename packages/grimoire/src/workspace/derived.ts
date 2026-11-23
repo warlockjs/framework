@@ -16,6 +16,8 @@ import type { BookAnnotations } from "../contracts/book";
 import type { CollectedFiles, Ownership } from "../contracts/bookmap";
 import type { BookHost } from "../contracts/adapter";
 import type { GrimoireFinding } from "../contracts/findings";
+import type { GrimoireSettings } from "../contracts/settings";
+import type { ShotsState } from "../contracts/shots";
 import type { AppMatch, GrimoireSnapshot } from "../contracts/snapshot";
 import type { ProofLine, TestResultsStore } from "../contracts/test-results";
 import type { WrittenGrimoire } from "../contracts/written";
@@ -26,7 +28,7 @@ import { resolveResultsFile } from "../test-results";
 export const DERIVED_PATH = `${GRIMOIRE_PATHS.book}/.cache/derived.json`;
 
 /** Bump when the shape below changes: an older file is treated as missing. */
-export const DERIVED_SCHEMA_VERSION = 2;
+export const DERIVED_SCHEMA_VERSION = 3;
 
 /** The written folders whose every file is part of the fingerprint. */
 const WRITTEN_TREES = [
@@ -35,6 +37,9 @@ const WRITTEN_TREES = [
   GRIMOIRE_PATHS.releases,
   GRIMOIRE_PATHS.tasks,
   GRIMOIRE_PATHS.screenshots,
+  GRIMOIRE_PATHS.approved,
+  // A single file: `filesUnder` returns it as it is.
+  GRIMOIRE_PATHS.settings,
 ];
 
 /** What a snapshot holds besides the book. */
@@ -50,6 +55,8 @@ export type DerivedSnapshot = {
   collected: CollectedFiles;
   annotations: BookAnnotations;
   host: BookHost | null;
+  settings: GrimoireSettings | null;
+  shots: ShotsState | null;
 };
 
 /** The file as stored. */
@@ -72,6 +79,9 @@ async function filesUnder(folder: string): Promise<string[]> {
     try {
       entries = await readdir(current, { withFileTypes: true });
     } catch {
+      // A written file that is not a folder (`settings.md`) is listed as it is.
+      if (await stat(current).then((info) => info.isFile(), () => false)) found.push(current);
+
       return;
     }
 
@@ -156,6 +166,8 @@ export async function writeDerived(
       collected: snapshot.collected,
       annotations: snapshot.annotations,
       host: snapshot.host ?? null,
+      settings: snapshot.settings ?? null,
+      shots: snapshot.shots ?? null,
     },
   };
   const previous = await readJson<StoredDerived>(path.join(root, ...DERIVED_PATH.split("/")));

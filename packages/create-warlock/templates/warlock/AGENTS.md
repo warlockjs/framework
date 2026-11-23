@@ -98,7 +98,11 @@ behaviour, follow its sibling skills (`write-a-feature`, `record-a-change`, `des
 
 ## Screenshots and the design system
 
-<!-- area C2 (5.64 merge marker): design-system feature first, @shows scenes, approvals; replace this line -->
+- Write the `design-system` feature first, and name `design-system` under `## Affects and affected by` in every flow with a `page` step. Its flows cover direction (RTL), components and error messages.
+- Show a criterion with a scene in `e2e/*.e2e.ts`: `// @shows <feature>/<flow> AC-n` directly above `await shows(context, "<feature>/<flow> AC-n", async ({ page, language, path }) => { … })`. The scene runs once per language in `grimoire/settings.md` and saves one screenshot each; a throw fails that language. `page.mockRequests([...])` fakes a failed or unreachable server for the failure cases.
+- Screenshots are captured for the features a change touches (`screenshots: changed`); `GRIMOIRE_SHOTS=all npx warlock e2e` captures everything. A flow that has nothing to look at says `screenshots: false` in its front matter.
+- The owner approves images and changed flows, criteria and cases: `warlock grimoire approve <id|feature/flow>` (or the tab). Never edit `grimoire/approved/` or `grimoire/screenshots/approved/` yourself, and list every `GR4017`, `GR4018` and `GR4019` from `warlock grimoire check` in your report.
+- `src/web/dev/components.page.tsx` renders the app's controls for review; it answers "not found" outside development. Add a control there when you add one to the app.
 
 ## Commands
 

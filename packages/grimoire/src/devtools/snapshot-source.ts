@@ -93,6 +93,11 @@ const STAMPED = [
   GRIMOIRE_PATHS.openTasks,
   GRIMOIRE_PATHS.doneTasks,
   GRIMOIRE_PATHS.releases,
+  // Settings, the approved baseline and the capture index change what the tab shows.
+  GRIMOIRE_PATHS.settings,
+  GRIMOIRE_PATHS.approved,
+  GRIMOIRE_PATHS.baseline,
+  GRIMOIRE_PATHS.captureIndex,
 ];
 
 /** The modified times of `files`, joined (`0` for a missing file). */

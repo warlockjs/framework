@@ -51,6 +51,16 @@ word is an error (`GR1004`).
 `grimoire/features/catalog/versions/v3.md`: why, what changes (which flows are new or changed),
 and what is out of scope. Keep it to one screen.
 
+## Write `design-system` first
+
+In a project that has a UI, create the `design-system` feature before any other. Its flows are the
+rules every screen follows: `direction` (inputs and text follow the reading direction, a page is
+mirrored in Arabic), `components` (every component renders in each language), `error-messages`
+(every error says what failed and what to do next), plus spacing and colours (contrast) when the
+project has rules for them. Every flow with a `page` step names `design-system` under
+`## Affects and affected by` (`- affects design-system`), so a change to a screen is checked against it.
+Its criteria are shown with `@shows` scenes (`record-a-change`).
+
 ## 3. Write or update the feature README
 
 ```md
@@ -174,10 +184,20 @@ When two sites, or a site and the mobile app, have a page with the same path, na
 the path in brackets: `page   /support [web-admin]`. The step then looks in that app only (its
 pages, or its screens for a mobile app). Without brackets it looks in the apps the feature lists.
 
+**Screenshots of a flow.** Criteria about what a user sees are shown in each language of the app
+(`languages` in `grimoire/settings.md`), so one criterion gives one screenshot per language. Write a
+criterion once; do not write one per language. A flow with nothing to look at (no screen, or a
+screen that cannot be captured) says `screenshots: false` in its front matter. `screenshots` is
+`false` or absent; the modes `changed`, `all` and `off` live in the settings
+(`SCREENSHOT_MODES`, default `DEFAULT_GRIMOIRE_SETTINGS.screenshots`, `changed`).
+
 **Cases.** End a case line with `(AC-n)` (or `(AC-1, AC-2)`) to link it to the criterion that
 proves it; a number the flow does not have is an error (`GR2013`). Answer all eight questions (invalid input, not allowed, not found, duplicate, limits,
 expiry, double submit, outside service down), each with a case or "does not apply" and the
-reason. A flow that skips one gets a finding, except that a flow with no writes (only pages and
+reason. A flow with a `page` step also answers the two UI questions (`UI_CASE_QUESTIONS`):
+`server unreachable` (what the user sees when the request never arrives) and `server error`
+(when the server answers with a failure); the screen of each is shown with a scene that mocks
+the request. A flow that skips one gets a finding, except that a flow with no writes (only pages and
 `GET` routes) may leave out `duplicate` and `double submit`. Do not invent cases beyond the questions unless the owner described one.
 
 **Criteria.** One per case that changes what the user gets. Number them `AC-1`, `AC-2`, … and

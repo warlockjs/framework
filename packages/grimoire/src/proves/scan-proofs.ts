@@ -186,7 +186,7 @@ function malformed(file: string, line: number, content: string): GrimoireFinding
  * so a `@proves` or a test call inside a block comment is never read. Line
  * comments are kept. String contents are not considered.
  */
-function withoutBlockComments(lines: readonly string[]): string[] {
+export function withoutBlockComments(lines: readonly string[]): string[] {
   let open = false;
 
   return lines.map((content) => {

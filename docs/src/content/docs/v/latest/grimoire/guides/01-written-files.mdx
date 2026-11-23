@@ -40,12 +40,39 @@ grimoire/
     open/T-<n>-<slug>.md
     done/<yyyy-mm>/T-<n>-<slug>.md
   releases/<release>.md
+  settings.md                  optional: languages, screenshot mode, code rules, protected areas
+  approved/                    what the owner approved (baseline.json, api.json), in git
   screenshots/<any folders>/<image>   images the written files show (.png .jpg .jpeg .webp .gif)
+  screenshots/approved/<feature>/<flow>/<AC-n>.<language>.png   approved images of `@shows` scenes, in git
+  screenshots/captured/<feature>/<flow>/<AC-n>.<language>.png   the last capture of each scene, not in git
 ```
 
-Warlock's own files are skipped: everything under `grimoire/book/` and `grimoire/screenshots/`, `features/index.json`, `tasks/index.json`, any
+Warlock's own files are skipped: everything under `grimoire/book/`, `grimoire/approved/` and `grimoire/screenshots/`, `features/index.json`, `tasks/index.json`, any
 `.json` file in a feature folder and `flows/*.bookmap.json`. Files whose name starts with a dot (`.gitkeep`) are
 skipped too. Any other file in these folders is reported as not part of the layout (`GR1020`, a warning).
+
+## `settings.md`
+
+An optional file of front matter only, read once per snapshot. Every key is optional:
+
+```md
+---
+languages: [en, ar]
+screenshots: changed
+rules: [logical-css, specific-errors, type-discriminator, no-js-imports]
+protected:
+  - payments src/app/payments/** src/config/payments.ts
+---
+```
+
+| Key           | Value                                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `languages`   | the app's languages, in order. Without it the adapter's `languages()` is used (the Warlock adapter reads `app.localeCodes` without booting the app), and without that there is one unnamed language.   |
+| `screenshots` | `changed` (default), `all` or `off`. `GRIMOIRE_SHOTS` overrides it for one run. See [Screenshots and approvals](/v/latest/grimoire/guides/12-screenshots-and-approvals/).                              |
+| `rules`       | the code rules to run: `logical-css`, `specific-errors`, `type-discriminator`, `no-js-imports`. Absent: `check` runs none and `guard` runs all four on added lines. `[]`: none anywhere.              |
+| `protected`   | `- <name> <glob> [<glob>…]` lines. A built-in area name replaces its globs; a new name adds an area.                                                                                                   |
+
+A key that is not in this table is `GR1005`; a wrong value is `GR1004`.
 
 ## Rules for every file
 
@@ -234,6 +261,7 @@ A customer saves a product they like and finds it again later on their wishlist.
 | `status` | yes      | `proposed`, `building`, `shipped` or `retired`                |
 | `who`    | yes      | who walks the flow: `customer`, `guest`, `admin`, `system`, … |
 | `origin` | no       | `inferred` or `confirmed`                                     |
+| `screenshots` | no  | `false` opts the flow out of `@shows` captures (default: captured) |
 
 Headings: the `# ` title, `## Steps`, `## Cases` and `## Acceptance criteria` are required. `## Story`,
 `## Differs by app` and `## Not handled` are optional.
@@ -295,6 +323,11 @@ ignored; a route's method matches whatever its case, and `ALL` matches any metho
 
 `invalid input`, `not allowed`, `not found`, `duplicate`, `limits`, `expiry`, `double submit`,
 `outside service down`.
+
+A flow with a `page` step also answers two more questions, because a screen can fail in ways an API cannot hide:
+`server unreachable` (what the user sees when the request never arrives) and `server error` (when the server answers
+with a failure). They are required, with the same `GR1012`, only in flows that have a `page` step, and optional
+everywhere else.
 
 A flow with no writes (every step is a page, or a `GET`, `HEAD` or `OPTIONS` route) may leave out `duplicate` and
 `double submit`; the other six stay required. Answering the two anyway is fine. A flow with no steps, or with any

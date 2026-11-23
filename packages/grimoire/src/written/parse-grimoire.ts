@@ -24,6 +24,7 @@ import { parseAppReadme, parseBlockFile, parseLayout, parsePage, type AppReadme 
 import { parseChangelog, parseFeatureReadme, parseFlow, parseVersionBrief } from "./features";
 import { lineAt } from "./markdown";
 import { FindingSink } from "./sink";
+import { parseSettings } from "./settings";
 import { parseRelease, parseTask, type TaskPlace } from "./tasks-releases";
 
 /** What `parseGrimoire()` returns. */
@@ -46,7 +47,8 @@ type Job =
   | { type: "page"; file: string; app: string; pageType: PageType; id: string }
   | { type: "block"; file: string; app: string; pageType: PageType; page: string; id: string }
   | { type: "task"; file: string; place: TaskPlace }
-  | { type: "release"; file: string; name: string };
+  | { type: "release"; file: string; name: string }
+  | { type: "settings"; file: string };
 
 type Listing = { files: string[]; dirs: string[] };
 
@@ -137,13 +139,19 @@ class Walker {
   public async walk(): Promise<void> {
     const top = await this.list(GRIMOIRE_DIR);
 
-    for (const name of top.files) this.unknown(`${GRIMOIRE_DIR}/${name}`);
+    for (const name of top.files) {
+      const file = `${GRIMOIRE_DIR}/${name}`;
+
+      if (name === "settings.md") this.jobs.push({ type: "settings", file });
+      else this.unknown(file);
+    }
 
     for (const name of top.dirs) {
       const dir = `${GRIMOIRE_DIR}/${name}`;
 
-      // `book/` is generated; `screenshots/` holds the images the written files show.
-      if (name === "book" || name === "screenshots") continue;
+      // `book/` is generated; `screenshots/` holds the images the written files show;
+      // `approved/` holds the baseline the owner approved (written by approve only).
+      if (name === "book" || name === "screenshots" || name === "approved") continue;
       else if (name === "features") await this.walkFeatures(dir);
       else if (name === "apps") await this.walkApps(dir);
       else if (name === "tasks") await this.walkTasks(dir);
@@ -495,6 +503,7 @@ function sinkFor(job: Job, sink: FindingSink): FindingSink {
     case "task":
       return sink.scope({ task: job.place.nameId });
     case "release":
+    case "settings":
       return sink;
   }
 }
@@ -642,6 +651,9 @@ export async function parseGrimoire(root: string): Promise<ParseGrimoireResult> 
         return;
       case "release":
         releases.push(parseRelease(job.file, text, job.name, fileSink));
+        return;
+      case "settings":
+        written.settings = parseSettings(job.file, text, fileSink);
         return;
     }
   });

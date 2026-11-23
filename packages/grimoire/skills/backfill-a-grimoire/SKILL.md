@@ -33,6 +33,10 @@ Start from the modules: a module is usually one feature. Then adjust.
 - Mail, notifications, search: the machinery is a feature; each mail or notification belongs to
   the feature that sends it.
 
+In a project with a UI, write the `design-system` feature first (`write-a-feature`), as `inferred`:
+direction, components, error messages. Add `grimoire/settings.md` with the app's `languages`; the
+Warlock adapter would read `app.localeCodes` anyway, but the file makes the choice visible.
+
 Write the proposal as a table for the owner **before** writing files:
 
 | Feature | Folders      | Flows you see                  | Apps               | Unsure about               |

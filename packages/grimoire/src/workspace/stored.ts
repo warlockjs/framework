@@ -50,12 +50,15 @@ export async function openStoredGrimoire(
 
   const moved = movedInputs(derived.inputs, await derivedInputs(root, options.testResultsFile));
   const changed = checked.changed.length + moved;
+  const { settings, shots, ...stored } = derived.snapshot;
 
   return {
     root: checked.book.root,
     book: checked.book,
     routes: checked.book.routes,
-    ...derived.snapshot,
+    ...stored,
+    ...(settings === null || settings === undefined ? {} : { settings }),
+    ...(shots === null || shots === undefined ? {} : { shots }),
     ...(changed > 0 ? { behind: { changed } } : {}),
   };
 }
