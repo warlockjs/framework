@@ -16,6 +16,7 @@ import type { BookAdapter } from "../contracts/adapter";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import path from "node:path";
 import type { GrimoireCheckFilter } from "./answers";
+import { approveFromPanel, rejectFromPanel } from "./approvals";
 import * as data from "./data";
 import { productFeature, productFlow, productMap, type ProductErrorSummary } from "./product-map";
 import { createSnapshotSource } from "./snapshot-source";
@@ -321,6 +322,29 @@ export async function grimoireDevtoolsPanel(
         ),
       },
       { path: "/graph/modules", handler: answer((snapshot) => data.graphOfModules(snapshot)) },
+      // The Bird view's buttons write the approved baseline: development only, never through a share link.
+      {
+        method: "POST",
+        path: "/approve",
+        handler: async (request) => {
+          if (!development || request.shared === true) {
+            throw new data.GrimoirePanelError(403, "Approving is only possible in development.");
+          }
+
+          return approveFromPanel(await source.get(), request.body);
+        },
+      },
+      {
+        method: "POST",
+        path: "/reject",
+        handler: async (request) => {
+          if (!development || request.shared === true) {
+            throw new data.GrimoirePanelError(403, "Rejecting is only possible in development.");
+          }
+
+          return rejectFromPanel(await source.get(), request.body);
+        },
+      },
     ],
   };
 }

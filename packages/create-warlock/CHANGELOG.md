@@ -4,6 +4,35 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.64.0
+
+### Added
+
+<!-- area A: starter grimoire folder (5.64 merge marker, remove at merge) -->
+
+<!-- area B: code rules, guard in CI and as an agent hook (5.64 merge marker, remove at merge) -->
+
+<!-- area C2: components page and screenshot scenes (5.64 merge marker, remove at merge) -->
+
+
+### Changed
+
+<!-- area A: starter grimoire folder (5.64 merge marker, remove at merge) -->
+
+<!-- area B: code rules, guard in CI and as an agent hook (5.64 merge marker, remove at merge) -->
+
+<!-- area C2: components page and screenshot scenes (5.64 merge marker, remove at merge) -->
+
+
+### Fixed
+
+<!-- area A: starter grimoire folder (5.64 merge marker, remove at merge) -->
+
+<!-- area B: code rules, guard in CI and as an agent hook (5.64 merge marker, remove at merge) -->
+
+<!-- area C2: components page and screenshot scenes (5.64 merge marker, remove at merge) -->
+
+
 ## 5.63.0 - 2026-11-22
 
 ### Fixed

@@ -2,6 +2,41 @@
 
 `@warlock.js/grimoire` is new in 5.55.0 and experimental: its file layout, `GR` codes and API may change in any release until it is marked stable.
 
+## 5.64.0
+
+### Added
+
+<!-- area A: scry search and release stamping (5.64 merge marker, remove at merge) -->
+
+<!-- area B: guard, code rules, locked tests, protected areas (5.64 merge marker, remove at merge) -->
+
+<!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
+
+<!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
+
+
+### Changed
+
+<!-- area A: scry search and release stamping (5.64 merge marker, remove at merge) -->
+
+<!-- area B: guard, code rules, locked tests, protected areas (5.64 merge marker, remove at merge) -->
+
+<!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
+
+<!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
+
+
+### Fixed
+
+<!-- area A: scry search and release stamping (5.64 merge marker, remove at merge) -->
+
+<!-- area B: guard, code rules, locked tests, protected areas (5.64 merge marker, remove at merge) -->
+
+<!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
+
+<!-- area C2: screenshots, approvals, design system (5.64 merge marker, remove at merge) -->
+
+
 ## 5.63.0 - 2026-11-22
 
 ### Added

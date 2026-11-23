@@ -42,6 +42,7 @@ export function snapshot(patch: Partial<GrimoireSnapshot> = {}): GrimoireSnapsho
       apps: [],
       tasks: [],
       releases: [],
+      settings: null,
       hash: "",
     },
     structure: [],
@@ -197,6 +198,7 @@ export function flow(featureId: string, id: string, input: FlowInput = {}): Writ
     cases: [],
     notHandled: [],
     unknowns: [],
+    screenshots: null,
     criteria: (input.criteria ?? []).map((value, index) => criterion(file, 30 + index, value)),
   };
 }

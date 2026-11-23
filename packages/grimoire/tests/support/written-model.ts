@@ -107,6 +107,7 @@ export function flow(feature: string, input: FlowInput): WrittenFlow {
     cases: [],
     notHandled: [],
     unknowns: [],
+    screenshots: null,
     criteria: (input.criteria ?? []).map((criterion) => ({
       id: criterion.id,
       number: Number(criterion.id.slice(3)),
@@ -277,6 +278,7 @@ export function written(
     apps: parts.apps ?? [],
     tasks: parts.tasks ?? [],
     releases: [],
+    settings: null,
     hash: "written-hash",
   };
 }

@@ -13,6 +13,7 @@ export const GRIMOIRE_GITIGNORE_LINES = [
   "/grimoire/features/**/bookmap.json",
   "/grimoire/features/**/*.bookmap.json",
   "/grimoire/tasks/index.json",
+  "/grimoire/screenshots/captured/",
 ] as const;
 
 /**

@@ -78,6 +78,11 @@ grimoire/
     done/<yyyy-mm>/T-<n>-<slug>.md
     index.json                  Warlock. Not in git.
   releases/<release>.md         The agent's brief and the collected changes.
+  settings.md                   Optional: languages, screenshot mode, code rules, protected areas.
+  approved/                     What the owner approved: baseline.json, api.json. In git.
+  screenshots/
+    approved/                   Approved images of `@shows` scenes. In git.
+    captured/                   Warlock. The last capture of each scene. Not in git.
 ```
 
 ## Commands
@@ -88,6 +93,8 @@ npx warlock grimoire check      # report broken names, untested criteria, files 
 npx warlock scry <file>         # what is this file?
 npx warlock scry --impact <file>
 npx warlock scry --search "new arrivals are empty for customers with no country"   # pass the whole sentence
+npx warlock grimoire guard T-12 # check a change against its task
+npx warlock grimoire approve <id|feature/flow|api>   # the owner approves a change
 ```
 
 ## Guides
@@ -102,6 +109,9 @@ npx warlock scry --search "new arrivals are empty for customers with no country"
 8. [Test results](/v/latest/grimoire/guides/08-test-results/): `@proves` and the Vitest reporter.
 9. [Devtools](/v/latest/grimoire/guides/09-devtools/): the tab and the static export.
 10. [The product map](/v/latest/grimoire/guides/10-product-map/): the plain-language view, screenshots, share links.
+11. [Drift controls](/v/latest/grimoire/guides/11-drift-controls/): `warlock grimoire guard`, locked tests, protected areas, code rules.
+12. [Screenshots and approvals](/v/latest/grimoire/guides/12-screenshots-and-approvals/): `@shows`, one capture per language, the approved baseline.
 
 Agents learn the workflow from the package's skills: `use-the-grimoire`, `write-a-feature`,
-`record-a-change`, `describe-an-app`, `document-a-file` and `backfill-a-grimoire`.
+`record-a-change`, `guard-a-change`, `review-a-change`, `describe-an-app`, `document-a-file` and
+`backfill-a-grimoire`.

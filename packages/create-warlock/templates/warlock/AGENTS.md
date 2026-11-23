@@ -92,6 +92,14 @@ behaviour, follow its sibling skills (`write-a-feature`, `record-a-change`, `des
 `document-a-file`, `backfill-a-grimoire`). Never edit files Warlock generates
 (`grimoire/book/`, `index.json`, `bookmap.json`, `*.bookmap.json`).
 
+## Drift controls
+
+<!-- area B (5.64 merge marker): guard, locked tests, protected areas, code rules, commit task ids; replace this line -->
+
+## Screenshots and the design system
+
+<!-- area C2 (5.64 merge marker): design-system feature first, @shows scenes, approvals; replace this line -->
+
 ## Commands
 
 - `npm run dev` — start the dev server (`warlock dev`)

@@ -11,7 +11,7 @@
  * | GR4xxx | tests     | criteria, `@proves` lines and test results                  |
  * | GR5xxx | apps      | sites, mobile apps, pages, screens and blocks               |
  * | GR6xxx | changelog | feature versions, changelogs and releases                   |
- * | GR7xxx | tasks     | task files                                                  |
+ * | GR7xxx | tasks     | task files, and a change guarded against its task           |
  * | GR8xxx | book      | building the book from the framework's facts                |
  * | GR9xxx | usage     | a command or query was asked something it cannot answer     |
  *
@@ -38,6 +38,7 @@ const RECORD = "record-a-change";
 const APP = "describe-an-app";
 const FILE = "document-a-file";
 const USE = "use-the-grimoire";
+const GUARD = "guard-a-change";
 
 /** Every code, in order. */
 export const GRIMOIRE_CODE_LIST = [
@@ -446,6 +447,38 @@ export const GRIMOIRE_CODE_LIST = [
     "Describe the behaviour in a flow, or delete dead code.",
     RECORD,
   ),
+  define(
+    "GR3007",
+    "files",
+    "error",
+    "A style uses a physical direction where a logical one is needed",
+    "Use the logical form (`margin-inline-start`, `text-align: start`, `inset-inline-start`, `ms-4`, `text-start`, `start-0`) so right-to-left languages work. When the physical side is really meant, write `grimoire-allow logical-css: <why>` in a comment on that line.",
+    GUARD,
+  ),
+  define(
+    "GR3008",
+    "files",
+    "error",
+    "A user-facing error message is generic",
+    "Say what failed and what to do next (\"Could not reach the server, check your connection\"), mapped from the error code. When the text is not shown to users, write `grimoire-allow specific-errors: <why>` in a comment on that line.",
+    GUARD,
+  ),
+  define(
+    "GR3009",
+    "files",
+    "error",
+    "A discriminator field is named `kind`",
+    "Name the field `type`.",
+    GUARD,
+  ),
+  define(
+    "GR3010",
+    "files",
+    "error",
+    "A relative import path ends in `.js`",
+    "Drop the extension: `./orders.service`, not `./orders.service.js`.",
+    GUARD,
+  ),
 
   // ── GR4xxx tests ─────────────────────────────────────────────────────────
   define(
@@ -526,6 +559,78 @@ export const GRIMOIRE_CODE_LIST = [
     "warning",
     "The reporter could not match a proving test to its result",
     "Keep the `it(...)` or `test(...)` call on the line right under the `@proves` comment, with a plain string name.",
+    RECORD,
+  ),
+  define(
+    "GR4011",
+    "tests",
+    "error",
+    "A test is focused with `.only`",
+    "Remove `.only`: it makes the runner skip every other test in the file.",
+    RECORD,
+  ),
+  define(
+    "GR4012",
+    "tests",
+    "warning",
+    "A test is skipped with `.skip`",
+    "Remove `.skip`, or use `.skipIf(<condition>)` with the reason the test cannot run there.",
+    RECORD,
+  ),
+  define(
+    "GR4013",
+    "tests",
+    "error",
+    "A `@shows` line has the wrong form or no matching `shows()` call",
+    "Write `// @shows <feature>/<flow> AC-<n>` on its own line, directly above `await shows(context, \"<feature>/<flow> AC-<n>\", …)` naming the same criterion.",
+    RECORD,
+  ),
+  define(
+    "GR4014",
+    "tests",
+    "error",
+    "A `@shows` line names a flow or criterion that does not exist",
+    "Fix the `@shows` line and its `shows()` call to name an existing `<feature>/<flow> AC-<n>`.",
+    RECORD,
+  ),
+  define(
+    "GR4015",
+    "tests",
+    "warning",
+    "A shown criterion has no capture in a language",
+    "Run the browser tests (`npx warlock e2e`); `GRIMOIRE_SHOTS=all` captures every flow, not only the changed ones.",
+    RECORD,
+  ),
+  define(
+    "GR4016",
+    "tests",
+    "error",
+    "A shown criterion failed in a language",
+    "Open the capture and the error in the Bird view, fix the code or the scene, then run the browser tests again.",
+    RECORD,
+  ),
+  define(
+    "GR4017",
+    "tests",
+    "warning",
+    "A capture differs from its approved version",
+    "Compare the two images in the Bird view; the owner approves or rejects the change (`warlock grimoire approve <id>`). List it in your report.",
+    RECORD,
+  ),
+  define(
+    "GR4018",
+    "tests",
+    "warning",
+    "A flow, criterion, case or proving test changed since the last approval",
+    "The owner approves or rejects it in the Bird view (`warlock grimoire approve <id>`). List it in your report.",
+    RECORD,
+  ),
+  define(
+    "GR4019",
+    "tests",
+    "error",
+    "A change the owner rejected is still there",
+    "Undo the rejected change the message names, then run the check again.",
     RECORD,
   ),
 
@@ -718,6 +823,70 @@ export const GRIMOIRE_CODE_LIST = [
     "Fix the `Brief:` path, or write the brief.",
     WRITE,
   ),
+  define(
+    "GR7006",
+    "tasks",
+    "error",
+    "A changed file is outside the task",
+    "Change only the files of the task's features and its `Files:` line. When the file belongs to the change, add it to `Files:` (or its feature to `Features:`) and say why in the task.",
+    GUARD,
+  ),
+  define(
+    "GR7007",
+    "tasks",
+    "error",
+    "The change removes a flow, criterion or case the task does not name",
+    "Restore it, or name it in the task's `Removes:` line once the owner agreed.",
+    GUARD,
+  ),
+  define(
+    "GR7008",
+    "tasks",
+    "error",
+    "The change deletes a proving test",
+    "Restore the test, or name its criterion in `Removes:` when the criterion goes too.",
+    GUARD,
+  ),
+  define(
+    "GR7009",
+    "tasks",
+    "error",
+    "The change edits a locked test",
+    "A locked test is the task's acceptance: change the code, not the test. Ask the owner when the test itself is wrong.",
+    GUARD,
+  ),
+  define(
+    "GR7010",
+    "tasks",
+    "warning",
+    "A changed test has fewer assertions than before",
+    "Keep every assertion, or say in the task why one goes.",
+    GUARD,
+  ),
+  define(
+    "GR7011",
+    "tasks",
+    "error",
+    "The change touches a protected area the task does not name",
+    "Leave the area unchanged, or name it in the task's `Touches:` line once the owner agreed (migrations, auth, public-api, config, lockfile, dependencies, or an area of the settings).",
+    GUARD,
+  ),
+  define(
+    "GR7012",
+    "tasks",
+    "error",
+    "A commit does not name its task",
+    "Name the task id in the commit message (`T-12`).",
+    GUARD,
+  ),
+  define(
+    "GR7013",
+    "tasks",
+    "warning",
+    "The public API differs from its approved snapshot",
+    "Once the owner agreed, approve it with `warlock grimoire approve api`; otherwise undo the change.",
+    GUARD,
+  ),
 
   // ── GR8xxx book ──────────────────────────────────────────────────────────
   define(
@@ -809,6 +978,30 @@ export const GRIMOIRE_CODE_LIST = [
     "The book is not built",
     "Run `warlock grimoire build`, then ask again. `warlock scry` only reads the book; it never builds it.",
     USE,
+  ),
+  define(
+    "GR9008",
+    "usage",
+    "error",
+    "The guard has no task to check the change against",
+    "Pass the task id (`warlock grimoire guard T-12`), pass `--commits <range>` whose commits name their tasks, or have exactly one task `in progress`.",
+    GUARD,
+  ),
+  define(
+    "GR9009",
+    "usage",
+    "error",
+    "Git could not answer",
+    "Run inside a git repository and pass a base that exists (`--base origin/main`); in CI, fetch the full history.",
+    GUARD,
+  ),
+  define(
+    "GR9010",
+    "usage",
+    "error",
+    "Nothing matches the approve or reject target",
+    "Pass a change id from the Bird view or the check, a `<feature>/<flow>`, `api`, or `--all`.",
+    RECORD,
   ),
 ] as const;
 

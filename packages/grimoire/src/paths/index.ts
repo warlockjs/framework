@@ -33,6 +33,20 @@ export const GRIMOIRE_PATHS = {
   releases: "grimoire/releases",
   /** Images that written files show (`![alt](path)` lines point inside this folder). */
   screenshots: "grimoire/screenshots",
+  /** Project settings (languages, screenshot mode, code rules, protected areas). Optional. */
+  settings: "grimoire/settings.md",
+  /** Approved state, written only by `warlock grimoire approve` / `reject` and the tab's buttons (in git). */
+  approved: "grimoire/approved",
+  /** The approved flows, criteria, cases, proving tests and images. */
+  baseline: "grimoire/approved/baseline.json",
+  /** The approved public API (the routes). */
+  apiSnapshot: "grimoire/approved/api.json",
+  /** Approved images of `@shows` scenes (in git). */
+  approvedShots: "grimoire/screenshots/approved",
+  /** Warlock. The last capture of every `@shows` scene (ignored by git). */
+  capturedShots: "grimoire/screenshots/captured",
+  /** Warlock. What the last captures were (ignored by git). */
+  captureIndex: "grimoire/screenshots/captured/index.json",
 } as const;
 
 /** Lines a project's `.gitignore` needs so Warlock's files stay out of git. */
@@ -42,6 +56,7 @@ export const GRIMOIRE_IGNORE_RULES = [
   "/grimoire/features/**/bookmap.json",
   "/grimoire/features/**/*.bookmap.json",
   "/grimoire/tasks/index.json",
+  "/grimoire/screenshots/captured/",
 ] as const;
 
 const CODE_EXTENSION = /\.(?:d\.ts|[cm]?[jt]s|[jt]sx)$/;
@@ -177,6 +192,16 @@ export function featureBookmapPath(feature: string): string {
 /** `grimoire/features/<feature>/flows/<flow>.bookmap.json`. */
 export function flowBookmapPath(feature: string, flow: string): string {
   return `${GRIMOIRE_PATHS.features}/${feature}/flows/${flow}.bookmap.json`;
+}
+
+/**
+ * The image of one criterion in one language, relative to its folder under
+ * `grimoire/screenshots/` (`approved/` or `captured/`):
+ * `contact/send-message/AC-2.ar.png`, or `…/AC-2.png` when the app names no
+ * language.
+ */
+export function criterionShotName(ref: string, criterion: string, language: string): string {
+  return `${ref}/${criterion}${language === "" ? "" : `.${language}`}.png`;
 }
 
 /** `grimoire/releases/<release>.md`. */

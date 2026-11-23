@@ -7,6 +7,8 @@ import type { BookHost, BookMobileApp, BookSite } from "./adapter";
 import type { BookAnnotations, LoadedBook } from "./book";
 import type { CollectedFiles, Ownership } from "./bookmap";
 import type { GrimoireFinding, RouteFreshness } from "./findings";
+import type { GrimoireSettings } from "./settings";
+import type { ShotsState } from "./shots";
 import type { ProofLine, TestResultsStore } from "./test-results";
 import type { WrittenGrimoire } from "./written";
 
@@ -41,6 +43,14 @@ export type GrimoireSnapshot = {
   behind?: { changed: number };
   /** What the adapter's `host()` reported (framework brand, app name and version); `null` or absent when it reports none. */
   host?: BookHost | null;
+  /**
+   * `grimoire/settings.md` with its defaults, and the adapter's languages when
+   * the file names none. Absent in snapshots made before 5.64; readers use
+   * `DEFAULT_GRIMOIRE_SETTINGS` then.
+   */
+  settings?: GrimoireSettings;
+  /** `@shows` lines, captures, the approved baseline and the drift from it. Absent when not loaded. */
+  shots?: ShotsState;
 };
 
 /** Options of `openGrimoire()`. */

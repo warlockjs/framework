@@ -419,7 +419,7 @@ describe("registerGrimoireCommands", () => {
     const [grimoire, scry, ...rest] = registerGrimoireCommands();
 
     expect(rest).toEqual([]);
-    expect(grimoire?.name).toBe("grimoire <action> [release]");
+    expect(grimoire?.name).toBe("grimoire <action> [name]");
     expect(scry?.name).toBe("scry [file]");
     expect(mcpToolsOf(grimoire)).toHaveLength(1);
 

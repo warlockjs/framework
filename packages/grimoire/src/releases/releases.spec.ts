@@ -78,7 +78,7 @@ function grimoire(
   features: WrittenFeature[],
   releases: WrittenRelease[],
 ): WrittenGrimoire {
-  return { root, exists: true, features, apps: [], tasks: [], releases, hash: "" };
+  return { root, exists: true, features, apps: [], tasks: [], releases, settings: null, hash: "" };
 }
 
 const catalog = () =>

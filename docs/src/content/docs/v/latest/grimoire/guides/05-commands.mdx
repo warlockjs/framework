@@ -137,6 +137,17 @@ It writes the list of the changelog entries stamped with that release between th
 `date`, and the brief) first: without it the command stops with `GR9005`. Broken markers stop it with `GR1024`. See
 [Tasks and releases](/v/latest/grimoire/guides/06-tasks-and-releases/).
 
+## `warlock grimoire guard [task]`
+
+Checks the change (the git diff against a base) against its task: files outside the task's features, removed flows,
+criteria and cases, deleted proving tests, edited locked tests, protected areas and the code rules on the lines the
+change adds. See [Drift controls](/v/latest/grimoire/guides/11-drift-controls/).
+
+## `warlock grimoire approve <target>` and `reject <target>`
+
+The owner accepts or refuses a change since the approved baseline: a new capture, a removed criterion, case or flow,
+a deleted proving test. See [Screenshots and approvals](/v/latest/grimoire/guides/12-screenshots-and-approvals/).
+
 ## `warlock scry`
 
 One question at a time. Text by default, `--json` for the result object. Paths may use either separator and may be

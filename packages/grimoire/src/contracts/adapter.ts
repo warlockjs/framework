@@ -270,4 +270,10 @@ export type BookAdapter = {
   tests?(root: string): Promise<string[]>;
   /** The framework brand and the app's own name and version, for the view's header and footer. Optional; never boots the app. */
   host?(root: string): Promise<BookHost | null> | BookHost | null;
+  /**
+   * The app's languages, in order (`["en", "ar"]`), when `grimoire/settings.md`
+   * names none. Static: never boots the app. Absent or empty means one
+   * language column.
+   */
+  languages?(root: string): Promise<string[]> | string[];
 };
