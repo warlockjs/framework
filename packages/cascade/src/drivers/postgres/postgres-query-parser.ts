@@ -1054,7 +1054,10 @@ export class PostgresQueryParser {
       .join(" || ");
 
     const placeholder = this.addParam(query);
-    this.addWhereClause(`(${tsVectors}) @@ plainto_tsquery('${language}', ${placeholder})`, boolean);
+    this.addWhereClause(
+      `(${tsVectors}) @@ plainto_tsquery('${language}', ${placeholder})`,
+      boolean,
+    );
   }
 
   /**

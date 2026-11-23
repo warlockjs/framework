@@ -148,7 +148,8 @@ function callerFile(root: string): string {
   return "";
 }
 
-const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+const message = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 async function maskSelectors(page: BrowserPage, selectors: readonly string[]): Promise<void> {
   if (selectors.length === 0) return;
@@ -211,7 +212,11 @@ export async function shows(
       ranAt,
     };
     let viewport = options.viewport
-      ? { name: options.viewport.name, width: options.viewport.width, height: options.viewport.height }
+      ? {
+          name: options.viewport.name,
+          width: options.viewport.width,
+          height: options.viewport.height,
+        }
       : { name: "default", width: 0, height: 0 };
 
     try {
@@ -275,6 +280,8 @@ export async function shows(
   await writeCaptureIndex(root, mergeCaptures(await readCaptureIndex(root), captures, now));
 
   if (failures.length > 0) {
-    throw new Error(`shows ${ref} failed in ${failures.length} of ${languages.length} runs: ${failures.join("; ")}`);
+    throw new Error(
+      `shows ${ref} failed in ${failures.length} of ${languages.length} runs: ${failures.join("; ")}`,
+    );
   }
 }

@@ -23,7 +23,7 @@ The Grimoire is experimental: its file structure and commands may still change.
 
 - Never edit `grimoire/book/`, `index.json`, `bookmap.json` or `*.bookmap.json`.
 - `warlock grimoire release <version> --stamp` moves every `## Unreleased` entry under the release and writes a missing release file; without `--stamp` it only writes the collected list.
-- Every project has a `design-system` feature first; flows with a page step name it in `affects`.
+- Every project has a design-system feature first (`grimoire/features/design-system/`); flows with a page step name it in `affects`.
 - Only the owner approves a changed screenshot or a removed criterion (`warlock grimoire approve`); list every change that is not approved in your report.
 - A finding marked `(expected)` belongs to `proposed` work and does not fail `warlock grimoire check`.
 - Mobile screens are listed from file names only with file-based routing; declare them when navigation is in code.

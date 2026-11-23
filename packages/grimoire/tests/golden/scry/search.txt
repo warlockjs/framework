@@ -2,8 +2,8 @@
 15.0  route    GET /api/products/new-arrivals    catalog.new-arrivals
 14.0  file     src/app/catalog/controllers/new-arrivals.controller.ts  Answers the new arrivals request.
 13.9  file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
-13.9  file     src/app/catalog/tests/new-arrivals.test.ts  Proves the new arrivals rules.
 13.8  task     T-010                             New arrivals were empty for customers with no country
+13.6  file     src/app/catalog/tests/new-arrivals.test.ts  Proves the new arrivals rules.
 13.1  export   src/app/catalog/controllers/new-arrivals.controller.ts#NewArrivalsController  Returns the new arrivals for the customer's country.
 12.8  block    mobile/home/new-arrivals          catalog/new-arrivals
 12.8  block    web-client/home/new-arrivals      catalog/new-arrivals
@@ -15,3 +15,7 @@
  1.4  feature  catalog                           Product catalog   [summary: Customers browse products, see what is new in their country, and will save products for l…]
  1.3  flow     orders/place-order                Place an order   [case duplicate: duplicate does not apply: each submit is a new order]
  1.2  flow     auth/sign-up                      Sign up   [AC-1: AC-1 a new account waits for email verification]
+changes with the top hits:
+  src/app/catalog/routes.ts                            step of catalog/new-arrivals +2
+  src/app/catalog/controllers/products.controller.ts   imported by new-arrivals
+next: warlock scry --impact src/app/catalog/controllers/new-arrivals.controller.ts

@@ -76,7 +76,7 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
      - columns: the app's languages (and apps where a criterion differs by app);
      - cells: test status and a screenshot thumbnail;
      - a jump-to search for any feature, flow or `AC-n`.
-     Built from existing data first.
+       Built from existing data first.
   2. Criteria times languages. Languages come from the app's config, so an agent writes each criterion once and it
      counts once per language. A `@shows <feature>/<flow> AC-n` line on a browser test saves one screenshot per
      language (network mocked for the failure cases). `grimoire check` lists the missing cells. Add the case

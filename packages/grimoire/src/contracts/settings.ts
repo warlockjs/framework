@@ -36,7 +36,11 @@ export const SCREENSHOT_MODES: readonly ScreenshotMode[] = ["changed", "all", "o
  * - `type-discriminator`: discriminator fields are named `type`, never `kind`;
  * - `no-js-imports`: relative import paths carry no `.js` extension.
  */
-export type CodeRuleName = "logical-css" | "specific-errors" | "type-discriminator" | "no-js-imports";
+export type CodeRuleName =
+  | "logical-css"
+  | "specific-errors"
+  | "type-discriminator"
+  | "no-js-imports";
 
 /** Every code rule. */
 export const CODE_RULES: readonly CodeRuleName[] = [

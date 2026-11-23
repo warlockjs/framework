@@ -168,6 +168,10 @@ describe("warlock grimoire guard: the demo diff", () => {
   it("counts the approved baseline and approved images as in scope", async () => {
     const { copy, root } = project();
 
+    mkdirSync(path.join(root, "grimoire/approved"), { recursive: true });
+    mkdirSync(path.join(root, "grimoire/screenshots/approved/catalog/new-arrivals"), {
+      recursive: true,
+    });
     copy.write("grimoire/approved/api.json", "{}\n");
     copy.write("grimoire/screenshots/approved/catalog/new-arrivals/AC-1.png", "png");
 

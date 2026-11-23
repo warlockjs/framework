@@ -44,7 +44,7 @@ const apiCall = (route: string, method: string, csrf: string | null, body?: unkn
   (async () => {
     const response = await fetch(${JSON.stringify(`${MONITOR}/${route}`)}, {
       method: ${JSON.stringify(method)},
-      headers: { "content-type": "application/json", ${csrf === null ? "" : `"x-devtools-csrf": ${JSON.stringify(csrf)}`} },
+      headers: { ${body === undefined ? "" : `"content-type": "application/json",`} ${csrf === null ? "" : `"x-devtools-csrf": ${JSON.stringify(csrf)}`} },
       ${body === undefined ? "" : `body: JSON.stringify(${JSON.stringify(body)}),`}
     });
     const text = await response.text();
@@ -90,21 +90,29 @@ test(
           startupTimeoutMs: 60_000,
         },
         timeoutMs: 240_000,
+        // The page is the monitor's own; the browser also asks for a favicon the fixture does not serve.
+        allowNetworkFailures: [{ url: /\/favicon\.ico$/, status: 404 }],
+        allowConsoleErrors: [/status of 404 \(Not Found\)/],
         run: async ({ page, port, step }) => {
           // WebAuthn needs a host name, not an address: `localhost` reaches the same server.
           const home = `http://localhost:${port}${MONITOR}/`;
           const authenticator = await addVirtualAuthenticator(page);
-          const call = async <T,>(
+          const call = async <T>(
             route: string,
             method: string,
             csrf: string | null,
             body?: unknown,
           ) => page.evaluate<{ status: number; body: T }>(apiCall(route, method, csrf, body));
           const signIn = async () => {
-            const login = await call<{ stage: string; csrf: string }>("api/auth/login", "POST", null, {
-              email: "admin@example.com",
-              password: PASSWORD,
-            });
+            const login = await call<{ stage: string; csrf: string }>(
+              "api/auth/login",
+              "POST",
+              null,
+              {
+                email: "admin@example.com",
+                password: PASSWORD,
+              },
+            );
 
             expect(login.status).toBe(200);
             expect(login.body.stage).toBe("mfa-verify");

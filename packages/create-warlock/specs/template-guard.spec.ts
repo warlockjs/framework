@@ -41,7 +41,15 @@ describe("starter template: drift controls", () => {
   it("tells agents the guard, locked tests, protected areas, task ids and the code rules", () => {
     const agents = read("AGENTS.md");
 
-    for (const text of ["grimoire guard", "Locked:", "Touches:", "T-12", "grimoire-allow", "approve api", "`.only`"]) {
+    for (const text of [
+      "grimoire guard",
+      "Locked:",
+      "Touches:",
+      "T-12",
+      "grimoire-allow",
+      "approve api",
+      "`.only`",
+    ]) {
       expect(agents).toContain(text);
     }
 

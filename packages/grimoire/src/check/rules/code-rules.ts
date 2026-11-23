@@ -18,9 +18,7 @@ export function checkCodeRules(snapshot: GrimoireSnapshot): GrimoireFinding[] {
   if (rules === null || rules.length === 0) return [];
 
   const findings: GrimoireFinding[] = [];
-  const files = Object.keys(snapshot.book.manifest.files)
-    .filter(isRuleFile)
-    .sort();
+  const files = Object.keys(snapshot.book.manifest.files).filter(isRuleFile).sort();
 
   for (const file of files) {
     let text: string;

@@ -154,7 +154,7 @@ await startHttpTestServer({ port: 0 });
 
 ## In the worker, with the production plugins — `createTestHttpServer()`
 
-The shared server of `globalSetup` runs in Vitest's main process, so the test fakes in a worker never see what a request did there. The default worker server and `createTestHttpServer()` both serve requests inside the worker;  `createTestHttpServer()` adds your own `routes`, built the way production builds it: `startHttpServer()`, every plugin `registerHttpPlugins()` registers (rate limit with its cache store, CORS, multipart, cookies), the router's real route registration, an OS-assigned port.
+The shared server of `globalSetup` runs in Vitest's main process, so the test fakes in a worker never see what a request did there. The default worker server and `createTestHttpServer()` both serve requests inside the worker; `createTestHttpServer()` adds your own `routes`, built the way production builds it: `startHttpServer()`, every plugin `registerHttpPlugins()` registers (rate limit with its cache store, CORS, multipart, cookies), the router's real route registration, an OS-assigned port.
 
 ```ts
 import { createTestHttpServer, mailFake, type TestHttpServer } from "@warlock.js/core/tests";

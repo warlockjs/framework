@@ -42,6 +42,7 @@ edits a file you wrote either.
    ```
 
    The number in front is the score: hits are in score order, best first, whatever the type.
+
 2. `scry --impact <top file>` (the `next:` line) and read the `changes with` lines: they are the files that usually change
    with it (what it imports and what imports it inside the same feature, and its tests).
 3. Use grep only for literal text, or when the answer says `weak match`.
@@ -84,14 +85,14 @@ in `grimoire/book/app/auth/controllers/login.controller.json`.
 
 ## Commands
 
-| Command                                     | Does                                                                                                                                   |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `warlock grimoire build`                    | Builds or refreshes the book (and its derived data). Run it after you finish editing; `scry` only reads and never builds               |
-| `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`); skipped when the folder is already current (`--force` writes it) |
-| `warlock grimoire build --site --product`   | Writes the business export: the Product map only, no file paths, test names or per-file answers                                        |
-| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error; `--all` lists every warning                          |
+| Command                                     | Does                                                                                                                                     |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `warlock grimoire build`                    | Builds or refreshes the book (and its derived data). Run it after you finish editing; `scry` only reads and never builds                 |
+| `warlock grimoire build --site [--out dir]` | Also writes the book as a static site (default `grimoire/book/site`); skipped when the folder is already current (`--force` writes it)   |
+| `warlock grimoire build --site --product`   | Writes the business export: the Product map only, no file paths, test names or per-file answers                                          |
+| `warlock grimoire check`                    | Reports broken names, untested criteria, files with no owner. Exit 1 on an error; `--all` lists every warning                            |
 | `warlock grimoire release <release>`        | Writes the collected list into `grimoire/releases/<release>.md`; with `--stamp` it first moves `## Unreleased` entries under the version |
-| `warlock explain GR2001`                    | Explains a finding code                                                                                                                |
+| `warlock explain GR2001`                    | Explains a finding code                                                                                                                  |
 
 Every finding has a code (`GR2001`) and a fix hint. A finding marked `(expected)` belongs to work
 that is still `proposed`; it does not fail the check.

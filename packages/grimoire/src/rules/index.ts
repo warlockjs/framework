@@ -100,8 +100,10 @@ export function runCodeRules(
 
   for (const rule of rules) {
     if (rule === "logical-css" && mode !== "json") add(rule, logicalCss(scanned, style));
-    else if (rule === "specific-errors" && style === "code") add(rule, specificErrors(scanned, locale));
-    else if (rule === "type-discriminator" && mode === "code") add(rule, typeDiscriminator(scanned));
+    else if (rule === "specific-errors" && style === "code")
+      add(rule, specificErrors(scanned, locale));
+    else if (rule === "type-discriminator" && mode === "code")
+      add(rule, typeDiscriminator(scanned));
     else if (rule === "no-js-imports" && mode === "code") add(rule, noJsImports(scanned));
   }
 

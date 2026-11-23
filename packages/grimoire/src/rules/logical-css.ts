@@ -14,7 +14,10 @@ const PHYSICAL_PROPERTY = new RegExp(
     String.raw`border-(?:top|bottom)-(?:left|right)-radius`,
   ].join("|"),
 );
-const PHYSICAL_PROPERTY_DECLARATION = new RegExp(`(?<![\\w-])(${PHYSICAL_PROPERTY.source})\\s*:`, "g");
+const PHYSICAL_PROPERTY_DECLARATION = new RegExp(
+  `(?<![\\w-])(${PHYSICAL_PROPERTY.source})\\s*:`,
+  "g",
+);
 /** `left:` and `right:` as properties (CSS files only). */
 const POSITION_DECLARATION = /(?<![\w-])(left|right)\s*:(?!:)/g;
 const DIRECTION_VALUE = /(?<![\w-])(text-align|float|clear)\s*:\s*(left|right)\b/g;
@@ -24,7 +27,8 @@ const CAMEL_KEY =
   /(?<![\w$.])(marginLeft|marginRight|paddingLeft|paddingRight|borderLeft(?:Width|Style|Color)?|borderRight(?:Width|Style|Color)?|borderTopLeftRadius|borderTopRightRadius|borderBottomLeftRadius|borderBottomRightRadius|scrollMarginLeft|scrollMarginRight|scrollPaddingLeft|scrollPaddingRight)\s*:/g;
 const CAMEL_DIRECTION_VALUE = /(?<![\w$.])(textAlign|float|clear)\s*:\s*["'`](left|right)["'`]/g;
 /** `left: 0`, `right: "8px"`: a bare key counts only with a length-like value, so data objects with `left`/`right` fields pass. */
-const POSITION_KEY = /(?<![\w$.-])(left|right)\s*:\s*(?:-?\d[\d.]*|["'`]-?[\d.]+(?:px|rem|em|%|vw|vh)?["'`]|["'`]auto["'`])/g;
+const POSITION_KEY =
+  /(?<![\w$.-])(left|right)\s*:\s*(?:-?\d[\d.]*|["'`]-?[\d.]+(?:px|rem|em|%|vw|vh)?["'`]|["'`]auto["'`])/g;
 
 const VARIANTS = String.raw`(?:(?:[a-z0-9_-]+|\[[^\]\s]+\]):)*`;
 const LENGTH = String.raw`(?:\d[\d./]*|px|auto|full|\[[^\]]+\]|\([^)]+\))`;
@@ -52,13 +56,29 @@ function suggestion(text: string): string {
 function classSuggestion(token: string): string {
   const base = token.slice(token.lastIndexOf(":") + 1).replace(/^!/, "");
 
-  if (/^-?m[lr]-/.test(base)) return base.replace(/m([lr])-/, (_all, side: string) => `m${side === "l" ? "s" : "e"}-`);
-  if (/^-?p[lr]-/.test(base)) return base.replace(/p([lr])-/, (_all, side: string) => `p${side === "l" ? "s" : "e"}-`);
-  if (/^-?(?:left|right)-/.test(base)) return base.replace(/(left|right)-/, (_all, side: string) => `${side === "left" ? "start" : "end"}-`);
-  if (/^text-/.test(base)) return base.replace(/left|right/, (side) => (side === "left" ? "start" : "end"));
-  if (/^float-/.test(base)) return base.replace(/left|right/, (side) => (side === "left" ? "start" : "end"));
-  if (/^border-[lr]/.test(base)) return base.replace(/^border-([lr])/, (_all, side: string) => `border-${side === "l" ? "s" : "e"}`);
-  if (/^rounded-[lr]/.test(base)) return base.replace(/^rounded-([lr])/, (_all, side: string) => `rounded-${side === "l" ? "s" : "e"}`);
+  if (/^-?m[lr]-/.test(base))
+    return base.replace(/m([lr])-/, (_all, side: string) => `m${side === "l" ? "s" : "e"}-`);
+  if (/^-?p[lr]-/.test(base))
+    return base.replace(/p([lr])-/, (_all, side: string) => `p${side === "l" ? "s" : "e"}-`);
+  if (/^-?(?:left|right)-/.test(base))
+    return base.replace(
+      /(left|right)-/,
+      (_all, side: string) => `${side === "left" ? "start" : "end"}-`,
+    );
+  if (/^text-/.test(base))
+    return base.replace(/left|right/, (side) => (side === "left" ? "start" : "end"));
+  if (/^float-/.test(base))
+    return base.replace(/left|right/, (side) => (side === "left" ? "start" : "end"));
+  if (/^border-[lr]/.test(base))
+    return base.replace(
+      /^border-([lr])/,
+      (_all, side: string) => `border-${side === "l" ? "s" : "e"}`,
+    );
+  if (/^rounded-[lr]/.test(base))
+    return base.replace(
+      /^rounded-([lr])/,
+      (_all, side: string) => `rounded-${side === "l" ? "s" : "e"}`,
+    );
 
   return "";
 }
@@ -102,7 +122,9 @@ export function logicalCss(scanned: ScannedSource, style: "css" | "code"): RuleH
       const place = lineColumn(declarations, match.index ?? 0);
       const side = match[2] === "left" ? "start" : "end";
 
-      hits.push(hit(place.line, place.column, `${match[1]}: ${match[2]}`, ` (use ${match[1]}: ${side})`));
+      hits.push(
+        hit(place.line, place.column, `${match[1]}: ${match[2]}`, ` (use ${match[1]}: ${side})`),
+      );
     });
 
     return hits;
@@ -117,7 +139,9 @@ export function logicalCss(scanned: ScannedSource, style: "css" | "code"): RuleH
     for (const match of part.text.matchAll(DIRECTION_VALUE)) {
       const side = match[2] === "left" ? "start" : "end";
 
-      hits.push(hit(part.line, part.column, `${match[1]}: ${match[2]}`, ` (use ${match[1]}: ${side})`));
+      hits.push(
+        hit(part.line, part.column, `${match[1]}: ${match[2]}`, ` (use ${match[1]}: ${side})`),
+      );
     }
 
     for (const token of part.text.split(/\s+/)) {

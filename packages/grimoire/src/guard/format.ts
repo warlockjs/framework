@@ -16,7 +16,9 @@ export function formatGuardReport(report: GuardReport, root: string): string[] {
   const lines = formatCheckReport(check, { all: true }).slice(0, -1);
 
   if (report.notApproved.length > 0) {
-    lines.push(`not approved: ${report.notApproved.length} change${report.notApproved.length === 1 ? "" : "s"}`);
+    lines.push(
+      `not approved: ${report.notApproved.length} change${report.notApproved.length === 1 ? "" : "s"}`,
+    );
 
     for (const item of report.notApproved) lines.push(`  ${item.id}`);
   }

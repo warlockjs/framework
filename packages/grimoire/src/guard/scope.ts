@@ -34,11 +34,13 @@ export function findTask(written: WrittenGrimoire, text: string): WrittenTask | 
 
 /** One `Removes:` entry. Entries that do not read as `<feature>[/<flow>[ AC-n | case <question>]]` are kept as a feature name. */
 export function parseRemoveEntry(text: string): RemoveEntry {
-  const match = /^([a-z0-9][a-z0-9-]*)(?:\/([a-z0-9][a-z0-9-]*))?(?:\s+(?:(AC-\d+)|case\s+(.+)))?$/i.exec(
-    text.trim(),
-  );
+  const match =
+    /^([a-z0-9][a-z0-9-]*)(?:\/([a-z0-9][a-z0-9-]*))?(?:\s+(?:(AC-\d+)|case\s+(.+)))?$/i.exec(
+      text.trim(),
+    );
 
-  if (!match) return { feature: text.trim(), flow: null, criterion: null, case: null, text: text.trim() };
+  if (!match)
+    return { feature: text.trim(), flow: null, criterion: null, case: null, text: text.trim() };
 
   return {
     feature: (match[1] ?? "").toLowerCase(),

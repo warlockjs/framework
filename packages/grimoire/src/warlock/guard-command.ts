@@ -123,9 +123,10 @@ export async function runGuard(
 
     // The agent already went on once because of this hook: report again, but let it stop, so a finding it may
     // not fix itself (a locked test, a wrong Files: line) never keeps it running.
-    const input = typeof options.hookInput === "string" ? options.hookInput : await readHookInput();
+    const hookInput =
+      typeof options.hookInput === "string" ? options.hookInput : await readHookInput();
 
-    if (stopHookActive(input)) {
+    if (stopHookActive(hookInput)) {
       io.err(
         "note: the guard already stopped this agent once; the findings above are left for the reviewer.",
       );

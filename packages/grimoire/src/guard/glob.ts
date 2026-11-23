@@ -28,7 +28,12 @@ export function splitList(value: string): string[] {
   parts.push(current);
 
   return parts
-    .map((part) => part.trim().replace(/^`+|`+$/g, "").trim())
+    .map((part) =>
+      part
+        .trim()
+        .replace(/^`+|`+$/g, "")
+        .trim(),
+    )
     .filter((part) => part !== "");
 }
 

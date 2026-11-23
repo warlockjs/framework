@@ -51,7 +51,13 @@ describe("logical-css", () => {
       "/* margin-right: 1px */",
     ].join("\n");
 
-    expect(lines("src/a.css", css)).toEqual(["GR3007:1", "GR3007:3", "GR3007:5", "GR3007:6", "GR3007:8"]);
+    expect(lines("src/a.css", css)).toEqual([
+      "GR3007:1",
+      "GR3007:3",
+      "GR3007:5",
+      "GR3007:6",
+      "GR3007:8",
+    ]);
   });
 
   it("flags inline style keys and values", () => {
@@ -162,7 +168,9 @@ describe("the escape comment", () => {
   });
 
   it("needs a reason", () => {
-    expect(lines("src/a.tsx", 'const a = "ml-4"; // grimoire-allow logical-css:')).toEqual(["GR3007:1"]);
+    expect(lines("src/a.tsx", 'const a = "ml-4"; // grimoire-allow logical-css:')).toEqual([
+      "GR3007:1",
+    ]);
   });
 });
 
@@ -180,9 +188,9 @@ describe("scanning", () => {
   });
 
   it("limits the rules it runs", () => {
-    expect(lines("src/a.tsx", 'import a from "./a.js"; const x = "ml-4";', ["no-js-imports"])).toEqual([
-      "GR3010:1",
-    ]);
+    expect(
+      lines("src/a.tsx", 'import a from "./a.js"; const x = "ml-4";', ["no-js-imports"]),
+    ).toEqual(["GR3010:1"]);
     expect(lines("src/a.tsx", 'const x = "ml-4";', [])).toEqual([]);
   });
 });

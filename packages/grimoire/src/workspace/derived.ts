@@ -80,7 +80,13 @@ async function filesUnder(folder: string): Promise<string[]> {
       entries = await readdir(current, { withFileTypes: true });
     } catch {
       // A written file that is not a folder (`settings.md`) is listed as it is.
-      if (await stat(current).then((info) => info.isFile(), () => false)) found.push(current);
+      if (
+        await stat(current).then(
+          (info) => info.isFile(),
+          () => false,
+        )
+      )
+        found.push(current);
 
       return;
     }

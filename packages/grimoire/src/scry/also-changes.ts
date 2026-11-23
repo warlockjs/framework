@@ -62,7 +62,8 @@ function provingTests(snapshot: GrimoireSnapshot, hit: ScryHit): string[] {
 /**
  * The files that change with the top hits, most shared first (then step, imports,
  * imported-by, test, then path), at most ten, none of them a hit's own file.
- * `next` is the impact command for the first file a top hit maps to.
+ * `next` is the impact command for the file of the best top hit that is not a
+ * flow (else the first step file of the top flow).
  */
 export function alsoChangesOf(
   snapshot: GrimoireSnapshot,
@@ -121,12 +122,13 @@ export function alsoChangesOf(
 
       if (book === undefined) continue;
 
-      for (const entry of book.imports) {
+      // Facts built by hand (an adapter's own, a spec's) may leave the import lists out.
+      for (const entry of book.imports ?? []) {
         if (entry.file === null || isSpec(entry.file) || !files.has(entry.file)) continue;
         if (sameGroup(seed, entry.file)) add(entry.file, "imported-by", hit.id);
       }
 
-      for (const importer of book.importedBy) {
+      for (const importer of book.importedBy ?? []) {
         if (!files.has(importer)) continue;
         if (isSpec(importer)) add(importer, "test", hit.id);
         else if (sameGroup(seed, importer)) add(importer, "imports", hit.id);
@@ -145,7 +147,8 @@ export function alsoChangesOf(
         byText(left.file, right.file),
     )
     .slice(0, ALSO_CHANGES_LIMIT);
-  const first = top[0]?.seeds[0];
+  // The file of the best hit that is a file itself (a flow hit's step files have no order of their own).
+  const first = (top.find((item) => item.hit.type !== "flow") ?? top[0])?.seeds[0];
 
   return { alsoChanges, next: first === undefined ? undefined : `warlock scry --impact ${first}` };
 }

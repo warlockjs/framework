@@ -18,7 +18,10 @@ export function ownersFrom(ownership: Ownership): OwnerLookup {
  * The ids of the touched features, or `null` when they cannot be known (no
  * git, no base, a git error): the caller then captures everything.
  */
-export async function touchedFeatures(root: string, owners: OwnerLookup): Promise<Set<string> | null> {
+export async function touchedFeatures(
+  root: string,
+  owners: OwnerLookup,
+): Promise<Set<string> | null> {
   try {
     const base = await resolveBase(root);
     const files = await changedFiles(root, base);

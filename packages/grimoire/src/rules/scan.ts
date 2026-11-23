@@ -140,7 +140,13 @@ export function scanSource(text: string, mode: ScanMode = "code"): ScannedSource
     const opener = text[start] ?? "`";
     const closer = ends === "quote" ? "`" : ends === "expression" ? "${" : "";
 
-    strings.push({ text: content, line: startLine, column: startColumn, quoteStart: start, isKey: false });
+    strings.push({
+      text: content,
+      line: startLine,
+      column: startColumn,
+      quoteStart: start,
+      isKey: false,
+    });
     emit(`${opener}${content}${closer}`, `${opener}${blank(content)}${closer}`);
     advanceLines(text.slice(start, cursor + closer.length), start);
 

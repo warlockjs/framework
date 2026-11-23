@@ -1,10 +1,12 @@
-import { environment } from "@warlock.js/core";
 import { groupedTranslations } from "@mongez/localization";
+import { environment } from "@warlock.js/core";
 import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
 
 /** Development only: a production build answers "not found" so the page is never public. */
 export async function loader({ response }: PageLoaderContext<undefined, undefined>) {
-  if (environment() !== "development") return response.notFound();
+  if (environment() !== "development") {
+    return response.notFound();
+  }
 
   return {};
 }

@@ -8,7 +8,9 @@ function scan(text: string) {
   const result = scanShowsInText(text, FILE, known);
 
   return {
-    shows: result.shows.map((line) => `${line.ref} ${line.criterion} call:${line.call?.line ?? "none"}`),
+    shows: result.shows.map(
+      (line) => `${line.ref} ${line.criterion} call:${line.call?.line ?? "none"}`,
+    ),
     codes: result.findings.map((finding) => `${finding.code}:${finding.at?.line}`),
   };
 }
@@ -46,7 +48,7 @@ describe("scanShowsInText", () => {
     expect(scan("// @shows contact AC-1\nawait shows(context, 'x', () => {});").codes).toEqual([
       "GR4013:1",
     ]);
-    expect(scan('const a = 1; // @shows contact/send-message AC-1').codes).toEqual(["GR4013:1"]);
+    expect(scan("const a = 1; // @shows contact/send-message AC-1").codes).toEqual(["GR4013:1"]);
   });
 
   it("reports a line with no shows() call under it (GR4013)", () => {
@@ -65,18 +67,21 @@ describe("scanShowsInText", () => {
   });
 
   it("ignores a line inside a block comment", () => {
-    expect(
-      scan("/*\n// @shows contact/send-message AC-1\n*/\nconst a = 1;"),
-    ).toEqual({ shows: [], codes: [] });
+    expect(scan("/*\n// @shows contact/send-message AC-1\n*/\nconst a = 1;")).toEqual({
+      shows: [],
+      codes: [],
+    });
   });
 
   it("reports a flow or criterion that does not exist (GR4014)", () => {
     expect(
-      scan('// @shows contact/send-message AC-9\nawait shows(context, "contact/send-message AC-9", () => {});')
-        .codes,
+      scan(
+        '// @shows contact/send-message AC-9\nawait shows(context, "contact/send-message AC-9", () => {});',
+      ).codes,
     ).toEqual(["GR4014:1"]);
     expect(
-      scan('// @shows contact/other AC-1\nawait shows(context, "contact/other AC-1", () => {});').codes,
+      scan('// @shows contact/other AC-1\nawait shows(context, "contact/other AC-1", () => {});')
+        .codes,
     ).toEqual(["GR4014:1"]);
   });
 });

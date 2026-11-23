@@ -10,7 +10,7 @@ import type { GuardFileText, GuardInput, TaskScope } from "../contracts/guard";
 import { DEFAULT_GRIMOIRE_SETTINGS } from "../contracts/settings";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import type { WrittenGrimoire } from "../contracts/written";
-import { changedFiles, commitsIn, filesAt, showFile, type ChangedFile, type CommitInfo } from "../git";
+import { commitsIn, filesAt, showFile, type ChangedFile, type CommitInfo } from "../git";
 import { parseGrimoire } from "../written";
 import { readApiSnapshot, routeLines } from "./api";
 import { matchesAny } from "./glob";
@@ -55,9 +55,11 @@ export async function readTexts(
   const texts: Record<string, GuardFileText> = {};
 
   for (const change of changed) {
-    if (!TEXT_FILE.test(change.file) && !(change.from !== null && TEXT_FILE.test(change.from))) continue;
+    if (!TEXT_FILE.test(change.file) && !(change.from !== null && TEXT_FILE.test(change.from)))
+      continue;
 
-    const before = change.status === "added" ? null : await showFile(root, base, change.from ?? change.file);
+    const before =
+      change.status === "added" ? null : await showFile(root, base, change.from ?? change.file);
 
     texts[change.file] = {
       base: before !== null && before.length > MAX_TEXT ? null : before,
@@ -172,7 +174,9 @@ export async function collectGuardInput(
 
   for (const [ref, flow] of Object.entries(snapshot.collected.flows)) {
     flowFiles[ref] = [
-      ...new Set(flow.steps.flatMap((step) => [...step.files, ...step.typeOnlyFiles, ...step.entries])),
+      ...new Set(
+        flow.steps.flatMap((step) => [...step.files, ...step.typeOnlyFiles, ...step.entries]),
+      ),
     ];
   }
 

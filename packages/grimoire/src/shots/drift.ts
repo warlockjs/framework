@@ -50,12 +50,16 @@ export function driftId(
   criterion: string | null,
   extra: string | null,
 ): string {
-  return [type, ref, criterion, extra === "" ? null : extra].filter((part) => part !== null).join(":");
+  return [type, ref, criterion, extra === "" ? null : extra]
+    .filter((part) => part !== null)
+    .join(":");
 }
 
 function item(
   baseline: ApprovedBaseline,
-  fields: { type: DriftType; ref: string } & Partial<Omit<DriftItem, "id" | "rejected" | "type" | "ref">>,
+  fields: { type: DriftType; ref: string } & Partial<
+    Omit<DriftItem, "id" | "rejected" | "type" | "ref">
+  >,
 ): DriftItem {
   const criterion = fields.criterion ?? null;
   const extra = fields.language ?? fields.case ?? null;
@@ -78,7 +82,9 @@ function item(
 
 async function readImage(root: string, file: string): Promise<Uint8Array | null> {
   try {
-    return await readFile(path.join(root, ...GRIMOIRE_PATHS.screenshots.split("/"), ...file.split("/")));
+    return await readFile(
+      path.join(root, ...GRIMOIRE_PATHS.screenshots.split("/"), ...file.split("/")),
+    );
   } catch {
     return null;
   }
@@ -99,7 +105,9 @@ export async function computeDrift(input: DriftInput): Promise<DriftItem[]> {
       continue;
     }
 
-    const beforeCriteria = new Map(before.criteria.map((criterion) => [criterion.id, criterion.text]));
+    const beforeCriteria = new Map(
+      before.criteria.map((criterion) => [criterion.id, criterion.text]),
+    );
     const nowCriteria = new Map(flow.criteria.map((criterion) => [criterion.id, criterion.text]));
 
     for (const [id, text] of nowCriteria) {
@@ -109,7 +117,13 @@ export async function computeDrift(input: DriftInput): Promise<DriftItem[]> {
         items.push(item(baseline, { type: "criterion-added", ref, criterion: id, after: text }));
       } else if (old !== text) {
         items.push(
-          item(baseline, { type: "criterion-changed", ref, criterion: id, before: old, after: text }),
+          item(baseline, {
+            type: "criterion-changed",
+            ref,
+            criterion: id,
+            before: old,
+            after: text,
+          }),
         );
       }
     }
@@ -148,7 +162,8 @@ export async function computeDrift(input: DriftInput): Promise<DriftItem[]> {
 
     seenProofs.add(key);
     // A removed flow or criterion is already reported by its own item.
-    if (!now.get(proof.ref)?.criteria.some((criterion) => criterion.id === proof.criterion)) continue;
+    if (!now.get(proof.ref)?.criteria.some((criterion) => criterion.id === proof.criterion))
+      continue;
 
     items.push(
       item(baseline, {

@@ -1,14 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TEST_SERVER_PORT_ENV_KEY } from "./test-server-port-channel";
 
-const created: Array<{ url: string; close: ReturnType<typeof vi.fn> }> = [];
+const created: Array<{
+  url: string;
+  close: () => Promise<void>;
+  closed: ReturnType<typeof vi.fn>;
+}> = [];
 
 vi.mock("./test-http-server", () => ({
   createTestHttpServer: vi.fn(async (options: unknown) => {
+    // The worker server wraps `close`; `closed` is the spy behind it.
+    const closed = vi.fn(async () => undefined);
     const server = {
       url: `http://127.0.0.1:${4000 + created.length}`,
       options,
-      close: vi.fn(async () => undefined),
+      closed,
+      close: closed as () => Promise<void>,
     };
 
     created.push(server);
@@ -69,7 +76,7 @@ describe("worker test server", () => {
     await worker.resolveTestServerUrl();
 
     expect(created).toHaveLength(2);
-    expect(created[0]!.close).toHaveBeenCalledTimes(1);
+    expect(created[0]!.closed).toHaveBeenCalledTimes(1);
   });
 
   it("lets a shared server published by globalSetup win", async () => {

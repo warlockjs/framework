@@ -110,7 +110,9 @@ describe("shows()", () => {
     ]);
     expect(captures[0]?.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(captures[0]?.viewport).toEqual({ name: "default", width: 1280, height: 800 });
-    expect(existsSync(path.join(root, "grimoire/screenshots/captured/contact/send-message/AC-1.en.png"))).toBe(true);
+    expect(
+      existsSync(path.join(root, "grimoire/screenshots/captured/contact/send-message/AC-1.en.png")),
+    ).toBe(true);
   });
 
   it("records a failing language, still runs the others, then throws", async () => {
@@ -123,7 +125,9 @@ describe("shows()", () => {
       }),
     ).rejects.toThrow(/failed in 1 of 2 runs: en: the button is missing/);
 
-    expect(index(root).captures.map((entry) => [entry.language, entry.outcome, entry.error])).toEqual([
+    expect(
+      index(root).captures.map((entry) => [entry.language, entry.outcome, entry.error]),
+    ).toEqual([
       ["ar", "pass", null],
       ["en", "fail", "the button is missing"],
     ]);
@@ -184,7 +188,9 @@ describe("shows()", () => {
     expect(ran).toBe(0);
 
     resetShowsCache();
-    git.changedFiles.mockResolvedValue([{ file: "grimoire/features/contact/flows/send-message.md", from: null }]);
+    git.changedFiles.mockResolvedValue([
+      { file: "grimoire/features/contact/flows/send-message.md", from: null },
+    ]);
 
     await shows(context, REF, async () => void ran++);
     expect(ran).toBe(2);
@@ -209,7 +215,9 @@ describe("shows()", () => {
     const root = project(null);
     const { context } = fakeContext(root);
 
-    await expect(shows(context, "contact AC-1", async () => {})).rejects.toThrow(/not "<feature>\/<flow> AC-<n>"/);
+    await expect(shows(context, "contact AC-1", async () => {})).rejects.toThrow(
+      /not "<feature>\/<flow> AC-<n>"/,
+    );
   });
 });
 
@@ -220,7 +228,11 @@ describe("localizedPath", () => {
     expect(localizedPath("/", "ar", { ...base, strategy: "none" })).toBe("/");
     expect(localizedPath("/", "ar", { ...base, strategy: "prefix" })).toBe("/ar");
     expect(localizedPath("/about", "en", { ...base, strategy: "prefix" })).toBe("/en/about");
-    expect(localizedPath("/about", "en", { ...base, strategy: "prefix-except-default" })).toBe("/about");
-    expect(localizedPath("about", "ar", { ...base, strategy: "prefix-except-default" })).toBe("/ar/about");
+    expect(localizedPath("/about", "en", { ...base, strategy: "prefix-except-default" })).toBe(
+      "/about",
+    );
+    expect(localizedPath("about", "ar", { ...base, strategy: "prefix-except-default" })).toBe(
+      "/ar/about",
+    );
   });
 });

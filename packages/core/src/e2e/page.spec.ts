@@ -329,7 +329,9 @@ describe("mocked requests and extra headers", () => {
       responseCode: 500,
       responseHeaders: [{ name: "content-type", value: "application/json" }],
     });
-    expect(Buffer.from(String(fulfilled.params.body), "base64").toString()).toBe('{"error":"down"}');
+    expect(Buffer.from(String(fulfilled.params.body), "base64").toString()).toBe(
+      '{"error":"down"}',
+    );
     expect(commandsOf(endpoint, "Fetch.continueRequest")[0]!.params).toEqual({ requestId: "b" });
   });
 

@@ -6,11 +6,7 @@
  */
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type {
-  ApprovedBaseline,
-  ShotCapture,
-  ShotCaptureIndex,
-} from "../contracts/shots";
+import type { ApprovedBaseline, ShotCapture, ShotCaptureIndex } from "../contracts/shots";
 import { GRIMOIRE_PATHS } from "../paths";
 
 function absolute(root: string, file: string): string {

@@ -234,7 +234,8 @@ export default defineConfig({devServer:{generateTypings:false,healthCheckers:fal
                   expect(formIds).toHaveLength(2);
                   expect(new Set(formIds).size).toBe(2);
                 }
-                await waitForHydration(browserPage, "input");
+                // The shared scenario's page has no inputs; waiting for hydrated inputs there never ends.
+                if (inputs.length > 0) await waitForHydration(browserPage, "input");
                 for (const id of inputs) {
                   await browserPage.click(`input[id="${id}"]`);
                   await expectHookId(browserPage, id);
@@ -264,10 +265,11 @@ export default defineConfig({devServer:{generateTypings:false,healthCheckers:fal
               text: "Revision 4",
               timeoutMs: 30_000,
             });
-            await waitForHydration(browserPage, "input");
-            for (const id of await browserPage.evaluate<string[]>(
+            const finalInputs = await browserPage.evaluate<string[]>(
               "Array.from(document.querySelectorAll('input'),input=>input.id)",
-            )) {
+            );
+            if (finalInputs.length > 0) await waitForHydration(browserPage, "input");
+            for (const id of finalInputs) {
               await browserPage.click(`input[id="${id}"]`);
               await expectHookId(browserPage, id);
             }

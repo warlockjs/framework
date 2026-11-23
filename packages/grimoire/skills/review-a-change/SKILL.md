@@ -37,12 +37,14 @@ Go file by file through the diff. For each hunk say which sentence or acceptance
 
 ```md
 Unasked changes
+
 - <file>: <what changed>, no sentence of the task asks for it
 
 Guard
 <the pasted output>
 
 Not approved
+
 - <drift item id>
 
 Verdict: ready | not ready, because …

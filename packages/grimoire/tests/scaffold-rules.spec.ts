@@ -33,7 +33,10 @@ function filesUnder(folder: string): string[] {
 
 describe("the scaffold's sources", () => {
   it("report nothing for the four code rules", () => {
-    const files = [...filesUnder(path.join(template, "src")), path.join(template, "e2e", "home.e2e.ts")]
+    const files = [
+      ...filesUnder(path.join(template, "src")),
+      path.join(template, "e2e", "home.e2e.ts"),
+    ]
       .map((file) => path.relative(template, file).split(path.sep).join("/"))
       .filter(isRuleFile);
 

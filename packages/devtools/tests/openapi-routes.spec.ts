@@ -79,7 +79,7 @@ describe("GET /api/openapi.json", () => {
     });
 
     expect(response.statusCode).toBe(500);
-    expect(response.json()).toEqual({ error: "boom" });
+    expect(response.json()).toEqual({ error: "boom", ref: expect.stringMatching(/^[A-Z2-9]{8}$/) });
   });
 });
 
@@ -205,7 +205,7 @@ describe("GET /api/postman.json", () => {
     });
 
     expect(response.statusCode).toBe(500);
-    expect(response.json()).toEqual({ error: "boom" });
+    expect(response.json()).toEqual({ error: "boom", ref: expect.stringMatching(/^[A-Z2-9]{8}$/) });
   });
 });
 

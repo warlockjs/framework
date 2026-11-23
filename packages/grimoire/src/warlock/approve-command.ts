@@ -76,7 +76,10 @@ export async function runApprove(
       return 0;
     }
 
-    const items = selectDrift(snapshot, { targets, ...(language === undefined ? {} : { language }) });
+    const items = selectDrift(snapshot, {
+      targets,
+      ...(language === undefined ? {} : { language }),
+    });
 
     print(context, await approveItems(snapshot, items), options, "approved");
 
@@ -96,8 +99,12 @@ export async function runReject(
     const targets = targetsOf(target, options);
     const snapshot = await openFor(context);
     const language = typeof options.lang === "string" ? options.lang : undefined;
-    const note = typeof options.note === "string" && options.note.trim() !== "" ? options.note.trim() : null;
-    const items = selectDrift(snapshot, { targets, ...(language === undefined ? {} : { language }) });
+    const note =
+      typeof options.note === "string" && options.note.trim() !== "" ? options.note.trim() : null;
+    const items = selectDrift(snapshot, {
+      targets,
+      ...(language === undefined ? {} : { language }),
+    });
 
     print(context, await rejectItems(snapshot, items, note), options, "rejected");
 

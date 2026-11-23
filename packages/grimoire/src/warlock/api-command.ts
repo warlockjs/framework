@@ -5,7 +5,13 @@
  */
 import { GrimoireError } from "../codes";
 import { GRIMOIRE_PATHS } from "../paths";
-import { readApiSnapshot, routeLines, writeApiSnapshot, diffRoutes, describeRouteDiff } from "../guard";
+import {
+  readApiSnapshot,
+  routeLines,
+  writeApiSnapshot,
+  diffRoutes,
+  describeRouteDiff,
+} from "../guard";
 import { openGrimoire } from "../workspace";
 import { reportError, type CommandContext } from "./actions";
 
@@ -40,7 +46,11 @@ export async function runApproveApi(
 
     io.out(
       `approved the public API: ${lines.length} route${lines.length === 1 ? "" : "s"} in ${GRIMOIRE_PATHS.apiSnapshot}${
-        before === null ? "" : diff.added.length + diff.removed.length === 0 ? " (unchanged)" : ` (${describeRouteDiff(diff)})`
+        before === null
+          ? ""
+          : diff.added.length + diff.removed.length === 0
+            ? " (unchanged)"
+            : ` (${describeRouteDiff(diff)})`
       }`,
     );
 

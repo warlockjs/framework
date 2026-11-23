@@ -68,9 +68,7 @@ describe("parseGrimoire on the shop fixture", () => {
       findings
         .filter((finding) => !isUiQuestion(finding))
         .map((finding) => [finding.code, finding.at?.file]),
-    ).toEqual([
-      ["GR1030", "grimoire/features/catalog/flows/wishlist.md"],
-    ]);
+    ).toEqual([["GR1030", "grimoire/features/catalog/flows/wishlist.md"]]);
     expect(written.exists).toBe(true);
     expect(written.root).toBe(path.resolve(shopRoot));
     expect(written.hash).toMatch(/^[0-9a-f]{64}$/);

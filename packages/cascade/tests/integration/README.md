@@ -13,15 +13,15 @@ When the variables below are set, the same two harness functions skip the contai
 you name. Every suite that uses them (CRUD, relations, migrations, sync, query, ...) then runs against that server, so a
 live run needs one long-lived database container (or a local server) and no testcontainers.
 
-| Variable | Used by | Meaning |
-| --- | --- | --- |
-| `LOCAL_PG_DATABASE` | PostgreSQL suites | Database to use. Must already exist; the harness never creates or drops databases. |
-| `LOCAL_PG_USER` | PostgreSQL suites | User name. |
-| `LOCAL_PG_PASSWORD` | PostgreSQL suites | Password (required when the two above are set). |
-| `LOCAL_PG_HOST` | PostgreSQL suites | Host. Default `127.0.0.1`. |
-| `LOCAL_PG_PORT` | PostgreSQL suites | Port. Default `5432`. |
-| `LOCAL_MONGO_URI` | MongoDB suites | Connection string, e.g. `mongodb://127.0.0.1:27017`. The driver connects directly (no replica-set discovery). |
-| `LOCAL_MONGO_DATABASE` | MongoDB suites | Database to use. |
+| Variable               | Used by           | Meaning                                                                                                       |
+| ---------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------- |
+| `LOCAL_PG_DATABASE`    | PostgreSQL suites | Database to use. Must already exist; the harness never creates or drops databases.                            |
+| `LOCAL_PG_USER`        | PostgreSQL suites | User name.                                                                                                    |
+| `LOCAL_PG_PASSWORD`    | PostgreSQL suites | Password (required when the two above are set).                                                               |
+| `LOCAL_PG_HOST`        | PostgreSQL suites | Host. Default `127.0.0.1`.                                                                                    |
+| `LOCAL_PG_PORT`        | PostgreSQL suites | Port. Default `5432`.                                                                                         |
+| `LOCAL_MONGO_URI`      | MongoDB suites    | Connection string, e.g. `mongodb://127.0.0.1:27017`. The driver connects directly (no replica-set discovery). |
+| `LOCAL_MONGO_DATABASE` | MongoDB suites    | Database to use.                                                                                              |
 
 The PostgreSQL switch is on when `LOCAL_PG_DATABASE` and `LOCAL_PG_USER` are both set; the MongoDB switch when
 `LOCAL_MONGO_URI` and `LOCAL_MONGO_DATABASE` are both set. The two are independent.

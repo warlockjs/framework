@@ -15,7 +15,8 @@ export function checkFocusedTests(snapshot: GrimoireSnapshot): GrimoireFinding[]
   const files = new Set(snapshot.book.facts.tests);
 
   for (const file of Object.keys(snapshot.book.manifest.files)) {
-    if (/\.[cm]?[jt]sx?$/.test(file) && isTestPath(file) && !file.includes("node_modules/")) files.add(file);
+    if (/\.[cm]?[jt]sx?$/.test(file) && isTestPath(file) && !file.includes("node_modules/"))
+      files.add(file);
   }
 
   for (const file of [...files].sort()) {

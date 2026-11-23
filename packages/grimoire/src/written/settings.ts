@@ -90,7 +90,8 @@ export function resolveSettings(
     languagesFrom:
       writtenLanguages.length > 0 ? "settings" : adapterLanguages.length > 0 ? "adapter" : "none",
     screenshots: written?.screenshots?.value ?? DEFAULT_GRIMOIRE_SETTINGS.screenshots,
-    rules: written?.rules === null || written === null ? null : written.rules.map((rule) => rule.value),
+    rules:
+      written?.rules === null || written === null ? null : written.rules.map((rule) => rule.value),
     protected: areas,
   };
 }

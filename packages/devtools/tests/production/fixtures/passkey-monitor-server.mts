@@ -34,7 +34,10 @@ const crypto: DevtoolsCrypto = {
   async verifyPassword(value, hash) {
     const [, salt, key] = hash.split(":");
 
-    return timingSafeEqual(await derive(value, Buffer.from(salt ?? "", "hex")), Buffer.from(key ?? "", "hex"));
+    return timingSafeEqual(
+      await derive(value, Buffer.from(salt ?? "", "hex")),
+      Buffer.from(key ?? "", "hex"),
+    );
   },
   encrypt: (plain) => `enc:${plain}`,
   decrypt: (cipher) => cipher.slice(4),
@@ -51,10 +54,7 @@ const crypto: DevtoolsCrypto = {
 };
 
 const store = createMemoryStore();
-const options = resolveProductionOptions(
-  { origin, requireHttps: false },
-  { DEVTOOLS_PATH: path },
-);
+const options = resolveProductionOptions({ origin, requireHttps: false }, { DEVTOOLS_PATH: path });
 const instance = {
   id: "e2e:1:abc",
   label: "e2e",

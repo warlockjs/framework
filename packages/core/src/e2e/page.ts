@@ -96,7 +96,7 @@ function probeReason(error: unknown, observed: string | undefined): string {
 }
 
 export class BrowserPage {
-  private viewport: Viewport = { ...defaultViewports[0] };
+  private viewport: Viewport = { ...defaultViewports[0]! };
   private loads = 0;
   private pendingRequests = new Map<string, string>();
   private requestUrls = new Map<string, string>();
@@ -169,7 +169,7 @@ export class BrowserPage {
     await this.cdp.command("Runtime.enable", {});
     await this.cdp.command("Network.enable", {});
     await this.cdp.command("Log.enable", {});
-    await this.setViewport(this.spec.viewports?.[0] ?? defaultViewports[0]);
+    await this.setViewport(this.spec.viewports?.[0] ?? defaultViewports[0]!);
   }
 
   async step<T>(name: string, action: () => Promise<T>): Promise<T> {

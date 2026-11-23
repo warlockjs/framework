@@ -58,7 +58,9 @@ describe("resolveSettings", () => {
       languages: ["en", "ar"],
       languagesFrom: "settings",
     });
-    expect(resolveSettings(parse("---\nscreenshots: off\n---\n").written, ["fr", "de"])).toMatchObject({
+    expect(
+      resolveSettings(parse("---\nscreenshots: off\n---\n").written, ["fr", "de"]),
+    ).toMatchObject({
       languages: ["fr", "de"],
       languagesFrom: "adapter",
       screenshots: "off",
@@ -69,7 +71,9 @@ describe("resolveSettings", () => {
   it("lets a protected line replace a built-in area and add a new one", () => {
     const settings = resolveSettings(parse(FULL).written);
 
-    expect(settings.protected.find((area) => area.name === "auth")?.globs).toEqual(["src/app/auth/**"]);
+    expect(settings.protected.find((area) => area.name === "auth")?.globs).toEqual([
+      "src/app/auth/**",
+    ]);
     expect(settings.protected.find((area) => area.name === "payments")?.globs).toEqual([
       "src/app/payments/**",
       "src/config/payments.ts",

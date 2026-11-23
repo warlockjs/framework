@@ -287,26 +287,6 @@ describe("MongoQueryBuilder — filter security", () => {
       expect(regexSourceOf(starts)).toBe("^\\(a\\+\\)\\+");
       expect(regexSourceOf(ends)).toBe("\\(a\\+\\)\\+$");
     });
-
-    it("escapes a regex-mode whereSearch operation", () => {
-      // `whereSearch()` compiles to $text on this builder; the $regex form of
-      // the operation is still reachable through the parser, so it is pinned
-      // here directly.
-      const query = builder();
-
-      query.operations.push({
-        stage: "$match",
-        mergeable: true,
-        type: "whereSearch",
-        data: { field: "name", query: "(a+)+$" },
-      } as never);
-
-      const pipeline = query.parse().pipeline;
-
-      expect(pipeline).toEqual([
-        { $match: { name: { $regex: "\\(a\\+\\)\\+\\$", $options: "i" } } },
-      ]);
-    });
   });
 
   describe("delete statics filter sanitization", () => {

@@ -460,7 +460,7 @@ export const GRIMOIRE_CODE_LIST = [
     "files",
     "error",
     "A user-facing error message is generic",
-    "Say what failed and what to do next (\"Could not reach the server, check your connection\"), mapped from the error code. When the text is not shown to users, write `grimoire-allow specific-errors: <why>` in a comment on that line.",
+    'Say what failed and what to do next ("Could not reach the server, check your connection"), mapped from the error code. When the text is not shown to users, write `grimoire-allow specific-errors: <why>` in a comment on that line.',
     GUARD,
   ),
   define(
@@ -582,7 +582,7 @@ export const GRIMOIRE_CODE_LIST = [
     "tests",
     "error",
     "A `@shows` line has the wrong form or no matching `shows()` call",
-    "Write `// @shows <feature>/<flow> AC-<n>` on its own line, directly above `await shows(context, \"<feature>/<flow> AC-<n>\", …)` naming the same criterion.",
+    'Write `// @shows <feature>/<flow> AC-<n>` on its own line, directly above `await shows(context, "<feature>/<flow> AC-<n>", …)` naming the same criterion.',
     RECORD,
   ),
   define(

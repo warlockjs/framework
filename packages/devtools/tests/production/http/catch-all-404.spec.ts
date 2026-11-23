@@ -201,10 +201,13 @@ describe("closed monitor URLs hit with a request body", () => {
     ["a valid JSON body", JSON.stringify({ a: 1 }), JSON_TYPE],
   ];
 
-  /** Fastify closes the connection after a body it could not read: that header is not part of the answer. */
+  /**
+   * Fastify closes the connection after a body it could not read: that header is not part of the answer.
+   * Every request here spends one of the same rate limit, so the remaining count differs by design.
+   */
   function answer(response: LightMyRequestResponse, path: string) {
     const {
-      headers: { connection: _connection, ...headers },
+      headers: { connection: _connection, "x-ratelimit-remaining": _remaining, ...headers },
       ...rest
     } = shape(response, path);
 
@@ -221,8 +224,13 @@ describe("closed monitor URLs hit with a request body", () => {
         const t = await createApp(config);
         const reference = await t.inject({ method: "POST", url: UNKNOWN, payload, headers });
 
-        for (const route of ["/api/auth/login", "/api/nothing-here", "/api/share/open"]) {
-          const closed = await t.inject({ method: "POST", url: `${PATH}${route}`, payload, headers });
+        for (const route of ["/api/admin/shares", "/api/nothing-here", "/api/share/open"]) {
+          const closed = await t.inject({
+            method: "POST",
+            url: `${PATH}${route}`,
+            payload,
+            headers,
+          });
 
           expect(answer(closed, `${PATH}${route}`), route).toEqual(answer(reference, UNKNOWN));
         }

@@ -38,16 +38,16 @@
       "score": 13.943952870934872
     },
     {
-      "type": "file",
-      "id": "src/app/catalog/tests/new-arrivals.test.ts",
-      "detail": "Proves the new arrivals rules.",
-      "score": 13.943789001883104
-    },
-    {
       "type": "task",
       "id": "T-010",
       "detail": "New arrivals were empty for customers with no country",
       "score": 13.797229937102077
+    },
+    {
+      "type": "file",
+      "id": "src/app/catalog/tests/new-arrivals.test.ts",
+      "detail": "Proves the new arrivals rules.",
+      "score": 13.623545176312874
     },
     {
       "type": "export",
@@ -123,5 +123,25 @@
       "score": 1.1592981967892435,
       "matched": "AC-1: AC-1 a new account waits for email verification"
     }
-  ]
+  ],
+  "alsoChanges": [
+    {
+      "file": "src/app/catalog/routes.ts",
+      "reason": "step",
+      "via": [
+        "catalog/new-arrivals",
+        "GET /api/products/new-arrivals",
+        "src/app/catalog/controllers/new-arrivals.controller.ts"
+      ]
+    },
+    {
+      "file": "src/app/catalog/controllers/products.controller.ts",
+      "reason": "imported-by",
+      "via": [
+        "catalog/new-arrivals"
+      ]
+    }
+  ],
+  "weak": false,
+  "next": "warlock scry --impact src/app/catalog/controllers/new-arrivals.controller.ts"
 }

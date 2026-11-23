@@ -46,6 +46,8 @@ describe("warlock inspect", () => {
       config: true,
       env: true,
       bootstrap: true,
+      // A failed config or bootstrap is reported, and inspect goes on.
+      tolerant: true,
     });
     expect(inspectCommand.commandOptions.map((option) => option.name)).toEqual(["json", "section"]);
   }, 60_000);

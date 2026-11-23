@@ -11,7 +11,9 @@ describe("PNG decode and compare", () => {
   });
 
   it("returns null for bytes that are not a PNG", () => {
-    expect(decodePng(Buffer.from("not an image at all, long enough to pass the size guard"))).toBeNull();
+    expect(
+      decodePng(Buffer.from("not an image at all, long enough to pass the size guard")),
+    ).toBeNull();
   });
 
   it("calls equal images unchanged", () => {
@@ -28,11 +30,16 @@ describe("PNG decode and compare", () => {
       y === 0 && x < 10 ? [0, 0, 0, 255] : [255, 255, 255, 255],
     );
 
-    expect(comparePng(solidPng(100, 100), changed)).toMatchObject({ changed: false, differing: 10 });
+    expect(comparePng(solidPng(100, 100), changed)).toMatchObject({
+      changed: false,
+      differing: 10,
+    });
   });
 
   it("ignores a difference under the channel delta", () => {
-    expect(comparePng(solidPng(10, 10), solidPng(10, 10, [245, 255, 255, 255])).changed).toBe(false);
+    expect(comparePng(solidPng(10, 10), solidPng(10, 10, [245, 255, 255, 255])).changed).toBe(
+      false,
+    );
   });
 
   it("calls an image changed when more than 0.1% of the pixels differ", () => {

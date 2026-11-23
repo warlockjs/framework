@@ -2045,6 +2045,19 @@ const shownCell = (
     },
   });
 
+/** The `GET /matrix` answer as the view reads it; the fixtures build it loosely, field by field. */
+type FixtureCell = Record<string, unknown>;
+type FixtureCriterion = { cells: FixtureCell[]; [key: string]: unknown };
+type FixtureFlow = { drift: string[]; criteria: FixtureCriterion[]; [key: string]: unknown };
+type FixtureMatrix = {
+  languages: string[];
+  mode: string;
+  baseline: { approvedAt: string } | null;
+  development: boolean;
+  features: { flows: FixtureFlow[]; [key: string]: unknown }[];
+  [key: string]: unknown;
+};
+
 const matrixAnswer = (patch: Partial<FixtureMatrix> = {}): FixtureMatrix => ({
   languages: ["en", "ar"],
   mode: "changed",
@@ -2226,7 +2239,7 @@ describe("grimoire view: bird view", () => {
         flow.drift = [];
 
         for (const row of flow.criteria)
-          row.cells = row.cells.map((item) => ({
+          row.cells = row.cells.map((item: FixtureCell) => ({
             ...item,
             shown: null,
             drift: [],
@@ -2378,7 +2391,12 @@ describe("grimoire view: bird view", () => {
 
     try {
       const { view } = await renderBird(matrixAnswer());
-      const input = view.find("input")[0] as FakeNode;
+      const input = view.findAll(
+        (node) =>
+          node.tag === "input" &&
+          node.attributes.type === "search" &&
+          (node.attributes.placeholder ?? "").startsWith("Jump to"),
+      )[0] as FakeNode;
 
       input.fire("input", { target: { value: "AC-3" } });
       expect(replaceState).toHaveBeenLastCalledWith(null, "", "#grimoire/bird-view?q=AC-3");

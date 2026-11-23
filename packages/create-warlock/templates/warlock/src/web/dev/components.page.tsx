@@ -14,21 +14,29 @@ export default function ComponentsPage() {
       <h1>{translate("components.title")}</h1>
       <h2>{translate("components.headings")}</h2>
       <h3>{translate("components.controls")}</h3>
-      <form className="warlock-contact-form" onSubmit={(event) => event.preventDefault()}>
+      {/* A display of the controls: nothing here is sent, so the button is a plain button. */}
+      <form className="warlock-contact-form">
         <label htmlFor="components-name">
           <span>{translate("components.name")}</span>
           <input id="components-name" name="name" type="text" />
         </label>
         <label htmlFor="components-email">
           <span>{translate("components.email")}</span>
-          <input id="components-email" name="email" type="email" aria-invalid="true" />
+          <input
+            id="components-email"
+            name="email"
+            type="text"
+            inputMode="email"
+            autoComplete="email"
+            aria-invalid="true"
+          />
           <small className="warlock-field-error">{translate("components.error")}</small>
         </label>
         <label htmlFor="components-message">
           <span>{translate("components.message")}</span>
           <textarea id="components-message" name="message" rows={4} />
         </label>
-        <button className="warlock-contact-submit" type="submit">
+        <button className="warlock-contact-submit" type="button">
           {translate("components.send")}
         </button>
       </form>
