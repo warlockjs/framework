@@ -3,7 +3,7 @@ import { HomeLogo } from "./logo";
 export function HomeHeader() {
   return (
     <header className="warlock-nav">
-      <a className="warlock-brand" href="/" aria-label="Warlock.js home">
+      <a className="warlock-brand" href="/">
         <HomeLogo showVersion />
       </a>
       <nav className="warlock-nav-links" aria-label="Primary navigation">

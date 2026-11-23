@@ -14,17 +14,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `collectFiles()` takes `files`: project-relative files read next to the folders in `dirs`, such as a mobile app's `App.tsx` and `index.ts`.
 - `recommendedTestWorkers()` stays within the number of test databases when `WARLOCK_TEST_DATABASES` is set (or a count is passed as its third argument).
 - The database cache driver finds the unique index on `key` once (the one `cacheMigration` creates) and writes with one upsert when it exists. `upsert: true` forces the upsert, `upsert: false` keeps the read first, and with no index it logs a one-time hint naming `cacheMigration` and `upsert: true`.
+- Browser tests (`warlock e2e`) can fake the server: `page.mockRequests(rules)` answers matching requests with a fixed status and body, or fails them as unreachable, until `page.clearMocks()`. `page.setExtraHeaders(headers)` sends headers with every request of the page. New `MockRequestRule` type.
+- `warlock add grimoire` writes `/grimoire/screenshots/captured/` into `.gitignore`: the last captures of `@shows` scenes are not committed.
 
 ### Changed
 
-- The test request helpers (`testGet`, `testPost`, `actingAs`, ...) send to an HTTP server that starts in the same Vitest worker on the first request of a test file and closes with the file. It reads the worker's own database `<name>_<worker id>`, and mail, jobs and other fakes record in the worker. A port published by `startHttpTestServer()` in a `globalSetup` still takes precedence (that server runs in the main process and reads worker 1's database). `warlock add test` no longer creates `src/test-global-setup.ts` or a `globalSetup` entry.
+- The test request helpers (`testGet`, `testPost`, `actingAs`, ...) send to an HTTP server that starts in the same Vitest worker on the first request of a test file and closes with the file. It reads the worker's own database `<name>_<worker id>`, and mail, jobs and other fakes record in the worker. A port published by `startHttpTestServer()` in a `globalSetup` still takes precedence (that server runs in the main process and reads worker 1's database). In an API-only app `warlock add test` no longer creates `src/test-global-setup.ts` or a `globalSetup` entry. An app with `@warlock.js/web` keeps both: the worker's server does not start the web connector, so pages are served by the shared server, which still reads worker 1's database.
 
 ### Fixed
 
-- Test requests no longer read `<name>_test_1` for every worker: a user created in worker 2 is visible to a request made from worker 2.
+- Test requests no longer read `<name>_test_1` for every worker: a user created in worker 2 is visible to a request made from worker 2 (in an app without a shared `globalSetup` server).
+- The `database` cache driver works on PostgreSQL. `cacheMigration` created `expires_at` as a timestamp while the driver writes `expiresAt` in epoch milliseconds, an entry without a lifetime wrote `Infinity` into number columns, and a string or array value was not valid JSON for the `data` column, so every `set` failed. The migration now creates `expiresAt` as a big integer, an entry without a lifetime stores `null` for `ttl` and `expiresAt`, and SQL drivers store `data` as JSON text. An app that ran `cacheMigration` on PostgreSQL before drops the `cache` table and runs the migration again (the table could not have held entries).
 - `warlock dev` listens for the file watcher's `error` event: the error is logged, passed to `onFileError` subscribers, and the dev server keeps running.
-- Browser tests (`warlock e2e`) can fake the server: `page.mockRequests(rules)` answers matching requests with a fixed status and body, or fails them as unreachable, until `page.clearMocks()`. `page.setExtraHeaders(headers)` sends headers with every request of the page. New `MockRequestRule` type.
-- `warlock add grimoire` writes `/grimoire/screenshots/captured/` into `.gitignore`: the last captures of `@shows` scenes are not committed.
 
 ## 5.63.1 - 2026-11-22
 

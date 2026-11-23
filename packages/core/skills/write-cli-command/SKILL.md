@@ -254,7 +254,7 @@ warlock generate                         (alias: g)      — interactive picker
 | `swagger`     | `@warlock.js/swagger`                                                                                                                                                                                                    |
 | `postman`     | `@warlock.js/postman`                                                                                                                                                                                                    |
 | `herald`      | `@warlock.js/herald` + `amqplib` + types; ejects `src/config/communicator.ts`                                                                                                                                            |
-| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-global-setup.ts` / `test-setup.ts` / `vite.config.ts`                                                                                                                  |
+| `test`        | `vitest` + `@mongez/vite` + coverage; drops `test-setup.ts` / `vite.config.ts` (+ `test-global-setup.ts` in an app with `@warlock.js/web`)                                                                               |
 | `process`     | `@warlock.js/process` pinned to installed Core; typed config, supervisor export, recovery/shutdown lifecycle and optional devtools process panel                                                                         |
 | `devtools`    | `@warlock.js/devtools` as a dev dependency; `warlock dev` auto-loads its development dashboard at `/__warlock`                                                                                                           |
 

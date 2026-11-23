@@ -4,7 +4,7 @@ title: Design system
 status: shipped
 version: 1.0
 updated: 2026-11-23
-apps: []
+apps: [default]
 folders: [src/web/dev]
 origin: confirmed
 audience: [developers, designers]

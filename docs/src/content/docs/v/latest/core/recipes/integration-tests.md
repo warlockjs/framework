@@ -16,13 +16,19 @@ We'll test a `products` controller. Substitute your own module name as you read.
 pnpm warlock add test
 ```
 
-That command drops three files into the project:
+That command drops these files into the project:
 
 ```
-src/test-global-setup.ts    ← starts the HTTP server once per vitest run
 src/test-setup.ts           ← runs setupTest in each worker
-vite.config.ts              ← wires globalSetup + setupFiles, sets the include pattern
+vite.config.ts              ← wires setupFiles (and globalSetup in a web app), sets the include pattern
+src/test-global-setup.ts    ← apps with @warlock.js/web only: one shared server that also serves the pages
 ```
+
+In an API-only app the request helpers (`testGet`, `actingAs`, ...) start an HTTP server inside each
+Vitest worker on first use, and it reads that worker's database. That server does not start the web
+connector, so a web app keeps the shared server of `src/test-global-setup.ts` for its pages. The shared
+server runs in the main process and reads the database of worker 1: a test that needs it to see rows it
+wrote serves its routes with `createTestHttpServer()`, or the suite runs with `maxWorkers: 1`.
 
 It also adds `vitest`, `@vitest/coverage-v8`, `vite`, `@mongez/vite` to `devDependencies`, and registers four scripts in `package.json`:
 
@@ -81,7 +87,7 @@ extend the file that declares them by default, and repeating it inside a project
 makes Vitest warn `applies the same plugin multiple times`. Use `extends: true`
 (inherit, the generated layout) or `extends: false` (own plugins) explicitly.
 
-The split matters: `globalSetup` runs ONCE in the main vitest process (boots the HTTP server); `setupFiles` runs in each worker thread (gives each worker its own DB connection for direct calls).
+The split matters: `globalSetup` (web apps) runs ONCE in the main vitest process (boots the shared HTTP server); `setupFiles` runs in each worker thread (gives each worker its own DB connection for direct calls).
 
 ### Keep Vitest setup out of development
 

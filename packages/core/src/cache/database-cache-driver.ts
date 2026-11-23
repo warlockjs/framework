@@ -109,6 +109,23 @@ export class DatabaseCacheDriver
     return this.uniqueKeyIndex;
   }
 
+  /**
+   * The value as the `data` column takes it. MongoDB stores the value itself; a
+   * SQL `json` column takes JSON text (a bare string, or an array, is not valid
+   * JSON as a parameter), and reads back the parsed value.
+   */
+  protected storedData(value: unknown): unknown {
+    let driver: string | undefined;
+
+    try {
+      driver = this.model.getDriver().name;
+    } catch {
+      return value;
+    }
+
+    return driver === "mongodb" ? value : JSON.stringify(value === undefined ? null : value);
+  }
+
   /** Tell, once per process, how to get one write per `set`. */
   protected showUpsertHint(): void {
     if (upsertHintShown) return;
@@ -158,11 +175,15 @@ export class DatabaseCacheDriver
     const keyParts = parsedKey.split(".");
     const namespace = keyParts.slice(0, -1).join(".") || parsedKey;
 
-    const expiresAt = this.getExpiresAt(ttl) || null;
+    // An entry without a lifetime has ttl (and expiry) Infinity, which a number column cannot hold: null.
+    const expires = this.getExpiresAt(ttl);
+    const expiresAt = typeof expires === "number" && Number.isFinite(expires) ? expires : null;
+    const storedTtl = typeof ttl === "number" && Number.isFinite(ttl) ? ttl : null;
+    const data = this.storedData(value);
 
     if (await this.usesUpsert()) {
       // One statement; relies on the unique index on `key`.
-      const row = { key: parsedKey, namespace, data: value, ttl, expiresAt };
+      const row = { key: parsedKey, namespace, data, ttl: storedTtl, expiresAt };
 
       await this.model.upsert({ key: parsedKey }, row, { conflictColumns: ["key"] });
     } else {
@@ -172,13 +193,13 @@ export class DatabaseCacheDriver
       if (cacheEntry) {
         // Update existing entry
         cacheEntry.set("namespace", namespace);
-        cacheEntry.set("data", value);
-        cacheEntry.set("ttl", ttl);
+        cacheEntry.set("data", data);
+        cacheEntry.set("ttl", storedTtl);
         cacheEntry.set("expiresAt", expiresAt);
         await cacheEntry.save();
       } else {
         // Create new entry
-        await this.model.create({ key: parsedKey, namespace, data: value, ttl, expiresAt });
+        await this.model.create({ key: parsedKey, namespace, data, ttl: storedTtl, expiresAt });
       }
     }
 
@@ -212,8 +233,9 @@ export class DatabaseCacheDriver
 
     const data: CacheData = {
       data: row.data,
-      expiresAt: (row.expiresAt ?? undefined) as number | undefined,
-      ttl: (row.ttl ?? undefined) as number | undefined,
+      // PostgreSQL returns a bigint column as a string.
+      expiresAt: row.expiresAt == null ? undefined : Number(row.expiresAt),
+      ttl: row.ttl == null ? undefined : Number(row.ttl),
     };
 
     return this.parseCachedData(parsedKey, data);

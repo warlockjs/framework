@@ -209,7 +209,7 @@ The snapshot is `{ status, contentType, body }`; redacted paths read `"[redacted
 
 ## Project wiring — `src/test-setup.ts` + `vite.config.ts`
 
-`warlock add test` creates `src/test-setup.ts` and `vite.config.ts` without a `globalSetup`. Add one only for the shared-server case above; its content is:
+`warlock add test` creates `src/test-setup.ts` and `vite.config.ts`. In an app with `@warlock.js/web` it also creates `src/test-global-setup.ts` and its `globalSetup` line, because the worker's own server does not start the web connector (a page answers 404 there); the shared server serves the pages. In an API-only app add one only for the shared-server case above; its content is:
 
 ```ts title="src/test-global-setup.ts"
 /**
@@ -250,7 +250,7 @@ Both files (and this config, with `lowerStage3Decorators()` first so decorated m
 
 **So the service-layer framework is file-scoped: bootstrapped by `setupTest` and closed by the `afterAll(teardownTest)` the setup file registers, once per test file.** ⚠ **`setupTest` alone is not the whole wiring — the paired teardown is mandatory from 4.14.0**; see the `test-service` skill.
 
-**HTTP requests go to a server in the same worker** (started on the first request), so it sees the worker's database; `globalSetup` is only for the shared-server case.
+**HTTP requests go to a server in the same worker** (started on the first request), so it sees the worker's database; `globalSetup` is only for the shared-server case, which a web app uses for its pages.
 
 ### Keep Vitest setup out of development
 

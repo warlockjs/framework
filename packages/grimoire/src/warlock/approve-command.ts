@@ -37,6 +37,15 @@ function print(
     return;
   }
 
+  // The first approval writes the whole current state as the baseline.
+  if (verb === "approved" && done.length === 1 && done[0] === "baseline") {
+    context.io.out(
+      "created the approved baseline from the current state (grimoire/approved/baseline.json)",
+    );
+
+    return;
+  }
+
   for (const id of done) context.io.out(id);
 
   context.io.out(`${verb} ${done.length}`);

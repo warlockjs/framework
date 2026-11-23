@@ -21,7 +21,8 @@ export const cacheMigration = migrate(CacheModel, {
     this.text("namespace").index();
     this.json("data").nullable();
     this.integer("ttl").nullable();
-    this.timestamp("expires_at").index().nullable();
+    // Epoch milliseconds, the field name the driver writes and reads.
+    this.bigInteger("expiresAt").index().nullable();
 
     this.timestamps();
   },

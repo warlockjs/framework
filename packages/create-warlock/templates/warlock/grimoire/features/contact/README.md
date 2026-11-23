@@ -4,7 +4,7 @@ title: Contact form
 status: shipped
 version: 1.0
 updated: 2026-11-23
-apps: []
+apps: [default]
 folders: [src/app/contact]
 origin: confirmed
 audience: [visitors]

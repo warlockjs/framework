@@ -24,7 +24,61 @@ async function usesGrimoire(): Promise<boolean> {
   }
 }
 
+/**
+ * True when the app lists `@warlock.js/web`. Its pages are served by the web
+ * connector, which only the shared server of `startHttpTestServer()` starts, so
+ * such an app keeps a `globalSetup` (`warlock add web test` records web's
+ * dependencies before this step runs).
+ */
+async function usesWeb(): Promise<boolean> {
+  try {
+    return (await getFileAsync(rootPath("package.json"))).includes('"@warlock.js/web"');
+  } catch {
+    return false;
+  }
+}
+
+/** `src/test-global-setup.ts` of an app with web pages: one shared server that also serves the pages. */
+const WEB_GLOBAL_SETUP = `/**
+ * Global Test Setup (web apps)
+ *
+ * Runs ONCE in Vitest's main process. It starts one shared HTTP server with the
+ * web connector, so request helpers (testGet, actingAs, ...) can load pages as
+ * well as API routes; while its port is published they send to it instead of the
+ * server each worker starts on its own.
+ *
+ * The shared server runs in the main process and reads the database of worker 1.
+ * A test that needs the server to see rows it wrote itself runs with one worker
+ * (\`maxWorkers: 1\`) or serves its routes with createTestHttpServer() in the test.
+ *
+ * port: 0 lets the OS pick a free port, so tests run while \`warlock dev\` holds
+ * the configured one.
+ */
+import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core/tests";
+
+export async function setup() {
+  await startHttpTestServer({ port: 0 });
+}
+
+export async function teardown() {
+  await stopHttpTestServer();
+}
+`;
+
 async function completeTestInstallation(options: CommandActionData) {
+  const web = await usesWeb();
+
+  if (web) {
+    const testGlobalSetupPath = srcPath("test-global-setup.ts");
+
+    if (!(await fileExistsAsync(testGlobalSetupPath))) {
+      await putFileAsync(testGlobalSetupPath, WEB_GLOBAL_SETUP);
+      console.log(`${colors.green("✓")} Created src/test-global-setup.ts`);
+    } else {
+      recordSkippedFile(testGlobalSetupPath, "exists");
+    }
+  }
+
   // Create test-setup.ts (runs before EVERY test file)
   const testSetupPath = srcPath("test-setup.ts");
   const testSetupExists = await fileExistsAsync(testSetupPath);
@@ -37,7 +91,8 @@ async function completeTestInstallation(options: CommandActionData) {
  *
  * The request helpers (testGet, testPost, actingAs, ...) send to an HTTP server that
  * starts inside the same Vitest worker, on first use, and reads the worker's own
- * database. No global server is needed.
+ * database. An app with web pages also has src/test-global-setup.ts: its shared
+ * server serves the pages, and the helpers use it while it runs.
  *
  * Vitest runs setupFiles before each test file. With the generated
  * src/config/tests.ts (lifetime: "worker") the framework boots once per Vitest
@@ -170,7 +225,13 @@ export default defineConfig({
           // Worker lifetime shares one module graph per fork, so it needs isolate: false.
           // WARLOCK_TEST_LIFETIME=file switches both back (see src/config/tests.ts).
           isolate: process.env.WARLOCK_TEST_LIFETIME === "file",
-          runner: "./src/test-runner.ts",
+          runner: "./src/test-runner.ts",${
+            web
+              ? `
+          // Pages need the web connector: one shared server, started once (see the file).
+          globalSetup: "./src/test-global-setup.ts",`
+              : ""
+          }
           setupFiles: ["./src/test-setup.ts"],
           include: [
             "src/**/*.{spec,test}.ts",

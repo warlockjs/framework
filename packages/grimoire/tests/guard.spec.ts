@@ -11,6 +11,7 @@ import type { GuardReport } from "../src/contracts";
 import { GRIMOIRE_IGNORE_RULES } from "../src/paths";
 import { openGrimoire } from "../src/workspace";
 import { runApproveApi } from "../src/warlock/api-command";
+import { runApprove } from "../src/warlock/approve-command";
 import { runGuard } from "../src/warlock/guard-command";
 import { createShopAdapter, shopFacts } from "./fixtures/shop-facts";
 import { copyFixture, type FixtureCopy } from "./support/copy-fixture";
@@ -310,5 +311,21 @@ describe("warlock grimoire approve api", () => {
 
     expect(out.join("\n")).toContain("GR7011");
     expect(out.join("\n")).toContain("removed GET /gone");
+  });
+});
+
+describe("warlock grimoire approve --all", () => {
+  it("says it created the baseline the first time", async () => {
+    const { root } = project();
+    const adapter = createShopAdapter();
+    const lines: string[] = [];
+    const io = { out: (line: string) => lines.push(line), err: (line: string) => lines.push(line) };
+
+    await openGrimoire(root, adapter, { routes: "fresh" });
+
+    expect(await runApprove({ root, adapter, io }, undefined, { all: true })).toBe(0);
+    expect(lines).toEqual([
+      "created the approved baseline from the current state (grimoire/approved/baseline.json)",
+    ]);
   });
 });

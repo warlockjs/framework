@@ -21,6 +21,7 @@ That command drops two files into the project:
 ```
 src/test-setup.ts           ← runs setupTest in each worker
 vite.config.ts              ← wires setupFiles, sets the include pattern
+src/test-global-setup.ts    ← apps with web pages only: one shared server that also serves the pages
 ```
 
 It also adds `vitest`, `@vitest/coverage-v8`, `vite`, `@mongez/vite` to `devDependencies`, and registers four scripts in `package.json`:
@@ -36,7 +37,8 @@ You don't need to edit any of the three generated files for a basic suite. The d
 
 ## Step 2 — Verify the bootstrap
 
-The generated files should look like this. Confirm they match before you write the first test:
+The generated files should look like this. Confirm they match before you write the first test.
+`src/test-global-setup.ts` and the `globalSetup` line exist only in an app with `@warlock.js/web`:
 
 ```ts title="src/test-global-setup.ts"
 import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core";
@@ -80,7 +82,7 @@ extend the file that declares them by default, and repeating it inside a project
 makes Vitest warn `applies the same plugin multiple times`. Use `extends: true`
 (inherit, the generated layout) or `extends: false` (own plugins) explicitly.
 
-The split matters: `globalSetup` runs ONCE in the main vitest process (boots the HTTP server); `setupFiles` runs in each worker thread (gives each worker its own DB connection for direct calls).
+The split matters: `globalSetup` (web apps) runs ONCE in the main vitest process (boots the shared HTTP server); `setupFiles` runs in each worker thread (gives each worker its own DB connection for direct calls).
 
 ### Keep Vitest setup out of development
 
@@ -94,9 +96,9 @@ if (process.env.VITEST) {
 
 ### One server per worker, or a shared one
 
-By default there is no global server. The first request helper call in a test file (`testGet`, `actingAs`, ...) starts an HTTP server inside the worker, on a free port, and the file's later calls reuse it. It reads the worker's own database, so a row created in worker 2 is visible to a request made in worker 2. The next file starts its own server.
+In an API-only app there is no global server. The first request helper call in a test file (`testGet`, `actingAs`, ...) starts an HTTP server inside the worker, on a free port, and the file's later calls reuse it. It reads the worker's own database, so a row created in worker 2 is visible to a request made in worker 2. The next file starts its own server.
 
-To share one server for the whole run (for example to serve web pages through Vite), start it in a `globalSetup` file with `startHttpTestServer()`, as below. While that server's port is published the helpers use it. It runs in the main process and reads the database of worker 1, so run such a suite with `maxWorkers: 1`.
+The worker's server serves the app's routes, not its web pages: it does not start the web connector, so a page answers 404 there. An app with `@warlock.js/web` therefore gets `src/test-global-setup.ts` from `warlock add test`: it starts one shared server with `startHttpTestServer()`, which also serves the pages. While that server's port is published the helpers use it. It runs in the main process and reads the database of worker 1, so a test that needs the server to see rows it wrote serves its routes with `createTestHttpServer()`, or the suite runs with `maxWorkers: 1`. Delete the file and the `globalSetup` line to use the worker servers in a web app whose tests never load a page.
 
 ### Running on a port of your own
 

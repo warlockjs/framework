@@ -18,11 +18,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- The starter's database config no longer describes a shared test server that reads worker 1's database. The test request helpers use a server per Vitest worker; set `WARLOCK_TEST_DATABASES` to the number of test databases so `recommendedTestWorkers()` never starts more workers than databases.
+- The starter's database config describes the test servers: the request helpers use a server per Vitest worker for API routes, the web starter's `src/test-global-setup.ts` server serves the pages and reads worker 1's database; set `WARLOCK_TEST_DATABASES` to the number of test databases so `recommendedTestWorkers()` never starts more workers than databases.
 - The project map paragraph of the starter `AGENTS.md` tells agents to search first (`scry --search "<the whole request>"`), then run `--impact` on the top hit and read the `changes with` lines, and to use grep only for literal text.
 
 ### Fixed
 
+- The starter's `contact` and `design-system` features name the web app (`apps: [default]`), so their page steps match the starter's pages instead of reporting `GR2002`.
+- The starter's brand link has no `aria-label` that hid its visible text (the accessibility check reported a label and content name mismatch).
 - The starter's home page styles use logical properties (`padding-inline-start`, `inset-inline-end`, `border-inline-start`), so the page lays out correctly in right-to-left languages; the two places that must stay physical carry a `grimoire-allow` comment.
 
 ## 5.63.0 - 2026-11-22
