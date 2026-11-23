@@ -1,6 +1,6 @@
 ---
 name: query-data
-description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, `.lean()` plain-object reads, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Covers filter safety: `where()` rejects `$`-prefixed keys (`UnsafeFilterError`), `whereRaw()` string form rejects `$where`/`$function`/`$accumulator` (`UnsafeRawExpressionError`), and `whereLike`/`whereStartsWith`/`whereEndsWith`/`whereSearch` match string arguments literally (pass a `RegExp` for pattern semantics). Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `.whereLike`, `.whereRaw`, `.lean`, `UnsupportedLeanOperationError`, `addScope`, `escapeRegex`, `likePatternToRegexSource`, `UnsafeFilterError`, `UnsafeRawExpressionError`; "filter by status", "find by id", "fetch active users", "check existence", "search box query", "is where() safe from injection"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — the `paginate-results` topic; aggregates — the `aggregate-data` topic.'
+description: 'Query records via the model — `.where(field, value)` / `.where(field, op, value)`, `.find(id)` / `.first` / `.all`, `.orderBy`, `.count` / `.exists`, `.lean()` plain-object reads, plus `.whereIn` / `.whereBetween` / `.whereLike` / `.pluck` / `.firstOrFail` / scopes via `addScope`. Covers filter safety: `where()` rejects `$`-prefixed keys (`UnsafeFilterError`), `whereRaw()` string form rejects `$where`/`$function`/`$accumulator` (`UnsafeRawExpressionError`), and `whereLike`/`whereStartsWith`/`whereEndsWith`/`whereContains` match string arguments literally; `whereFullText`/`whereSearch` take `{ language, weights }` (PostgreSQL) and use the data source's `textSearchConfig` (pass a `RegExp` for pattern semantics). Triggers: `.where`, `.find`, `.first`, `.firstOrFail`, `.all`, `.get`, `.orderBy`, `.exists`, `.whereIn`, `.whereBetween`, `.whereLike`, `.whereRaw`, `.lean`, `UnsupportedLeanOperationError`, `addScope`, `escapeRegex`, `likePatternToRegexSource`, `UnsafeFilterError`, `UnsafeRawExpressionError`; "filter by status", "find by id", "fetch active users", "check existence", "search box query", "is where() safe from injection"; typical import `import { Model } from "@warlock.js/cascade"`. Skip: pagination — the `paginate-results` topic; aggregates — the `aggregate-data` topic.'
 ---
 
 # Query data
@@ -143,7 +143,8 @@ Cascade's query builder has around 60 methods. Reach for these as the need arise
 | `.whereNull(field)` / `.whereNotNull(field)`                                                                        | Nullability checks                                                                                                                                                                         |
 | `.whereBetween(field, [a, b])`                                                                                      | Inclusive range                                                                                                                                                                            |
 | `.whereDate(field, value)`, `.whereDateBetween`, `.whereDateBefore`, `.whereDateAfter`                              | Date helpers                                                                                                                                                                               |
-| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereSearch`                               | Pattern matching — see below for literal-vs-regex semantics                                                                                                                                |
+| `.whereLike(field, pattern)` / `.whereStartsWith` / `.whereEndsWith` / `.whereContains(field, value)`              | Pattern / substring matching — see below for literal-vs-regex semantics                                                                                                                    |
+| `.whereFullText(fields, query, { language?, weights? })` / `.orWhereFullText` / `.whereSearch(field, query, options?)` | Full-text search — see "Full-text search" below                                                                                                                                         |
 | `.whereHas(relation, callback)`                                                                                     | Filter by conditions on a related model (both drivers; on MongoDB a write cannot carry a relation filter — `pluck` the ids first)                                                          |
 | `.sum(field)` / `.avg(field)` / `.min(field)` / `.max(field)`                                                       | Aggregates — the `aggregate-data` topic                                                                                                                                                    |
 | `.distinct(field)` / `.pluck(field)`                                                                                | Single-field reads (distinct values, flat list)                                                                                                                                            |
@@ -155,14 +156,16 @@ Cascade's query builder has around 60 methods. Reach for these as the need arise
 
 Each chains off `User.where(...)` or `User.query()` and ends with the appropriate terminator. (`where`, `with`, `joinWith`, `first`, `count`, `find`, `all`, `paginate` are static shortcuts on the model; the rest live on the query builder, so reach them via `User.query()` or by chaining off a static `where`.)
 
-### `whereLike` / `whereSearch` — string arguments match literally
+### `whereLike` / `whereContains` — string arguments match literally
 
 ```ts
 await User.where(...).whereLike("email", "%@gmail.com").get();      // literal, % still wildcards
-await User.query().whereSearch("name", req.query.q).get();          // safe with raw user input
+await User.query().whereContains("name", req.query.q).get();        // safe with raw user input, no wildcards at all
 ```
 
-A **string** argument to `whereLike`/`whereNotLike`/`whereStartsWith`/`whereEndsWith` (and their `Not` variants) and the `$regex` form of `whereSearch` is escaped and matched as a **literal substring** — the SQL `LIKE` wildcard `%` still expands (to `.*`, runs of `%` collapse), but every other regex metacharacter (`.`, `*`, `+`, `^`, `$`, …) in the string is neutralized. On MongoDB a string pattern may hold at most two `%` wildcards and 256 characters (enough for `%term%`, `prefix%`, `%suffix`); more throws `UnsafeFilterError`. Raise the caps with the data source's `driverOptions: { like: { maxWildcards, maxLength } }`. This is what makes `whereSearch("name", req.query.q)` safe to wire directly to a search box: before this, a user-controlled string compiled straight into a MongoDB `$regex`, so `^.*$` matched everything, `^a`/`^b`/… probed a value back one character at a time, and a nested-quantifier pattern like `(a+)+$` triggered catastrophic backtracking (ReDoS) against every scanned document.
+`whereContains(field, value)` / `orWhereContains` is a case-insensitive substring match where `%`, `_` and `\` in the value are plain characters (PostgreSQL `ILIKE … ESCAPE`, MongoDB escaped `$regex`). Use it for search boxes and partial words in any language.
+
+A **string** argument to `whereLike`/`whereNotLike`/`whereStartsWith`/`whereEndsWith` (and their `Not` variants) is escaped and matched as a **literal substring** — the SQL `LIKE` wildcard `%` still expands (to `.*`, runs of `%` collapse), but every other regex metacharacter (`.`, `*`, `+`, `^`, `$`, …) in the string is neutralized. On MongoDB a string pattern may hold at most two `%` wildcards and 256 characters (enough for `%term%`, `prefix%`, `%suffix`); more throws `UnsafeFilterError`. Raise the caps with the data source's `driverOptions: { like: { maxWildcards, maxLength } }`. This is what makes `whereContains("name", req.query.q)` safe to wire directly to a search box: before this, a user-controlled string compiled straight into a MongoDB `$regex`, so `^.*$` matched everything, `^a`/`^b`/… probed a value back one character at a time, and a nested-quantifier pattern like `(a+)+$` triggered catastrophic backtracking (ReDoS) against every scanned document.
 
 An explicit **`RegExp`** argument is still used as a pattern (verbatim, no escaping) — that's how you get real regex semantics — but a `RegExp` can't arrive as JSON, so it only reaches these calls when a developer constructs it in code. **Never build that `RegExp` from user input**; if you need dynamic pattern matching, escape the dynamic parts yourself with the exported `escapeRegex(value)` / `likePatternToRegexSource(pattern)` helpers.
 
@@ -171,6 +174,16 @@ import { escapeRegex, likePatternToRegexSource } from "@warlock.js/cascade";
 ```
 
 The Postgres driver was already parameterized (`ILIKE $1`) and is unaffected either way.
+
+### Full-text search — `whereFullText` / `whereSearch`
+
+```ts
+await Post.query().whereFullText(["title", "body"], "shipment").get();
+await Post.query().whereSearch("title", "الخامس", { language: "simple" }).get();   // PostgreSQL language
+await Post.query().whereFullText(["title", "body"], q, { weights: { title: "A", body: "B" } }).get();
+```
+
+`whereSearch(field, query, options?)` is `whereFullText` with one field; it is NOT pattern matching. On **PostgreSQL** it is stemmed whole-word search (`to_tsvector(language, …) @@ plainto_tsquery(language, …)`), so a partial word does not match. On **MongoDB** it is `$text` over the collection's text index (the field does not narrow the search) and `options` are ignored. The PostgreSQL language is `options.language`, else the data source's `driverOptions: { textSearchConfig }`, else `"english"`; use `"simple"` for non-English apps. `createFullTextIndex` / `addFullText` use the same default, so give the query and the index the same language. The name must be a plain identifier (`safeTextSearchConfig(value, fallback?)`, exported from the PostgreSQL dialect module, enforces it and falls back to the default). For partial words use `whereContains`. `textSearch(query, filters)`'s second argument is equality filters, not options.
 
 ## Scopes — reusable query fragments
 
@@ -202,7 +215,7 @@ const activeUsers = await User.query().scope("active").get();
 - Don't `Model.all()` without a filter on a production table — use pagination or chunking.
 - Don't `!` away the null from `.find()` / `.first()` — handle the missing case explicitly or use `.firstOrFail()` when absence is a real error.
 - Don't write the same filter chain across multiple services — promote it to a scope.
-- Don't build a `RegExp` for `whereLike`/`whereSearch` out of user input — a string argument is already safely escaped; a raw `RegExp` bypasses that and reintroduces the injection/ReDoS risk it closes.
+- Don't build a `RegExp` for `whereLike` out of user input — a string argument is already safely escaped; a raw `RegExp` bypasses that and reintroduces the injection/ReDoS risk it closes.
 - Don't reach for `whereRaw()` string mode on MongoDB expecting it to still work — it now throws `UnsafeRawExpressionError`; use the object form (`whereRaw({ $expr: … })`).
 
 ## See also

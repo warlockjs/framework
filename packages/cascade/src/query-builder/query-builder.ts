@@ -28,6 +28,7 @@
  */
 
 import type {
+  FullTextSearchOptions,
   GroupByInput,
   HavingInput,
   JoinOptions,
@@ -574,6 +575,33 @@ export class QueryBuilder<T = unknown> {
     return pattern instanceof RegExp ? { pattern: pattern.source, isRegExp: true } : { pattern };
   }
 
+  /**
+   * Case-insensitive substring match. The value is literal text: `%`, `_` and
+   * `\` are not wildcards (unlike a string given to `whereLike`).
+   *
+   * @example q.whereContains("title", "100%")
+   */
+  public whereContains(field: string, value: string | number): this {
+    this.addOperation("whereLike", {
+      field,
+      pattern: `%${value}%`,
+      value: String(value),
+      mode: "contains",
+    });
+    return this;
+  }
+
+  /** OR variant of `whereContains`. */
+  public orWhereContains(field: string, value: string | number): this {
+    this.addOperation("orWhereLike", {
+      field,
+      pattern: `%${value}%`,
+      value: String(value),
+      mode: "contains",
+    });
+    return this;
+  }
+
   /** Starts with a prefix (the value is literal text, `%` / `_` / `\` included). */
   public whereStartsWith(field: string, value: string | number): this {
     this.addOperation("whereLike", {
@@ -816,28 +844,49 @@ export class QueryBuilder<T = unknown> {
 
   /**
    * Full-text search across one or more fields.
+   *
+   * PostgreSQL: stemmed whole-word search with the given `language` (default:
+   * the data source's `textSearchConfig`, `"english"`) and optional per-field
+   * `weights`. MongoDB: `$text`; the options are ignored there.
+   *
    * @example q.whereFullText(["title", "body"], "typescript")
+   * @example q.whereFullText("title", "الخامس", { language: "simple" })
    */
-  public whereFullText(fields: string | string[], query: string): this {
-    this.addOperation("whereFullText", {
-      fields: Array.isArray(fields) ? fields : [fields],
-      query,
-    });
+  public whereFullText(
+    fields: string | string[],
+    query: string,
+    options?: FullTextSearchOptions,
+  ): this {
+    this.addOperation("whereFullText", this.fullTextData(fields, query, options));
     return this;
   }
 
   /** Full-text search (OR). */
-  public orWhereFullText(fields: string | string[], query: string): this {
-    this.addOperation("orWhereFullText", {
-      fields: Array.isArray(fields) ? fields : [fields],
-      query,
-    });
+  public orWhereFullText(
+    fields: string | string[],
+    query: string,
+    options?: FullTextSearchOptions,
+  ): this {
+    this.addOperation("orWhereFullText", this.fullTextData(fields, query, options));
     return this;
   }
 
   /** Alias for whereFullText with a single field. */
-  public whereSearch(field: string, query: string): this {
-    return this.whereFullText([field], query);
+  public whereSearch(field: string, query: string, options?: FullTextSearchOptions): this {
+    return this.whereFullText([field], query, options);
+  }
+
+  private fullTextData(
+    fields: string | string[],
+    query: string,
+    options?: FullTextSearchOptions,
+  ): Record<string, unknown> {
+    return {
+      fields: Array.isArray(fields) ? fields : [fields],
+      query,
+      ...(options?.language === undefined ? {} : { language: options.language }),
+      ...(options?.weights === undefined ? {} : { weights: options.weights }),
+    };
   }
 
   /**

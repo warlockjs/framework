@@ -41,6 +41,9 @@ export interface SqlDialectContract {
    */
   readonly name: string;
 
+  /** Default text-search configuration (PostgreSQL), used when a query gives no language. */
+  readonly textSearchConfig?: string;
+
   /**
    * Generate a parameter placeholder for the given index.
    *

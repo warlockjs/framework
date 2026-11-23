@@ -1,4 +1,5 @@
 import type { SqlDialectContract } from "../sql/sql-dialect.contract";
+import { safeTextSearchConfig } from "./postgres-dialect";
 import type { PendingOperation } from "../../migration/migration";
 import { SQLSerializer } from "../../migration/sql-serializer";
 import { rawDefaultSql } from "../../migration/raw-default";
@@ -384,7 +385,7 @@ export class PostgresSQLSerializer extends SQLSerializer {
     const quotedTable = this.dialect.quoteIdentifier(table);
     const indexName = options?.name ?? `idx_${table}_fulltext_${columns.join("_")}`;
     const quotedIndexName = this.dialect.quoteIdentifier(indexName);
-    const language = options?.language ?? "english";
+    const language = safeTextSearchConfig(options?.language, this.dialect.textSearchConfig);
 
     const tsvectors = columns.map((col) => {
       const weight = options?.weights?.[col] ?? "A";

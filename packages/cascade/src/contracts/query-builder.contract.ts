@@ -125,6 +125,14 @@ export type WhereOperator =
  */
 import type { GlobalScopeDefinition, LocalScopeCallback } from "../model/model";
 import type { AtomicUpdate, AtomicUpdateOptions, DriverContract } from "./database-driver.contract";
+
+/** Options of a full-text search (`whereFullText`, `orWhereFullText`, `whereSearch`). */
+export type FullTextSearchOptions = {
+  /** PostgreSQL text-search configuration, e.g. `"simple"`. Default: the data source's `textSearchConfig`. */
+  readonly language?: string;
+  /** PostgreSQL per-field weight, `A` (highest) to `D`. Default `A`. */
+  readonly weights?: Record<string, "A" | "B" | "C" | "D">;
+};
 export type WhereObject = Record<string, unknown>;
 
 /**
@@ -646,18 +654,40 @@ export interface QueryBuilderContract<T = unknown> {
 
   /**
    * Perform a full-text search across the specified fields.
+   *
+   * On PostgreSQL the options pick the text-search configuration
+   * (`language`, default: the data source's `textSearchConfig`, `"english"`)
+   * and the per-field weight (`A`..`D`). MongoDB `$text` uses the index's
+   * language, so the options are accepted and ignored there.
+   *
+   * @example
+   * query.whereFullText(["title", "body"], "shipment", { language: "simple" })
    */
-  whereFullText(fields: string | string[], query: string): this;
+  whereFullText(fields: string | string[], query: string, options?: FullTextSearchOptions): this;
 
   /**
    * Apply a full-text OR clause.
    */
-  orWhereFullText(fields: string | string[], query: string): this;
+  orWhereFullText(fields: string | string[], query: string, options?: FullTextSearchOptions): this;
 
   /**
-   * Convenience alias for simple text searches.
+   * Convenience alias for `whereFullText` with one field. On PostgreSQL it is
+   * stemmed whole-word full-text search; on MongoDB it is a case-insensitive
+   * substring match. Use `whereContains` for a substring match on both.
    */
-  whereSearch(field: string, query: string): this;
+  whereSearch(field: string, query: string, options?: FullTextSearchOptions): this;
+
+  /**
+   * Case-insensitive substring match. The value is literal text: `%`, `_` and
+   * `\` are not wildcards.
+   *
+   * @example
+   * query.whereContains('title', 'الخامس')
+   */
+  whereContains(field: string, value: string | number): this;
+
+  /** OR variant of `whereContains`. */
+  orWhereContains(field: string, value: string | number): this;
 
   /**
    * Negate a nested callback block.
@@ -874,10 +904,12 @@ export interface QueryBuilderContract<T = unknown> {
   whereSize(field: string, operator: ">" | ">=" | "=" | "<" | "<=", size: number): this;
 
   /**
-   * Perform a full-text search (driver-specific implementation).
+   * Perform a full-text search (driver-specific implementation). The second
+   * argument holds extra equality filters, not search options; use
+   * `whereFullText(fields, query, { language })` to choose a language.
    *
    * @example
-   * query.textSearch('javascript tutorial', { language: 'en' })
+   * query.textSearch('javascript tutorial', { status: 'published' })
    */
   textSearch(query: string, filters?: WhereObject): this;
 

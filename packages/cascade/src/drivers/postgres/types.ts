@@ -104,6 +104,16 @@ export type PostgresPoolConfig = PostgresConnectionConfig & {
    * @default undefined (no native-array columns)
    */
   readonly nativeArrayColumns?: readonly string[];
+  /**
+   * Default PostgreSQL text-search configuration for `whereFullText`,
+   * `orWhereFullText`, `whereSearch` and `createFullTextIndex` when the call
+   * gives no `language`. Use `"simple"` for apps whose text is not English
+   * (no stemming, no stop words). A plain identifier; anything else falls back
+   * to `"english"`.
+   *
+   * @default "english"
+   */
+  readonly textSearchConfig?: string;
 };
 
 /**

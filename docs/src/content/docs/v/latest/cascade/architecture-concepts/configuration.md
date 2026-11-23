@@ -170,6 +170,12 @@ connectToDatabase({
 // model.set("createdAt", …) writes "created_at"; Order.where("tenantId", id) queries "tenant_id"
 ```
 
+**`textSearchConfig`** sets the default PostgreSQL text-search configuration for `whereFullText`, `orWhereFullText`, `whereSearch` and `createFullTextIndex` / `addFullText` when a call gives no `language`. The default is `"english"`; use `"simple"` for apps whose text is not English. Because queries and indexes read the same default, the GIN index expression keeps matching the query.
+
+```ts
+driverOptions: { textSearchConfig: "simple" },
+```
+
 This is separate from [`namingConvention`](#namingconvention), which only names the columns Cascade generates for you (timestamps, foreign keys).
 
 **Session time zone.** Every Postgres connection starts with its session `TimeZone` pinned to `UTC`, because Cascade stores timestamps in UTC. Without this, date helpers (`groupByDate`, `whereDate`, `whereDateBetween`, `date_trunc`) and raw SQL such as `now()::date` follow the database server's own zone and can put rows near a month boundary in the wrong bucket. MongoDB's date helpers already default to UTC, so they need no option.
@@ -230,7 +236,7 @@ await connectToDatabase({
 
 Set a `statement_timeout` in production: without one, a runaway query holds its pool connection until it finishes, and a few of them drain the pool. `statement_timeout` is in milliseconds, cancels the statement on the server, and `0` or unset means no limit. A single query can still run as a named prepared statement with `query.prepare("name")` (see the [Query Builder API reference](../reference/query-builder-api.md#preparename-postgresql)).
 
-On Postgres every key you pass in `clientOptions` is forwarded to `pg.Pool` (and on to each `pg.Client`): `statement_timeout`, `query_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout`, `keepAliveInitialDelayMillis`, `allowExitOnIdle`, `client_encoding`, `types` and anything else `pg` accepts. Only Cascade's own keys (`naming`, `timezone`, `nativeArrayColumns`, `logging`) are kept out of the pool config; Cascade's pool defaults (`max`, `idleTimeoutMillis`, `connectionTimeoutMillis`, `keepAlive`, `application_name`) still apply when you don't set them.
+On Postgres every key you pass in `clientOptions` is forwarded to `pg.Pool` (and on to each `pg.Client`): `statement_timeout`, `query_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout`, `keepAliveInitialDelayMillis`, `allowExitOnIdle`, `client_encoding`, `types` and anything else `pg` accepts. Only Cascade's own keys (`naming`, `timezone`, `nativeArrayColumns`, `textSearchConfig`, `logging`) are kept out of the pool config; Cascade's pool defaults (`max`, `idleTimeoutMillis`, `connectionTimeoutMillis`, `keepAlive`, `application_name`) still apply when you don't set them.
 
 When in doubt about which option is Cascade's vs the native library's: Cascade-side options are documented in the `MongoDriverOptions` / Postgres types; everything else is the native library. The split keeps the API portable — same Cascade options on every driver, native escape hatch when you specifically need it.
 

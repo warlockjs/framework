@@ -1049,6 +1049,7 @@ export class MongoQueryParser {
         };
 
       case "whereLike":
+      case "orWhereLike":
         return {
           [field]: { $regex: this.buildLikeRegexSource(op.data, field), $options: "i" },
         };
@@ -1340,6 +1341,11 @@ export class MongoQueryParser {
    * @returns Regex source for `$regex`
    */
   private buildLikeRegexSource(data: any, field?: string): string {
+    // whereContains: the value is literal text, never a pattern
+    if (data.mode === "contains") {
+      return escapeRegex(String(data.value));
+    }
+
     if (data.isRegExp === true && typeof data.pattern === "string") {
       return data.pattern;
     }

@@ -652,26 +652,14 @@ export class PostgresQueryBuilder<T = unknown>
   /** Full-text search across the whole row, plus optional equality filters. */
   public override textSearch(query: string, filters?: WhereObject): this {
     const table = this.driver.dialect.quoteTableIdentifier(this.table);
+    const language = this.driver.dialect.textSearchConfig;
     this.addOperation("whereRaw", {
-      expression: `to_tsvector('english', ${table}::text) @@ plainto_tsquery('english', ?)`,
+      expression: `to_tsvector('${language}', ${table}::text) @@ plainto_tsquery('${language}', ?)`,
       bindings: [query],
     });
     if (filters) {
       for (const [key, value] of Object.entries(filters)) this.where(key, value as never);
     }
-    return this;
-  }
-
-  /** Full-text search (OR). */
-  public override orWhereFullText(fields: string | string[], query: string): this {
-    const list = Array.isArray(fields) ? fields : [fields];
-    const vectors = list
-      .map((f) => `to_tsvector('english', ${this.driver.dialect.quoteIdentifier(f)})`)
-      .join(" || ");
-    this.addOperation("orWhereRaw", {
-      expression: `(${vectors}) @@ plainto_tsquery('english', ?)`,
-      bindings: [query],
-    });
     return this;
   }
 

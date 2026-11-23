@@ -493,13 +493,14 @@ export async function transaction<T = any>(
 /** The Cascade-side Postgres driver options `driverOptions` may carry. */
 function pickPostgresDriverOptions(
   driverOptions: unknown,
-): Pick<PostgresPoolConfig, "naming" | "timezone"> {
-  const { naming, timezone } = (driverOptions ?? {}) as Partial<
-    Pick<PostgresPoolConfig, "naming" | "timezone">
+): Pick<PostgresPoolConfig, "naming" | "timezone" | "textSearchConfig"> {
+  const { naming, timezone, textSearchConfig } = (driverOptions ?? {}) as Partial<
+    Pick<PostgresPoolConfig, "naming" | "timezone" | "textSearchConfig">
   >;
 
   return {
     ...(naming === undefined ? {} : { naming }),
     ...(timezone === undefined ? {} : { timezone }),
+    ...(textSearchConfig === undefined ? {} : { textSearchConfig }),
   };
 }

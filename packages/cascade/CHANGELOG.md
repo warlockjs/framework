@@ -4,6 +4,23 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.64.0
+
+### Added
+
+- `whereFullText`, `orWhereFullText` and `whereSearch` take an options argument `{ language?, weights? }`. On PostgreSQL `language` picks the text-search configuration (for example `"simple"` for non-English text) and `weights` sets the per-field weight; MongoDB `$text` ignores both. The language was always `english` before, so Arabic and other non-English words never matched.
+- A PostgreSQL data source option `textSearchConfig` (default `"english"`, unchanged) sets the default text-search configuration for full-text queries and for `createFullTextIndex` / `addFullText`, so the index expression keeps matching the query. A value that is not a plain identifier falls back to the default; this also applies to a `language` given to an index.
+- `whereContains(field, value)` / `orWhereContains` match a case-insensitive substring where `%`, `_` and `\` are literal characters (PostgreSQL `ILIKE` with an `ESCAPE` clause, MongoDB an escaped case-insensitive regex).
+- The integration test harnesses (`startPostgresHarness`, `startMongodbHarness`) connect to an existing server when `LOCAL_PG_*` / `LOCAL_MONGO_*` are set, instead of starting a container (`tests/integration/README.md`).
+
+### Changed
+
+- `orWhereFullText` on PostgreSQL now goes through the same builder as `whereFullText` (NULL-safe vectors, same language handling), and `textSearch` uses the data source's default configuration.
+
+### Fixed
+
+- The contract's `textSearch` example no longer passes `{ language }` as if it were an option (the second argument is equality filters), and the docs and the `query-data` skill describe `whereSearch` as full-text search (stemmed whole words on PostgreSQL, `$text` on MongoDB) instead of pattern matching.
+
 ## 5.63.1 - 2026-11-22
 
 ### Fixed

@@ -2,6 +2,7 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testconta
 import { DataSource } from "../../../src/data-source/data-source";
 import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { PostgresDriver } from "../../../src/drivers/postgres";
+import { hasLocalPostgres, startLocalPostgresHarness } from "./local-postgres-harness";
 import type { PostgresQueryResult } from "../../../src/drivers/postgres/types";
 
 /**
@@ -33,8 +34,8 @@ export type PostgresHarnessOptions = {
  * lifecycle. Call `stop()` once in `afterAll`.
  */
 export type PostgresHarness = {
-  /** The started testcontainers Postgres instance. */
-  container: StartedPostgreSqlContainer;
+  /** The started testcontainers Postgres instance; `undefined` when `LOCAL_PG_*` points at an existing server. */
+  container?: StartedPostgreSqlContainer;
   /** The connected cascade PostgreSQL driver. */
   driver: PostgresDriver;
   /** The registered cascade data source wrapping the driver. */
@@ -62,6 +63,10 @@ export type PostgresHarness = {
  * Start a real Postgres container, connect a cascade data source to it, and
  * register that data source as the default so `Model` subclasses resolve to it
  * automatically.
+ *
+ * When `LOCAL_PG_DATABASE` and `LOCAL_PG_USER` are set, no container is
+ * started: the harness connects to that existing server instead (see
+ * `local-postgres-harness.ts`).
  *
  * The first call is slow (~50s) because Docker pulls the image and boots the
  * server; subsequent runs reuse the cached image. Always pair it with `stop()`
@@ -97,9 +102,16 @@ export type PostgresHarness = {
 export async function startPostgresHarness(
   options: PostgresHarnessOptions = {},
 ): Promise<PostgresHarness> {
-  const image = options.image ?? DEFAULT_POSTGRES_IMAGE;
   const dataSourceName = options.dataSourceName ?? "pg-test";
   const isDefault = options.isDefault ?? true;
+
+  // An existing server named by LOCAL_PG_* replaces the container: no Docker,
+  // and teardown only disconnects. See tests/integration/README.md.
+  if (hasLocalPostgres()) {
+    return startLocalPostgresHarness({ dataSourceName, isDefault, logging: options.logging });
+  }
+
+  const image = options.image ?? DEFAULT_POSTGRES_IMAGE;
 
   const container = await new PostgreSqlContainer(image)
     .withDatabase("cascade_test")

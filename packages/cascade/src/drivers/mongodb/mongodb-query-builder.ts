@@ -11,6 +11,7 @@ import type {
   CursorPaginationOptions,
   CursorPaginationResult,
   DriverQuery,
+  FullTextSearchOptions,
   GroupByInput,
   HavingInput,
   JoinOptions,
@@ -621,8 +622,14 @@ export class MongoQueryBuilder<T = unknown>
    * Performs full-text search on one or more fields.
    * @param fields - Field name or array of field names to search
    * @param query - The search query string
+   * @param _options - Accepted for parity with PostgreSQL and ignored: `$text` uses the
+   * language of the collection's text index.
    */
-  public whereFullText(fields: string | string[], query: string): this {
+  public whereFullText(
+    fields: string | string[],
+    query: string,
+    _options?: FullTextSearchOptions,
+  ): this {
     const filters = typeof fields === "string" ? { fields: [fields] } : { fields: fields ?? [] };
     this.operationsHelper.addMatchOperation("whereFullText", {
       fields: filters.fields,
@@ -635,8 +642,13 @@ export class MongoQueryBuilder<T = unknown>
    * Performs full-text search with OR logic.
    * @param fields - Field name or array of field names to search
    * @param query - The search query string
+   * @param _options - Accepted and ignored, see `whereFullText`.
    */
-  public orWhereFullText(fields: string | string[], query: string): this {
+  public orWhereFullText(
+    fields: string | string[],
+    query: string,
+    _options?: FullTextSearchOptions,
+  ): this {
     const filters = typeof fields === "string" ? { fields: [fields] } : { fields: fields ?? [] };
     this.operationsHelper.addMatchOperation("orWhereFullText", {
       fields: filters.fields,
@@ -646,12 +658,41 @@ export class MongoQueryBuilder<T = unknown>
   }
 
   /**
-   * Alias for `whereFullText()` with a single field.
+   * Alias for `whereFullText()` with a single field. On MongoDB this is a `$text`
+   * search over the collection's text index (the field only has to be indexed; it does
+   * not narrow the search). Use `whereContains()` for a substring match on one field.
    * @param field - The field name to search
    * @param query - The search query string
+   * @param options - Accepted and ignored, see `whereFullText`.
    */
-  public whereSearch(field: string, query: string): this {
-    return this.whereFullText(field, query);
+  public whereSearch(field: string, query: string, options?: FullTextSearchOptions): this {
+    return this.whereFullText(field, query, options);
+  }
+
+  /**
+   * Case-insensitive substring match. The value is literal text (regex-escaped).
+   * @param field - The field name to check
+   * @param value - The text the field must contain
+   */
+  public whereContains(field: string, value: string | number): this {
+    this.operationsHelper.addMatchOperation("whereLike", {
+      field,
+      pattern: `%${value}%`,
+      value: String(value),
+      mode: "contains",
+    });
+    return this;
+  }
+
+  /** OR variant of `whereContains`. */
+  public orWhereContains(field: string, value: string | number): this {
+    this.operationsHelper.addMatchOperation("orWhereLike", {
+      field,
+      pattern: `%${value}%`,
+      value: String(value),
+      mode: "contains",
+    });
+    return this;
   }
 
   /**

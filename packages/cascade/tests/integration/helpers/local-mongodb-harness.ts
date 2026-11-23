@@ -12,6 +12,15 @@ import { MongoDbDriver } from "../../../src/drivers/mongodb/mongodb-driver";
  * collections it is explicitly given, and on teardown disconnects without
  * touching the server.
  */
+export type LocalMongodbHarnessOptions = {
+  /** Data source name in the registry. Defaults to `"local-mongo-test"`. */
+  readonly dataSourceName?: string;
+  /** Register as the default data source. Defaults to `true`. */
+  readonly isDefault?: boolean;
+  /** Log commands. Defaults to `false`. */
+  readonly logging?: boolean;
+};
+
 export type LocalMongodbHarness = {
   readonly driver: MongoDbDriver;
   readonly dataSource: DataSource;
@@ -36,7 +45,9 @@ export function hasLocalMongodb(): boolean {
  * Connect a cascade MongoDB data source to the server named by
  * `LOCAL_MONGO_URI` / `LOCAL_MONGO_DATABASE` and register it as the default.
  */
-export async function startLocalMongodbHarness(): Promise<LocalMongodbHarness> {
+export async function startLocalMongodbHarness(
+  options: LocalMongodbHarnessOptions = {},
+): Promise<LocalMongodbHarness> {
   const uri = process.env.LOCAL_MONGO_URI;
   const database = process.env.LOCAL_MONGO_DATABASE;
 
@@ -49,13 +60,17 @@ export async function startLocalMongodbHarness(): Promise<LocalMongodbHarness> {
   const driver = new MongoDbDriver({
     uri,
     database,
-    logging: false,
+    logging: options.logging ?? false,
     clientOptions: { directConnection: true },
   });
 
   await driver.connect();
 
-  const dataSource = new DataSource({ name: "local-mongo-test", driver, isDefault: true });
+  const dataSource = new DataSource({
+    name: options.dataSourceName ?? "local-mongo-test",
+    driver,
+    isDefault: options.isDefault ?? true,
+  });
 
   dataSourceRegistry.register(dataSource);
 

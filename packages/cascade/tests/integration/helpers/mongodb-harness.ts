@@ -3,6 +3,7 @@ import type { Db } from "mongodb";
 import { DataSource } from "../../../src/data-source/data-source";
 import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { MongoDbDriver } from "../../../src/drivers/mongodb/mongodb-driver";
+import { hasLocalMongodb, startLocalMongodbHarness } from "./local-mongodb-harness";
 
 /**
  * Default MongoDB image. Pinned to a major tag so the harness is reproducible
@@ -44,8 +45,8 @@ export type MongodbHarnessOptions = {
  * lifecycle. Call `stop()` once in `afterAll`.
  */
 export type MongodbHarness = {
-  /** The started testcontainers MongoDB instance. */
-  container: StartedMongoDBContainer;
+  /** The started testcontainers MongoDB instance; `undefined` when `LOCAL_MONGO_URI` points at an existing server. */
+  container?: StartedMongoDBContainer;
   /** The connected cascade MongoDB driver. */
   driver: MongoDbDriver;
   /** The registered cascade data source wrapping the driver. */
@@ -65,6 +66,10 @@ export type MongodbHarness = {
  * Start a real MongoDB container, connect a cascade data source to it, and
  * register that data source as the default so `Model` subclasses resolve to it
  * automatically.
+ *
+ * When `LOCAL_MONGO_URI` and `LOCAL_MONGO_DATABASE` are set, no container is
+ * started: the harness connects to that existing server instead (see
+ * `local-mongodb-harness.ts`).
  *
  * The first call is slow because Docker pulls the image, boots the server, and
  * initializes the replica set; subsequent runs reuse the cached image. Always
@@ -93,10 +98,17 @@ export type MongodbHarness = {
 export async function startMongodbHarness(
   options: MongodbHarnessOptions = {},
 ): Promise<MongodbHarness> {
-  const image = options.image ?? DEFAULT_MONGODB_IMAGE;
-  const database = options.database ?? DEFAULT_DATABASE;
   const dataSourceName = options.dataSourceName ?? "mongo-test";
   const isDefault = options.isDefault ?? true;
+
+  // An existing server named by LOCAL_MONGO_* replaces the container: no
+  // Docker, and teardown only disconnects. See tests/integration/README.md.
+  if (hasLocalMongodb()) {
+    return startLocalMongodbHarness({ dataSourceName, isDefault, logging: options.logging });
+  }
+
+  const image = options.image ?? DEFAULT_MONGODB_IMAGE;
+  const database = options.database ?? DEFAULT_DATABASE;
 
   const container = await new MongoDBContainer(image).start();
 

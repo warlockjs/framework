@@ -13,10 +13,12 @@ sidebar:
 await Post.query().whereFullText(["title", "body"], "cascade orm").get();
 ```
 
-- **Postgres** — translates to a `to_tsquery(...)` match against the combined `to_tsvector(title || ' ' || body)`. Without a GIN index on that vector expression, it's a sequential scan.
+- **Postgres** — translates to a `plainto_tsquery(language, ...)` match against the combined `to_tsvector(language, title) || to_tsvector(language, body)`. Without a GIN index on that vector expression, it's a sequential scan. The language is the data source's `textSearchConfig` (default `"english"`); pass `{ language: "simple" }` as a third argument to override it for one call.
 - **MongoDB** — translates to `$text: { $search: "cascade orm" }`. Requires a text index on the relevant fields.
 
 The index lives in the migration; Cascade picks it up automatically once it exists. The [Migrations intro](../getting-started/04-migrations-intro.md) covers the column-builder syntax; consult your database's full-text docs for the specific index expression.
+
+Full-text search matches whole, stemmed words. For partial words (a search box that matches as you type, or non-English text where the `english` stemmer does not apply) set `textSearchConfig: "simple"` on the data source and/or use `whereContains(field, value)`, a case-insensitive literal substring match on both drivers.
 
 ## The search service
 

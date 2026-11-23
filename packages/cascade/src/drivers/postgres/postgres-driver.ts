@@ -118,6 +118,7 @@ export function buildPostgresPoolConfig(config: PostgresPoolConfig): PgPoolConfi
     naming: _naming,
     timezone: _timezone,
     nativeArrayColumns: _nativeArrayColumns,
+    textSearchConfig: _textSearchConfig,
     logging: _logging,
     ...passthrough
   } = config;
@@ -370,7 +371,10 @@ export class PostgresDriver implements DriverContract {
    * @param config - PostgreSQL connection configuration
    */
   public constructor(private readonly config: PostgresPoolConfig) {
-    this.dialect = new PostgresDialect({ naming: config.naming });
+    this.dialect = new PostgresDialect({
+      naming: config.naming,
+      textSearchConfig: config.textSearchConfig,
+    });
     this._nativeArrayColumns = new Set(config.nativeArrayColumns ?? []);
   }
 

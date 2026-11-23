@@ -164,8 +164,24 @@ await User.whereLike("name", "%john%").get();
 await User.whereStartsWith("email", "admin@").get();
 ```
 
+### `whereContains` / `orWhereContains`
+
+```ts
+whereContains(field: string, value: string | number): this
+orWhereContains(field: string, value: string | number): this
+```
+
+**What it does:** case-insensitive substring match where the value is literal text: `%`, `_` and `\` are not wildcards. PostgreSQL runs `ILIKE '%value%' ESCAPE '\'` with those characters escaped; MongoDB runs a case-insensitive `$regex` of the regex-escaped value. It matches partial words in any language, which full-text search does not (see below).
+
+```ts
+await Shipment.whereContains("title", "الخامس").get();
+await Product.whereContains("sku", "50%_off").get(); // matches the characters "50%_off" literally
+```
+
+It scans the column unless you add a trigram index on PostgreSQL, so prefer `whereFullText` for large tables when whole-word matching is enough.
+
 :::caution[A `string` pattern is matched LITERALLY]
-`whereLike`, `whereNotLike`, `whereStartsWith`/`whereNotStartsWith`, `whereEndsWith`/`whereNotEndsWith` — and the `$regex` form of `whereSearch` below — escape a `string` argument before matching, so it behaves as a literal substring, not a regex. The one wildcard that still expands is the SQL `LIKE` `%` (runs of `%` collapse into one `.*`, and a leading or trailing `%` is dropped because the match is a substring match anyway); every other regex metacharacter (`.`, `*`, `+`, `^`, `$`, `(`, `)`, …) in the string matches itself. This is what makes it safe to wire `whereSearch("name", req.query.q)` straight to a search box — before this, a raw string compiled directly into a MongoDB `$regex`, so a value like `^.*$` matched everything, `^a`/`^b`/… probed a field back one character at a time, and a pattern with nested quantifiers (`(a+)+$`) triggered catastrophic backtracking (ReDoS) against every scanned document.
+`whereLike`, `whereNotLike`, `whereStartsWith`/`whereNotStartsWith`, `whereEndsWith`/`whereNotEndsWith` escape a `string` argument before matching, so it behaves as a literal substring, not a regex. The one wildcard that still expands is the SQL `LIKE` `%` (runs of `%` collapse into one `.*`, and a leading or trailing `%` is dropped because the match is a substring match anyway); every other regex metacharacter (`.`, `*`, `+`, `^`, `$`, `(`, `)`, …) in the string matches itself. This is what makes it safe to wire `whereContains("name", req.query.q)` straight to a search box — before this, a raw string compiled directly into a MongoDB `$regex`, so a value like `^.*$` matched everything, `^a`/`^b`/… probed a field back one character at a time, and a pattern with nested quantifiers (`(a+)+$`) triggered catastrophic backtracking (ReDoS) against every scanned document.
 
 On MongoDB a string pattern may hold at most **two** `%` wildcards and **256** characters, which covers `%term%`, `prefix%` and `%suffix`; each extra wildcard multiplies the matching cost per document, so a longer pattern throws `UnsafeFilterError`. Raise the caps with the `like` driver option (`driverOptions: { like: { maxWildcards, maxLength } }`). A number argument matches its text form.
 
@@ -231,17 +247,32 @@ await User.whereIds([1, 2, 3]).get();
 ### `whereFullText` / `orWhereFullText` / `whereSearch` / `textSearch`
 
 ```ts
-whereFullText(fields: string | string[], query: string): this
-orWhereFullText(fields: string | string[], query: string): this
-whereSearch(field: string, query: string): this
+whereFullText(fields: string | string[], query: string, options?: FullTextSearchOptions): this
+orWhereFullText(fields: string | string[], query: string, options?: FullTextSearchOptions): this
+whereSearch(field: string, query: string, options?: FullTextSearchOptions): this
 textSearch(query: string, filters?: WhereObject): this
+
+type FullTextSearchOptions = {
+  language?: string; // PostgreSQL text-search configuration
+  weights?: Record<string, "A" | "B" | "C" | "D">; // PostgreSQL per-field weight, default "A"
+};
 ```
 
-**What it does:** full-text search variants. `whereFullText` constrains specific fields; `textSearch` does a driver-native full-text query with optional filters.
+**What it does:** full-text search variants. `whereFullText` constrains specific fields; `whereSearch(field, query)` is `whereFullText` with one field; `textSearch` does a driver-native full-text query with extra equality filters (its second argument is a filter object, not search options).
 
 ```ts
 await Post.whereFullText(["title", "body"], "cascade orm").get();
+await Post.whereSearch("title", "الخامس", { language: "simple" }).get();
 ```
+
+What it means on each driver:
+
+- **PostgreSQL:** stemmed, whole-word full-text search: `to_tsvector(language, column) @@ plainto_tsquery(language, query)`. The stemmer and stop-word list come from the text-search configuration, so with the default `english` configuration a query for `shipments` matches `shipment`, but a partial word (`الخامس` inside `الخامسة`, `ship` inside `shipment`) does not match.
+- **MongoDB:** `$text` over the collection's text index. The field you name does not narrow the search (every field in the text index is searched), and the collection needs a text index. The `options` are accepted and ignored: `$text` uses the language of the index.
+
+**Picking the language (PostgreSQL).** Pass `{ language }` per call, or set the data source's default once with the `textSearchConfig` option (`driverOptions: { textSearchConfig: "simple" }`). The default is `"english"`. Use `"simple"` for apps whose text is not English (or mixed languages): it lowercases and splits into words without stemming or stop words. Any other configuration installed in the database works too (`"spanish"`, `"german"`, ...); the name must be a plain identifier, anything else falls back to the default. `createFullTextIndex` / `addFullText` use the same default when no `language` is given, so the index expression keeps matching the query. A query that names a different language than the index was built with still works but cannot use the index, so pass the same language on both sides.
+
+**Partial words.** Full-text search matches whole words. For a substring match (a search box that matches as you type, Arabic or other text where stemming does not fit), use [`whereContains`](#wherecontains--orwherecontains).
 
 ### `whereNot(...)` / `orWhereNot(...)`
 

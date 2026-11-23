@@ -14,7 +14,19 @@ import { camelToSnake } from "./naming";
 
 export type PostgresNaming = "preserve" | "snake_case";
 
-export type PostgresDialectOptions = { readonly naming?: PostgresNaming };
+export type PostgresDialectOptions = {
+  readonly naming?: PostgresNaming;
+  /** Default text-search configuration for full-text queries and indexes. @default "english" */
+  readonly textSearchConfig?: string;
+};
+
+/**
+ * A text-search configuration name that is safe to inline in SQL; anything but
+ * a plain identifier falls back to `fallback`.
+ */
+export function safeTextSearchConfig(value: unknown, fallback = "english"): string {
+  return typeof value === "string" && /^[a-z_][a-z0-9_]*$/i.test(value) ? value : fallback;
+}
 
 /**
  * PostgreSQL-specific SQL dialect implementation.
@@ -38,8 +50,15 @@ export type PostgresDialectOptions = { readonly naming?: PostgresNaming };
 export class PostgresDialect implements SqlDialectContract {
   private readonly naming: PostgresNaming;
 
+  /**
+   * Text-search configuration used by `whereFullText` / `whereSearch` and
+   * `createFullTextIndex` when no language is given.
+   */
+  public readonly textSearchConfig: string;
+
   public constructor(options: PostgresDialectOptions = {}) {
     this.naming = options.naming ?? "preserve";
+    this.textSearchConfig = safeTextSearchConfig(options.textSearchConfig);
   }
   /**
    * Dialect name identifier.

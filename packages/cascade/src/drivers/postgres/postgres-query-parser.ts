@@ -15,7 +15,7 @@ import type {
 } from "../../contracts/query-builder.contract";
 import type { SqlDialectContract } from "../sql/sql-dialect.contract";
 import { JSON_PATH_PLACEHOLDER, type JsonPathOperand } from "../../query-builder/json-path-operand";
-import { escapeSqlLiteral, PostgresDialect } from "./postgres-dialect";
+import { escapeSqlLiteral, PostgresDialect, safeTextSearchConfig } from "./postgres-dialect";
 
 /** Allowed `::cast` type names, e.g. `int`, `numeric(10,2)`, `text[]`. */
 const SAFE_CAST_PATTERN = /^[a-z_][a-z0-9_ ]*(\(\d+(,\d+)?\))?(\[\])?$/i;
@@ -87,6 +87,7 @@ export type PostgresOperationType =
   | "orWhereNotNull"
   | "orWhereBetween"
   | "whereLike"
+  | "orWhereLike"
   | "whereNotLike"
   | "whereColumn"
   | "orWhereColumn"
@@ -101,6 +102,7 @@ export type PostgresOperationType =
   | "whereJsonContains"
   | "whereJsonDoesntContain"
   | "whereFullText"
+  | "orWhereFullText"
   // SELECT operations
   | "select"
   | "selectRaw"
@@ -461,6 +463,9 @@ export class PostgresQueryParser {
       case "whereLike":
         this.processWhereLike(data, false);
         break;
+      case "orWhereLike":
+        this.processWhereLike(data, false, "OR");
+        break;
       case "whereNotLike":
         this.processWhereLike(data, true);
         break;
@@ -477,7 +482,10 @@ export class PostgresQueryParser {
         this.processWhereJsonContains(data, true);
         break;
       case "whereFullText":
-        this.processWhereFullText(data);
+        this.processWhereFullText(data, "AND");
+        break;
+      case "orWhereFullText":
+        this.processWhereFullText(data, "OR");
         break;
       case "whereNot":
         this.processNested(data.nested, "AND", true, type);
@@ -930,7 +938,8 @@ export class PostgresQueryParser {
    *
    * Cross-driver semantics (matches MongoDB): `%` is the only wildcard, `_`
    * and backslash are literal, and a pattern with no `%` matches as a
-   * substring. `startsWith` / `endsWith` anchor the escaped text explicitly.
+   * substring. `startsWith` / `endsWith` / `contains` take the value as
+   * literal text (`%` escaped too) and anchor it explicitly.
    * A `RegExp` has no SQL equivalent and is rejected.
    */
   private processWhereLike(
@@ -940,7 +949,7 @@ export class PostgresQueryParser {
     modeArg?: "startsWith" | "endsWith",
   ): void {
     const field = data.field as string;
-    const mode = modeArg ?? (data.mode as "startsWith" | "endsWith" | undefined);
+    const mode = modeArg ?? (data.mode as "startsWith" | "endsWith" | "contains" | undefined);
 
     // A RegExp maps to the POSIX case-insensitive match operators
     if (data.isRegExp === true || (data.pattern as unknown) instanceof RegExp) {
@@ -976,6 +985,8 @@ export class PostgresQueryParser {
       finalPattern = `${escaped}%`;
     } else if (mode === "endsWith") {
       finalPattern = `%${escaped}`;
+    } else if (mode === "contains") {
+      finalPattern = `%${escaped}%`;
     } else if (!escaped.includes("%")) {
       finalPattern = `%${escaped}%`;
     }
@@ -1018,15 +1029,15 @@ export class PostgresQueryParser {
     this.addWhereClause(`${quotedPath} ${operator} ${placeholder}::jsonb`, "AND");
   }
 
-  /** Text search config name; anything but a plain identifier falls back to english. */
+  /** Text search config name; anything but a plain identifier falls back to the dialect default. */
   private safeLanguage(language: unknown): string {
-    return typeof language === "string" && /^[a-z_]+$/i.test(language) ? language : "english";
+    return safeTextSearchConfig(language, this.dialect.textSearchConfig);
   }
 
   /**
    * Process full-text search WHERE.
    */
-  private processWhereFullText(data: Record<string, unknown>): void {
+  private processWhereFullText(data: Record<string, unknown>, boolean: "AND" | "OR"): void {
     const fields = data.fields as string[];
     const query = data.query as string;
     const language = this.safeLanguage(data.language);
@@ -1043,7 +1054,7 @@ export class PostgresQueryParser {
       .join(" || ");
 
     const placeholder = this.addParam(query);
-    this.addWhereClause(`(${tsVectors}) @@ plainto_tsquery('${language}', ${placeholder})`, "AND");
+    this.addWhereClause(`(${tsVectors}) @@ plainto_tsquery('${language}', ${placeholder})`, boolean);
   }
 
   /**
