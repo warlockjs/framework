@@ -113,6 +113,6 @@ describe("whereContains (PostgreSQL)", () => {
   it("has an OR variant", () => {
     const { query } = queryFor().where("a", 1).orWhereContains("title", "x").parse();
 
-    expect(query).toContain(' OR "title" ILIKE');
+    expect(query).toContain(' OR "shipments"."title" ILIKE');
   });
 });

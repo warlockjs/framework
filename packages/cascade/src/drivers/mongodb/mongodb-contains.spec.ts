@@ -11,7 +11,7 @@ function query() {
 }
 
 const matchOf = (builder: MongoQueryBuilder<any>) =>
-  (builder.parse().query as unknown as any[]).find((stage) => stage.$match)?.$match;
+  ((builder.parse() as any).pipeline as any[]).find((stage) => stage.$match)?.$match;
 
 describe("whereContains (MongoDB)", () => {
   it("builds a case-insensitive regex of the escaped value", () => {
