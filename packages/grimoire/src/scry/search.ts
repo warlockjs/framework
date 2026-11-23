@@ -16,15 +16,56 @@ import type { ScryHit, ScryHitType, ScryQuery } from "../contracts/scry";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import type { WrittenFeature, WrittenFlow } from "../contracts/written";
 
+/** An id such as `AC-5` is one word (`ac5`), so it never matches `ac` alone. */
+const ID_PATTERN = /\b([a-z]{1,5})-(\d+)\b/gi;
+
+/** Arabic words of five or more letters lose a leading article (`ال`, `وال`, `بال`, `لل`). */
+const ARABIC_ARTICLE = /^(?:وال|بال|لل|ال)/u;
+const ARABIC_WORD = /^\p{Script=Arabic}+$/u;
+const ARTICLE_MIN_LENGTH = 5;
+
+/**
+ * Letters without accents or marks, in one form: accents and Arabic vowel marks
+ * are dropped (which also unifies alef with hamza), tatweel is dropped, `ى` is
+ * `ي` and `ة` is `ه`, upper case is lower case.
+ */
+function foldText(text: string): string {
+  return text
+    .normalize("NFKD")
+    .replace(/[\p{M}\u0640]/gu, "")
+    .replace(/\u0649/g, "\u064A")
+    .replace(/\u0629/g, "\u0647");
+}
+
+/**
+ * The words of a text, one tokeniser for the query and the index: `catalog/new-arrivals.service.ts` →
+ * `catalog new arrivals service ts`; `AC-5` → `ac5`; `café` → `cafe`; `الشحنة` → `شحنه`.
+ */
+export function wordsOf(text: string): string[] {
+  return foldText(text)
+    .replace(ID_PATTERN, "$1$2")
+    .replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, "$1 $2")
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word !== "")
+    .map((word) =>
+      word.length >= ARTICLE_MIN_LENGTH && ARABIC_WORD.test(word)
+        ? word.replace(ARABIC_ARTICLE, "")
+        : word,
+    );
+}
+
 /**
  * Words that carry no meaning in a sentence and are left out of the query and the
  * index. The set is extendable: add words before the first search of a process.
  */
-export const SCRY_STOP_WORDS: Set<string> = new Set(
-  "the a an and or of to in on for with at by from is are was be been not no only its it their this that these those into through after before when then than so as has have had do does did can will should would via per if but also each any".split(
+export const SCRY_STOP_WORDS: Set<string> = new Set([
+  ..."the a an and or of to in on for with at by from is are was be been not no only its it their this that these those into through after before when then than so as has have had do does did can will should would via per if but also each any".split(
     " ",
   ),
-);
+  // Arabic: in, from, on, to, about, with, this (m, f), that, which (m, f), and, or.
+  ...wordsOf("في من على إلى عن مع هذا هذه ذلك الذي التي أو و"),
+]);
 
 /** BM25 term saturation. */
 const K1 = 1.2;
@@ -34,6 +75,10 @@ const B = 0.75;
 
 /** Field weights of the BM25F score. */
 const WEIGHT = { id: 3, exports: 2, about: 1, body: 1 } as const;
+
+/** File types that rank below code on an equal match, and by how much. */
+const LOW_RANK_FILE_TYPES: ReadonlySet<string> = new Set(["spec", "locale", "type"]);
+const LOW_RANK_FACTOR = 0.6;
 
 /** Added to the name level of features and flows, so written content ranks above files of the same match. */
 const WRITTEN_BOOST = 2;
@@ -71,6 +116,8 @@ type Candidate = {
   scored: boolean;
   /** A page or screen file: it outranks helper files on an equal score. */
   pageFile: boolean;
+  /** Multiplies the BM25F score: specs, locale files and type files rank below code. */
+  factor: number;
 };
 
 type Doc = {
@@ -82,6 +129,8 @@ type Doc = {
   titleText: string;
   titleWords: string[];
   boost: number;
+  /** Rank factor of the candidate. */
+  factor: number;
   /** Length of the weighted token list (0 when the document is not scored). */
   length: number;
   /** Tokens of the written parts, per part, for the `matched` text. */
@@ -95,22 +144,11 @@ type SearchIndex = {
   average: number;
 };
 
-/** An id such as `AC-5` is one word (`ac5`), so it never matches `ac` alone. */
-const ID_PATTERN = /\b([a-z]{1,5})-(\d+)\b/gi;
-
-/** Lower-case words: `catalog/new-arrivals.service.ts` → `catalog new arrivals service ts`; `AC-5` → `ac5`. */
-export function wordsOf(text: string): string[] {
-  return text
-    .replace(ID_PATTERN, "$1$2")
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .split(" ")
-    .filter((word) => word !== "");
-}
-
 /** Light stemming: `ies`, `ing`, `ed`, `es` and a plural `s` come off a longer word. */
 function stem(word: string): string {
+  // Stemming is Latin only.
+  if (!/^[a-z0-9]+$/.test(word)) return word;
+
   if (word.length > 4 && word.endsWith("ies")) return `${word.slice(0, -3)}y`;
   if (word.length > 5 && word.endsWith("ing")) return word.slice(0, -3);
   if (word.length > 4 && word.endsWith("ed")) return word.slice(0, -2);
@@ -218,6 +256,7 @@ function candidates(snapshot: GrimoireSnapshot): Candidate[] {
       body: extra.body ?? [],
       scored: extra.scored ?? true,
       pageFile: extra.pageFile ?? false,
+      factor: extra.factor ?? 1,
     });
   };
 
@@ -299,6 +338,7 @@ function candidates(snapshot: GrimoireSnapshot): Candidate[] {
           .filter((entry) => entry.name !== "default" && entry.name !== "*")
           .map((entry) => entry.name),
         pageFile: pageFiles.has(file.file),
+        factor: LOW_RANK_FILE_TYPES.has(file.type) ? LOW_RANK_FACTOR : 1,
       },
     );
 
@@ -350,6 +390,7 @@ function buildIndex(snapshot: GrimoireSnapshot): SearchIndex {
       nameWords,
       titleText: titleWords.join(" "),
       titleWords,
+      factor: candidate.factor,
       boost: candidate.hit.type === "feature" || candidate.hit.type === "flow" ? WRITTEN_BOOST : 0,
       length: 0,
       bodyTokens,
@@ -459,6 +500,8 @@ export type SearchOutcome = {
   counts: Partial<Record<ScryHitType, number>>;
   /** Best first. */
   hits: ScryHit[];
+  /** The best hit is not a name match and holds fewer than half of the query's distinct words. */
+  weak: boolean;
 };
 
 /**
@@ -474,7 +517,7 @@ export function searchSnapshot(
   const words = wordsOf(query.text);
   const queryText = words.join(" ");
   const tokens = [...new Set(tokensOf(query.text))];
-  const outcome: SearchOutcome = { counts: {}, hits: [] };
+  const outcome: SearchOutcome = { counts: {}, hits: [], weak: false };
 
   if (tokens.length === 0) return outcome;
 
@@ -490,7 +533,8 @@ export function searchSnapshot(
     for (const [position, weighted] of list) {
       const length = index.docs[position]?.length ?? 0;
       const part =
-        (idf * weighted * (K1 + 1)) / (weighted + K1 * (1 - B + (B * length) / index.average));
+        ((idf * weighted * (K1 + 1)) / (weighted + K1 * (1 - B + (B * length) / index.average))) *
+        (index.docs[position]?.factor ?? 1);
 
       bm25.set(position, (bm25.get(position) ?? 0) + part);
     }
@@ -538,6 +582,17 @@ export function searchSnapshot(
         TYPE_ORDER.indexOf(right.doc.candidate.hit.type) ||
       byText(left.doc.candidate.hit.id, right.doc.candidate.hit.id),
   );
+
+  const best = ranked[0];
+
+  if (best !== undefined && !best.named) {
+    const position = index.docs.indexOf(best.doc);
+    const held = tokens.filter((token) =>
+      index.postings.get(token)?.some(([at]) => at === position),
+    ).length;
+
+    outcome.weak = held * 2 < tokens.length;
+  }
 
   for (const { doc } of ranked) {
     const type = doc.candidate.hit.type;

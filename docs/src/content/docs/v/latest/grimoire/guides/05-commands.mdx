@@ -137,6 +137,37 @@ It writes the list of the changelog entries stamped with that release between th
 `date`, and the brief) first: without it the command stops with `GR9005`. Broken markers stop it with `GR1024`. See
 [Tasks and releases](/v/latest/grimoire/guides/06-tasks-and-releases/).
 
+### Stamp and collect: `--stamp`
+
+```bash
+npx warlock grimoire release --stamp
+npx warlock grimoire release 1.4.0 --stamp --date 2026-11-24
+```
+
+```
+stamped catalog, orders → 1.4.0 (2026-11-24)
+wrote grimoire/releases/1.4.0.md
+grimoire/releases/1.4.0.md: 2 entries collected
+```
+
+With `--stamp` the command does the agent's release steps first, then collects as above:
+
+- The version is the argument, or the `version` of the app's `package.json`. The date is `--date`, else the date of the
+  release file when it exists, else today.
+- In each feature `CHANGELOG.md` that has entries under `## Unreleased`, the entries move under a new
+  `## <version> (<date>)` heading and an empty `## Unreleased` stays above it. No other byte of the file changes.
+- When `grimoire/releases/<version>.md` is missing, it is written with its front matter, a `# Release <version>`
+  heading and a one-line brief that names the changed features. Rewrite the brief in your own words; a release file
+  that exists is never touched, and neither is its brief.
+- It stops with `GR9006` and changes nothing when the version is missing (no argument and no `version` in
+  `package.json`), when the date is not `yyyy-mm-dd`, or when a section for the version exists with another date or the
+  release file has another date than `--date`.
+- `--json` prints `{ stamped, created, collect }`: the features stamped, the release file written (or `null`) and the
+  collect result.
+
+The stamp is the only edit Warlock makes to written files, and only when you ask for it with `--stamp`. Without
+`--stamp` the command writes the collected list and nothing else.
+
 ## `warlock grimoire guard [task]`
 
 Checks the change (the git diff against a base) against its task: files outside the task's features, removed flows,
@@ -350,13 +381,23 @@ npx warlock scry --search "order" --limit 5 --app mobile
  12.9  block    mobile/home/new-arrivals          catalog/new-arrivals
  11.3  route    GET /api/products/new-arrivals    catalog.new-arrivals
   9.8  file     src/app/catalog/services/new-arrivals.service.ts  Lists the newest products sold in the customer's country.
-…
+changes with the top hits:
+  src/app/catalog/repositories/products.repository.ts   imported by new-arrivals.service.ts
+  src/app/catalog/tests/new-arrivals.test.ts            test
+next: warlock scry --impact src/app/catalog/services/new-arrivals.service.ts
 ```
 
-Pass the whole sentence (a commit title, a bug report) rather than two keywords: a hit needs only some of the words,
+Search first, then run `--impact` on the top hit (the `next:` line). Pass the whole sentence (a commit title, a bug report) rather than two keywords: a hit needs only some of the words,
 and more words give the right file more to match. Case does not matter, words are matched whole (`ui` does not find
 `build`), a plural or `-ing`/`-ed` form matches its base word, and small words such as `the`, `of` and `for` are left
 out (a text of small words only finds nothing). An id such as `AC-5` or `WL9003` stays one word.
+
+Search reads any language. One tokeniser serves the text and the index: accents and Arabic vowel marks are dropped
+(`café` and `cafe` match, so do `أحمد` and `احمد`), the tatweel is dropped, `ى` is read as `ي` and `ة` as `ه`, words
+split at every character that is not a letter or digit, camel case splits in any script, and an Arabic word of five or
+more letters loses a leading article (`ال`, `وال`, `بال`, `لل`), so `شحنة` finds `الشحنة`. A few Arabic small words
+(`في`, `من`, `على`) are left out like the English ones. Stemming of plurals and `-ing`/`-ed` is for Latin words only.
+A text with no letters or digits in any script stops with `GR9006`.
 
 Hits are ranked in two tiers and printed in score order, best first, with the score in front of each line:
 
@@ -375,6 +416,28 @@ only the hits of that app (features, flows, routes and tasks belong to none and 
 list, a last line counts the matches per type (`showing 20 of 41 (2 flow, 39 file); raise --limit for more`), and
 `--json` carries the same `counts`. The index is built once for each opened book, so repeated searches in the MCP
 server stay fast. `--limit` defaults to 20.
+
+#### What changes with the top hits
+
+After the hits, the answer lists the files that usually change with the top ones, so you open the right files
+without a second question. They come from the top three hits that map to files (a file, an export, a page or screen, a
+mail or job, a route's handler, or the files a flow's steps start from). For each, the list holds the files it imports
+and the files that import it when they belong to the same feature (the same module when the file has no owner), no
+specs, plus the spec files that import it and the tests that prove a hit flow's criteria. Files are ranked by how many
+of the top hits share them, then step files, importers, imports and tests, and the list stops at 10 files whatever the
+`--limit`. A file that is already a hit is left out.
+
+Each line says why the file is there: `imports <hit file>` (it imports the hit's file), `imported by <hit file>` (the
+hit's file imports it), `test`, or `step of <flow>`. The last line, `next: warlock scry --impact <file>`, names the
+impact question for the first file. In `--json` the answer carries `alsoChanges` (`{ file, reason, via }`, `via` being
+the ids of the top hits that brought the file in), `weak` and `next`.
+
+When the best hit is not a name match and holds fewer than half of the words of the text, the answer is marked weak
+(`"weak": true`) and ends with `weak match: no hit holds most of the request's words; use grep for literal text`.
+Use grep for literal text and when the answer says this.
+
+Spec files, locale files and type files have their BM25F score multiplied by 0.6, so code wins a near tie and they are
+still found when nothing else matches.
 
 ### Errors
 

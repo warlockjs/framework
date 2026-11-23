@@ -167,6 +167,18 @@ export type ScryHit = {
   matched?: string;
 };
 
+/** A file that usually changes with the top search hits. */
+export type ScryAlsoChange = {
+  file: string;
+  /**
+   * `imports`: the file imports a hit's file. `imported-by`: a hit's file imports it.
+   * `test`: a spec that imports a hit's file or proves a hit's flow. `step`: a file a hit's flow starts from.
+   */
+  reason: "imports" | "imported-by" | "test" | "step";
+  /** The ids of the top hits that brought the file in. */
+  via: string[];
+};
+
 export type ScrySearchResult = ScryNotes & {
   type: "search";
   text: string;
@@ -174,6 +186,16 @@ export type ScrySearchResult = ScryNotes & {
   counts: Partial<Record<ScryHitType, number>>;
   /** Best first, whatever the type; on an equal score features and flows come first. */
   hits: ScryHit[];
+  /**
+   * Files that usually change with the top hits (the top three that map to files): their imports and importers in the
+   * same owning feature, plus their tests, most shared first, at most 10, none already a hit. Absent in stored answers
+   * from before it existed.
+   */
+  alsoChanges?: ScryAlsoChange[];
+  /** The best hit is not a name match and holds fewer than half of the request's words: use grep for literal text. */
+  weak?: boolean;
+  /** The command to run next: `warlock scry --impact <top file>`. Absent when no top hit maps to a file. */
+  next?: string;
 };
 
 export type ScryResult =

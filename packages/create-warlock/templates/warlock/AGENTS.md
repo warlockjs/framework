@@ -85,11 +85,16 @@ single skills with `agentKit.omit`.
 
 ## Project map (Grimoire, experimental)
 
-`grimoire/` describes what this app does and where things are. Before you search the code,
-read the **`use-the-grimoire`** skill and ask the map: `npx warlock scry --search "<words>"`,
-`npx warlock scry <file>` or `npx warlock scry --impact <file>`. When you add or change
-behaviour, follow its sibling skills (`write-a-feature`, `record-a-change`, `describe-an-app`,
-`document-a-file`, `backfill-a-grimoire`). Never edit files Warlock generates
+`grimoire/` describes what this app does and where things are. Read the **`use-the-grimoire`** skill
+before you search the code, then for every task:
+
+1. `npx warlock scry --search "<the whole request>"`.
+2. `npx warlock scry --impact <top file>` and read the `changes with` lines: they are the files that usually
+   change with it.
+3. Use grep only for literal text, or when the answer says `weak match`.
+
+When you add or change behaviour, follow its sibling skills (`write-a-feature`, `record-a-change`,
+`describe-an-app`, `document-a-file`, `backfill-a-grimoire`). Never edit files Warlock generates
 (`grimoire/book/`, `index.json`, `bookmap.json`, `*.bookmap.json`).
 
 ## Drift controls

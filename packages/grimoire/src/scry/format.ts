@@ -405,6 +405,38 @@ function scoreText(score: number): string {
   return score >= 100 ? score.toFixed(0) : score.toFixed(1);
 }
 
+/** How a file that changes with the top hits relates to them, in a few words. */
+function alsoReason(change: NonNullable<ScrySearchResult["alsoChanges"]>[number]): string {
+  const name = (id: string): string => id.split(/[\s#]/)[0]?.split("/").pop() ?? id;
+  const first = name(change.via[0] ?? "");
+  const more = change.via.length > 1 ? ` +${change.via.length - 1}` : "";
+
+  switch (change.reason) {
+    case "imports":
+      return `imports ${first}${more}`;
+    case "imported-by":
+      return `imported by ${first}${more}`;
+    case "step":
+      return `step of ${change.via[0] ?? ""}${more}`;
+    case "test":
+      return "test";
+  }
+}
+
+/** The `changes with the top hits:` block, at most 10 files (the answer's own cap), or nothing. */
+function alsoChangesLines(result: ScrySearchResult): string[] {
+  const list = result.alsoChanges ?? [];
+
+  if (list.length === 0) return [];
+
+  const width = Math.min(60, Math.max(...list.map((change) => change.file.length)));
+
+  return [
+    "changes with the top hits:",
+    ...list.map((change) => `  ${change.file.padEnd(width)}   ${alsoReason(change)}`),
+  ];
+}
+
 /** Hits in score order, one line each: `score type id  detail  (app)  [matched]`. */
 function formatSearch(result: ScrySearchResult): string[] {
   if (result.hits.length === 0)
@@ -426,6 +458,11 @@ function formatSearch(result: ScrySearchResult): string[] {
       return line.trimEnd() + (hit.matched === undefined ? "" : `   [${hit.matched}]`);
     }),
     ...truncatedLine(result),
+    ...alsoChangesLines(result),
+    ...(result.weak === true
+      ? ["weak match: no hit holds most of the request's words; use grep for literal text"]
+      : []),
+    ...(result.next === undefined ? [] : [`next: ${result.next}`]),
     ...notes(result),
   ];
 }

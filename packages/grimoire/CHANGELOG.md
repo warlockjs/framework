@@ -8,6 +8,10 @@
 
 <!-- area A: scry search and release stamping (5.64 merge marker, remove at merge) -->
 
+- `warlock scry --search` answers with the files that change together with the top hits. After the hits it lists, as `changes with the top hits:`, the files the top three file-mapped hits import and the files that import them inside the same feature (the same module when unowned), the spec files that import them and the tests that prove a hit flow's criteria, most shared first, at most 10, then a `next: warlock scry --impact <file>` line. The search result gains `alsoChanges` (`ScryAlsoChange`: `file`, `reason`, `via`), `weak` and `next`. `grimoire_search` returns the same fields.
+- A weak search answer. When the best hit is not a name match and holds fewer than half of the request's words, the answer ends with `weak match: no hit holds most of the request's words; use grep for literal text` and carries `weak: true`.
+- `warlock grimoire release [version] --stamp [--date yyyy-mm-dd]` stamps the changelogs and collects. The version defaults to the app's `package.json` version and the date to the release file's date, else today. Each feature changelog with entries under `## Unreleased` gets them moved under `## <version> (<date>)` with an empty `## Unreleased` above, a missing `grimoire/releases/<version>.md` is written with a one-line brief naming the changed features, and the list is collected. `--json` prints `{ stamped, created, collect }`. It stops with `GR9006` for a missing version, a date that is not `yyyy-mm-dd`, or a version section with another date. This is the only edit Warlock makes to written files, and only with `--stamp`.
+
 <!-- area B: guard, code rules, locked tests, protected areas (5.64 merge marker, remove at merge) -->
 
 <!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
@@ -19,6 +23,10 @@
 
 <!-- area A: scry search and release stamping (5.64 merge marker, remove at merge) -->
 
+- `warlock scry --search` reads Arabic and accented Latin text. One tokeniser serves the query, the index and the `GR9006` check: accents and Arabic vowel marks are dropped, the tatweel is dropped, `ى` is read as `ي` and `ة` as `ه`, words split at every non-letter and non-digit in any script, camel case splits in any script, an Arabic word of five or more letters loses a leading `ال`, `وال`, `بال` or `لل`, and a few Arabic small words join `SCRY_STOP_WORDS`. `شحنة` finds `الشحنة`, `cafe` finds `café`, and an Arabic-only query no longer stops with `GR9006`. Stemming stays Latin only; `AC-5` stays one word.
+- Search ranks spec, locale and type files below code: their BM25F score is multiplied by 0.6.
+- The `use-the-grimoire` skill and the `grimoire_search` and `grimoire_impact` tool descriptions tell agents to search first, then run `--impact` on the top hit and read the `changes with` lines, and to use grep only for literal text or after a weak match.
+
 <!-- area B: guard, code rules, locked tests, protected areas (5.64 merge marker, remove at merge) -->
 
 <!-- area C1: bird view, product map, What's new (5.64 merge marker, remove at merge) -->
@@ -29,6 +37,8 @@
 ### Fixed
 
 <!-- area A: scry search and release stamping (5.64 merge marker, remove at merge) -->
+
+- Editing only a top-level file of a mobile app folder (`App.tsx`, `index.ts`) now marks the book stale. The freshness fingerprint also covers the code files that sit directly in the parent folder of a nested source root, without tool configs and type shims.
 
 <!-- area B: guard, code rules, locked tests, protected areas (5.64 merge marker, remove at merge) -->
 

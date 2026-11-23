@@ -90,12 +90,30 @@ Customers with no country now see new arrivals again, and orders can be paid lat
 
 | Step                                                                                                | Who                                                   |
 | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Move the entries from `## Unreleased` under `## <release> (<yyyy-mm-dd>)` in each feature changelog | The agent                                             |
-| Write the release file's front matter and brief                                                     | The agent                                             |
+| Move the entries from `## Unreleased` under `## <release> (<yyyy-mm-dd>)` in each feature changelog | The agent, or `warlock grimoire release --stamp`      |
+| Write the release file's front matter and brief                                                     | The agent, or `--stamp` writes a first brief          |
 | `warlock grimoire release 1.4.1`                                                                    | Warlock writes the collected list between the markers |
 
-Feature changelogs and the brief are never edited by Warlock. A spec of the package asserts that their bytes are
-unchanged after a release run.
+Without `--stamp`, Warlock never edits a feature changelog or the brief. A spec of the package asserts that their bytes
+are unchanged after a release run.
+
+### Stamp from the release flow
+
+```bash
+npx warlock grimoire release --stamp
+```
+
+Run it in the app's release flow, after the version is bumped in `package.json`. It does the first two steps of the
+table and then collects: every feature changelog with entries under `## Unreleased` gets a `## <version> (<date>)`
+section holding them (and an empty `## Unreleased` above), the release file is written when it is missing, and the
+list is collected into it. The command prints `stamped catalog, orders → 1.4.0 (2026-11-24)`, then
+`wrote grimoire/releases/1.4.0.md` when it created the file. The generated brief only names the changed features, so
+rewrite it in the owner's words, then run `npx warlock grimoire release 1.4.0` again if you want the list refreshed.
+
+The stamp is the only edit Warlock makes to files an agent wrote, and only when you pass `--stamp`. It changes the
+`## Unreleased` heading line and adds one heading line and a blank line; every other byte stays. It stops with `GR9006`
+when the version is missing, the date is not `yyyy-mm-dd`, or a section for the version already has another date. The
+[commands page](/v/latest/grimoire/guides/05-commands/#stamp-and-collect---stamp) has the options.
 
 ### Collect the list
 
