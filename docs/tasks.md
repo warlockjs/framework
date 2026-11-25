@@ -4,10 +4,10 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Owner decisions waiting
 
+- Next release scope: T-215..T-230 (findings check 2026-11-26; T-230 decided, five features to build).
 - Next-major items (T-007, T-009, T-033, and the 6.0 halves of T-042 and T-047) wait for 6.0.
 - Parked until an app asks: T-171, T-196, the streaming half of T-183. Windows-only items (T-100, T-180, T-120) need a
   Windows machine or Windows CI runs.
-- T-230: which of the verified capability requests from the Mentor Me findings to build.
 
 ## Next release
 
@@ -187,16 +187,32 @@ https://claude.ai/artifact/8qWT2nzB4UNkZGM2TGuRCH (private). Every fix ships a r
 - Acceptance: each text corrected (or the eager test load implemented with a spec).
 - Status: open.
 
-### T-230 [decision] Capability requests from the Mentor Me findings (vet before building)
+### T-230 [feature] Capability requests from the Mentor Me findings (decided 2026-11-26)
 
-- What: verified as real gaps, but each comes from one app: per-site `locales`/`defaultLocale`
-  (`packages/web/src/sites/site-config.types.ts:31`); per-site/theme font preload by family name (today
-  `metadata.links` + `fontPreload: false`); a navigation blocker for `navigateTo` and Back/Forward (`<Link onClick>` +
-  `preventDefault()` already works); `request` in the `http.errorResponse` context or one error hook with request +
-  error; `request.rawBody` / route `rawBody: true` (the `preParsing` workaround is supported); passkey `origin`/`rpID`
-  as functions of the request; `request` passed to `canAuthenticate`.
-- Decision needed: which to build now (per the vet-feature-requests rule).
-- Status: waiting for the owner.
+- Source: Mentor Me v2 findings page, verified 2026-11-26 (see the section header). Owner decision 2026-11-26: build
+  the five items with a verified need in the next release; park the two that already have a working route (T-171).
+- Build (each with spec, docs page, skill update and CHANGELOG entry):
+  1. `http.errorResponse` context gets `request` and the thrown error (`packages/core/src/http/error-response.ts:15-20`;
+     the `onSend` hook at :34-42 already has the request). Need: the app stitched `errorMapper`, `Response.on("error")`
+     and a middleware together to capture 5xx with route, user and the client's reference id.
+  2. Route option `rawBody: true` exposing `request.rawBody` (string/Buffer) for webhook signatures, in dev
+     (`router/router.ts:1452-1459` wildcard path) and production. Need: HMAC checks; the app hand-wrote a `preParsing`
+     hook.
+  3. Navigation blocker: `routerEvents.onBeforeNavigate(listener)` whose listener may return `false` (or a promise of
+     it) to cancel, applied to `<Link>`, `navigateTo()` and popstate (restore the URL), plus a `useBlocker(when)` hook
+     (`packages/web/src/routing/router-events.ts:131-137`, `client/navigation/verbs.ts:45-50`,
+     `client/navigation/navigation-root.tsx:~286-321`). Need: unsaved-changes guards; Back/Forward cannot be guarded today.
+  4. `canAuthenticate(user, context)` with the request (and login method) where available
+     (`packages/auth/src/services/auth.service.ts:164`, `assertCanAuthenticate` in `completeLogin` :870). Need:
+     tenant-membership checks before tokens are issued.
+  5. Per-site `locales` and `defaultLocale` in `web.sites.<key>.localeRouting` (validated as a subset of
+     `app.localeCodes`), honoured by locale resolution, `changeLocaleCode`, `?locale=`/cookie switching and the
+     route-locale build (`packages/web/src/sites/site-config.types.ts:31`, `routing/locale-routing.ts:~24-32`).
+     Need: an Arabic-only site still switches to English via `?locale=en`.
+- Parked (moved to T-171): per-site/theme font preload by family name (manual route: `metadata.links` +
+  `fontPreload: false`); passkey `origin`/`rpID` as functions of the request (a config getter works, read per call in
+  `packages/auth/src/auth-config.ts:390-410`).
+- Status: open, decided.
 
 ## From the 5.64.0 release
 
@@ -358,6 +374,11 @@ https://claude.ai/artifact/SC6Mxrw5sNn465fWr2snCf (page URLs in `--route`). Ever
   6. `scry --impact <package-name>` ("which files import this package") for dependency upgrades. Asked by one agent
      after `scry --impact package.json` answered GR9001, which is by design (`bookFile`,
      `packages/grimoire/src/scry/query.ts:49-65`: code files only). Source: the 2026-11-21 scry field report (T-189).
+  7. Per-site or per-theme font preload by family name (`fontPreload: string[]` or a request-scoped helper). Today one
+     app-wide list (`packages/web/src/fonts/prepare-fonts.ts:47`); manual route: `metadata.links` preload tags +
+     `fontPreload: false`. Source: Mentor Me findings U-4 (T-230).
+  8. Passkey `origin`/`rpID` as functions of the request. A config getter already works (read per call,
+     `packages/auth/src/auth-config.ts:390-410`). Source: Mentor Me findings U-19 (T-230).
 - Status: parked, one app asked. Revisit when a second app asks for the same item.
 
 ## 5.58.0: Grimoire flow pages, type-only reach and product map
