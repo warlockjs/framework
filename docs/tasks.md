@@ -7,6 +7,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 - Next-major items (T-007, T-009, T-033, and the 6.0 halves of T-042 and T-047) wait for 6.0.
 - Parked until an app asks: T-171, T-196, the streaming half of T-183. Windows-only items (T-100, T-180, T-120) need a
   Windows machine or Windows CI runs.
+- T-230: which of the verified capability requests from the Mentor Me findings to build.
 
 ## Next release
 
@@ -16,6 +17,186 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 - 5.63.1 shipped T-204 (PostgreSQL `date` columns). 5.63.0 shipped T-188..T-195, T-197 (closed), T-198..T-200, T-202, T-203 (closed).
 - 5.62.0 shipped T-185, T-186 and T-187 (see `tasks.completed.md`).
 - 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
+
+## From the 2026-11-26 findings check (5.64.0)
+
+Source for every entry below: two app findings pages (Forma AI "Grimoire Panel Boot Stall", Mentor Me v2 findings),
+verified against 5.64.0 (`abaf604b4`) on 2026-11-26. Verdicts, repro outputs and line numbers:
+https://claude.ai/artifact/8qWT2nzB4UNkZGM2TGuRCH (private). Every fix ships a regression spec built from the repro below.
+
+### T-215 [bug] Grimoire devtools panel rebuilds the book on the main thread at boot
+
+- What: `packages/grimoire/src/devtools/index.ts:135` calls `source.warm()` at panel creation in production, and in
+  development whenever no custom adapter is set. `warm()` → `openGrimoire` → `buildBook` → core `collectFiles`
+  (sync `readdirSync` + `parseSync`). The panel never uses `openStoredGrimoire` (`workspace/stored.ts:32`) and has no
+  `warm` option. Forma measured ~6 s with no responses after every restart (11.6k files).
+- Repro: create `grimoireDevtoolsPanel({ root, mode: "production" })` over a generated project and sample a 50 ms
+  interval: 3k files → longest gap 818 ms, 9k files → 2,406 ms (development: 881 / 2,458 ms); with a current stored
+  book 68 ms.
+- Acceptance: panel creation never blocks the event loop for more than ~50 ms (spec over a generated fixture);
+  production builds lazily on the first tab view (or `warm: false`), any warm is deferred past boot, and rebuilds run
+  off the main thread or yield. Profile Forma's stored-book case (3.8–5.9 s reported) on a real book.
+- Status: open.
+
+### T-216 [bug] create-warlock: pnpm 11+ scaffold with `queue` fails on `msgpackr-extract`
+
+- What: `packages/create-warlock/src/helpers/pnpm-build-approvals.ts:99-101` approves only `image → sharp`; bullmq's
+  `msgpackr-extract` has an install script, so `pnpm install` fails with `ERR_PNPM_IGNORED_BUILDS` and no feature is
+  installed.
+- Repro: package with `bullmq` + `allowBuilds: { esbuild: true }`, `pnpm install` on pnpm 12.15.0 → exit 1
+  "Ignored build scripts: msgpackr-extract@3.0.7"; adding `msgpackr-extract: true` installs.
+- Acceptance: `queue: ["msgpackr-extract"]` in both the pnpm 11+ `allowBuilds` and pnpm 10 layouts; a spec that every
+  feature's native build deps are approved.
+- Status: open.
+
+### T-217 [bug] create-warlock: shadcn templates fail the scaffold's own `logical-css` rule
+
+- What: `runCodeRules(…, ["logical-css"])` over the templates finds 9 GR3007 hits:
+  `templates/design-system/src/web/components/ui/calendar.tsx:74,96,98`, `command.tsx:145`, `dialog.tsx:56,65,80`,
+  `radio-group.tsx:38`.
+- Acceptance: convert to logical classes (`ms-auto`, `pe-1 ps-2`, `rounded-s-md`/`rounded-e-md`, `end-4`,
+  `sm:text-start`); the two centering lines (`dialog.tsx:56`, `radio-group.tsx:38`) get `grimoire-allow logical-css`;
+  a create-warlock spec runs the rule over all templates and expects zero findings.
+- Status: open.
+
+### T-218 [feature] auth: tell a wrong password from an account `canAuthenticate` refuses
+
+- What: `attemptLogin()` returns `null` for both (`packages/auth/src/services/auth.service.ts:780-824`, refusal at
+  :809-813); apps that must reveal a suspension only after a correct password re-implement the login.
+- Repro: suspended user, `canAuthenticate: u => u.get("status") === "active"` → `{ right: null, wrong: null }`.
+- Acceptance: a public `verifyCredentials()` with a discriminated result (`ok` / `invalid` / `refused`), keeping the
+  equal-timing dummy hash; docs + auth skill.
+- Status: open.
+
+### T-219 [bug] web: chunk-cycle members can get the same output file
+
+- What: `packages/web/src/vite/finalize-chunk-names.ts:278-302` hashes cycle members from canonical code only and
+  never checks for a taken name; the writer (:318-328) overwrites. Mentor Me's two theme entries shared one file, so
+  one theme hydrated with the other's code.
+- Repro: four chunks in one cycle (`x-A`→`p`, `x-B`→`q`, `p`↔`q`, equal `x` code) → 4 chunks in, 3 files out.
+- Acceptance: member identity in the hash (`${cycleDigest}:${oldBase}:${code}`) and a writer assertion that no two
+  chunks share a target; the repro as a spec.
+- Status: open.
+
+### T-220 [bug] auth: `AccessToken.deleteAllForUser()` ignores `user_type`
+
+- What: `packages/auth/src/models/access-token/access-token.model.ts:146-148` deletes by `user_id` only. Reached by
+  `revokeAllTokens`, `logout()` without a refresh token (default `revoke-all`), password reset
+  (`services/password-reset.ts:135`) and `Auth.removeAllAccessTokens()`; signs out another identity with the same id.
+- Repro: access tokens for `{ id, student }` and `{ id, staff }`; `deleteAllForUser({ id, userType: "student" })`
+  leaves `[]` (staff row deleted).
+- Acceptance: filter by `user_type`; spec asserts the staff row remains.
+- Status: open.
+
+### T-221 [bug] cascade: unique violations name only the first column, with quotes, no constraint, no cause
+
+- What: `packages/cascade/src/writer/database-writer.ts:~656-700` (`mapUniqueViolation`) keeps `.split(",")[0]` of
+  `Key (...)`, quotes included, and drops `err.constraint` and the driver error.
+- Repro: composite unique index `("tenantId","receiptFileId")`, same row twice →
+  `[{"type":"unique","error":"The \"tenantId\" must be unique","input":"\"tenantId\""}]`, `cause` undefined.
+- Acceptance: all columns unquoted, the constraint name and `cause` on the error (PostgreSQL and MongoDB
+  `keyPattern`); docs.
+- Status: open.
+
+### T-222 [bug] queue: `jobId` with `:` fails only on BullMQ; docs show `invoice:43`
+
+- What: `packages/queue/src/job-options.ts:56` passes `jobId` through; BullMQ rejects `:` (unless exactly three
+  parts) and integer-like ids, fake/local accept them. Example at `packages/queue/README.md:89` and
+  `skills/define-jobs/SKILL.md:36`.
+- Repro (bullmq 6.3.6): `invoice:43` → "Custom Id cannot contain :", `43` → "Custom Id cannot be integers",
+  `invoice-43` OK.
+- Acceptance: one validation in `job-options.ts` for every driver with a clear error; docs and skill use
+  `invoice-43`.
+- Status: open.
+
+### T-223 [bug] web: build accepts route locales that boot refuses; `warlock start` keeps running after a failed boot
+
+- What: build-side `parseRouteLocaleFile` calls omit `localeCodes` (`packages/web/src/build/translation-manifest.ts:94`,
+  `serialize-route-locales.ts:33`, `list-route-locale-keys.ts:21`), so WL1007 ("cannot mix locale codes with nested
+  entries", `packages/core/src/localization/parse-locale-dictionary.ts:~237`) fires only at boot. The boot rejection is
+  not fatal for persistent commands (`packages/core/src/cli/cli-commands.manager.ts:727`), so the process serves nothing.
+- Repro: `parseRouteLocaleFile` on `{"legal":{"languages":{"ar":{"en":"Arabic","ar":"…"},"en":{…}}}}` passes without
+  `localeCodes`, throws WL1007 with `["en","ar"]`.
+- Acceptance: `warlock build` fails on such a file (pass `app.localeCodes`); a failed connector boot under `start`
+  exits non-zero.
+- Status: open.
+
+### T-224 [bug] create-warlock: `pnpm format <file>` formats all of `./src`
+
+- What: `packages/create-warlock/templates/warlock/package.json:23` and `src/helpers/app.ts:242` hard-code
+  `--write ./src`, so an extra path formats everything (agents overwrite each other's work).
+- Repro: `oxfmt --write ./src src/target.ts` → "Finished … on 2 files", `other.ts` rewritten.
+- Acceptance: a single-file format script (or `format` defaulting to `./src` only without arguments), named in the
+  scaffold's AGENTS.md.
+- Status: open.
+
+### T-225 [bug] cascade: `query().limit(n).update()` ignores the limit
+
+- What: `packages/cascade/src/drivers/postgres/postgres-query-builder.ts:1462-1491` never reads limit/order;
+  MongoDB `mongodb-query-builder.ts:2483-2489` uses `updateMany` (same result).
+- Repro: 3 matching rows, `limit(1).update(...)` → 3 rows changed.
+- Acceptance: honour the limit (ctid subquery as in `deleteOne()`, :1449) or throw a clear error on both drivers;
+  spec on PostgreSQL.
+- Status: open.
+
+### T-226 [bug] auth: model `accessTokenPayload()` is never called; custom claims lost on refresh and renewal
+
+- What: `issueAccessToken` (`packages/auth/src/services/auth.service.ts:174-186`) uses the service's
+  `buildAccessTokenPayload`, never the model override (`models/auth.model.ts:30`), although
+  `docs/src/content/docs/v/latest/auth/guides/customize-user-type.md:147-165` documents the override.
+  `refreshTokens` and `renewAutomaticSession` drop `deviceInfo.payload` (middleware renewal at
+  `services/resolve-request-user.ts:112` passes none).
+- Repro: override adding `tenantId: 7` → token has none; login with `payload: { tenantId: 9 }` → refreshed and renewed
+  tokens have none.
+- Acceptance: issue paths call `user.accessTokenPayload()` (forced `id`/`userType`/`jti` kept), so refresh and renewal
+  recompute claims; specs for both.
+- Status: open.
+
+### T-227 [bug] core: `useHashedPassword()` re-hashes an existing hash
+
+- What: `packages/core/src/database/utils.ts:14-20` hashes every new/changed value; seeding a known bcrypt hash makes
+  the account unusable.
+- Repro: transformer on a bcrypt hash with `isNew: true` → stored value no longer verifies the original password.
+- Acceptance: explicit opt-in (e.g. `useHashedPassword({ keepHashes: true })`) using the hash patterns in
+  `core/src/encryption/password.ts`; docs.
+- Status: open.
+
+### T-228 [bug] core: migrations under nested `models` folders are silently skipped
+
+- What: `packages/core/src/database/migrate-action.ts:313-318` globs `*/models/*/migrations/*`, so
+  `src/app/ai/capabilities/models/x/migrations/*` never runs; nothing warns.
+- Repro: fast-glob with the pattern finds only `ai/models/x/...`; `**/models/*/migrations/*` finds both.
+- Acceptance: discover nested folders (keep `*/migrations/*`), and a check/doctor finding for a `*.migration.ts`
+  outside the patterns.
+- Status: open.
+
+### T-229 [chore] Docs and skills that contradict the code
+
+- What, from the findings check:
+  - `packages/create-warlock/templates/warlock/src/web/root.tsx:8` and `packages/web/skills/measure-web-vitals/SKILL.md:28-29`
+    say the root is not hydrated; it is (`packages/web/src/entry/index.ts:85`, `documentRoot: true`).
+  - `packages/cascade/skills/manage-transactions/SKILL.md:236-238`: an un-awaited async call started inside
+    `transaction()` shares the transaction client (repro: it saw the uncommitted row); recommend `afterCommit()`.
+  - Test runtime: app `main.ts` files load only on the first request-helper call
+    (`packages/core/src/tests/worker-test-server.ts:53-66`); say so in `test-http`/testing docs, or load eagerly in
+    `setupTest()`.
+  - Dotted query keys become nested objects (`packages/core/src/http/request.ts:1105`); undocumented.
+  - The scaffold AGENTS.md names `src/web/dev/components.page.tsx`, which multi-site mode refuses
+    (`packages/web/src/build/discover-pages.ts:946-952`); add the multi-site path.
+  - Only first-level module `main.ts` files load (`dev-server/special-file-patterns.ts:16-17`); document it.
+- Acceptance: each text corrected (or the eager test load implemented with a spec).
+- Status: open.
+
+### T-230 [decision] Capability requests from the Mentor Me findings (vet before building)
+
+- What: verified as real gaps, but each comes from one app: per-site `locales`/`defaultLocale`
+  (`packages/web/src/sites/site-config.types.ts:31`); per-site/theme font preload by family name (today
+  `metadata.links` + `fontPreload: false`); a navigation blocker for `navigateTo` and Back/Forward (`<Link onClick>` +
+  `preventDefault()` already works); `request` in the `http.errorResponse` context or one error hook with request +
+  error; `request.rawBody` / route `rawBody: true` (the `preParsing` workaround is supported); passkey `origin`/`rpID`
+  as functions of the request; `request` passed to `canAuthenticate`.
+- Decision needed: which to build now (per the vet-feature-requests rule).
+- Status: waiting for the owner.
 
 ## From the 5.64.0 release
 
@@ -29,6 +210,9 @@ Open work for the framework repository. Finished entries move to `tasks.complete
   (`generations/features/test.feature.ts`), and in those apps API tests still read worker 1's database.
 - Evidence: on a fresh web scaffold without a global setup, `src/app/shared/tests/infrastructure.test.ts:20` gets
   `{"error":{"code":"notFound",...}}` for `GET /`; with the global setup it passes (2 of 2).
+- 2026-11-26 findings check (Mentor Me F-4): the generated config still sets `maxWorkers: recommendedTestWorkers()`
+  next to the global setup, so with `WARLOCK_TEST_DATABASES=2` 12 of 44 API tests failed. Interim guard: `maxWorkers: 1`
+  (or a throwing setup) while the global setup exists.
 - Acceptance: the worker server can start the web connector (one Vite per worker, or a shared Vite with per-worker
   HTTP), the starter's page test passes with two workers and no global setup, and the web scaffold drops the file.
 - Status: open.
@@ -58,6 +242,8 @@ Open work for the framework repository. Finished entries move to `tasks.complete
   - Fresh-scaffold check warnings worth a template pass: `GR3001` x83 and `GR3002` x49 (mostly `src/app/auth`),
     `GR4001` x8, `GR3006` x2 (`src/web/dev/components.*`); the contact form UI lives in `src/web/home/components/`,
     outside the contact feature's `folders:`, so a contact task gets `GR7006` for editing it.
+- 2026-11-26 findings check (Mentor Me U-3): the fixture's `env` option already overrides `NODE_ENV`
+  (`packages/core/src/e2e/fixture.ts:218-221`); the scaffold's e2e files and design-system scenes just don't use it.
 - Acceptance: `warlock e2e` runs the starter's scenes on a fresh scaffold with the documented env only; the
   design-system scenes capture the components page; a fresh scaffold's check has no template warnings.
 - Status: open.
