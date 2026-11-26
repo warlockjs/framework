@@ -504,6 +504,8 @@ The synchronous formatter receives `HttpErrorResponseContext`: `{ status: number
 
 The hook covers status 400–599 with `application/json` or an `application/*+json` content type, including Fastify parsing errors, unmatched-route 404s, validation 422s, rate-limit 429s, and 500s. Warlock responses use the ID already stamped from `request.id`. Before Warlock creates a Request, the formatter receives Fastify's `request.id` and echoes that same value under `http.requestId.header` (default `X-Request-Id`). Setting `http.requestId.enabled: false` suppresses that header; without a stamped Warlock ID, the formatter falls back to Fastify's request ID even for routed responses. Keep request-ID headers enabled when the body must correlate with Warlock request logs. HTML pages, files, raw text, streams, and errors after headers have been sent are not reformatted. With no formatter configured, existing response shapes are unchanged.
 
+Web data replies are never reformatted either. A reply to a request that carries the `x-warlock-data` header (client navigations, `refresh()`, and JavaScript `<Form>` submits) is part of the `@warlock.js/web` client's own wire format: a failed page action's 422 `{ actionData }`, the data 404 for an unknown `_action`, and loader errors on a client navigation reach the browser exactly as web wrote them, so `useActionData()` and form outcomes work under any formatter. JSON API errors on the same server are still formatted.
+
 ## Co-located configuration tests
 
 `src/config/mail.spec.ts` and `src/config/mail.test.tsx` are never imported as

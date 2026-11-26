@@ -141,6 +141,70 @@ describe("http.errorResponse", () => {
     expect(formatter).not.toHaveBeenCalled();
   });
 
+  it("never formats a web data reply (x-warlock-data) and still formats the same error without it", async () => {
+    const formatter = vi.fn<HttpErrorResponseFormatter>(({ status, requestId }) => ({
+      error: { code: `http${status}`, message: "Request failed." },
+      requestId,
+    }));
+    const server = serverWith(formatter);
+    // The shape a failed page action answers a JS submit with: a devalue
+    // string sent as application/json.
+    const actionReply = '[{"actionData":1},{"ok":2,"formErrors":3},false,[4],"workspaceNotFound"]';
+    server.post("/action", (_request: FastifyRequest, reply: FastifyReply) =>
+      reply.code(422).type("application/json").send(actionReply),
+    );
+    server.get("/data-404", (_request: FastifyRequest, reply: FastifyReply) =>
+      reply
+        .code(404)
+        .type("application/json")
+        .send(JSON.stringify({ error: "not_found" })),
+    );
+
+    for (const value of ["1", "yes"]) {
+      const action = await server.inject({
+        method: "POST",
+        url: "/action",
+        headers: { "x-warlock-data": value },
+      });
+
+      expect(action.statusCode).toBe(422);
+      expect(action.body).toBe(actionReply);
+      expect(action.headers["content-type"]).toMatch(/^application\/json/);
+    }
+
+    const notFound = await server.inject({
+      method: "GET",
+      url: "/data-404",
+      headers: { "x-warlock-data": "1" },
+    });
+
+    expect(notFound.statusCode).toBe(404);
+    expect(notFound.json()).toEqual({ error: "not_found" });
+    expect(formatter).not.toHaveBeenCalled();
+
+    // The same reply to a request without the header (an API caller) is formatted.
+    const api = await server.inject({ method: "POST", url: "/action" });
+
+    expect(api.statusCode).toBe(422);
+    expect(api.json()).toEqual({
+      error: { code: "http422", message: "Request failed." },
+      requestId: api.headers["x-request-id"],
+    });
+
+    // An empty header value is not a data request.
+    const empty = await server.inject({
+      method: "GET",
+      url: "/data-404",
+      headers: { "x-warlock-data": "" },
+    });
+
+    expect(empty.json()).toEqual({
+      error: { code: "http404", message: "Request failed." },
+      requestId: empty.headers["x-request-id"],
+    });
+    expect(formatter).toHaveBeenCalledTimes(2);
+  });
+
   it("logs formatter failures and retains the original error body", async () => {
     const failure = new Error("formatter failed");
     const logger = vi.spyOn(log, "error").mockResolvedValue(undefined as never);

@@ -210,6 +210,8 @@ The action's `response` is buffered like a loader's, so `header()` and `cookie()
 | Validation / failure helper | Page renders at `422` (or the helper's status) with `actionData` including `values` | `422`/4xx body of `actionData` only; the page tree is not swapped                        |
 | Throws                      | Error page through the normal boundary                                              | Page stays; `routerEvents.onNavigationError` fires                                       |
 
+The JS replies in the right-hand column are web's own data format. An app-wide `http.errorResponse` formatter never rewrites them: core leaves every reply to a request carrying the `x-warlock-data` header untouched, so a failed action's 422 `{ actionData }` reaches `useActionData()` as the action produced it.
+
 ## `<Form>`
 
 `<Form>` renders a real `<form method="post">` with `encType` defaulting to `multipart/form-data`. Props: `action` (an action name, not a URL), `to` and `params` (post to another page's route by name), `query` (the query string of the URL it posts to), `independent`, `resetOnSuccess`, `onSuccess(outcome)`, `onError(actionData)`, `onSettled(outcome)`, and any other form attribute except `action` and `method`. If the navigation runtime is not connected, `<Form>` leaves the submit to the browser, which posts natively. A submit button whose `formaction` names another origin is always posted natively: the runtime only enhances same-origin targets.

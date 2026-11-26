@@ -5,6 +5,24 @@ import type { AppError } from "./errors";
 import type { Request } from "./request";
 import type { FastifyInstance } from "./server";
 
+/**
+ * The header `@warlock.js/web` sends on every client navigation, refresh and
+ * JS page-action submit (web's `WARLOCK_DATA_REQUEST_HEADER`). Kept as a local
+ * constant because core cannot import web; the two must stay equal.
+ */
+const WEB_DATA_REQUEST_HEADER = "x-warlock-data";
+
+/**
+ * Whether the request is a web data request. Presence-based, the same rule
+ * web uses to choose the data reply: any non-empty value counts.
+ */
+function isWebDataRequest(request: FastifyRequest): boolean {
+  const value = request.headers?.[WEB_DATA_REQUEST_HEADER];
+  const first = Array.isArray(value) ? value[0] : value;
+
+  return typeof first === "string" && first.length > 0;
+}
+
 const appErrors = new WeakMap<FastifyReply, AppError>();
 const replyRequests = new WeakMap<FastifyReply, Request>();
 const replyErrors = new WeakMap<FastifyReply, unknown>();
@@ -51,7 +69,10 @@ export type HttpErrorResponseFormatter = (
 
 /**
  * Format JSON errors from both Warlock and Fastify, including early rejections.
- * HTML, files, and streams retain their own response contracts.
+ * HTML, files, and streams retain their own response contracts, and so do web
+ * data replies: a reply to a request carrying `x-warlock-data` is part of the
+ * web client's wire contract (a page action's 422 `{ actionData }`, the data
+ * 404, loader errors on client navigation), never an API error envelope.
  * @internal
  */
 export function registerErrorResponseFormatter(server: FastifyInstance): void {
@@ -69,6 +90,12 @@ export function registerErrorResponseFormatter(server: FastifyInstance): void {
       // A reply another handler already wrote (or is writing) cannot be
       // rewritten: touching headers now would throw ERR_HTTP_HEADERS_SENT.
       if (reply.sent || reply.raw.headersSent || reply.raw.writableEnded) {
+        return payload;
+      }
+
+      // Web data replies are devalue payloads the client parses itself; an app
+      // envelope in their place leaves `useActionData()` and navigation empty.
+      if (isWebDataRequest(request)) {
         return payload;
       }
 
