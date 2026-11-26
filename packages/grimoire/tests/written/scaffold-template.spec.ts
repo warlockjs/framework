@@ -8,14 +8,18 @@ const TEMPLATE = fileURLToPath(
 );
 
 describe("the starter app's grimoire/ folder", () => {
-  it("parses with no structure errors and carries the design-system and contact features", async () => {
+  it("parses with no structure errors and carries the accounts, contact and design-system features", async () => {
     const { written, findings } = await parseGrimoire(TEMPLATE);
 
     expect(path.basename(TEMPLATE)).toBe("warlock");
     expect(
       findings.filter((finding) => finding.severity === "error" && finding.code.startsWith("GR1")),
     ).toEqual([]);
-    expect(written.features.map((feature) => feature.id)).toEqual(["contact", "design-system"]);
+    expect(written.features.map((feature) => feature.id)).toEqual([
+      "accounts",
+      "contact",
+      "design-system",
+    ]);
 
     const criteria = Object.fromEntries(
       written.features.flatMap((feature) =>
@@ -37,6 +41,17 @@ describe("the starter app's grimoire/ folder", () => {
       "AC-1 Every error says what failed and what to do next.",
     ]);
     expect(criteria["contact/send-message"]).toHaveLength(4);
+    expect(
+      Object.keys(criteria)
+        .filter((ref) => ref.startsWith("accounts/"))
+        .sort(),
+    ).toEqual([
+      "accounts/posts",
+      "accounts/reset-password",
+      "accounts/sign-in",
+      "accounts/uploads",
+      "accounts/users",
+    ]);
   });
 
   it("names the design system in the contact feature's relations", async () => {
