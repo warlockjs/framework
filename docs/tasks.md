@@ -11,6 +11,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Next release
 
+- 5.65.1 shipped T-235 (`http.errorResponse` no longer rewrites web data replies; see `tasks.completed.md`).
 - 5.65.0 shipped T-211..T-233 (T-230: all five capabilities) and T-206's code step (see `tasks.completed.md`); T-206 waits for
   its re-run on the published code, T-014 stays open for the suites listed in its status, T-234 is new.
 - 5.64.0 shipped T-207, T-208, T-201 (API routes), T-209, T-210, T-182, T-181, T-168, T-172, T-147, T-138, T-139,
@@ -21,29 +22,6 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 - 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
 
 ## From the 5.65.0 release
-
-### T-235 [bug] `http.errorResponse` rewrites a page action's 422 data reply, so `useActionData()` gets nothing
-
-- Source: Manazil wave-12 findings page https://claude.ai/artifact/68W7j5zdpztypW7C7wHWRQ (private), 2026-11-26;
-  verified on the 5.65.0 checkout (`c07f0b3ad`) the same day.
-- What: a failed page action on a JS submit answers 422 with the devalue string `stringify({ actionData })` and content
-  type `application/json` (`packages/web/src/server/create-page-route-handler.ts:~369-371`,
-  `routing/data-request.ts:46`). Core's `onSend` formatter hook (`packages/core/src/http/error-response.ts:~63-85`)
-  rewrites every 400-599 JSON reply and exempts nothing for data requests (`x-warlock-data`,
-  `routing/data-request.ts:32`), so an app formatter that builds its own envelope replaces the payload and the client
-  gives up (`client/navigation/submit-page-action.ts:~119`, "status 422 without an actionData body"). No-JS submits work.
-- Repro (run 2026-11-26, tsx on the checkout source): Fastify + `registerErrorResponseFormatter` with an app formatter
-  returning `{ error: { code, message }, requestId }`, a route replying 422 `application/json` with
-  `stringify({ actionData: { ok: false, formErrors: ["workspaceNotFound"] } })`, request with `x-warlock-data: 1` →
-  `422 {"error":{"code":"validationFailed","message":"Request failed."},"requestId":"req-1"}`.
-- Fix: core skips the formatter when the request carries `x-warlock-data` (or web marks its data replies and core
-  checks the mark); docs (`http.errorResponse`) and the form-action skill say data replies are never formatted.
-  Check the other data replies too (the `{ error: "not_found" }` data 404 and loader 4xx/5xx on client navigation).
-- Acceptance: integration spec with such a formatter: a failing page action posted with `x-warlock-data: 1` returns a
-  422 whose devalue-parsed body has `actionData.formErrors`; API JSON errors are still formatted.
-- Workaround (apps): return `undefined` from the formatter for data requests (`context.request` exists for routed
-  requests since 5.65.0) or for a devalue array body.
-- Status: open.
 
 ### T-234 [bug] `MaxListenersExceededWarning` on the HTTP server at every boot
 

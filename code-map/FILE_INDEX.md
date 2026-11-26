@@ -2698,7 +2698,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/http/database/RequestLog.ts` - RequestLogSchema, RequestLog, schema
 - `packages/core/src/http/error-codes.ts` - HttpErrorCodes, http/error-codes.ts, IdempotencyKeyConflict, IdempotencyKeyInvalid, RateLimitExceeded, ConcurrencyLimitReached, BodyTooLarge, IpForbidden
 - `packages/core/src/http/error-mapper.ts` - HttpErrorMapping, HttpErrorMapper, mapRequestError, mapBuiltInError, applyErrorMapper
-- `packages/core/src/http/error-response.ts` - HttpErrorResponseContext, HttpErrorResponseFormatter, appErrors, replyRequests, replyErrors, setResponseRequest, setResponseThrown, setResponseAppError
+- `packages/core/src/http/error-response.ts` - HttpErrorResponseContext, HttpErrorResponseFormatter, isWebDataRequest, appErrors, replyRequests, replyErrors, setResponseRequest, setResponseThrown
 - `packages/core/src/http/errors/errors.ts` - AppError, HttpError, ResourceNotFoundError, UnAuthorizedError, ForbiddenError, BadRequestError, ServerError, ConflictError
 - `packages/core/src/http/errors/index.ts` - http/errors/index.ts
 - `packages/core/src/http/escape-header-value.ts` - escapeHeaderValue
@@ -3841,7 +3841,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/tests/panels/helpers.tsx` - Answer, Route, ApiCall, FakeEventSource, instanceA, instanceB, session, devSession
 - `packages/devtools/ui-src/tests/setup.ts` - tests/setup.ts
 - `packages/devtools/ui-src/vite.config.ts` - ui-src/vite.config.ts, devBase, proxied
-- `packages/devtools/ui/dashboard/assets/app.js` - be, C, me, ve, xe, ye, pe, y
+- `packages/devtools/ui/dashboard/assets/app.js` - ae, ce, ee, ne, se, te, v, x
 - `packages/devtools/ui/docs-swagger.js`
 - `packages/devtools/ui/panels/processes.js` - renderProcesses
 - `packages/devtools/vitest.config.ts` - devtools/vitest.config.ts
@@ -4547,7 +4547,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/sitemap/src/xml.ts` - XML_ESCAPES, escapeXml, XHTML_NAMESPACE_ATTR, IMAGE_NAMESPACE_ATTR, renderUrlBlock, buildSitemapXml, buildSitemapXmlFromBlocks
 - `packages/sitemap/vitest.config.ts` - sitemap/vitest.config.ts
 
-## packages/web (488 test files not listed)
+## packages/web (489 test files not listed)
 
 - `packages/web/README.md`
 - `packages/web/scripts/generate-llms.mjs` - web/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
