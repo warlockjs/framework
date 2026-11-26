@@ -15,7 +15,7 @@ import { requestContext as requestContextInstance } from "../context/request-con
 import { applyCspHeader } from "../csp";
 import { applyRouteSecurityHeaders } from "../security-headers";
 import { runDefaultCsrfGuard } from "../csrf-default-guard";
-import { setResponseAppError } from "../error-response";
+import { setResponseAppError, setResponseRequest, setResponseThrown } from "../error-response";
 import { mapRequestError } from "../error-mapper";
 import { AppError, HttpError } from "../errors";
 import { type Request } from "../request";
@@ -54,6 +54,7 @@ export function createRequestStore(
   response: Response,
 ): Promise<ReturnedResponse> {
   stampRequestIdHeader(request, response);
+  setResponseRequest(response.baseResponse, request);
 
   // Stamped this early — before any middleware or handler runs — so the
   // header carries the SAME nonce the web layer later reads off
@@ -138,6 +139,7 @@ export function createRequestStore(
       return output as ReturnedResponse;
     } catch (thrown) {
       const error = mapRequestError(thrown, request);
+      setResponseThrown(response.baseResponse, thrown);
       const status = resolveRequestErrorStatus(error) ?? 500;
 
       logRequestError(error, request);

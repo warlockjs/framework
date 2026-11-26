@@ -40,6 +40,7 @@ import {
   createDevBodyLimitHook,
   describeUnsupportedServerOptions,
 } from "./dev-body-limit";
+import { rawBodyPreParsing } from "../http/raw-body";
 import { RouteRegistry } from "./route-registry";
 import { REFUSAL_STATUS, requestAcceptsHtml, setRefusalDispatcher } from "../http/refusal-dispatch";
 import { routeNameMethodSuffix } from "./route-name-method-suffix";
@@ -1245,6 +1246,12 @@ export class Router {
 
       const options = {
         ...route.serverOptions,
+        ...(route.rawBody === true && {
+          preParsing: [
+            ...(([] as unknown[]).concat(route.serverOptions?.preParsing ?? []) as never[]),
+            rawBodyPreParsing,
+          ],
+        }),
         ...(serializerSchemas && {
           schema: { ...route.serverOptions?.schema, response: serializerSchemas },
         }),

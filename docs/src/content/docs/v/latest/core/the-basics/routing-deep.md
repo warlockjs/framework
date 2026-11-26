@@ -98,7 +98,33 @@ The full surface:
 | `isPage`               | Marks the route as React SSR-rendered                                                                                     |
 | `rateLimit`            | Per-route rate limit override                                                                                             |
 | `uploads`              | `true` (or `{ maxTotalSize }`): the route takes multipart uploads — see [File uploads](../digging-deeper/file-uploads.md) |
+| `rawBody`              | `true`: keep the exact request body as `request.rawBody` — see [Reading the raw body](#reading-the-raw-body-for-signatures) |
 | `serverOptions`        | Fastify route-shorthand options for very low-level tuning                                                                 |
+
+### Reading the raw body for signatures
+
+A webhook signature covers the body exactly as the sender wrote it, which the parsed body cannot reproduce (key order and whitespace are lost). Declare `rawBody: true` on the route and read the bytes from the request:
+
+```ts
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+router.post("/webhooks/payments", handlePayment, { rawBody: true });
+
+export const handlePayment: RequestHandler = ({ request, response }) => {
+  const expected = createHmac("sha256", process.env.WEBHOOK_SECRET!)
+    .update(request.rawBody ?? "")
+    .digest();
+  const sent = Buffer.from(request.header("x-signature") ?? "", "hex");
+
+  if (sent.length !== expected.length || !timingSafeEqual(sent, expected)) {
+    return response.unauthorized();
+  }
+
+  return response.success({ received: request.input("id") });
+};
+```
+
+`request.rawBody` is a `Buffer` and `request.rawBodyText()` returns it as UTF-8 text; both are `undefined` on routes without the option and when no body was sent. The body is parsed as usual, `bodyLimit` still applies, multipart bodies are not kept, and routes that do not set the option copy nothing. It works the same in `warlock dev` and in a production build.
 
 ### Raising the body limit for one route
 

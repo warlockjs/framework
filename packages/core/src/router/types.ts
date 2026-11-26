@@ -339,6 +339,17 @@ export interface RouteOptions {
    */
   uploads?: RouteUploadsOption;
   /**
+   * Keep the exact bytes of the request body and expose them as
+   * `request.rawBody` (a `Buffer`) and `request.rawBodyText()`, for example to
+   * verify a webhook signature that covers the body as sent. Works in
+   * production and in the dev server; the body limit still applies, and
+   * routes without the option buffer nothing. Multipart bodies are not kept.
+   *
+   * @example
+   * router.post("/webhooks/payments", handlePayment, { rawBody: true });
+   */
+  rawBody?: boolean;
+  /**
    * Serialize this route's responses through its handler's `responseSchema`:
    * the declared fields are written with a compiled serializer and any field
    * the schema does not name is dropped. Overrides `http.compileResponseSchemas`

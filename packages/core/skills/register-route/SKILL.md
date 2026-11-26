@@ -302,6 +302,12 @@ the dev server does not. It also warns once at boot when `http.compileResponseSc
 router.post("/avatars", uploadAvatar, { uploads: true });
 ```
 
+### Webhook signatures: `rawBody: true`
+
+`router.post("/webhooks/payments", handler, { rawBody: true })` keeps the exact request bytes: read `request.rawBody`
+(`Buffer`) or `request.rawBodyText()` and verify the HMAC over them. The body is still parsed, `bodyLimit` still applies,
+multipart bodies are not kept, and it works in dev and production. Routes without it buffer nothing.
+
 ## Gotchas
 
 - **Never import `routes.ts`.** The framework auto-loads it. Importing causes a double-registration error.

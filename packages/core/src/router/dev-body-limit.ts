@@ -2,6 +2,7 @@ import { errorCodes } from "fastify";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { Transform } from "node:stream";
 import type { Readable } from "node:stream";
+import { captureRawBody } from "../http/raw-body";
 import type { Route } from "./types";
 
 /**
@@ -100,6 +101,9 @@ async function runPayloadHooks(
  *    before a byte is read, and a chunked or unannounced body is counted as it
  *    streams and refused the moment it passes the limit.
  *
+ * 3. a route declared with `rawBody: true` keeps the exact body bytes for
+ *    `request.rawBody`.
+ *
  * Both refusals are Fastify's `FST_ERR_CTP_BODY_TOO_LARGE`, so the status and
  * the error shape are the ones production answers with. Multipart uploads are
  * streamed by their own plugin and bounded by `http.fileUploadLimit`, never by
@@ -136,7 +140,11 @@ export function createDevBodyLimitHook(
       throw new errorCodes.FST_ERR_CTP_BODY_TOO_LARGE();
     }
 
-    return limitPayload(stream, limit);
+    const limited = limitPayload(stream, limit);
+
+    // `rawBody: true` keeps the bytes after the limit counted them, so a
+    // refused body is never buffered whole.
+    return route?.rawBody === true ? captureRawBody(request, limited) : limited;
   };
 }
 
