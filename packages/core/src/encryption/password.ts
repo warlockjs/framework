@@ -27,6 +27,9 @@ const NATIVE_HASH_PATTERN = /^\$2[ab]\$\d{2}\$[./A-Za-z0-9]{53}$/;
 const SCRYPT_HASH_PATTERN =
   /^\$scrypt\$N=(\d+),r=(\d+),p=(\d+)\$([A-Za-z0-9+/]+={0,2})\$([A-Za-z0-9+/]+={0,2})$/;
 
+/** A complete bcrypt hash of any supported version. */
+const BCRYPT_HASH_PATTERN = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+
 const SCRYPT_SALT_BYTES = 16;
 const SCRYPT_KEY_BYTES = 64;
 const SCRYPT_DEFAULTS = { cost: 32768, blockSize: 8, parallelization: 1 };
@@ -218,6 +221,23 @@ async function verifyScrypt(plain: string, hash: string): Promise<boolean> {
     // Parameters the runtime refuses (not a power of two, too large): not a match.
     return false;
   }
+}
+
+/**
+ * Whether a value is already a password hash in a format `verifyPassword()`
+ * understands: bcrypt (`$2a$`, `$2b$`, `$2y$`) or scrypt (`$scrypt$...`).
+ * A plain password, an empty string or any other format answers `false`.
+ *
+ * @example
+ * import { isPasswordHash } from "@warlock.js/core";
+ *
+ * isPasswordHash("$scrypt$N=32768,r=8,p=1$c2FsdA==$aGFzaA=="); // true
+ * isPasswordHash("my-password"); // false
+ */
+export function isPasswordHash(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+
+  return BCRYPT_HASH_PATTERN.test(value) || SCRYPT_HASH_PATTERN.test(value);
 }
 
 /**

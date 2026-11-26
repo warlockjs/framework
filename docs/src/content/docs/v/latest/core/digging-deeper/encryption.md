@@ -203,6 +203,16 @@ if ((await verifyPassword(plain, stored)) && needsRehash(stored)) {
 
 Set `password.driver: "scrypt"` to hash new passwords with scrypt from `node:crypto`: it runs on the thread pool, needs no extra dependency and has no 72-byte limit. scrypt hashes look like `$scrypt$N=32768,r=8,p=1$<salt>$<hash>`. `verifyPassword` checks both formats whatever the driver is, so switching in either direction never locks anyone out; the password is normalized (NFKC) before scrypt.
 
+### Keeping existing hashes
+
+`useHashedPassword()` hashes every new or changed value, so a row seeded with a known hash would be hashed twice and the password would never verify. Pass `keepHashes` to store a value that already is a bcrypt or scrypt hash as it is; every other value is still hashed:
+
+```ts
+password: v.string().addTransformer(useHashedPassword({ keepHashes: true })),
+```
+
+`isPasswordHash(value)` is the check it uses: `true` for a complete bcrypt (`$2a$`, `$2b$`, `$2y$`) or scrypt hash, `false` for anything else.
+
 ### The 72-byte limit
 
 bcrypt uses only the first 72 bytes of a password (UTF-8 bytes, so about 18 to 24 characters of a non-Latin script). Everything after byte 72 is ignored, so two passwords that share their first 72 bytes match each other. By default `hashPassword` still hashes such a password and logs a one-time warning. Set `encryption.password.rejectLongPasswords: true` to make it throw instead, and cap password length in your validation rules so users get a clear message before that.

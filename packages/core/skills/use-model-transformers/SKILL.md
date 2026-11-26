@@ -60,6 +60,8 @@ What it does at save time:
 | Existing row, password unchanged | Pass through (no re-hashing — stored hash preserved). |
 | Empty / undefined value          | Pass through untouched.                               |
 
+Seeding rows that already carry a known hash? `useHashedPassword({ keepHashes: true })` stores a value that is already a bcrypt (`$2a$`/`$2b$`/`$2y$`) or scrypt hash as it is and hashes everything else; without the option every new or changed value is hashed, so a seeded hash would be hashed a second time and the password would never verify. The helper `isPasswordHash(value)` (from `@warlock.js/core`) is the same check; the options type is `HashedPasswordOptions`.
+
 Calls `authService.hashPassword(String(value))` under the hood — same bcryptjs path as the standalone `hashPassword()` helper. See the `hash-password` topic for full bcrypt setup (salt rounds, `npm install bcryptjs`).
 
 ### Why declarative wins

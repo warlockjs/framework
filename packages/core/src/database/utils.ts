@@ -2,7 +2,17 @@ import { get } from "@mongez/reinforcements";
 import { slugify } from "@mongez/slug";
 import { Model, useModelTransformer } from "@warlock.js/cascade";
 import { type ComputedCallback, type SchemaContext } from "@warlock.js/seal";
-import { hashPassword } from "../encryption/password";
+import { hashPassword, isPasswordHash } from "../encryption/password";
+
+export type HashedPasswordOptions = {
+  /**
+   * Store a value that already is a bcrypt or scrypt hash as it is instead of
+   * hashing it again. Use it when rows are seeded or imported with known
+   * hashes. Every other value is still hashed. Default `false`: every new or
+   * changed value is hashed.
+   */
+  keepHashes?: boolean;
+};
 
 /**
  * Hash password on saving if password changes.
@@ -10,12 +20,17 @@ import { hashPassword } from "../encryption/password";
  * Uses core's own bcrypt `hashPassword` (salt rounds from
  * `encryption.password.salt`). Core must never import `@warlock.js/auth`:
  * auth depends on core, and its `authService.hashPassword` only delegates here.
+ *
+ * Pass `{ keepHashes: true }` to leave a value that already is a supported
+ * hash untouched (seeding, imports).
  */
-export const useHashedPassword = () =>
+export const useHashedPassword = (options: HashedPasswordOptions = {}) =>
   useModelTransformer(({ value, isChanged, isNew }) => {
     if (!value) return value;
 
     if (!isNew && !isChanged) return value;
+
+    if (options.keepHashes && isPasswordHash(value)) return value;
 
     return hashPassword(String(value));
   });
