@@ -86,9 +86,9 @@ export const sendInvoice = defineJob({
 });
 
 await sendInvoice.dispatch({ invoiceId: "42" });
-await sendInvoice.dispatch({ invoiceId: "43" }, { delay: "10m", priority: 1, jobId: "invoice:43" });
+await sendInvoice.dispatch({ invoiceId: "43" }, { delay: "10m", priority: 1, jobId: "invoice-43" });
 
-const snapshot = await sendInvoice.find("invoice:43"); // state, progress, result, failedReason
+const snapshot = await sendInvoice.find("invoice-43"); // state, progress, result, failedReason
 ```
 
 ## Failed jobs
@@ -100,7 +100,7 @@ for (const job of await failedJobs()) {
   console.log(job.name, job.failedReason, job.attemptsMade);
 }
 
-await retryFailedJob("invoice:43");
+await retryFailedJob("invoice-43");
 ```
 
 ## Notifications

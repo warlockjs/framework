@@ -3,7 +3,7 @@ import { InvalidJobDefinitionError } from "./errors";
 import { getQueueContext, wrapPayload } from "./queue-context";
 import { queueOf, registerJob, type RegisteredJob } from "./job-registry";
 import { getQueueDriver } from "./queue-driver";
-import { resolveJobOptions } from "./job-options";
+import { assertJobId, resolveJobOptions } from "./job-options";
 import { assertFailOnTimeout, resolveTimeout } from "./job-timeout";
 import type { JobDefinition, JobSnapshot, QueueJob } from "./types";
 
@@ -37,6 +37,8 @@ export function defineJob<TPayload, TResult = unknown>(
       return queueOf(definition);
     },
     async dispatch(payload, options = {}) {
+      assertJobId(options.jobId);
+
       const queueName = queueOf(definition);
       const interceptor = getDispatchInterceptor();
 

@@ -63,7 +63,7 @@ export const sendInvoice = defineJob({
 });
 
 await sendInvoice.dispatch({ invoiceId: "42" });
-await sendInvoice.dispatch({ invoiceId: "43" }, { delay: "10m", priority: 1, jobId: "invoice:43" });
+await sendInvoice.dispatch({ invoiceId: "43" }, { delay: "10m", priority: 1, jobId: "invoice-43" });
 ```
 
 `defineJob` registers the handler by `name` in a process-wide registry;

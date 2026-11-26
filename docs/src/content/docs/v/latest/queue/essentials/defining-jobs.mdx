@@ -105,7 +105,7 @@ await sendInvoice.dispatch(
   {
     delay: "10m", // a number of ms, or "500ms" | "30s" | "10m" | "2h" | "1d"
     priority: 1, // 1 runs first; larger numbers later; omitted runs ahead of any prioritized job
-    jobId: "invoice:43", // dispatching again with a still-live id is a no-op — idempotent dispatch
+    jobId: "invoice-43", // dispatching again with a still-live id is a no-op — idempotent dispatch
     attempts: 3, // overrides defineJob's attempts for this call only
     backoff: { type: "fixed", delay: 500 },
     timeout: "30s", // overrides defineJob's per-attempt time limit — see Retry and failed jobs

@@ -17,7 +17,7 @@ for (const job of failed) {
 }
 
 await failed[0]?.retry(); // back to waiting
-await retryFailedJob("invoice:43"); // by id; throws FailedJobNotFoundError if not failed
+await retryFailedJob("invoice-43"); // by id; throws FailedJobNotFoundError if not failed
 ```
 
 ## Dashboard (optional)

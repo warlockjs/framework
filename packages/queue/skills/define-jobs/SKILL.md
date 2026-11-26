@@ -33,10 +33,12 @@ await sendInvoice.dispatch(
   {
     delay: "10m", // ms number or "500ms" | "30s" | "10m" | "2h" | "1d"
     priority: 1, // 1 runs first; larger numbers later
-    jobId: "invoice:43", // a second dispatch with a live id is ignored
+    jobId: "invoice-43", // a second dispatch with a live id is ignored
   },
 );
 ```
+
+`jobId` must not contain `:` and must not be only digits; `dispatch()` throws `InvalidJobDefinitionError` for those on every driver (BullMQ, local, `queueFake`). Use `invoice-43`.
 
 ## Timeouts
 
