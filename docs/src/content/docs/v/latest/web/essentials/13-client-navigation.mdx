@@ -93,6 +93,49 @@ Use `useIsNavigating()` for reactive UI state; do not infer pending state from
 events, because an event callback can miss a transition that began before the
 component subscribed.
 
+## Guard against leaving a page
+
+`routerEvents.onBeforeNavigate(listener)` runs before a navigation starts and
+may cancel it. The listener receives `{ to, from, type }`, where `type` is
+`"link"` (a `<Link>` click), `"navigate"` (`navigateTo()`) or `"pop"` (Back and
+Forward). Return `false`, or a promise of `false`, to cancel; anything else
+lets the navigation go ahead. Listeners run in registration order and the first
+`false` wins. It returns an unsubscribe function.
+
+- A guarded `<Link>` click or `navigateTo()` is accepted at once and starts
+  when the answer is `true`; `navigateTo()` still returns `true` for an accepted
+  request, so read the outcome from the page, not the return value.
+- Back and Forward cannot be stopped before the browser moves. On a cancel the
+  previous URL is put back with a new history entry and nothing re-renders, so
+  cancelling Forward leaves one extra entry behind.
+- A jump to a fragment of the current page leaves the page standing and is not
+  asked.
+
+`useBlocker(when, confirm?, options?)` wraps this for components. `when` is a
+boolean or a function read at the moment of each navigation; a clean form never
+prompts. `confirm` is a message for the browser's confirm dialog, or a function
+returning `true` to leave (it may return a promise, so an in-page dialog
+works). `{ beforeUnload: true }` also asks the browser's own prompt on reload
+and tab close.
+
+```tsx
+import { useState } from "react";
+import { useBlocker } from "@warlock.js/web";
+
+export function ProfileForm() {
+  const [dirty, setDirty] = useState(false);
+
+  useBlocker(dirty, "You have unsaved changes. Leave this page?", { beforeUnload: true });
+
+  return (
+    <form onChange={() => setDirty(true)} onSubmit={() => setDirty(false)}>
+      <input name="displayName" />
+      <button type="submit">Save</button>
+    </form>
+  );
+}
+```
+
 ## Programmatic navigation
 
 ```tsx

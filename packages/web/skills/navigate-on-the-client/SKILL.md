@@ -275,6 +275,29 @@ export function CheckoutButtons() {
 
 `navigateTo(pathOrTarget, { replace?: boolean })` accepts a path or a `{ name, params, query }` route target. In a browser with no client runtime connected (before hydration), it falls back to a real browser navigation and returns `true`, so callers never hand-write `window.location.assign`. It returns `false` on the server, or when the runtime declines a same-origin URL. `navigateBack()` is a no-op without a browser.
 
+## Guard against leaving a page
+
+`routerEvents.onBeforeNavigate(listener)` (returns an unsubscribe) runs before a
+`<Link>` click, `navigateTo()` or Back/Forward. The listener gets
+`{ to, from, type: "link" | "navigate" | "pop" }`; return `false` or a promise of
+`false` to cancel. Registration order, first `false` wins. Exported types:
+`BeforeNavigateListener`, `BeforeNavigatePayload`, `BeforeNavigateType`.
+
+`useBlocker(when, confirm?, options?)` is the component form: `when` is a
+boolean or a function read per navigation (a clean form never prompts);
+`confirm` is a message for `window.confirm` or a function returning
+`true`/`false` or a promise of it; `{ beforeUnload: true }` also prompts on
+reload and tab close. Exported types: `BlockerConfirm`, `UseBlockerOptions`.
+
+```tsx
+useBlocker(isDirty, "You have unsaved changes. Leave this page?", { beforeUnload: true });
+```
+
+Gotchas: `navigateTo()` still returns `true` for an accepted request even when a
+guard later cancels it; a cancelled Back/Forward puts the old URL back as a new
+history entry (cancelling Forward leaves one extra entry); same-page fragment
+jumps are not guarded.
+
 ## Re-fetch after a mutation
 
 The public primitive is `refresh()`. There is no `revalidate()` export.
