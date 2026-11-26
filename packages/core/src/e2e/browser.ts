@@ -64,6 +64,21 @@ export async function findBrowserBinary(
   return undefined;
 }
 
+/**
+ * The flags the owned browser starts with. Chrome refuses to start its sandbox as
+ * root (a container, a CI job), so `--no-sandbox` is added when the process runs
+ * as uid 0, unless the caller's own flags already settle it (`--no-sandbox` or
+ * `--enable-sandbox`).
+ */
+export function browserFlags(
+  args: readonly string[] = [],
+  uid: number | undefined = process.getuid?.(),
+): string[] {
+  const decided = args.some((arg) => arg === "--no-sandbox" || arg === "--enable-sandbox");
+
+  return uid === 0 && !decided ? ["--no-sandbox", ...args] : [...args];
+}
+
 export class OwnedBrowser {
   connection?: CdpConnection;
   process?: OwnedProcess;
@@ -103,7 +118,7 @@ export class OwnedBrowser {
         "--headless",
         "--remote-debugging-port=0",
         `--user-data-dir=${profile}`,
-        ...(options.args ?? []),
+        ...browserFlags(options.args),
         "about:blank",
       ],
       this.root,

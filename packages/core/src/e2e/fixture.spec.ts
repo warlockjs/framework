@@ -2,8 +2,8 @@ import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { browserCandidates, findBrowserBinary } from "./browser";
-import { AppFixture, isolatedEnvironment } from "./fixture";
+import { browserCandidates, browserFlags, findBrowserBinary } from "./browser";
+import { AppFixture, isolatedEnvironment, parseEnvFile } from "./fixture";
 import { commandLineOwns } from "./owned-process";
 import type { E2EEvidence } from "./types";
 
@@ -185,5 +185,74 @@ describe("owned app fixture", () => {
       "relative paths",
     );
     expect(report.processes).toEqual([]);
+  });
+
+  it("reads dotenv lines with quotes, comments and export", () => {
+    expect(
+      parseEnvFile(
+        [
+          "# note",
+          "A=1",
+          'export B="two words"',
+          "C='x # y'",
+          "D=plain # trailing",
+          "bad line",
+          "",
+        ].join("\n"),
+      ),
+    ).toEqual({ A: "1", B: "two words", C: "x # y", D: "plain" });
+  });
+
+  const envServer = `
+import {createServer} from 'node:http';
+import {writeFileSync} from 'node:fs';
+const app=createServer((_req,res)=>res.end(JSON.stringify({file:process.env.FROM_FILE,over:process.env.OVER,e2e:process.env.WARLOCK_E2E,nodeEnv:process.env.NODE_ENV})));
+app.listen(0,'127.0.0.1',()=>writeFileSync(process.env.WARLOCK_E2E_PORT_FILE,String(app.address().port)));
+`;
+
+  async function startEnvApp(files: Record<string, string>, options: Record<string, unknown> = {}) {
+    const source = await tempDirectory();
+    await writeFile(join(source, "env-app.mjs"), envServer);
+    for (const [name, text] of Object.entries(files)) await writeFile(join(source, name), text);
+    const fixture = await AppFixture.create(evidence());
+    cleanups.push(() => fixture.stop());
+    const context = await fixture.start(
+      {
+        directory: source,
+        portFromFile: true,
+        start: [process.execPath, "env-app.mjs"],
+        ...options,
+      },
+      {},
+    );
+    return {
+      fixture,
+      body: (await fetch(context.url).then((response) => response.json())) as Record<
+        string,
+        unknown
+      >,
+    };
+  }
+
+  it("starts the disposable app with the app's .env, WARLOCK_E2E=1 and the env option on top", async () => {
+    const { body } = await startEnvApp(
+      { ".env": "FROM_FILE=from-dotenv\nOVER=file\nNODE_ENV=development\n" },
+      { env: { OVER: "option" } },
+    );
+    expect(body).toEqual({ file: "from-dotenv", over: "option", e2e: "1", nodeEnv: "production" });
+  });
+
+  it("prefers .env.e2e over .env, and envFile: false starts without either", async () => {
+    const files = { ".env": "FROM_FILE=plain\n", ".env.e2e": "FROM_FILE=e2e\n" };
+    expect((await startEnvApp(files)).body.file).toBe("e2e");
+    expect((await startEnvApp(files, { envFile: false })).body.file).toBeUndefined();
+  });
+
+  it("adds --no-sandbox as root unless the flags already decide", () => {
+    expect(browserFlags(["--lang=en"], 0)).toEqual(["--no-sandbox", "--lang=en"]);
+    expect(browserFlags(["--enable-sandbox"], 0)).toEqual(["--enable-sandbox"]);
+    expect(browserFlags(["--no-sandbox"], 0)).toEqual(["--no-sandbox"]);
+    expect(browserFlags(["--lang=en"], 1000)).toEqual(["--lang=en"]);
+    expect(browserFlags(undefined, undefined)).toEqual([]);
   });
 });

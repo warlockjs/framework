@@ -88,16 +88,21 @@ describe("browser page over a fake CDP endpoint", () => {
   });
 
   it("keeps the covered reason when a later probe runs out of the deadline", async () => {
+    // Only Date is faked, so the deadline does not depend on how fast this machine is:
+    // the clock moves when the second probe arrives, never because wall time passed.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    cleanups.push(() => vi.useRealTimers());
     let probes = 0;
     const endpoint = await fakeCdp((command: FakeCommand) => {
       if (command.method !== "Runtime.evaluate") return { result: {} };
       probes++;
-      // The first probe answers with the covered target. Later probes get no reply,
-      // so each fails with a CDP timeout once the shrinking deadline runs out.
+      // The first probe answers with the covered target. The second gets no reply and
+      // moves the clock past the deadline, so it fails with a CDP timeout.
       if (probes === 1)
         return {
           result: { result: { value: { ...stable, reason: "target is covered by DIALOG#modal" } } },
         };
+      vi.setSystemTime(Date.now() + 1000);
       return undefined;
     });
     cleanups.push(endpoint.close);
@@ -112,7 +117,7 @@ describe("browser page over a fake CDP endpoint", () => {
     await expect(page.click("#save", 100)).rejects.toThrow(
       /^Cannot click "#save" within 100ms: target is covered by DIALOG#modal$/,
     );
-    expect(probes).toBeGreaterThan(1);
+    expect(probes).toBe(2);
     expect(endpoint.commands.some(({ method }) => method === "Input.dispatchMouseEvent")).toBe(
       false,
     );

@@ -61,7 +61,9 @@ describe("worker test server", () => {
 
     expect(first).toBe(second);
     expect(created).toHaveLength(1);
-    expect(created[0]).toMatchObject({ options: { loadAppModules: true, importModule } });
+    expect(created[0]).toMatchObject({
+      options: { loadAppModules: true, importModule, web: true },
+    });
   });
 
   it("starts a fresh server after the file's server was closed", async () => {

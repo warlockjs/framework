@@ -26,13 +26,10 @@ import {
   type TestAuthenticableUser,
   actingAs,
 } from "./authenticated-test-client";
-import {
-  APP_MODULES_LOADED_KEY,
-  APP_MODULES_ROOT_KEY,
-  type LoadedHolder,
-} from "./app-modules-state";
+import { loadAppModulesOnce } from "./load-app-modules-once";
 import { forgetOpenTestServer, trackOpenTestServer } from "./open-test-servers";
 import { type TestRequestClient, createTestRequestClient } from "./test-helpers";
+import { startWebConnectorOn } from "./worker-web-connector";
 
 export type CreateTestHttpServerOptions = {
   /**
@@ -54,6 +51,14 @@ export type CreateTestHttpServerOptions = {
    * app classes are the same ones the test imports.
    */
   importModule?: AppModuleImporter;
+  /**
+   * Start the app's web connector on this server, so pages render as well as
+   * API routes. The worker's request helpers set it; it needs the app's
+   * `warlock.config.ts` to declare the web connector and does nothing without
+   * one. One connector serves the worker, so only the first server that asks
+   * starts it.
+   */
+  web?: boolean;
   /** Interface to bind. Defaults to `127.0.0.1`. */
   host?: string;
 };
@@ -72,29 +77,6 @@ export type TestHttpServer = TestRequestClient & {
 };
 
 let serverCounter = 0;
-
-async function loadAppModulesOnce(importModule: AppModuleImporter | undefined): Promise<void> {
-  const holder = globalThis as LoadedHolder;
-  const root = process.cwd();
-
-  // Modules loaded for another project root say nothing about this one.
-  if (holder[APP_MODULES_ROOT_KEY] !== root) {
-    holder[APP_MODULES_LOADED_KEY] = undefined;
-  }
-
-  holder[APP_MODULES_ROOT_KEY] = root;
-  holder[APP_MODULES_LOADED_KEY] ??= (async () => {
-    const { loadTestAppModules } = await import("./load-test-app-modules");
-
-    await loadTestAppModules(importModule);
-  })().catch((error: unknown) => {
-    // A failed load may be retried by the next server.
-    holder[APP_MODULES_LOADED_KEY] = undefined;
-    throw error;
-  });
-
-  await holder[APP_MODULES_LOADED_KEY];
-}
 
 function boundPort(server: FastifyInstance): number {
   const address = server.server.address();
@@ -149,13 +131,17 @@ export async function createTestHttpServer(
   validateCspConfigAtBoot();
 
   const server = startHttpServer();
+  let stopWeb: (() => Promise<void>) | undefined;
 
   try {
     await registerHttpPlugins(server);
+    // Pages mount on the server before the routes are scanned, as in development.
+    if (options.web) stopWeb = await startWebConnectorOn(server);
     router.scan(server);
     await server.listen({ port: 0, host });
   } catch (error) {
     router.removeRoutesBySourceFile(sourceFile);
+    await stopWeb?.().catch(() => undefined);
     await server.close().catch(() => undefined);
     throw error;
   }
@@ -177,6 +163,8 @@ export async function createTestHttpServer(
       closed = true;
       forgetOpenTestServer(handle);
       router.removeRoutesBySourceFile(sourceFile);
+      // Vite closes before the HTTP server does.
+      await stopWeb?.();
       await server.close();
     },
   };

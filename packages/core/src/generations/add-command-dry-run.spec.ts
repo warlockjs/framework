@@ -66,11 +66,11 @@ describe("warlock add --dry-run --json", () => {
       "vitest",
     );
     expect(result.details.scripts).toMatchObject({ test: "vitest run" });
-    // An API-only app: the helpers use the server each worker starts, no global setup.
+    // The helpers use the server each worker starts; no app gets a global setup.
     expect(result.written).not.toContain("src/test-global-setup.ts");
   });
 
-  it("keeps a global setup for an app with web pages", async () => {
+  it("generates no global setup for an app with web pages: the worker server serves them", async () => {
     await writeFile(
       path.join(tempDir, "package.json"),
       `${JSON.stringify({ name: "app", dependencies: { "@warlock.js/web": "5.64.0" }, devDependencies: {} }, null, 2)}\n`,
@@ -83,8 +83,9 @@ describe("warlock add --dry-run --json", () => {
     );
 
     expect(report().written).toEqual(
-      expect.arrayContaining(["src/test-global-setup.ts", "src/test-setup.ts", "vite.config.ts"]),
+      expect.arrayContaining(["src/test-setup.ts", "vite.config.ts"]),
     );
+    expect(report().written).not.toContain("src/test-global-setup.ts");
   });
 
   it("reports files that already exist as skipped", async () => {

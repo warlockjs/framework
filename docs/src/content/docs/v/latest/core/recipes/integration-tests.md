@@ -20,15 +20,15 @@ That command drops these files into the project:
 
 ```
 src/test-setup.ts           ← runs setupTest in each worker
-vite.config.ts              ← wires setupFiles (and globalSetup in a web app), sets the include pattern
-src/test-global-setup.ts    ← apps with @warlock.js/web only: one shared server that also serves the pages
+vite.config.ts              ← wires setupFiles, sets the include pattern
 ```
 
-In an API-only app the request helpers (`testGet`, `actingAs`, ...) start an HTTP server inside each
-Vitest worker on first use, and it reads that worker's database. That server does not start the web
-connector, so a web app keeps the shared server of `src/test-global-setup.ts` for its pages. The shared
-server runs in the main process and reads the database of worker 1: a test that needs it to see rows it
-wrote serves its routes with `createTestHttpServer()`, or the suite runs with `maxWorkers: 1`.
+The request helpers (`testGet`, `actingAs`, ...) start an HTTP server inside each Vitest worker on first
+use, and it reads that worker's database. In an app with `@warlock.js/web` that server also starts the web
+connector, so pages render against the worker's own database; no global setup is generated. An older app
+that still has `src/test-global-setup.ts` keeps working (its shared server wins while it runs, against the
+database of worker 1, so run it with `maxWorkers: 1`); delete the file and the `globalSetup` line to move
+to the worker servers.
 
 It also adds `vitest`, `@vitest/coverage-v8`, `vite`, `@mongez/vite` to `devDependencies`, and registers four scripts in `package.json`:
 
@@ -323,7 +323,7 @@ Either works. The first is easier to find when you're fixing a specific endpoint
 
 ## Common pitfalls
 
-- **`globalSetup` failed silently → all tests get `fetch failed`.** Check that `src/test-global-setup.ts` exports `setup` and `teardown` (not default exports). A typo in the export name = no error at compile time, just every HTTP test failing.
+- **`globalSetup` failed silently → all tests get `fetch failed`.** If you use a `globalSetup`, check that `src/test-global-setup.ts` exports `setup` and `teardown` (not default exports). A typo in the export name = no error at compile time, just every HTTP test failing.
 - **Port conflict with running dev server.** If `pnpm start` is running on `:2031`, the preflight stops the run with `Port 2031 is already in use` before anything binds. Stop the dev server, or start the suite on a free port: `startHttpTestServer({ port: 3999 })`.
 - **JWT signed against a different secret.** Make sure `JWT_SECRET` (or whatever your auth config reads) is in `.env`. The test server reads the same env as the dev server — no `.env.test` overlay by default.
 - **`User.create(...)` for fixtures hits the `useHashedPassword()` transformer.** Pass the plain password; the model hashes it on save. Tokens generated via `authService` use the hashed password from the DB, so the round-trip is consistent.

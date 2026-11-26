@@ -71,6 +71,51 @@ export function isolatedEnvironment(
   };
 }
 
+/**
+ * Read the variables of a dotenv file: `KEY=value` lines, an optional `export `, `#`
+ * comments, and single or double quotes around a value. No interpolation.
+ */
+export function parseEnvFile(text: string): Record<string, string> {
+  const values: Record<string, string> = {};
+
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const match = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*)$/.exec(line);
+    if (!match) continue;
+    let value = match[2]!.trim();
+    const quote = value[0];
+    if ((quote === '"' || quote === "'") && value.indexOf(quote, 1) > 0) {
+      value = value.slice(1, value.indexOf(quote, 1));
+      if (quote === '"') value = value.replace(/\\n/g, "\n");
+    } else value = value.replace(/\s+#.*$/, "");
+    values[match[1]!] = value;
+  }
+
+  return values;
+}
+
+async function readAppEnvFile(
+  source: string,
+  option: string | false | undefined,
+): Promise<Record<string, string>> {
+  if (option === false) return {};
+  const candidates = option === undefined ? [".env.e2e", ".env"] : [option];
+  for (const candidate of candidates) {
+    const file = resolve(source, candidate);
+    if (relative(source, file).startsWith("..") || isAbsolute(relative(source, file)))
+      throw new Error("The e2e env file must live inside the app directory");
+    try {
+      return parseEnvFile(await readFile(file, "utf8"));
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+      if (option !== undefined)
+        throw new Error(`The e2e env file ${candidate} does not exist in ${source}`);
+    }
+  }
+  return {};
+}
+
 async function reservePort(): Promise<{ port: number; release: () => Promise<void> }> {
   const server = createServer();
   await new Promise<void>((accept, reject) => {
@@ -212,13 +257,16 @@ export class AppFixture {
     try {
       await options.prepare?.(context);
       runOptions.signal?.throwIfAborted();
+      const appEnv = await readAppEnvFile(source, options.envFile);
       const additions =
         typeof options.env === "function" ? options.env(context) : (options.env ?? {});
       const env = isolatedEnvironment(
         this.root,
         {
+          ...appEnv,
           NODE_ENV: "production",
           ...additions,
+          WARLOCK_E2E: "1",
           HOST: "127.0.0.1",
           HTTP_HOST: "127.0.0.1",
           PORT: String(options.portFromFile ? 0 : context.port),

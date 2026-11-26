@@ -21,7 +21,6 @@ That command drops two files into the project:
 ```
 src/test-setup.ts           ← runs setupTest in each worker
 vite.config.ts              ← wires setupFiles, sets the include pattern
-src/test-global-setup.ts    ← apps with web pages only: one shared server that also serves the pages
 ```
 
 It also adds `vitest`, `@vitest/coverage-v8`, `vite`, `@mongez/vite` to `devDependencies`, and registers four scripts in `package.json`:
@@ -38,19 +37,7 @@ You don't need to edit any of the three generated files for a basic suite. The d
 ## Step 2 — Verify the bootstrap
 
 The generated files should look like this. Confirm they match before you write the first test.
-`src/test-global-setup.ts` and the `globalSetup` line exist only in an app with `@warlock.js/web`:
-
-```ts title="src/test-global-setup.ts"
-import { startHttpTestServer, stopHttpTestServer } from "@warlock.js/core";
-
-export async function setup() {
-  await startHttpTestServer();
-}
-
-export async function teardown() {
-  await stopHttpTestServer();
-}
-```
+A web app needs no extra file: its pages are served by each worker's own server.
 
 ```ts title="src/test-setup.ts"
 import { setupTest } from "@warlock.js/core";
@@ -82,7 +69,7 @@ extend the file that declares them by default, and repeating it inside a project
 makes Vitest warn `applies the same plugin multiple times`. Use `extends: true`
 (inherit, the generated layout) or `extends: false` (own plugins) explicitly.
 
-The split matters: `globalSetup` (web apps) runs ONCE in the main vitest process (boots the shared HTTP server); `setupFiles` runs in each worker thread (gives each worker its own DB connection for direct calls).
+`setupFiles` runs in each worker (it gives each worker its own database connection). An optional `globalSetup` runs ONCE in the main vitest process; use it only for the shared-server case below.
 
 ### Keep Vitest setup out of development
 
@@ -98,7 +85,9 @@ if (process.env.VITEST) {
 
 In an API-only app there is no global server. The first request helper call in a test file (`testGet`, `actingAs`, ...) starts an HTTP server inside the worker, on a free port, and the file's later calls reuse it. It reads the worker's own database, so a row created in worker 2 is visible to a request made in worker 2. The next file starts its own server.
 
-The worker's server serves the app's routes, not its web pages: it does not start the web connector, so a page answers 404 there. An app with `@warlock.js/web` therefore gets `src/test-global-setup.ts` from `warlock add test`: it starts one shared server with `startHttpTestServer()`, which also serves the pages. While that server's port is published the helpers use it. It runs in the main process and reads the database of worker 1, so a test that needs the server to see rows it wrote serves its routes with `createTestHttpServer()`, or the suite runs with `maxWorkers: 1`. Delete the file and the `globalSetup` line to use the worker servers in a web app whose tests never load a page.
+In an app with `@warlock.js/web` the worker's server also starts the web connector (one Vite per worker, started on the worker's first request), so pages render against the worker's own database and a test that writes rows then loads a page sees them. `warlock add test` generates no `src/test-global-setup.ts` for it.
+
+An app generated before this change may still have `src/test-global-setup.ts` and a `globalSetup` line. It keeps working: while the shared server's port is published the helpers use it, in the main process, against the database of worker 1, so such an app should run with `maxWorkers: 1`. To move to the worker servers, delete the file and the `globalSetup` line from `vite.config.ts`.
 
 ### Running on a port of your own
 
@@ -334,7 +323,7 @@ Either works. The first is easier to find when you're fixing a specific endpoint
 
 ## Common pitfalls
 
-- **`globalSetup` failed silently → all tests get `fetch failed`.** Check that `src/test-global-setup.ts` exports `setup` and `teardown` (not default exports). A typo in the export name = no error at compile time, just every HTTP test failing.
+- **`globalSetup` failed silently → all tests get `fetch failed`.** If you use a `globalSetup`, check that `src/test-global-setup.ts` exports `setup` and `teardown` (not default exports). A typo in the export name = no error at compile time, just every HTTP test failing.
 - **Vitest waits about ten seconds after a green run, then prints `something prevents N Vite servers from exiting`.** Something in the global-setup process kept an open handle after `stopHttpTestServer()`. The test server stops a started `@warlock.js/scheduler` scheduler with the other connectors, so a `scheduler.start()` in a module's `main.ts` is covered. A timer, socket or watcher you open yourself in a module is not: close it in `Application.onShutdown(...)`, or `unref()` it when it is background work. Run `vitest run --reporter=hanging-process` to see what is still open.
 - **A route's `serverOptions.config` is not applied.** The test server runs the development dispatcher, which cannot forward the per-route config Fastify plugins read (for example a per-route `multipartOptions` file limit), so such a route is held to the global `http.fileUploadLimit` and the server logs a warning at boot. The in-process helpers (`createTestHttpServer`, the integration harness) use the production scan and apply it. The route-level `uploads: { maxTotalSize }` works in both.
 - **Per-route `serverOptions.bodyLimit` is honoured.** The test server runs the development dispatcher, which enforces each route's `bodyLimit` (and runs its `preParsing` hooks) the way a production build does, so a route that raises its limit can be tested before release.

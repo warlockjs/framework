@@ -67,8 +67,9 @@ export default defineE2E({
 });
 ```
 
-For a controlled root container that cannot use Chrome's sandbox, explicitly add
-`browser: { args: ["--no-sandbox"] }`. The harness does not add that flag for you.
+Chrome cannot start its sandbox as root, so the harness adds `--no-sandbox` by itself when
+the process runs as root (uid 0, as in a container or a CI job). Pass `--no-sandbox` or
+`--enable-sandbox` in `browser.args` to decide it yourself.
 A missing browser fails the CLI with an installation/override instruction; the
 framework's real-browser integration specs skip with that reason instead.
 
@@ -104,7 +105,7 @@ configuration. `WARLOCK_E2E_DATA_ROOT` always names the disposable root; it does
 not rewrite arbitrary app configuration or provision a database. Supply test
 service URLs explicitly if your app needs them. Do not pass production services.
 
-The fixture omits `.env`, `.env.*`, `.git`, `.warlock`, symlinks, `node_modules`,
+The fixture omits `.env`, `.env.*` (read as described below), `.git`, `.warlock`, symlinks, `node_modules`,
 and configured exclusions. It links the nearest project `node_modules` for
 **dependency reads only**; commands must not install or mutate dependencies.
 Explicitly exclude large data directories. Keep `--out` outside source content
@@ -116,6 +117,14 @@ and ambient service endpoints are absent. HOME, temporary, config and cache
 directories are owned. `app.env` adds fixture variables; the harness then pins
 `HOST`/`HTTP_HOST` to loopback, `PORT`/`HTTP_PORT`, and the data/port-file variables.
 An owned `.env` mirrors this environment for framework `env()` consumers.
+
+The app's own variables come from its `.env.e2e` when it has one, else its `.env`
+(`app.envFile` names another file inside the app directory, `false` starts without one).
+Those values are the base: `NODE_ENV`, `app.env` and the harness's own variables win over
+them, and the disposable app gets one merged `.env`. Point that file at a test database
+and a memory cache, never at production services. The harness also sets `WARLOCK_E2E=1`
+in the app's environment, so the app can switch off development-only guards (a page that
+answers 404 outside development, for example) while an e2e run drives it.
 `NODE_ENV` defaults to `production`; set it explicitly if your app needs another mode.
 
 By default, the OS assigns an ephemeral port which is reserved until immediately
