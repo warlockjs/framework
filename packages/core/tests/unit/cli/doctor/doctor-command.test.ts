@@ -67,6 +67,7 @@ describe("default doctor check set", () => {
       "sites",
       "capabilities",
       "locales-ts-deprecated",
+      "migrations",
       "upload-limits",
       "cors",
       "auth-tokens",
