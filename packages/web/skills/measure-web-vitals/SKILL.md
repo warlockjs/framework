@@ -25,11 +25,13 @@ scope in anything reachable from the server render — a page, layout, or
 and evaluated during SSR, so `web-vitals`' own `window` access at call time
 would need guarding anyway. The two supported places to call it:
 
-**An effect component in the top-level layout.** `root.tsx` is the document
-shell and is not hydrated, so a reporter rendered there never runs in the
-browser. Put the small client component in `src/web/layout.tsx`, which renders
-under `#vessel` and is hydrated with every page. It fires the registration
-from a `useEffect`:
+**An effect component in the top-level layout.** `root.tsx` is hydrated too
+(the entry hydrates the whole document), so an effect there would run; only its
+`<head>` content is not hydrated, so a reporter must not live inside `<head>`.
+The top-level layout is the better home: it renders under `#vessel`, stays
+mounted across client navigations, and keeps the document shell free of
+behaviour. Put the small client component in `src/web/layout.tsx`. It fires the
+registration from a `useEffect`:
 
 ```tsx title="src/web/vitals-reporter.tsx"
 import { useEffect } from "react";

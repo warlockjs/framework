@@ -631,7 +631,7 @@ export function Link({
       does what an anchor does. That is the whole progressive-enhancement story:
       links work before this code runs, and work better after.
     */
-    if (currentNavigator()?.(url) !== true) return;
+    if (currentNavigator()?.(url, { source: "link" }) !== true) return;
 
     event.preventDefault();
   };

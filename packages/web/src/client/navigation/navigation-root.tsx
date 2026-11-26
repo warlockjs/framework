@@ -599,6 +599,36 @@ export function NavigationRoot({
       // document to fetch or swap. Declining leaves the anchor to the browser.
       if (new URL(url, window.location.href).origin !== window.location.origin) return false;
 
+      /*
+        Before-navigate listeners (`routerEvents.onBeforeNavigate`, `useBlocker`)
+        may veto the navigation. A jump to a fragment of THIS page leaves the
+        page standing, so it is not asked. A guard that answers later (a
+        confirmation dialog) cannot hold the click's default open, so the
+        navigator accepts the navigation now and starts it once the answer is
+        `true`.
+      */
+      if (samePageFragment(url, window.location.href) === undefined) {
+        const verdict = routerEvents.emitBeforeNavigate({
+          to: url,
+          from: window.location.href,
+          type: options?.source ?? "navigate",
+        });
+
+        if (verdict === false) return true;
+
+        if (verdict !== true) {
+          void verdict.then((allowed) => {
+            if (allowed && !disposed) startNavigation(url, options);
+          });
+
+          return true;
+        }
+      }
+
+      return startNavigation(url, options);
+    });
+
+    function startNavigation(url: string, options?: { replace?: boolean }): boolean {
       const replace = options?.replace === true;
 
       /*
@@ -645,7 +675,7 @@ export function NavigationRoot({
       // cannot wait on the network without the browser having already followed
       // it.
       return true;
-    });
+    }
 
     /*
       Back/Forward. The entry is already in history and the URL has already
@@ -676,6 +706,40 @@ export function NavigationRoot({
         to trigger one.
       */
       const hashOnlyMove = withoutFragment(target) === withoutFragment(committedUrl);
+
+      if (!hashOnlyMove) {
+        /*
+          Back/Forward cannot be stopped before the browser moves, so a guard
+          that says no (or has not answered yet) gets the previous URL put back:
+          the address bar returns to the page that is still on screen, and
+          nothing re-renders. When a pending answer turns out to be yes, the
+          entry pushed back is replaced by the one the user asked for and the
+          navigation runs as an ordinary Back/Forward.
+        */
+        const departing = committedUrl;
+        const arrivedState: unknown = window.history.state;
+        const verdict = routerEvents.emitBeforeNavigate({
+          to: target,
+          from: departing,
+          type: "pop",
+        });
+
+        if (verdict !== true) {
+          window.history.pushState(withEntryKey(null, activeEntryKey.current), "", departing);
+
+          if (verdict !== false) {
+            void verdict.then((allowed) => {
+              if (!allowed || disposed) return;
+
+              window.history.replaceState(arrivedState, "", target);
+              committedUrl = target;
+              void apply(target, true, "popstate");
+            });
+          }
+
+          return;
+        }
+      }
 
       committedUrl = target;
 

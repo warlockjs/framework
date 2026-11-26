@@ -199,7 +199,12 @@ export { navigateTo, navigateBack, getHash } from "./client/navigation/verbs";
 // concurrent SSR requests learn nothing about each other from it.
 // `createRouterEvents` is ours, not MRR's, and exists so tests get isolation.
 export { routerEvents, createRouterEvents } from "./routing/router-events";
+export { useBlocker } from "./client/navigation/use-blocker";
+export type { BlockerConfirm, UseBlockerOptions } from "./client/navigation/use-blocker";
 export type {
+  BeforeNavigateListener,
+  BeforeNavigatePayload,
+  BeforeNavigateType,
   RefreshReason,
   NavigationStartPayload,
   NavigationEndPayload,
