@@ -179,6 +179,22 @@ export type ScryAlsoChange = {
   via: string[];
 };
 
+/** The impact of a search's top file, folded into the search answer: what reaches it, shortened. */
+export type ScrySearchImpact = {
+  /** The file whose impact this is (the best top hit's file). */
+  file: string;
+  /** Files that import it, transitively, not already in `alsoChanges` or the hits; at most 8. */
+  files: string[];
+  /** How many more such files there are than `files` lists. */
+  more: number;
+  /** API routes that reach it, as `METHOD path`; at most 5. */
+  routes: string[];
+  /** `<feature>/<flow>` whose steps include it; at most 5. */
+  flows: string[];
+  /** Test files among the importers and the tests proving those flows; at most 5. */
+  tests: string[];
+};
+
 export type ScrySearchResult = ScryNotes & {
   type: "search";
   text: string;
@@ -192,9 +208,15 @@ export type ScrySearchResult = ScryNotes & {
    * from before it existed.
    */
   alsoChanges?: ScryAlsoChange[];
+  /**
+   * The impact of the top hit's file, so one search answers "what changes with it" without a second command:
+   * the same facts as `--impact`, shortened and without the files `alsoChanges` already lists. Absent when no top
+   * hit maps to a file, or in stored answers from before it existed.
+   */
+  impact?: ScrySearchImpact;
   /** The best hit is not a name match and holds fewer than half of the request's words: use grep for literal text. */
   weak?: boolean;
-  /** The command to run next: `warlock scry --impact <top file>`. Absent when no top hit maps to a file. */
+  /** The full impact command for the top file (`warlock scry --impact <top file>`), for when `impact` is cut short. Absent when no top hit maps to a file. */
   next?: string;
 };
 

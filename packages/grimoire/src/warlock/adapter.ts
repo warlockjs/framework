@@ -31,6 +31,7 @@ import type {
 } from "../contracts/adapter";
 import { isCodeFile, isInsideFolder, toPosixPath } from "../paths";
 import { WARLOCK_LOGO_DATA_URI } from "./logo";
+import { collectOffThread } from "./collect-off-thread";
 import { collectMobileFacts, type MobileAppOption } from "./mobile-facts";
 import { readAppLanguages } from "./languages";
 
@@ -463,7 +464,11 @@ export function createWarlockAdapter(options: WarlockAdapterOptions = {}): BookA
     const mobile = await mobileApps(root);
     const dirs = await sourceFolders(root, mobile);
     const topFiles = (await Promise.all(mobile.map((app) => mobileTopFiles(root, app)))).flat();
-    const collected = collectFiles(root, [], { dirs, files: topFiles })
+    // The scan runs in a worker thread when it can, so a large app's scan never blocks the event loop.
+    const scanned =
+      (await collectOffThread<InspectFile>({ root, dirs, files: topFiles })) ??
+      collectFiles(root, [], { dirs, files: topFiles });
+    const collected = scanned
       .filter((file) => isCodeFile(file.file))
       .map((file) => toBookFile(file, mobile));
 

@@ -91,6 +91,13 @@ export type GrimoirePanelContext = {
    * `grimoireReporter({ file })`.
    */
   testResultsFile?: string;
+  /**
+   * Open the book ahead of the first tab view. Default: `true` in development with the default adapter, `false`
+   * otherwise (production and a custom adapter), so creating the panel never scans the app: the book opens on the
+   * first view, from the stored book when it is current. When on, the open starts after the creating tick (never
+   * during boot) and its failures surface on the first request.
+   */
+  warm?: boolean;
   /** Captured error groups of the monitor (counts only), for the product map's health. Devtools passes it. */
   errors?: () => Promise<readonly ProductErrorSummary[]>;
 };
@@ -130,9 +137,12 @@ export async function grimoireDevtoolsPanel(
     ...(context.testResultsFile === undefined ? {} : { testResultsFile: context.testResultsFile }),
   });
 
-  // Start opening the book now so the first tab view is fast. In development this runs in the background
-  // (never awaited, failures ignored) and only with the default adapter, so a custom one is not called early.
-  if (!development || context.adapter === undefined) source.warm();
+  // Open the book ahead of the first view only when asked (or in development with the default adapter, so a
+  // custom adapter is not called early). Deferred past the creating tick so boot is never held up; never
+  // awaited, failures ignored (they surface on the first request).
+  const warm = context.warm ?? (development && context.adapter === undefined);
+
+  if (warm) setTimeout(() => source.warm(), 0).unref();
 
   const answer =
     <Answer>(read: (snapshot: GrimoireSnapshot, request: GrimoirePanelRequest) => Answer) =>

@@ -20,6 +20,7 @@ import type {
   ScryResult,
   ScryRoutePage,
   ScryRouteResult,
+  ScrySearchImpact,
   ScrySearchResult,
 } from "../contracts/scry";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
@@ -607,6 +608,53 @@ function scryFlow(
 
 // ── Search ─────────────────────────────────────────────────────────────────
 
+/** The most of each list a search answer carries from the top file's impact. */
+const SEARCH_IMPACT_FILES = 8;
+const SEARCH_IMPACT_OTHERS = 5;
+
+/** The top file's impact, shortened for a search answer; no file already listed twice. */
+function impactOfTop(
+  snapshot: GrimoireSnapshot,
+  file: string,
+  hits: readonly ScryHit[],
+  alsoChanges: readonly { file: string }[],
+): ScrySearchImpact | undefined {
+  let full: ScryImpactResult;
+
+  try {
+    full = scryImpact(snapshot, { type: "impact", file });
+  } catch {
+    return undefined;
+  }
+
+  const listed = new Set([
+    file,
+    ...alsoChanges.map((change) => change.file),
+    ...hits.filter((hit) => hit.type === "file").map((hit) => hit.id),
+  ]);
+  const specs = new Set(
+    snapshot.book.facts.files.filter((item) => item.type === "spec").map((item) => item.file),
+  );
+  const files = full.importers.all.filter((item) => !listed.has(item) && !specs.has(item));
+
+  const impact: ScrySearchImpact = {
+    file,
+    files: files.slice(0, SEARCH_IMPACT_FILES),
+    more: Math.max(0, files.length - SEARCH_IMPACT_FILES),
+    routes: full.routes
+      .slice(0, SEARCH_IMPACT_OTHERS)
+      .map((route) => `${route.method} ${route.path}`),
+    flows: full.flows.slice(0, SEARCH_IMPACT_OTHERS),
+    tests: full.tests.filter((item) => !listed.has(item)).slice(0, SEARCH_IMPACT_OTHERS),
+  };
+
+  // Nothing beyond what the answer already lists: leave it out, so `next` stays the way to look further.
+  return impact.files.length + impact.routes.length + impact.flows.length + impact.tests.length ===
+    0
+    ? undefined
+    : impact;
+}
+
 function scrySearch(
   snapshot: GrimoireSnapshot,
   query: Extract<ScryQuery, { type: "search" }>,
@@ -619,7 +667,9 @@ function scrySearch(
   }
 
   const { counts, hits, weak } = searchSnapshot(snapshot, query);
-  const { alsoChanges, next } = alsoChangesOf(snapshot, hits);
+  const { alsoChanges, next, topFile } = alsoChangesOf(snapshot, hits);
+  const impact =
+    topFile === undefined ? undefined : impactOfTop(snapshot, topFile, hits, alsoChanges);
 
   return {
     type: "search",
@@ -628,6 +678,7 @@ function scrySearch(
     counts,
     hits,
     alsoChanges,
+    ...(impact === undefined ? {} : { impact }),
     weak,
     ...(next === undefined ? {} : { next }),
   };

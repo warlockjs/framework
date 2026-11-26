@@ -437,6 +437,32 @@ function alsoChangesLines(result: ScrySearchResult): string[] {
   ];
 }
 
+/** The top file's impact, folded into the search answer (what reaches it), or nothing when it adds nothing. */
+function impactLines(result: ScrySearchResult): string[] {
+  const impact = result.impact;
+
+  if (impact === undefined) return [];
+
+  const rows: [string, string][] = [];
+
+  if (impact.files.length > 0) {
+    rows.push([
+      "files",
+      impact.files.join(", ") + (impact.more > 0 ? `, +${impact.more} more` : ""),
+    ]);
+  }
+  if (impact.routes.length > 0) rows.push(["routes", impact.routes.join(", ")]);
+  if (impact.flows.length > 0) rows.push(["flows", impact.flows.join(", ")]);
+  if (impact.tests.length > 0) rows.push(["tests", impact.tests.join(", ")]);
+
+  if (rows.length === 0) return [];
+
+  return [
+    `impact of ${impact.file}:`,
+    ...rows.map(([label, text]) => `  ${label.padEnd(6)} ${text}`),
+  ];
+}
+
 /** Hits in score order, one line each: `score type id  detail  (app)  [matched]`. */
 function formatSearch(result: ScrySearchResult): string[] {
   if (result.hits.length === 0)
@@ -462,7 +488,9 @@ function formatSearch(result: ScrySearchResult): string[] {
     ...(result.weak === true
       ? ["weak match: no hit holds most of the request's words; use grep for literal text"]
       : []),
-    ...(result.next === undefined ? [] : [`next: ${result.next}`]),
+    ...impactLines(result),
+    // The impact above is the same answer as `--impact`; the command is offered only when it is not in the output.
+    ...(result.next === undefined || result.impact !== undefined ? [] : [`next: ${result.next}`]),
     ...notes(result),
   ];
 }

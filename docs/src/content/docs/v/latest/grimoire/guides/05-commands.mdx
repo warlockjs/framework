@@ -464,7 +464,7 @@ changes with the top hits:
 next: warlock scry --impact src/app/catalog/services/new-arrivals.service.ts
 ```
 
-Search first, then run `--impact` on the top hit (the `next:` line). Pass the whole sentence (a commit title, a bug report) rather than two keywords: a hit needs only some of the words,
+Search first: the answer already carries the top file's impact list. Run `--impact` only for the full lists. Pass the whole sentence (a commit title, a bug report) rather than two keywords: a hit needs only some of the words,
 and more words give the right file more to match. Case does not matter, words are matched whole (`ui` does not find
 `build`), a plural or `-ing`/`-ed` form matches its base word, and small words such as `the`, `of` and `for` are left
 out (a text of small words only finds nothing). An id such as `AC-5` or `WL9003` stays one word.
@@ -504,10 +504,22 @@ specs, plus the spec files that import it and the tests that prove a hit flow's 
 of the top hits share them, then step files, importers, imports and tests, and the list stops at 10 files whatever the
 `--limit`. A file that is already a hit is left out.
 
-Each line says why the file is there: `imports <hit file>` (it imports the hit's file), `imported by <hit file>` (the
-hit's file imports it), `test`, or `step of <flow>`. The last line, `next: warlock scry --impact <file>`, names the
-impact question for the first file. In `--json` the answer carries `alsoChanges` (`{ file, reason, via }`, `via` being
-the ids of the top hits that brought the file in), `weak` and `next`.
+Below the block, the answer folds in the impact of the top hit's file, so one search answers "what changes with it"
+without `--impact`: the importers (transitively) that are not already listed above, at most 8 with a `+n more` count,
+then the API routes (`METHOD path`), flows and tests that reach it, at most 5 each:
+
+```text
+impact of src/app/catalog/services/new-arrivals.service.ts:
+  files  src/app/orders/controllers/orders.controller.ts, src/app/catalog/controllers/home.controller.ts
+  routes GET /api/products/new-arrivals
+```
+
+When that block is printed it replaces the `next:` line; when the impact adds nothing beyond the list above, the
+`next:` line stays. Each line of the first block says why the file is there: `imports <hit file>` (it imports the hit's file), `imported by <hit file>` (the
+hit's file imports it), `test`, or `step of <flow>`. When there is no impact block, the last line,
+`next: warlock scry --impact <file>`, names the impact question for the first file. In `--json` the answer carries
+`alsoChanges` (`{ file, reason, via }`, `via` being the ids of the top hits that brought the file in), `impact`
+(`{ file, files, more, routes, flows, tests }`), `weak` and `next`.
 
 When the best hit is not a name match and holds fewer than half of the words of the text, the answer is marked weak
 (`"weak": true`) and ends with `weak match: no hit holds most of the request's words; use grep for literal text`.
