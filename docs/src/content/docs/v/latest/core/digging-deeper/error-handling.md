@@ -432,6 +432,30 @@ const errorResponse: HttpErrorResponseFormatter = ({ appError, requestId }) => {
 // Set this function as http.errorResponse in your HTTP configuration.
 ```
 
+The context also carries `request` (the Warlock request this reply answers) and
+`error` (the value that was thrown). Both are `undefined` for replies sent before
+routing, such as an unmatched URL, a rejected body or the global rate limit. Use
+them to capture a server failure with its route, method, user and the request id
+the client sees:
+
+```ts
+import type { HttpErrorResponseFormatter } from "@warlock.js/core";
+
+const errorResponse: HttpErrorResponseFormatter = ({ status, request, error, requestId }) => {
+  if (status >= 500) {
+    captureFailure({
+      requestId,
+      route: request?.route?.path,
+      method: request?.method,
+      userId: request?.locals.user?.id,
+      error,
+    });
+  }
+
+  return undefined; // keep the response body unchanged
+};
+```
+
 The formatter sees the original instance only for thrown `AppError`s handled
 by the request lifecycle. Early Fastify rejections and returned helper responses
 have no `appError`; use `body` and `status` for those cases. Do not spread an

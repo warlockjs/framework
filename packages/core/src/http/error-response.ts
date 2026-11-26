@@ -2,9 +2,22 @@ import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { AppError } from "./errors";
+import type { Request } from "./request";
 import type { FastifyInstance } from "./server";
 
 const appErrors = new WeakMap<FastifyReply, AppError>();
+const replyRequests = new WeakMap<FastifyReply, Request>();
+const replyErrors = new WeakMap<FastifyReply, unknown>();
+
+/** @internal Remember the Warlock request that this reply answers. */
+export function setResponseRequest(reply: FastifyReply, request: Request): void {
+  replyRequests.set(reply, request);
+}
+
+/** @internal Remember the value a handler or middleware threw for this reply. */
+export function setResponseThrown(reply: FastifyReply, thrown: unknown): void {
+  replyErrors.set(reply, thrown);
+}
 
 /** @internal Preserve the typed domain failure until the JSON formatter runs. */
 export function setResponseAppError(reply: FastifyReply, error: AppError): void {
@@ -17,6 +30,14 @@ export type HttpErrorResponseContext = {
   status: number;
   body: unknown;
   requestId: string;
+  /**
+   * The Warlock request this reply answers (route, method, user, headers).
+   * `undefined` for replies sent before routing, such as an unmatched URL,
+   * a rejected body or the global rate limit.
+   */
+  request?: Request;
+  /** The value that was thrown when the reply came from a throw. */
+  error?: unknown;
 };
 
 /** Return a JSON object, or undefined to retain the original response. */
@@ -69,6 +90,8 @@ export function registerErrorResponseFormatter(server: FastifyInstance): void {
           body,
           requestId,
           appError: appErrors.get(reply),
+          request: replyRequests.get(reply),
+          error: replyErrors.get(reply),
         });
 
         if (formatted === undefined) {
