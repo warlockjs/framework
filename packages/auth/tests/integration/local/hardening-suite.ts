@@ -69,6 +69,7 @@ const ItestUserMigration = migrate(ItestUser, {
 
 const TABLES = [
   "access_tokens",
+  "auth_token_families",
   "refresh_tokens",
   "one_time_tokens",
   "provider_accounts",
