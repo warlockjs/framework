@@ -11,11 +11,15 @@ const replyErrors = new WeakMap<FastifyReply, unknown>();
 
 /** @internal Remember the Warlock request that this reply answers. */
 export function setResponseRequest(reply: FastifyReply, request: Request): void {
+  if (typeof reply !== "object" || reply === null) return;
+
   replyRequests.set(reply, request);
 }
 
 /** @internal Remember the value a handler or middleware threw for this reply. */
 export function setResponseThrown(reply: FastifyReply, thrown: unknown): void {
+  if (typeof reply !== "object" || reply === null) return;
+
   replyErrors.set(reply, thrown);
 }
 

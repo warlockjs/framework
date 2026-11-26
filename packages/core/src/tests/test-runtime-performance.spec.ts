@@ -28,6 +28,8 @@ vi.mock("./fresh-module-graph", async (importOriginal) => ({
   prepareFreshFile: mocks.resetGraph,
 }));
 vi.mock("./reset-test-database", () => ({ resetTestDatabase: mocks.resetDatabase }));
+// setupTest() loads the app modules after boot; these specs drive the lifecycle, not the app.
+vi.mock("./load-app-modules-once", () => ({ loadAppModulesOnce: async () => undefined }));
 vi.mock("./reset-test-state", () => ({
   captureTestRouterSnapshot: mocks.captureSnapshot,
   resetTestRuntimeState: mocks.resetState,

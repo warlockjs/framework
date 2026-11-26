@@ -253,6 +253,6 @@ app.listen(0,'127.0.0.1',()=>writeFileSync(process.env.WARLOCK_E2E_PORT_FILE,Str
     expect(browserFlags(["--enable-sandbox"], 0)).toEqual(["--enable-sandbox"]);
     expect(browserFlags(["--no-sandbox"], 0)).toEqual(["--no-sandbox"]);
     expect(browserFlags(["--lang=en"], 1000)).toEqual(["--lang=en"]);
-    expect(browserFlags(undefined, undefined)).toEqual([]);
+    expect(browserFlags(undefined, 1000)).toEqual([]);
   });
 });

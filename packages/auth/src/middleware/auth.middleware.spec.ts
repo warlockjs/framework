@@ -182,7 +182,11 @@ describe("authMiddleware", () => {
 
     await middleware(makeCtx({ request, response }));
 
-    expect(renewAutomaticSession).toHaveBeenCalledWith("old-refresh", "user", { overlapMs: 4_000 });
+    expect(renewAutomaticSession).toHaveBeenCalledWith(
+      "old-refresh",
+      "user",
+      expect.objectContaining({ overlapMs: 4_000, request }),
+    );
     expect(setAuthCookie).toHaveBeenNthCalledWith(
       1,
       response,

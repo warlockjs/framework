@@ -56,6 +56,8 @@ describe("serializeRouteLocales", () => {
     const files = [{ sourceFile: file.sourceFile, webRoot: file.webRoot }];
 
     expect(() => serializeRouteLocales(files, file.appRoot)).not.toThrow();
-    expect(() => serializeRouteLocales(files, file.appRoot, ["en", "ar"])).toThrow(/WL1007/);
+    expect(() => serializeRouteLocales(files, file.appRoot, ["en", "ar"])).toThrow(
+      /locales\.json.*cannot mix locale codes with nested entries/,
+    );
   });
 });
