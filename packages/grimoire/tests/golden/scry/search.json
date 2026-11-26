@@ -142,6 +142,18 @@
       ]
     }
   ],
+  "impact": {
+    "file": "src/app/catalog/controllers/new-arrivals.controller.ts",
+    "files": [],
+    "more": 0,
+    "routes": [
+      "GET /api/products/new-arrivals"
+    ],
+    "flows": [
+      "catalog/new-arrivals"
+    ],
+    "tests": []
+  },
   "weak": false,
   "next": "warlock scry --impact src/app/catalog/controllers/new-arrivals.controller.ts"
 }

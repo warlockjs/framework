@@ -18,4 +18,6 @@
 changes with the top hits:
   src/app/catalog/routes.ts                            step of catalog/new-arrivals +2
   src/app/catalog/controllers/products.controller.ts   imported by new-arrivals
-next: warlock scry --impact src/app/catalog/controllers/new-arrivals.controller.ts
+impact of src/app/catalog/controllers/new-arrivals.controller.ts:
+  routes GET /api/products/new-arrivals
+  flows  catalog/new-arrivals
