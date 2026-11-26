@@ -85,6 +85,10 @@ Identifiers are normalized before the lookup: string values are trimmed and `ema
 
 For lower-level credential verification (just check, don't issue tokens), use `authService.attemptLogin(Model, credentials)` — returns the user or null without creating tokens.
 
+To tell a wrong password from an account the policy refuses, use `authService.verifyCredentials(Model, credentials, request?)`. It returns a `CredentialsVerification`: `{ type: "ok", user }`, `{ type: "invalid" }` (unknown account or wrong password, same timing) or `{ type: "refused", user }` (right password, `auth.canAuthenticate` said no). It emits no events and does not rehash.
+
+`auth.canAuthenticate(user, context?)` receives an `AuthenticationContext`: `{ via: AuthenticationMethod; request?: Request }`, where `via` is `"password" | "otp" | "passkey" | "oauth" | "token" | "refresh" | "custom"`. The request is present wherever the call site has one (`login(Model, credentials, deviceInfo, request)`, `authMiddleware`, provider and passkey login, `verifyOtp(..., request)`, automatic renewal); a refresh by token string has none. A policy taking only `(user)` still works.
+
 ## Device info
 
 The optional `deviceInfo` carries metadata into the refresh token row:

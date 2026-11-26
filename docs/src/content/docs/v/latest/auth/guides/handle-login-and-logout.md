@@ -109,6 +109,45 @@ const tokens = await user.createTokenPair({ userAgent, ip });
 return response.success({ user, tokens });
 ```
 
+## Tell a wrong password from a refused account
+
+`attemptLogin` returns `null` for a wrong password, an unknown account and an account that `auth.canAuthenticate` refuses. When you want to say "this account is suspended" only to someone who knows the password, use `authService.verifyCredentials(Model, credentials, request?)`. It returns one of three results:
+
+```ts
+const result = await authService.verifyCredentials(User, { email, password }, request);
+
+if (result.type === "invalid") {
+  return response.unauthorized({ error: "Invalid credentials" }); // unknown account or wrong password
+}
+
+if (result.type === "refused") {
+  return response.forbidden({ error: "Your account is suspended" }); // right password, policy said no
+}
+
+const tokens = await result.user.createTokenPair({ userAgent, ip }); // type: "ok"
+```
+
+An unknown account spends the same hashing time as a wrong password, so the `invalid` answer does not reveal which one it was. `verifyCredentials` does not emit login events and does not rehash the stored password; `attemptLogin` does both and keeps returning `null` for every failure.
+
+## Decide who may authenticate
+
+`auth.canAuthenticate(user, context?)` runs on every path that resolves a user or issues tokens. The second argument says how and, where the call site has one, on which request:
+
+```ts
+// src/config/auth.ts
+canAuthenticate: async (user, context) => {
+  if (user.get("status") !== "active") return false;
+
+  // Tenant checks need the request. Token refreshes by token string have none.
+  if (context?.via === "password" && context.request) {
+    return belongsToTenant(user, context.request.header("x-tenant"));
+  }
+
+  return true;
+},
+```
+
+`context.via` is `"password"`, `"otp"`, `"passkey"`, `"oauth"`, `"token"` (an access token on a request, or tokens issued for a user directly), `"refresh"` (refresh-token exchange and automatic renewal) or `"custom"` (your own `completeLogin()` call). `context.request` is set for password login through `loginWithSessionCookies`, `login(..., request)`, `verifyCredentials(..., request)`, provider and passkey login, `verifyOtp(..., request)`, `authMiddleware` and automatic session renewal. A policy that takes only `(user)` keeps working.
 The static `User.attempt({ email, password })` is a sugary alias for the same call.
 
 ## Device info — `DeviceInfo`
