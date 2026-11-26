@@ -183,7 +183,7 @@ Good fits: cache clears, sitemap regeneration, emails, webhooks. `afterCommit` i
 
 ## Work scheduled inside a transaction
 
-A `setTimeout`, a queue push or a fire-and-forget promise started inside the callback usually runs after the transaction has ended. That work runs **outside the transaction and with no session**: its Cascade queries behave as if no transaction had ever been opened, `transaction()` called from it opens a fresh transaction, and `afterCommit()` called from it runs on the next microtask.
+A `setTimeout`, a queue push or a promise started **after the callback returns** runs **outside the transaction and with no session**: its Cascade queries behave as if no transaction had ever been opened, `transaction()` called from it opens a fresh transaction, and `afterCommit()` called from it runs on the next microtask. An async call started while the callback is still running (for example `void audit(user)` without `await`) shares the transaction client, so it sees the transaction's uncommitted rows and rolls back with it, but nothing waits for it before COMMIT: await it, or queue it with `afterCommit()`.
 
 ```ts
 await transaction(async () => {

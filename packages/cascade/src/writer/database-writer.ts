@@ -658,6 +658,7 @@ export class DatabaseWriter implements WriterContract {
       | {
           code?: string | number;
           detail?: string;
+          constraint?: string;
           keyPattern?: Record<string, unknown>;
           message?: string;
         }
@@ -667,22 +668,39 @@ export class DatabaseWriter implements WriterContract {
       return error;
     }
 
-    let field: string | undefined;
+    let columns: string[] = [];
+    let constraint: string | undefined = err.constraint;
 
     if (err.keyPattern) {
-      field = Object.keys(err.keyPattern)[0];
+      columns = Object.keys(err.keyPattern);
     } else {
-      // Postgres: "Key (email)=(x) already exists."
-      field = /Key \(([^)]+)\)=/
-        .exec(err.detail ?? "")?.[1]
-        ?.split(",")[0]
-        ?.trim();
+      // Postgres: 'Key ("tenantId", "receiptFileId")=(1, 2) already exists.'
+      const keyList = /Key \((.+?)\)=/.exec(err.detail ?? "")?.[1];
+
+      if (keyList) {
+        columns = keyList
+          .split(",")
+          .map((column) => column.trim().replace(/^"(.*)"$/, "$1"))
+          .filter(Boolean);
+      }
     }
 
-    if (!field) {
-      // Mongo: "index: email_1 dup key"
-      field = /index: (\S+?)_-?1\b/.exec(err.message ?? "")?.[1];
+    // Mongo: "E11000 duplicate key error ... index: email_1 dup key"
+    const mongoIndex = /index: (\S+)/.exec(err.message ?? "")?.[1];
+
+    if (!constraint && mongoIndex) {
+      constraint = mongoIndex;
     }
+
+    if (columns.length === 0 && mongoIndex) {
+      const single = /^(.+?)_-?1$/.exec(mongoIndex)?.[1];
+
+      if (single) {
+        columns = [single];
+      }
+    }
+
+    const field = columns.length > 0 ? columns.join(", ") : undefined;
 
     return new DatabaseWriterValidationError(
       `[${this.model.constructor.name} Model] ${isInsert ? "Insert" : "Update"} Validation failed`,
@@ -693,6 +711,7 @@ export class DatabaseWriter implements WriterContract {
           input: field ?? "id",
         },
       ],
+      { constraint, columns, cause: error },
     );
   }
 

@@ -218,6 +218,25 @@ slug: v.string().unique("Post", {
 
 Slug only needs to be unique among _published_ posts — drafts can share. The callback receives the in-progress query builder, the value being validated, and the rest of the input object, so you can branch on whatever context you need.
 
+### Unique violations that race past the rule
+
+Two requests can both pass the `unique` check and reach the database together. The database's own unique index then rejects the second write, and Cascade turns that rejection into a `DatabaseWriterValidationError` instead of a raw driver error. This works on PostgreSQL and MongoDB, and for composite indexes too:
+
+```ts
+try {
+  await Receipt.create({ tenantId, receiptFileId });
+} catch (error) {
+  if (error instanceof DatabaseWriterValidationError) {
+    error.errors; // [{ type: "unique", error: "The tenantId, receiptFileId must be unique", input: "tenantId, receiptFileId" }]
+    error.columns; // ["tenantId", "receiptFileId"]
+    error.constraint; // the index or constraint name, when the driver reports it
+    error.cause; // the original driver error
+  }
+}
+```
+
+`columns` lists every column of the violated index without quotes, `constraint` holds the index name, and `cause` keeps the driver error for logs.
+
 ## Writing your own custom rules
 
 For checks beyond unique/exists — cross-field validation, third-party API calls, computed-value rules — write a plain seal rule:

@@ -1461,7 +1461,7 @@ export class PostgresQueryBuilder<T = unknown>
    */
   public async update(fields: Record<string, unknown>): Promise<number> {
     this.applyPendingScopes();
-    const { sql: filterSql, params: filterParams } = this.buildFilter();
+    const { sql: filterSql, params: filterParams } = this.buildBoundedFilter();
 
     // The filter's placeholders own $1..$N; SET values bind after them, and
     // pass through the driver's json/jsonb-aware serialization like every
@@ -2377,6 +2377,44 @@ export class PostgresQueryBuilder<T = unknown>
   // ============================================================================
   // INTERNAL HELPERS
   // ============================================================================
+
+  /**
+   * Like `buildFilter()`, but when the chain carries `limit()` / `offset()` the
+   * filter becomes `WHERE ctid IN (SELECT ctid FROM t WHERE … [ORDER BY …] LIMIT n)`
+   * so a bounded `update()` touches only the rows the query would return.
+   * Without a limit it is exactly `buildFilter()`.
+   */
+  private buildBoundedFilter(): { sql: string; params: unknown[] } {
+    const hasBound = this.operations.some((op) => op.type === "limit" || op.type === "offset");
+
+    if (!hasBound) {
+      return this.buildFilter();
+    }
+
+    this.applyHasRelations();
+
+    const boundedOps = this.operations.filter(
+      (op) =>
+        op.type === "has" ||
+        op.type.includes("where") ||
+        op.type.includes("Where") ||
+        op.type === "orderBy" ||
+        op.type === "orderByRaw" ||
+        op.type === "limit" ||
+        op.type === "offset",
+    );
+
+    const parser = new PostgresQueryParser({
+      table: this.table,
+      dialect: this.driver.dialect,
+      operations: toParserOps(boundedOps),
+    });
+
+    const { query = "", bindings = [] } = parser.parse();
+    const subquery = query.replace(/^SELECT \*/, "SELECT ctid");
+
+    return { sql: `WHERE ctid IN (${subquery})`, params: bindings };
+  }
 
   /**
    * Build a WHERE-only SQL fragment from `where*` operations on the current builder.

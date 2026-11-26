@@ -210,6 +210,8 @@ const activeUsers = await User.query().scope("active").get();
 **Local scopes** (`addScope`) — opt-in, only when you call `.scope("name")`.
 **Global scopes** (`addGlobalScope`) — run on every query for that model. Useful for multi-tenancy or default soft-delete filtering. Bypass per-query with `.withoutGlobalScope("name")` / `.withoutGlobalScopes()`. A scope may carry `{ stamp: { tenantId } }` (or a function returning it): the values are written into inserts by `create()`, `createMany()`, a new record's `save()` and `upsert()` when the caller left the column unset.
 
+**Bounded bulk updates.** `Model.where(...).orderBy(...).limit(n).update(fields)` changes only the first `n` rows in that order (PostgreSQL through a `ctid` subquery; MongoDB through `_id` selection, or in place for `limit(1)`); the returned count is the number of rows changed. Without `limit()` every match is updated.
+
 ## Things NOT to do
 
 - Don't test an unset column with `=== undefined`: PostgreSQL returns `null` for it (MongoDB omits the field). Use `model.isFilled("field")` or `== null`. Same for lean rows.

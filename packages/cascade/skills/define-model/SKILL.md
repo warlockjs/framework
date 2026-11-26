@@ -125,6 +125,8 @@ Quick reference:
 | Replace object columns | `user.set(data).save()`   |
 | After spread mutations | `user.save()`             |
 
+**Unique violations.** When two writes race past a `unique` rule and the database's unique index rejects one, `save()`/`create()` throw `DatabaseWriterValidationError` (never the raw driver error) with `errors: [{ type: "unique", input: "tenantId, receiptFileId", … }]`, `columns` (every column of the index, unquoted), `constraint` (index name when the driver reports it) and `cause` (the driver error).
+
 **Write-heavy MongoDB model?** `public static idReservationBlockSize = 100;` reserves 100 generated ids per counter round-trip instead of one per insert (default `1`). Ids stay unique but are not strictly increasing across processes, and unused ids in a block are lost on restart.
 
 ## Remove a field — `.unset(field)`
