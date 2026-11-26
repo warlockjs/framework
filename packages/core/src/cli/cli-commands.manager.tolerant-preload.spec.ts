@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { command } from "../commands/cli-command";
 import type { CommandActionData } from "../commands/types";
-import { CLICommandsManager } from "./cli-commands.manager";
+import { CLICommandsManager, shouldExitOnAsyncError } from "./cli-commands.manager";
 
 class FailingPreloadManager extends CLICommandsManager {
   protected override async loadPreloaders(): Promise<void> {
@@ -47,5 +47,26 @@ describe("tolerant preload", () => {
     await new FailingPreloadManager().execute(build(false, seen), { args: [], options: {} });
 
     expect(exit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("shouldExitOnAsyncError", () => {
+  const persistent = { isPersistent: true };
+
+  it("always exits for a one-shot command", () => {
+    expect(
+      shouldExitOnAsyncError({ isPersistent: false }, { isProduction: false, isBooted: true }),
+    ).toBe(true);
+  });
+
+  it("exits for a persistent production command that has not finished booting", () => {
+    expect(shouldExitOnAsyncError(persistent, { isProduction: true, isBooted: false })).toBe(true);
+  });
+
+  it("keeps a persistent command alive after boot, and in development", () => {
+    expect(shouldExitOnAsyncError(persistent, { isProduction: true, isBooted: true })).toBe(false);
+    expect(shouldExitOnAsyncError(persistent, { isProduction: false, isBooted: false })).toBe(
+      false,
+    );
   });
 });

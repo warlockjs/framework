@@ -67,6 +67,7 @@ import {
 } from "./payload-budget-estimate";
 import { findUnusedRouteLocaleFiles } from "./build-route-locale-manifest";
 import { serializeRouteLocales } from "./serialize-route-locales";
+import type { SiteLocaleCodes } from "./site-locale-codes";
 import { buildTranslationManifest, type TranslationBuildOptions } from "./translation-manifest";
 import {
   isNotFoundPageFile,
@@ -176,6 +177,14 @@ export type GeneratePagesBarrelOptions = {
   appRoot: string;
   /** Absolute path to `.warlock/production` — where the barrel is written. */
   productionDir: string;
+  /**
+   * `app.localeCodes`. When given, route locale files are parsed against it, so a
+   * file boot would refuse (for example locale codes mixed with nested entries)
+   * fails the build with the same error.
+   */
+  localeCodes?: readonly string[];
+  /** Locales of the sites that declare their own `localeRouting.locales`, by site key. */
+  siteLocaleCodes?: SiteLocaleCodes;
   /** Source directory name under `appRoot`; defaults to `"src"`. */
   srcDir?: string;
   /**
@@ -555,7 +564,12 @@ export async function generatePagesBarrel(
   const webRoots = discoverWebRoots(srcRoot);
   const graph = discoverPageGraph({ appRoot, srcDir: options.srcDir, sites: options.sites });
   const discovered = graph.pages;
-  const localeFiles = serializeRouteLocales(graph.localeFiles, appRoot);
+  const localeFiles = serializeRouteLocales(
+    graph.localeFiles,
+    appRoot,
+    options.localeCodes,
+    options.siteLocaleCodes,
+  );
   // An app with no pages yet has nothing for a dictionary to reach: stay quiet.
   const unusedLocaleFiles = graph.pages.length === 0 ? [] : findUnusedRouteLocaleFiles(graph);
   if (unusedLocaleFiles.length > 0) {
@@ -839,6 +853,8 @@ export async function generatePagesBarrel(
     srcRoot,
     pages: discovered,
     localeFiles: graph.localeFiles,
+    localeCodes: options.localeCodes,
+    siteLocaleCodes: options.siteLocaleCodes,
     relativeTo: (file) => toPosix(path.relative(appRoot, file)),
     options: options.translations,
   });

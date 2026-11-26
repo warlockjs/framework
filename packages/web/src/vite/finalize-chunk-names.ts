@@ -299,7 +299,7 @@ export async function finalizeChunkNames(input: {
     );
 
     for (const entry of canonical) {
-      entry.member.newBase = `${entry.member.stem}-${shortHash(`${cycleDigest}:${entry.code}`)}.js`;
+      entry.member.newBase = `${entry.member.stem}-${shortHash(`${cycleDigest}:${entry.member.oldBase}:${entry.code}`)}.js`;
     }
   }
 
@@ -315,6 +315,25 @@ export async function finalizeChunkNames(input: {
   }
 
   const rewrite = createReplacer(finalNames);
+
+  // Two different chunks must never share an output file: the second write
+  // would silently replace the first and one page would run the other's code.
+  const owners = new Map<string, string>();
+
+  for (const state of states) {
+    if (state.duplicateOf !== undefined) continue;
+
+    const target = `${state.directory}/${state.newBase}`;
+    const owner = owners.get(target);
+
+    if (owner !== undefined) {
+      throw new Error(
+        `Chunks "${owner}" and "${state.fileName}" would both be written to "${target}". Rename one of the entries or report this build, because two chunks must never share an output file.`,
+      );
+    }
+
+    owners.set(target, state.fileName);
+  }
 
   // Write the new files first, then remove the old ones that no new name reuses.
   const written = new Set<string>();

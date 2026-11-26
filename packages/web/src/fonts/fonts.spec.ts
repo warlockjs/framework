@@ -284,4 +284,19 @@ describe("font declarations", () => {
   ])("rejects invalid declarations", (overrides) => {
     expect(() => prepareFonts(app(), [{ ...declaration, ...overrides } as WebFont])).toThrow();
   });
+
+  it("names the family, the value and the supported list for a fallback read from JSON", () => {
+    const parsed = JSON.parse(
+      '[{"family":"Display","variable":"--font-display","fallback":"Tahoma","files":[{"path":"src/fonts/display.woff2"}]}]',
+    ) as WebFont[];
+    const root = app();
+
+    expect(() => prepareFonts(root, parsed)).toThrow(
+      'Font "Display": fallback "Tahoma" is not supported. Use one of: Arial, Helvetica, Times New Roman, Segoe UI, Roboto.',
+    );
+    expect(() =>
+      prepareFonts(root, [{ ...parsed[0]!, fallback: ["Arial", "Tahoma"] as never }]),
+    ).toThrow(/fallback "Tahoma" is not supported/);
+    expect(() => prepareFonts(root, [{ ...parsed[0]!, fallback: "Arial" }])).not.toThrow();
+  });
 });

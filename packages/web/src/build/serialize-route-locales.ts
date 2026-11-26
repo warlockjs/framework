@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { DiscoveredLocaleFile } from "./discover-pages";
 import { parseRouteLocaleFile } from "./parse-route-locales";
+import { localeCodesForFile, type SiteLocaleCodes } from "./site-locale-codes";
 import { assertRouteLocaleKeyOwnership } from "./route-locale-key-ownership";
 import { toPosix } from "../shared/to-posix";
 
@@ -20,6 +21,8 @@ export type SerializedRouteLocaleFile = {
 export function serializeRouteLocales(
   localeFiles: readonly DiscoveredLocaleFile[],
   appRoot: string,
+  localeCodes?: readonly string[],
+  siteLocaleCodes?: SiteLocaleCodes,
 ): SerializedRouteLocaleFile[] {
   const serialized: SerializedRouteLocaleFile[] = [];
   const parsed = [];
@@ -30,7 +33,13 @@ export function serializeRouteLocales(
     return leftPath < rightPath ? -1 : leftPath > rightPath ? 1 : 0;
   })) {
     const source = fs.readFileSync(localeFile.sourceFile, "utf-8");
-    parsed.push(parseRouteLocaleFile({ ...localeFile, source }));
+    parsed.push(
+      parseRouteLocaleFile({
+        ...localeFile,
+        source,
+        localeCodes: localeCodesForFile(localeFile.sourceFile, localeCodes, siteLocaleCodes),
+      }),
+    );
     serialized.push({
       sourceFile: toPosix(path.relative(appRoot, localeFile.sourceFile)),
       webRoot: toPosix(path.relative(appRoot, localeFile.webRoot)),

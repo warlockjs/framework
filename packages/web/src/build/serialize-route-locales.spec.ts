@@ -48,4 +48,14 @@ describe("serializeRouteLocales", () => {
       serializeRouteLocales([{ sourceFile: file.sourceFile, webRoot: file.webRoot }], file.appRoot),
     ).toThrow(/invalid locale code/);
   });
+
+  it("fails with the boot error when a file mixes locale codes with nested entries", () => {
+    const source =
+      '{"legal":{"languages":{"ar":{"en":"Arabic","ar":"العربية"},"en":{"en":"English","ar":"الإنجليزية"}}}}';
+    const file = fixture("src/web/locales.json", source);
+    const files = [{ sourceFile: file.sourceFile, webRoot: file.webRoot }];
+
+    expect(() => serializeRouteLocales(files, file.appRoot)).not.toThrow();
+    expect(() => serializeRouteLocales(files, file.appRoot, ["en", "ar"])).toThrow(/WL1007/);
+  });
 });

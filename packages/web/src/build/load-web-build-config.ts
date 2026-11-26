@@ -10,6 +10,8 @@ export type WebBuildConfig = {
   sites?: SitesConfig;
   fonts?: readonly import("../fonts/types").WebFont[];
   moduleBoundary?: "error" | "warn" | "off";
+  /** `app.localeCodes`, so the build can check route locale files the way boot does. */
+  localeCodes?: readonly string[];
 };
 
 type Esbuild = typeof import("esbuild");
@@ -68,11 +70,43 @@ function resolveEsbuild(appRoot: string): string {
  * inside the app so those package imports resolve from its `node_modules`.
  */
 export async function loadWebBuildConfig(appRoot: string): Promise<WebBuildConfig> {
-  const configFile = ["web.ts", "web.tsx"]
+  const webModule = await importConfigModule<WebBuildConfig>(appRoot, ["web.ts", "web.tsx"]);
+  // The app config may read environment values that only exist at boot; when it
+  // cannot be loaded here the build checks route locales without the codes, as before.
+  const appModule = await importConfigModule<{ localeCodes?: unknown }>(appRoot, [
+    "app.ts",
+    "app.tsx",
+  ]).catch(() => undefined);
+  const codes = appModule?.localeCodes;
+  const localeCodes =
+    Array.isArray(codes) && codes.every((code) => typeof code === "string")
+      ? (codes as string[])
+      : undefined;
+
+  if (webModule === undefined) return localeCodes === undefined ? {} : { localeCodes };
+
+  const moduleBoundary = webModule.moduleBoundary;
+
+  return {
+    sites: staticSites(webModule.sites),
+    fonts: webModule.fonts,
+    ...(moduleBoundary === "error" || moduleBoundary === "warn" || moduleBoundary === "off"
+      ? { moduleBoundary }
+      : {}),
+    ...(localeCodes === undefined ? {} : { localeCodes }),
+  };
+}
+
+/** Bundles one `src/config/<name>` file (the first that exists) and returns its default export. */
+async function importConfigModule<T>(
+  appRoot: string,
+  names: readonly string[],
+): Promise<T | undefined> {
+  const configFile = names
     .map((name) => path.join(appRoot, "src", "config", name))
     .find(existsSync);
 
-  if (configFile === undefined) return {};
+  if (configFile === undefined) return undefined;
 
   const esbuild = (await import(pathToFileURL(resolveEsbuild(appRoot)).href)) as Esbuild & {
     default?: Esbuild;
@@ -103,19 +137,9 @@ export async function loadWebBuildConfig(appRoot: string): Promise<WebBuildConfi
   await writeFile(bundleFile, result.outputFiles[0]!.text, "utf8");
 
   try {
-    const module = (await import(pathToFileURL(bundleFile).href)) as {
-      default?: WebBuildConfig;
-    };
+    const module = (await import(pathToFileURL(bundleFile).href)) as { default?: T };
 
-    const moduleBoundary = module.default?.moduleBoundary;
-
-    return {
-      sites: staticSites(module.default?.sites),
-      fonts: module.default?.fonts,
-      ...(moduleBoundary === "error" || moduleBoundary === "warn" || moduleBoundary === "off"
-        ? { moduleBoundary }
-        : {}),
-    };
+    return module.default;
   } finally {
     await unlink(bundleFile).catch(() => {});
   }

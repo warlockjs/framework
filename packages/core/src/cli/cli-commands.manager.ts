@@ -42,6 +42,21 @@ import type { CommandActionData, ResolvedCLICommandOption } from "../commands/ty
 const EXIT_FLUSH_BUDGET = 500;
 
 /**
+ * Whether an async error that escaped a command must end the process.
+ * One-shot commands always exit. A persistent command survives runtime errors
+ * (HMR or a supervisor recovers), except in production before boot has
+ * finished, where there is no running server to keep alive.
+ */
+export function shouldExitOnAsyncError(
+  command: Pick<CLICommand, "isPersistent">,
+  state: { isProduction: boolean; isBooted: boolean },
+): boolean {
+  if (!command.isPersistent) return true;
+
+  return state.isProduction && !state.isBooted;
+}
+
+/**
  * Exit with `code` once stdout/stderr have drained.
  *
  * `process.exit()` truncates writes still queued on a non-TTY stdout — a pipe,
@@ -709,6 +724,11 @@ export class CLICommandsManager {
    * they own a run loop that is expected to survive runtime errors so HMR or a
    * supervisor can recover. They still print — silence is what made this class
    * of failure invisible in the first place.
+   *
+   * The exemption ends where the run loop has not started: a production
+   * persistent command (`warlock start`) whose boot has not finished yet has
+   * nothing to recover into, so a rejection then exits non-zero and the process
+   * manager shows the app as errored instead of online and serving nothing.
    */
   protected fatalAsyncErrorReported = false;
 
@@ -724,7 +744,12 @@ export class CLICommandsManager {
 
       displayCommandError(command.name, error);
 
-      if (!command.isPersistent) {
+      if (
+        shouldExitOnAsyncError(command, {
+          isProduction: Application.isProduction,
+          isBooted: Application.isBooted,
+        })
+      ) {
         exitAfterFlush(1);
       }
     };

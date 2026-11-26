@@ -232,6 +232,22 @@ describe("finalizeChunkNames", () => {
     expect(yOf(first.directory)).not.toBe(yOf(second.directory));
   });
 
+  it("gives every member of a cycle its own file even when two members have equal code", async () => {
+    // a -> p -> b -> q -> a: a and b share a stem and identical code once the
+    // in-cycle names are blanked.
+    const { directory } = await finalize({
+      "x-AAAAAAAA.js": { code: 'import "./p-PPPPPPPP.js";export const x=1;' },
+      "p-PPPPPPPP.js": { code: 'import "./x-BBBBBBBB.js";export const p=1;' },
+      "x-BBBBBBBB.js": { code: 'import "./q-QQQQQQQQ.js";export const x=1;' },
+      "q-QQQQQQQQ.js": { code: 'import "./x-AAAAAAAA.js";export const q=1;' },
+    });
+
+    const files = emitted(directory);
+
+    expect(files).toHaveLength(4);
+    expect(new Set(files).size).toBe(4);
+  });
+
   it("does nothing when the build emitted no chunks", async () => {
     const { directory } = build({});
     const result = await finalizeChunkNames({ outDir: directory, chunks: [] });
