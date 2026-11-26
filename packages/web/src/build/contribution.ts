@@ -22,6 +22,7 @@ import type {
 } from "@warlock.js/core";
 import type { PluginOption } from "vite";
 import type { SitesConfig } from "../sites/site-config.types";
+import { siteLocaleCodesOf } from "./site-locale-codes";
 import { resolveClientChunkMode } from "../vite/client-chunk-mode";
 import { clientVisibleRouteNames } from "../routing/named-api-routes";
 import { resolvePayloadBudget } from "../server/payload-budget";
@@ -297,6 +298,7 @@ export function createWebBuildContribution(
       const webConfig = await loadWebBuildConfig(context.appRoot);
       sites = options.sites ?? webConfig.sites;
       fonts = webConfig.fonts;
+      const localeCodes = webConfig.localeCodes;
       moduleBoundary = options.moduleBoundary ?? webConfig.moduleBoundary;
 
       const payloadBudget = resolvePayloadBudget(context.options.budgets?.payload);
@@ -305,6 +307,8 @@ export function createWebBuildContribution(
         appRoot: context.appRoot,
         productionDir: context.productionDir,
         srcDir: options.srcDir,
+        localeCodes,
+        siteLocaleCodes: siteLocaleCodesOf(sites),
         // Derived from `resolveClientOutDir` — the SAME function `emit` passes
         // to the Vite build below — so the path baked into the manifest and
         // the path the bundle is written to are one expression, not two that

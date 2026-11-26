@@ -13,6 +13,7 @@ import fs from "node:fs";
 import { analyzePageTranslationUsage, type TranslationUsage } from "@warlock.js/core";
 import { isDiscoveredRoutablePage, type DiscoveredPage } from "./discover-pages";
 import { parseRouteLocaleFile } from "./parse-route-locales";
+import { localeCodesForFile, type SiteLocaleCodes } from "./site-locale-codes";
 import {
   EVERYTHING_USAGE,
   serializeUsage,
@@ -64,6 +65,10 @@ export type TranslationBuildInput = {
   /** Turns an absolute path into the app-root-relative identity the barrel uses. */
   readonly relativeTo: (absolutePath: string) => string;
   readonly options?: TranslationBuildOptions;
+  /** `app.localeCodes`, so a file boot would refuse fails the build too. */
+  readonly localeCodes?: readonly string[];
+  /** Locales of the sites that declare their own, by site key. */
+  readonly siteLocaleCodes?: SiteLocaleCodes;
 };
 
 const GROUP = /^[A-Za-z_][A-Za-z0-9_-]*$/;
@@ -89,12 +94,15 @@ export function resolveSharedGroups(groups: readonly string[] | undefined): read
  */
 function localeSources(
   localeFiles: TranslationBuildInput["localeFiles"],
+  localeCodes: readonly string[] | undefined,
+  siteLocaleCodes: SiteLocaleCodes | undefined,
 ): TranslationSourceEntries[] {
   return localeFiles.map((file) =>
     parseRouteLocaleFile({
       sourceFile: file.sourceFile,
       webRoot: file.webRoot,
       source: fs.readFileSync(file.sourceFile, "utf8"),
+      localeCodes: localeCodesForFile(file.sourceFile, localeCodes, siteLocaleCodes),
     }),
   );
 }
@@ -109,7 +117,7 @@ function localeSources(
 export function buildTranslationManifest(input: TranslationBuildInput): TranslationBuildResult {
   const sharedGroups = resolveSharedGroups(input.options?.sharedGroups);
   const prune = input.options?.prune !== false;
-  const sources = localeSources(input.localeFiles);
+  const sources = localeSources(input.localeFiles, input.localeCodes, input.siteLocaleCodes);
   const usage: Record<string, SerializedTranslationUsage> = {};
 
   const routable = input.pages.filter(isDiscoveredRoutablePage);

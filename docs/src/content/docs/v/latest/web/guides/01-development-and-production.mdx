@@ -89,7 +89,11 @@ Existing build and CSS Modules configuration continues to work without changes.
   does not need to load the TypeScript build config.
 
 At production boot, the Web connector refuses to start without the page
-manifest instead of reporting healthy while serving only 404s.
+manifest instead of reporting healthy while serving only 404s. A failure while
+the app boots under `warlock start` ends the process with a non-zero exit code
+after it is logged, so a process manager shows the app as errored instead of
+online and serving nothing; an error after boot is logged and the server keeps
+running.
 
 ### Assets and the rate limiter
 
@@ -311,7 +315,9 @@ import specifiers inside it point at the final names of the chunks they import:
 - A chunk's name changes whenever its bytes or the bytes of anything it imports
   change, and it stays the same when nothing changed.
 - Chunks that import each other (a cycle) are named together: a change inside the
-  cycle renames every member.
+  cycle renames every member. Each member's own identity is part of its name, so
+  two members with equal code still get two files; the build stops with an error
+  naming both chunks if two chunks would ever be written to one file.
 - Byte-identical chunks are merged into one file and their importers point at it.
   Entry chunks are never merged.
 - `client/.vite/manifest.json`, the module preload lists inside the chunks and the

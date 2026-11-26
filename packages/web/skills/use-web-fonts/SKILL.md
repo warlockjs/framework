@@ -113,7 +113,7 @@ export default function AboutPage() {
   (400 by default, or a range such as `"100 900"`), `style`, `unicodeRange`,
   `preload`, `aboveFold`, and optional equivalent TTF/OTF `metricsPath`.
 - `display` defaults to `swap`. `fallback` accepts Arial, Helvetica, Times New
-  Roman, Segoe UI, Roboto, or an array. Use names from this recorded set.
+  Roman, Segoe UI, Roboto, or an array. Use names from this recorded set; any other value (for example one read from JSON) fails before any font is processed with an error that names the family, the value and the supported list.
 - Use the CSS variable; naming only the real family bypasses the adjusted stack.
 - Inspect initial HTML: one cross-origin font preload per critical URL and a
   stylesheet link appear inside the head in development and production.

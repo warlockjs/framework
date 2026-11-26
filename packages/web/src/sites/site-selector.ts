@@ -187,6 +187,8 @@ export function validateSitesAtBoot(config: {
   sites: SitesConfig;
   resolveHost?: HostResolver;
   unknownHost?: "not-found" | string;
+  /** `app.localeCodes`, to check each site's own `localeRouting.locales` against. */
+  localeCodes?: readonly string[];
 }): void {
   const errors = validateSitesConfig(config);
 

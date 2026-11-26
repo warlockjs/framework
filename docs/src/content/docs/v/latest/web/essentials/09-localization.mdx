@@ -45,7 +45,10 @@ prefix to append, cannot be empty, and is allowed only at the JSON root.
 Every flattened key has one owner across every route dictionary: duplicate
 keys, including an ancestor/child conflict, stop discovery with both source
 files named. Each leaf must provide the configured locale codes, so there is
-no route-JSON fallback for a missing translation.
+no route-JSON fallback for a missing translation. `warlock build` parses every
+dictionary against `app.localeCodes`, so a file the server would refuse at boot
+(for example one that mixes locale codes with nested entries) fails the build
+with the same error and file path.
 
 In a multi-site app, a `locales.json` above the site folders
 (`src/web/locales.json` or `src/web/$sites/locales.json`) reaches every page of

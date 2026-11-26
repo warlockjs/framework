@@ -287,4 +287,41 @@ describe("assertRouteLocaleKeyOwnership", () => {
       expect(found).toEqual(["/app/src/web/other/locales.json"]);
     });
   });
+
+  it("holds a site's dictionaries and pages to the site's own locales", () => {
+    const siteRoot = "/app/src/web/$sites/shop";
+    const files = {
+      "/app/src/web/locales.json": '{"app":{"name":{"en":"Shop","ar":"متجر","fr":"Boutique"}}}',
+      "/app/src/web/$sites/shop/locales.json": '{"$group":"shop","cta":{"en":"Buy","ar":"اشتر"}}',
+    };
+    const result = buildRouteLocaleManifest(
+      graph(
+        [{ pageFile: `${siteRoot}/home.page.tsx`, webRoot: siteRoot }],
+        [
+          { sourceFile: "/app/src/web/locales.json" },
+          { sourceFile: `${siteRoot}/locales.json`, webRoot: siteRoot },
+        ],
+      ),
+      {
+        localeCodes: ["en", "ar", "fr"],
+        localeCode: "en",
+        siteLocaleCodes: { shop: ["en", "ar"] },
+        readSource: sources(files),
+      },
+    );
+
+    expect(Object.keys(result!.pages[`${siteRoot}/home.page.tsx`]!.translationsByLocale)).toEqual([
+      "en",
+      "ar",
+    ]);
+    expect(() =>
+      buildRouteLocaleManifest(
+        graph(
+          [{ pageFile: `${siteRoot}/home.page.tsx`, webRoot: siteRoot }],
+          [{ sourceFile: `${siteRoot}/locales.json`, webRoot: siteRoot }],
+        ),
+        { localeCodes: ["en", "ar", "fr"], localeCode: "en", readSource: sources(files) },
+      ),
+    ).toThrow();
+  });
 });

@@ -28,7 +28,22 @@ export type HostResolver = (
   input: HostResolverInput,
 ) => Promise<HostResolution | null> | HostResolution | null;
 
-type SiteLocaleRouting = { strategy?: LocaleRoutingStrategy };
+/** A site's own locale routing: the strategy plus, optionally, the locales it serves. */
+export type SiteLocaleRouting = {
+  strategy?: LocaleRoutingStrategy;
+  /**
+   * The locales this site serves, a subset of `app.localeCodes`. A request for a
+   * code outside the set (a `?locale=` value, the locale cookie or header) falls
+   * back to the site's default. Omitted: the site serves every app locale.
+   */
+  locales?: string[];
+  /**
+   * This site's default locale; one of `locales` (or of `app.localeCodes` when
+   * `locales` is omitted). Omitted: `app.localeCode` when the site serves it,
+   * otherwise the first of `locales`.
+   */
+  defaultLocale?: string;
+};
 
 /** A site served on an explicit list of exact hostnames. */
 export type FixedSiteConfig = {

@@ -87,6 +87,32 @@ A site can carry its own `/robots.txt` policy: `robots` on a site (and on a `res
 
 `localeRouting` on a site replaces the global `web.localeRouting` for that site. Omit it to inherit the global setting; use `{}` to disable locale routing for that site. The global locale codes and default locale still come from `app.localeCodes` and `app.localeCode`.
 
+### A site's own locales
+
+A site can serve fewer locales than the app. Set `locales` (a subset of `app.localeCodes`) and, optionally, `defaultLocale` (one of those locales) in the site's `localeRouting`:
+
+```ts title="src/config/web.ts"
+sites: {
+  storefront: {
+    hosts: ["shop.example.com"],
+    localeRouting: {
+      strategy: "prefix-except-default",
+      locales: ["en", "ar"],
+      defaultLocale: "en",
+    },
+  },
+  docs: { hosts: ["docs.example.com"] }, // serves every app locale
+},
+```
+
+For that site only:
+
+- locale prefix routes (`/ar/pricing`) exist only for its `locales`, and the not-found page pins the locale of a prefixed URL from the same set;
+- a `?locale=` value, the locale cookie or the `locale` header naming a code outside the set is answered in the site's default locale, and that default is what a locale switch persists;
+- a route `locales.json` inside the site folder only needs that site's codes in the leaves you ship; dictionaries above the site folders still follow `app.localeCodes`.
+
+Without `defaultLocale`, the site uses `app.localeCode` when it serves that locale, and its first locale otherwise. A code that `app.localeCodes` does not declare, or a `defaultLocale` outside the site's `locales`, stops boot with an error naming the site (`web.sites.storefront.localeRouting.locales lists "de", which app.localeCodes does not declare`). A site without these options behaves as before.
+
 ## Local development
 
 Browsers resolve `*.localhost` to loopback, so point local configuration at the same shape as production, including the development port:

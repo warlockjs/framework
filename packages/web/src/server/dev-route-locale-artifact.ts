@@ -10,6 +10,7 @@ import {
   serializeRouteLocales,
   type SerializedRouteLocaleFile,
 } from "../build/serialize-route-locales";
+import type { SiteLocaleCodes } from "../build/site-locale-codes";
 import { toPosix } from "../shared/to-posix";
 
 type SerializedGraphPage = { pageFile: string; webRoot: string };
@@ -26,6 +27,8 @@ export type PrepareDevRouteLocaleArtifactOptions = {
   artifactPath: string;
   localeCodes?: readonly string[];
   localeCode?: string;
+  /** Locales of the sites that declare their own, by site key. */
+  siteLocaleCodes?: SiteLocaleCodes;
 };
 
 export type PreparedDevRouteLocaleArtifact = {
@@ -103,6 +106,7 @@ export function prepareDevRouteLocaleArtifact(
       {
         localeCodes: options.localeCodes,
         localeCode: options.localeCode,
+        siteLocaleCodes: options.siteLocaleCodes,
         readSource: (sourceFile) => {
           const source = sources.get(sourceFile);
           if (source === undefined) {

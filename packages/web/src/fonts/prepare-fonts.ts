@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
+import recorded from "./system-metrics";
 import { fallbackMetrics, fallbackOverrides } from "./fallback";
 import { readFontMetrics } from "./read-metrics";
 import type { FontDocument, WebFont } from "./types";
@@ -41,6 +42,30 @@ export function fontPath(root: string, file: string): string {
   return absolute;
 }
 
+/**
+ * A manifest read from JSON is not checked by the `SystemFont` type, so every
+ * family's `fallback` is validated here before any file is read.
+ */
+function assertSupportedFallbacks(fonts: readonly WebFont[]): void {
+  const supported = Object.keys(recorded);
+
+  for (const font of fonts) {
+    const fallbacks =
+      typeof font.fallback === "string"
+        ? [font.fallback]
+        : Array.isArray(font.fallback)
+          ? font.fallback
+          : [];
+
+    for (const fallback of fallbacks) {
+      if (typeof fallback !== "string" || !Object.hasOwn(recorded, fallback))
+        throw new Error(
+          `Font "${font.family}": fallback "${String(fallback)}" is not supported. Use one of: ${supported.join(", ")}.`,
+        );
+    }
+  }
+}
+
 /** No source paths or font metrics are needed by a production server. */
 export function prepareFonts(root: string, fonts: readonly WebFont[]): PreparedFonts {
   const assets = new Map<string, Buffer | string>();
@@ -49,6 +74,7 @@ export function prepareFonts(root: string, fonts: readonly WebFont[]): PreparedF
   const css: string[] = [];
   const variables = new Set<string>();
   const families = new Set<string>();
+  assertSupportedFallbacks(fonts);
   for (const font of fonts) {
     if (!font.family.trim() || families.has(font.family) || !font.files.length)
       throw new Error("Fonts require unique nonempty families and at least one file");

@@ -96,6 +96,10 @@ Regular, bold, italic and bold italic use recorded face-specific widths and
 local face names. If a visitor lacks a local font, the browser tries the next
 entry. Select fallbacks available on your audience's operating systems.
 
+A value outside that list (for example one read from a JSON file, which no type
+checks) is refused before any font is processed:
+`Font "Display": fallback "Tahoma" is not supported. Use one of: Arial, Helvetica, Times New Roman, Segoe UI, Roboto.`
+
 ## Disable preloads for a route
 
 ```ts title="src/web/articles/layout.setup.ts"

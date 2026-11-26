@@ -66,7 +66,7 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 
 `basePath` selects a site below a path prefix; the longest matching prefix wins. `unknownHost` is `"not-found"` by default, or may name a configured fallback site. During development use hosts such as `acme.localhost:2030`. `warlock dev` answers only `localhost`, `*.localhost`, IP addresses, fixed sites' `hosts` and `web.devAllowedHosts` (default none; `".tenant.test"` also matches subdomains) — list dynamic tenants' dev hosts there, or they get a 403 "Blocked request" whose text names `web.devAllowedHosts`. `devAllowedHosts: true` disables the host check (DNS-rebinding exposure; avoid).
 
-`localeRouting` on a site replaces global `web.localeRouting`; omit it to inherit, and use `{}` to disable it for one site. Locale codes and the default locale still come from `app.localeCodes` and `app.localeCode`.
+`localeRouting` on a site replaces global `web.localeRouting`; omit it to inherit, and use `{}` to disable it for one site. Locale codes and the default locale still come from `app.localeCodes` and `app.localeCode`, unless the site narrows them: `localeRouting: { strategy, locales: ["en", "ar"], defaultLocale: "en" }` (type `SiteLocaleRouting`) makes the site serve only that subset of `app.localeCodes`. Prefix routes, the not-found locale pin and route `locales.json` checks use the site's set, and a `?locale=`, cookie or header value outside it is answered in the site's default. A code outside `app.localeCodes`, or a `defaultLocale` outside `locales`, stops boot with an error naming the site; without the options a site behaves as before.
 
 ## 4. Read the result in a page handler
 

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseRouteLocaleFile } from "./parse-route-locales";
+import { localeCodesForFile, type SiteLocaleCodes } from "./site-locale-codes";
 import { assertRouteLocaleKeyOwnership } from "./route-locale-key-ownership";
 
 type ParsedRouteLocaleFile = ReturnType<typeof parseRouteLocaleFile>;
@@ -24,6 +25,12 @@ export type BuildRouteLocaleManifestOptions = {
   localeCode?: string;
   /** Lets production hand the generated barrel's source text over without a filesystem read. */
   readSource?: (sourceFile: string) => string;
+  /**
+   * Locales of the sites that declare their own `localeRouting.locales`, by site
+   * key. A dictionary inside such a site's folder, and the pages of that site,
+   * are held to these codes instead of `app.localeCodes`.
+   */
+  siteLocaleCodes?: SiteLocaleCodes;
 };
 
 /** The filesystem identity both dev and the generated production barrel retain. */
@@ -165,7 +172,7 @@ export function buildRouteLocaleManifest(
       sourceFile: source.sourceFile,
       webRoot: source.webRoot,
       source: readSource(source.sourceFile),
-      localeCodes,
+      localeCodes: localeCodesForFile(source.sourceFile, localeCodes, options.siteLocaleCodes),
     }),
   );
   const keys = assertRouteLocaleKeyOwnership(sources);
@@ -178,11 +185,12 @@ export function buildRouteLocaleManifest(
       .filter((source) => applies(source, page))
       .sort((left, right) => directoryDepth(left) - directoryDepth(right));
     const translationsByLocale = safeRecord<Record<string, unknown>>();
-    for (const code of localeCodes) translationsByLocale[code] = safeRecord<unknown>();
+    const pageCodes = localeCodesForFile(page.pageFile, localeCodes, options.siteLocaleCodes)!;
+    for (const code of pageCodes) translationsByLocale[code] = safeRecord<unknown>();
 
     for (const source of applicable) {
       for (const [key, translations] of Object.entries(source.entries)) {
-        for (const code of localeCodes) {
+        for (const code of pageCodes) {
           assignNested(translationsByLocale[code]!, key, translations[code]!);
         }
       }

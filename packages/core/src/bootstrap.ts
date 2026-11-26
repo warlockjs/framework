@@ -23,4 +23,19 @@ export async function bootstrap() {
   unhandledCaptureInstalled = true;
 
   captureAnyUnhandledRejection({ exitOnUncaughtException: Application.isProduction });
+
+  // A rejection before the app has finished booting leaves a process that is
+  // up but serves nothing (a connector failed to boot). In production that is
+  // fatal: the logger listener above has already recorded it, so exit non-zero
+  // after a short flush and let the process manager show the app as errored.
+  // After boot a rejection stays a logged error.
+  if (Application.isProduction) {
+    process.on("unhandledRejection", () => {
+      if (Application.isBooted) return;
+
+      process.exitCode = 1;
+      const timer = setTimeout(() => process.exit(1), 1000);
+      timer.unref?.();
+    });
+  }
 }
