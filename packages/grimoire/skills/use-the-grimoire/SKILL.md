@@ -38,13 +38,19 @@ edits a file you wrote either.
    changes with the top hits:
      src/app/catalog/repositories/products.repository.ts   imported by new-arrivals.service.ts
      src/app/catalog/tests/new-arrivals.test.ts            test
-   next: warlock scry --impact src/app/catalog/services/new-arrivals.service.ts
+   impact of src/app/catalog/services/new-arrivals.service.ts:
+     files  src/app/orders/controllers/orders.controller.ts
+     routes GET /api/products/new-arrivals
    ```
+
+   Where your client supports MCP, prefer the Grimoire MCP tools (`grimoire_search`, `grimoire_impact`, `grimoire_flow`)
+   to the CLI: the same answers, one call each, no shell.
 
    The number in front is the score: hits are in score order, best first, whatever the type.
 
-2. `scry --impact <top file>` (the `next:` line) and read the `changes with` lines: they are the files that usually change
-   with it (what it imports and what imports it inside the same feature, and its tests).
+2. Read the `changes with` and `impact of` lines of that same answer: they are the files that usually change with the
+   top hit (what it imports and what imports it, its routes, flows and tests). The search already includes them; run
+   `scry --impact <top file>` only when you need the full lists (the `next:` line appears when the answer has no impact block).
 3. Use grep only for literal text, or when the answer says `weak match`.
 4. Read the feature's `README.md`, then the flow file. They say what the behaviour should be.
 5. Ask for the flow's book map. It lists the files behind each step, the tests that prove each
@@ -77,7 +83,7 @@ build, then ask again. A project with no book stops with `GR9007`. A note
 
 Add `--json` for machine-readable output; a failed call then prints `{ "type": "error", "code", "message", "fix" }` on stdout and exits 1 (the scry MCP tools return the same JSON as their error text). `--impact` lists API routes, pages, flows and features,
 including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`
-prints every line. `--search` takes the whole sentence (the commit title or the bug report, not two keywords): hits whose name or title holds the words come first, every other hit follows by score, and the list is printed in score order with the score in front. It also reads a flow's summary, story, cases and criteria (`AC-5` works); a hit found by written text shows the part that matched in brackets. Page, screen, block and file hits carry their app, and `--app <id>` keeps one app's hits. Specs, locale files and type files rank below code of an equal match. Search reads Arabic and accented Latin text too: accents, Arabic vowel marks, hamza forms and the leading article `ال` do not matter (`شحنة` finds `الشحنة`, `cafe` finds `café`). The answer's `alsoChanges` list (`changes with the top hits:`, at most 10 files) and `next` line come from the top three hits; `weak: true` (the line `weak match: …`) says no hit holds most of the request's words. Read the flows it names and run their tests after
+prints every line. `--search` takes the whole sentence (the commit title or the bug report, not two keywords): hits whose name or title holds the words come first, every other hit follows by score, and the list is printed in score order with the score in front. It also reads a flow's summary, story, cases and criteria (`AC-5` works); a hit found by written text shows the part that matched in brackets. Page, screen, block and file hits carry their app, and `--app <id>` keeps one app's hits. Specs, locale files and type files rank below code of an equal match. Search reads Arabic and accented Latin text too: accents, Arabic vowel marks, hamza forms and the leading article `ال` do not matter (`شحنة` finds `الشحنة`, `cafe` finds `café`). The answer's `alsoChanges` list (`changes with the top hits:`, at most 10 files) comes from the top three hits, and its `impact` block (`impact of <file>:`, the importers, routes, flows and tests that reach the top file, shortened) from the top file, so `--impact` is only for the full lists (its `next` line is printed when there is no impact block); `weak: true` (the line `weak match: …`) says no hit holds most of the request's words. Read the flows it names and run their tests after
 your change.
 
 A file's entry is also at a fixed path: `src/app/auth/controllers/login.controller.ts` is described

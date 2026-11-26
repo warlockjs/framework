@@ -45,7 +45,8 @@ function snapshotOf(
         },
       ],
     },
-    book: { facts: { pages: [], mobile: [], routes: [], named: [], files } },
+    proofs: [],
+    book: { facts: { pages: [], mobile: [], routes: [], named: [], files, tests: [] } },
     ownership: {
       files: Object.fromEntries(
         specs.map((item) => [
@@ -122,6 +123,31 @@ describe("search: files that change with the top hits", () => {
     expect(result.next).toBe(`warlock scry --impact ${SERVICE}`);
   });
 
+  it("folds the top file's impact into the answer without repeating listed files, and caps it at 8", () => {
+    const result = search(snapshot, "zephyr");
+
+    // The orders controller imports the service from another feature, so only the impact list has it.
+    expect(result.impact).toEqual({
+      file: SERVICE,
+      files: ["src/app/orders/controllers/orders.controller.ts"],
+      more: 0,
+      routes: [],
+      flows: [],
+      tests: [],
+    });
+
+    const importers = Array.from({ length: 12 }, (_, index) => ({
+      file: `src/app/orders/c${index}.ts`,
+      owner: "orders",
+      imports: [SERVICE],
+    }));
+    const wide = search(snapshotOf([{ file: SERVICE, type: "service" }, ...importers]), "zephyr");
+
+    expect(wide.impact?.files).toHaveLength(8);
+    expect(wide.impact?.more).toBe(4);
+    expect(formatScryResult(wide).join("\n")).toContain("+4 more");
+  });
+
   it("prints the block, the next line and no weak note for a name match", () => {
     const lines = formatScryResult(search(snapshot, "zephyr"));
     const start = lines.indexOf("changes with the top hits:");
@@ -129,7 +155,12 @@ describe("search: files that change with the top hits", () => {
     expect(start).toBeGreaterThan(0);
     expect(lines[start + 1]).toMatch(/arrivals\.controller\.ts\s+imports zephyr\.service\.ts$/);
     expect(lines[start + 2]).toMatch(/products\.repository\.ts\s+imported by zephyr\.service\.ts$/);
-    expect(lines.at(-1)).toBe(`next: warlock scry --impact ${SERVICE}`);
+    // The impact of the top file follows the block; it already answers `--impact`, so no `next:` line.
+    const impact = lines.indexOf(`impact of ${SERVICE}:`);
+
+    expect(impact).toBeGreaterThan(start);
+    expect(lines[impact + 1]).toBe("  files  src/app/orders/controllers/orders.controller.ts");
+    expect(lines.some((line) => line.startsWith("next:"))).toBe(false);
     expect(lines.some((line) => line.startsWith("weak match"))).toBe(false);
   });
 

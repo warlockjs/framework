@@ -63,12 +63,12 @@ function provingTests(snapshot: GrimoireSnapshot, hit: ScryHit): string[] {
  * The files that change with the top hits, most shared first (then step, imports,
  * imported-by, test, then path), at most ten, none of them a hit's own file.
  * `next` is the impact command for the file of the best top hit that is not a
- * flow (else the first step file of the top flow).
+ * flow (else the first step file of the top flow); `topFile` is that file.
  */
 export function alsoChangesOf(
   snapshot: GrimoireSnapshot,
   hits: readonly ScryHit[],
-): { alsoChanges: ScryAlsoChange[]; next: string | undefined } {
+): { alsoChanges: ScryAlsoChange[]; next: string | undefined; topFile: string | undefined } {
   const files = new Map(snapshot.book.facts.files.map((file) => [file.file, file]));
   const owner = (file: string): string | null => snapshot.ownership?.files?.[file]?.owner ?? null;
   const sameGroup = (left: string, right: string): boolean => {
@@ -150,5 +150,9 @@ export function alsoChangesOf(
   // The file of the best hit that is a file itself (a flow hit's step files have no order of their own).
   const first = (top.find((item) => item.hit.type !== "flow") ?? top[0])?.seeds[0];
 
-  return { alsoChanges, next: first === undefined ? undefined : `warlock scry --impact ${first}` };
+  return {
+    alsoChanges,
+    next: first === undefined ? undefined : `warlock scry --impact ${first}`,
+    topFile: first,
+  };
 }
