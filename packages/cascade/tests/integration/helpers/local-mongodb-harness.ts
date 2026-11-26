@@ -2,6 +2,7 @@ import type { Db } from "mongodb";
 import { DataSource } from "../../../src/data-source/data-source";
 import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { MongoDbDriver } from "../../../src/drivers/mongodb/mongodb-driver";
+import type { ModelDefaults } from "../../../src/types";
 
 /**
  * A harness for a MongoDB server this process did NOT start — the MongoDB
@@ -19,6 +20,12 @@ export type LocalMongodbHarnessOptions = {
   readonly isDefault?: boolean;
   /** Log commands. Defaults to `false`. */
   readonly logging?: boolean;
+  /**
+   * Model defaults set on the data source (they win over the driver's). The
+   * MongoDB driver infers camelCase relation keys (`userId`); a suite whose
+   * fixtures store snake_case keys passes `{ namingConvention: "snake_case" }`.
+   */
+  readonly modelDefaults?: Partial<ModelDefaults>;
 };
 
 export type LocalMongodbHarness = {
@@ -70,6 +77,7 @@ export async function startLocalMongodbHarness(
     name: options.dataSourceName ?? "local-mongo-test",
     driver,
     isDefault: options.isDefault ?? true,
+    modelDefaults: options.modelDefaults,
   });
 
   dataSourceRegistry.register(dataSource);
