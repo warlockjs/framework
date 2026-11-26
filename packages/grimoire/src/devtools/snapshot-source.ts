@@ -7,7 +7,8 @@
  * facts (`liveFacts`, development), an edit to a file the route facts were read from reads them again from
  * the running app on the next open, so a route edit shows without `warlock grimoire build`.
  *
- * - Production (`mode: "production"`): a snapshot is reused until the stamp
+ * - Production (`mode: "production"`): the stored book is read when it is current (no build), otherwise the
+ *   book is built in memory. A snapshot is reused until the stamp
  *   changes, with no time limit, unless `ttlMs` is set. A request that finds
  *   the stamp changed waits for the new open. `warm()` opens the book ahead
  *   of the first request.
@@ -31,7 +32,7 @@ import type { BookAdapter } from "../contracts/adapter";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import { GRIMOIRE_PATHS } from "../paths";
 import { resolveResultsFile } from "../test-results";
-import { openGrimoire } from "../workspace";
+import { openGrimoire, openStoredGrimoire } from "../workspace";
 
 /** Options of the panel's snapshot source. */
 export type SnapshotSourceOptions = {
@@ -178,9 +179,22 @@ export function createSnapshotSource(
         ? {}
         : { testResultsFile: options.testResultsFile }),
     };
-    let snapshot: GrimoireSnapshot;
+    let snapshot: GrimoireSnapshot | undefined;
 
-    if (!liveCollected || refreshRoutes) {
+    // Production reads the stored book when it is current: no build, so the first view is fast.
+    if (options.mode === "production") {
+      try {
+        const stored = await openStoredGrimoire(root, adapter, openOptions);
+
+        if (stored.behind === undefined) snapshot = stored;
+      } catch {
+        // No book, or one from another version: build it in memory below.
+      }
+    }
+
+    if (snapshot !== undefined) {
+      // The stored book answers as it is.
+    } else if (!liveCollected || refreshRoutes) {
       // One pass: the book and the live route facts together, so a first open never builds twice.
       // After a routes-file edit: the dev server reloads the file on save, so the live read sees its new routes.
       liveCollected = true;
