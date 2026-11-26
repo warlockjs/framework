@@ -55,6 +55,8 @@ import { composeLayoutModules } from "./compose-layout-modules";
 import { composePageModule } from "./compose-page-module";
 import { createPageModuleLoader } from "./create-page-module-loader";
 import { resolveLocaleRouting } from "./locale-routing/resolve-locale-routing";
+import { notFoundLocaleCodes, restrictToSiteLocales } from "./locale-routing/site-locale-guard";
+import type { SiteLocaleRouting } from "../sites/site-config.types";
 import { stableRouteNames } from "./named-api-routes";
 import { resolvePayloadBudget } from "./payload-budget";
 import {
@@ -70,6 +72,7 @@ import {
 import { layoutPrefixesByDirectory } from "./layout-prefixes";
 import { createRefusalPageRenderer } from "./core-refusal-page";
 import type { FailureShell } from "./render-page";
+import { siteLocaleCodesOf } from "../build/site-locale-codes";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
 import { normalizePageModule } from "./normalize-page-module";
 import { productionDeclaredStylesheetUrls, productionStylesheetUrls } from "./stylesheet-urls";
@@ -93,7 +96,7 @@ import {
 
 type SiteSlice = {
   readonly site: string;
-  readonly localeRouting?: { readonly strategy?: "none" | "prefix" | "prefix-except-default" };
+  readonly localeRouting?: SiteLocaleRouting;
 };
 
 function manifestModule(entry: {
@@ -479,6 +482,7 @@ export function installPageRoutesFromManifest(
     {
       localeCodes: config.key<readonly string[] | undefined>("app.localeCodes"),
       localeCode: config.key<string | undefined>("app.localeCode"),
+      siteLocaleCodes: siteLocaleCodesOf(options.siteDispatch?.sites),
       readSource: (sourceFile) => {
         const source = localeSourceByFile.get(sourceFile);
         if (source === undefined) {
@@ -535,7 +539,7 @@ export function installPageRoutesFromManifest(
   // Resolved once, up front — the same value dev resolves in
   // `../install-page-routes.ts`, so a page's registrations cannot disagree
   // between dev and production.
-  const localeRouting = resolveLocaleRouting(siteSlice?.localeRouting);
+  const localeRouting = resolveLocaleRouting(siteSlice?.localeRouting, siteSlice?.site);
 
   // Per-request `linkStylesheetsFor()` declarations, resolved against the same
   // client manifest the chains above read. Memoised per declared set: the
@@ -790,7 +794,7 @@ export function installPageRoutesFromManifest(
     )) {
       router.get(
         routerPathOf(registration.path),
-        registration.handler,
+        restrictToSiteLocales(registration.handler, localeRouting, siteSlice?.localeRouting),
         // `isPage` marks this route as SSR-served. Pages and API routes
         // share one router and one route-name namespace, so the router's
         // duplicate-name error reads this flag to say which claimant is the
@@ -806,12 +810,16 @@ export function installPageRoutesFromManifest(
         localeRouting,
         { pageFile: page.sourceFile, renderNotFound },
       )) {
-        router.post(routerPathOf(registration.path), registration.handler, {
-          isPage: true,
-          ...(pageModule.uploads === undefined || pageModule.uploads === false
-            ? {}
-            : { uploads: pageModule.uploads }),
-        });
+        router.post(
+          routerPathOf(registration.path),
+          restrictToSiteLocales(registration.handler, localeRouting, siteSlice?.localeRouting),
+          {
+            isPage: true,
+            ...(pageModule.uploads === undefined || pageModule.uploads === false
+              ? {}
+              : { uploads: pageModule.uploads }),
+          },
+        );
       }
     }
 
@@ -832,7 +840,11 @@ export function installPageRoutesFromManifest(
   */
   registerNotFoundPageRoute({
     router,
-    renderPage: notFoundPageHandler,
+    renderPage:
+      notFoundPageHandler === undefined
+        ? undefined
+        : restrictToSiteLocales(notFoundPageHandler, localeRouting, siteSlice?.localeRouting),
+    localeCodes: notFoundLocaleCodes(localeRouting),
     renderRefusal: createRefusalPageRenderer({
       loadShell: async () =>
         ({

@@ -543,3 +543,157 @@ describe("installPageRoutesFromManifest — locale routing, [locale] folder (car
     ).toThrow(localePostsPage.sourceFile);
   });
 });
+
+describe("installPageRoutesFromManifest — not-found page under locale routing", () => {
+  function notFoundRequest(requestPath: string) {
+    return {
+      locale: "en",
+      path: requestPath,
+      method: "GET",
+      header: (name: string) => (name === "accept" ? "text/html" : undefined),
+    };
+  }
+
+  it("pins the locale of a prefixed URL for the production 404, as development does", async () => {
+    config.set("web", { localeRouting: { strategy: "prefix-except-default" } });
+    config.set("app", { localeCodes: ["en", "ar"], localeCode: "en" });
+
+    const { router, notFound } = recordingRouter();
+    const { createHandler } = recordingHandlerFactory();
+
+    installPageRoutesFromManifest({
+      router,
+      manifest: manifestOf([postsPage, notFoundPage]),
+      createHandler,
+    });
+
+    expect(notFound).toHaveLength(1);
+
+    const request = notFoundRequest("/ar/missing");
+    await notFound[0]!.handler({
+      request,
+      response: { header() {} },
+    } as unknown as HttpContext);
+
+    expect(request.locale).toBe("ar");
+  });
+
+  it("leaves the locale alone under strategy none", async () => {
+    config.set("web", {});
+    config.set("app", { localeCodes: ["en", "ar"], localeCode: "en" });
+
+    const { router, notFound } = recordingRouter();
+    const { createHandler } = recordingHandlerFactory();
+
+    installPageRoutesFromManifest({
+      router,
+      manifest: manifestOf([postsPage, notFoundPage]),
+      createHandler,
+    });
+
+    const request = notFoundRequest("/ar/missing");
+    await notFound[0]!.handler({
+      request,
+      response: { header() {} },
+    } as unknown as HttpContext);
+
+    expect(request.locale).toBe("en");
+  });
+});
+
+describe("installPageRoutesFromManifest — a site's own locales", () => {
+  function install() {
+    config.set("web", {});
+    config.set("app", { localeCodes: ["en", "ar", "fr"], localeCode: "en" });
+
+    const routes: Array<{ site: string; path: string; handler: PageRouteHandler }> = [];
+    const dispatch = {
+      add(site: string, _method: string, path: string, handler: PageRouteHandler) {
+        routes.push({ site, path, handler });
+      },
+      setNotFound() {},
+      register() {},
+    };
+    const page = {
+      ...postsPage,
+      module: {
+        config: { route: { path: "/pricing", name: "shop.pricing" } },
+        default: () => null,
+      },
+      site: "shop",
+      sourceFile: "src/web/$sites/shop/pricing.page.tsx",
+    };
+
+    installPageRoutesFromManifest({
+      router: recordingRouter().router,
+      createHandler: recordingHandlerFactory().createHandler,
+      siteDispatch: {
+        dispatch,
+        sites: {
+          shop: {
+            hosts: ["shop.test"],
+            localeRouting: { strategy: "prefix-except-default", locales: ["en", "ar"] },
+          },
+        },
+      },
+      manifest: {
+        pages: [page],
+        sites: { shop: { app: { module: appModule, sourceFile: "src/web/$sites/shop/root.tsx" } } },
+      },
+    });
+
+    return routes;
+  }
+
+  it("registers prefix routes only for the site's locales", () => {
+    expect(install().map((route) => route.path)).toEqual([
+      "/pricing",
+      "/en/pricing",
+      "/ar/pricing",
+    ]);
+  });
+
+  it("answers a locale outside the site's set in the site's default locale", async () => {
+    const base = install().find((route) => route.path === "/pricing")!;
+    const request = fakeRequest("/pricing");
+    request.locale = "fr";
+
+    await base.handler({ request, response: fakeResponse() } as unknown as HttpContext);
+
+    expect(request.locale).toBe("en");
+  });
+
+  it("refuses a site locale that app.localeCodes does not declare, naming the site", () => {
+    config.set("web", {});
+    config.set("app", { localeCodes: ["en", "ar"], localeCode: "en" });
+
+    expect(() =>
+      installPageRoutesFromManifest({
+        router: recordingRouter().router,
+        createHandler: recordingHandlerFactory().createHandler,
+        siteDispatch: {
+          dispatch: { add() {}, setNotFound() {}, register() {} },
+          sites: {
+            shop: {
+              hosts: ["shop.test"],
+              localeRouting: { strategy: "prefix", locales: ["en", "de"] },
+            },
+          },
+        },
+        manifest: {
+          pages: [
+            {
+              ...postsPage,
+              module: { config: { route: "/x" }, default: () => null },
+              site: "shop",
+              sourceFile: "src/web/$sites/shop/x.page.tsx",
+            },
+          ],
+          sites: {
+            shop: { app: { module: appModule, sourceFile: "src/web/$sites/shop/root.tsx" } },
+          },
+        },
+      }),
+    ).toThrow(/web\.sites\.shop\.localeRouting\.locales .*"de"/);
+  });
+});

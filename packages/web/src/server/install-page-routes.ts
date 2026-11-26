@@ -75,6 +75,8 @@ import {
   type PageRouteHandlerOptions,
 } from "./create-page-route-handler";
 import { resolveLocaleRouting } from "./locale-routing/resolve-locale-routing";
+import { notFoundLocaleCodes, restrictToSiteLocales } from "./locale-routing/site-locale-guard";
+import type { SiteLocaleRouting } from "../sites/site-config.types";
 import {
   localeActionRegistrations,
   localePageRegistrations,
@@ -83,6 +85,7 @@ import { composeErrorPageLoader, type ErrorPageModule } from "./error-page";
 import { layoutPrefixesByDirectory } from "./layout-prefixes";
 import { createRefusalPageRenderer } from "./core-refusal-page";
 import type { FailureShell } from "./render-page";
+import { siteLocaleCodesOf } from "../build/site-locale-codes";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
 import { devClientApiRouteNames, type NamedApiRouteRegistry } from "./dev-client-api-route-names";
 import { resolvePayloadBudget, type PayloadBudgetConfig } from "./payload-budget";
@@ -565,7 +568,7 @@ function discoverSiteAppFiles(options: InstallPageRoutesOptions): {
 type SiteScope = {
   site: string;
   root: string;
-  localeRouting?: { readonly strategy?: "none" | "prefix" | "prefix-except-default" };
+  localeRouting?: SiteLocaleRouting;
 };
 
 /**
@@ -622,6 +625,7 @@ export async function installPageRoutes(
   const localeOptions = {
     localeCodes: config.key<readonly string[] | undefined>("app.localeCodes"),
     localeCode: config.key<string | undefined>("app.localeCode"),
+    siteLocaleCodes: siteLocaleCodesOf(options.siteDispatch?.sites),
   };
   const artifact =
     options.routeLocaleArtifactPath === undefined
@@ -745,7 +749,7 @@ async function installDiscoveredPageRoutes(
   // Resolved once, up front: every page's registrations below (and the
   // catch-all's absence of them) are decided against this one value, and
   // publishing it once after the loop keeps it in step with `publishRouteTable`.
-  const localeRouting = resolveLocaleRouting(siteScope?.localeRouting);
+  const localeRouting = resolveLocaleRouting(siteScope?.localeRouting, siteScope?.site);
   // Read from the live config, which `warlock dev` loads; a build reads the same
   // value through the generated manifest (see `PageManifest.payloadBudget`).
   const payloadBudget = resolvePayloadBudget(
@@ -1030,7 +1034,7 @@ async function installDiscoveredPageRoutes(
       )) {
         router.get(
           routerPathOf(registration.path),
-          registration.handler,
+          restrictToSiteLocales(registration.handler, localeRouting, siteScope?.localeRouting),
           // `isPage` marks this route as SSR-served. Pages and API routes
           // share one router and one route-name namespace, so the router's
           // duplicate-name error reads this flag to say which claimant is the
@@ -1047,10 +1051,14 @@ async function installDiscoveredPageRoutes(
         localeRouting,
         { pageFile, renderNotFound },
       )) {
-        router.post(routerPathOf(registration.path), registration.handler, {
-          isPage: true,
-          ...(uploads === undefined || uploads === false ? {} : { uploads }),
-        });
+        router.post(
+          routerPathOf(registration.path),
+          restrictToSiteLocales(registration.handler, localeRouting, siteScope?.localeRouting),
+          {
+            isPage: true,
+            ...(uploads === undefined || uploads === false ? {} : { uploads }),
+          },
+        );
       }
     });
 
@@ -1136,8 +1144,11 @@ async function installDiscoveredPageRoutes(
     const registerNotFoundRoute = () =>
       registerNotFoundPageRoute({
         router,
-        renderPage: notFoundPageHandler,
-        localeCodes: localeRouting.strategy === "none" ? undefined : localeRouting.codes,
+        renderPage:
+          notFoundPageHandler === undefined
+            ? undefined
+            : restrictToSiteLocales(notFoundPageHandler, localeRouting, siteScope?.localeRouting),
+        localeCodes: notFoundLocaleCodes(localeRouting),
         renderRefusal: createRefusalPageRenderer({
           // The site's root and the layout beside it, so a refusal page keeps the site's chrome.
           loadShell: async () => {

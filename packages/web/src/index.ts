@@ -70,6 +70,7 @@ export type {
   FixedSiteConfig,
   DynamicSiteConfig,
   SiteConfig,
+  SiteLocaleRouting,
   SitesConfig,
 } from "./sites/site-config.types";
 export {

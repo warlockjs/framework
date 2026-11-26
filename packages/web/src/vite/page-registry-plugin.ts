@@ -567,6 +567,7 @@ export function clientPageRegistry(options: ClientPageRegistryPluginOptions = {}
       // only; the document the server renders carries the authoritative one.
       const localeRouting = resolveClientLocaleRoutingFallback(
         site === undefined ? undefined : options.sites![site]!.localeRouting,
+        site,
       );
       const strictMode =
         site === undefined

@@ -15,6 +15,39 @@ const realEstate: SitesConfig = {
 };
 
 describe("validateSitesConfig", () => {
+  it("SITE_LOCALES_INVALID: a site's locales must be a subset of app.localeCodes", () => {
+    const sites: SitesConfig = {
+      shop: { hosts: ["shop.test"], localeRouting: { locales: ["en", "de"], defaultLocale: "en" } },
+    };
+    const errors = validateSitesConfig({ sites, localeCodes: ["en", "ar"] });
+
+    expect(errors.map((error) => error.code)).toEqual(["SITE_LOCALES_INVALID"]);
+    expect(errors[0]!.message).toContain('Site "shop"');
+    expect(errors[0]!.message).toContain('"de"');
+    expect(
+      validateSitesConfig({
+        sites: {
+          shop: {
+            hosts: ["shop.test"],
+            localeRouting: { locales: ["ar", "en"], defaultLocale: "ar" },
+          },
+        },
+        localeCodes: ["en", "ar"],
+      }),
+    ).toEqual([]);
+  });
+
+  it("SITE_LOCALES_INVALID: defaultLocale must be one of the site's locales", () => {
+    const errors = validateSitesConfig({
+      sites: {
+        shop: { hosts: ["shop.test"], localeRouting: { locales: ["en"], defaultLocale: "ar" } },
+      },
+      localeCodes: ["en", "ar"],
+    });
+
+    expect(errors.map((error) => error.code)).toEqual(["SITE_LOCALES_INVALID"]);
+  });
+
   it("accepts the Real-Estate config", () => {
     expect(validateSitesConfig({ sites: realEstate, resolveHost })).toEqual([]);
     expect(validateSitesConfig({ sites: realEstate, resolveHost, unknownHost: "landing" })).toEqual(

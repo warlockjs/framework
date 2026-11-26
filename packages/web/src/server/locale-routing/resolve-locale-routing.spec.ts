@@ -88,3 +88,52 @@ describe("resolveClientLocaleRoutingFallback — the build-time client registry"
     );
   });
 });
+
+describe("resolveLocaleRouting — a site's own locales", () => {
+  const app = { localeCodes: ["en", "ar", "fr"], localeCode: "en" };
+
+  it("narrows codes and keeps the app default when the site serves it", () => {
+    config.set("app", app);
+
+    expect(resolveLocaleRouting({ strategy: "prefix", locales: ["en", "ar"] }, "shop")).toEqual({
+      strategy: "prefix",
+      codes: ["en", "ar"],
+      defaultLocale: "en",
+    });
+  });
+
+  it("uses the site's defaultLocale, or its first locale when the app default is not served", () => {
+    config.set("app", app);
+
+    expect(
+      resolveLocaleRouting({ strategy: "prefix", locales: ["ar", "fr"] }, "shop").defaultLocale,
+    ).toBe("ar");
+    expect(
+      resolveLocaleRouting(
+        { strategy: "prefix", locales: ["ar", "fr"], defaultLocale: "fr" },
+        "shop",
+      ).defaultLocale,
+    ).toBe("fr");
+  });
+
+  it("names the site when a locale is not in app.localeCodes", () => {
+    config.set("app", app);
+
+    expect(() => resolveLocaleRouting({ locales: ["en", "de"] }, "shop")).toThrow(
+      /web\.sites\.shop\.localeRouting\.locales lists "de"/,
+    );
+    expect(() => resolveLocaleRouting({ locales: ["en"], defaultLocale: "ar" }, "shop")).toThrow(
+      /web\.sites\.shop\.localeRouting\.defaultLocale is "ar"/,
+    );
+  });
+
+  it("leaves a site without the options exactly as before", () => {
+    config.set("app", app);
+
+    expect(resolveLocaleRouting({ strategy: "prefix" }, "shop")).toEqual({
+      strategy: "prefix",
+      codes: ["en", "ar", "fr"],
+      defaultLocale: "en",
+    });
+  });
+});

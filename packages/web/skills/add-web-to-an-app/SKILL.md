@@ -106,7 +106,7 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 
 ## Fewer client files for a desktop or offline app
 
-`webConnector({ build: { chunks, precompress } })` shapes the browser bundle: `chunks: "split"` (default), `"merged"` (small shared chunks packed together, pages still lazy) or `"single"` (one JavaScript entry and one stylesheet; single-site apps only), and `precompress: false` to skip the `.br` and `.gz` copies. Pair it with `build: { singleBundle: true }` in core's config for a server that runs with `node dist/app.js` and no `node_modules`; `singleBundle` does not change these options. Run the server with the `client/` folder next to `app.js`.
+`webConnector({ build: { chunks, precompress } })` shapes the browser bundle: `chunks: "split"` (default), `"merged"` (small shared chunks packed together, pages still lazy) or `"single"` (one JavaScript entry and one stylesheet; single-site apps only), and `precompress: false` to skip the `.br` and `.gz` copies. Pair it with `build: { singleBundle: true }` in core's config for a server that runs with `node dist/app.js` and no `node_modules`; `singleBundle` does not change these options. Run the server with the `client/` folder next to `app.js`. A failure while the app boots under `warlock start` exits non-zero after it is logged, so a process manager shows the app as errored.
 
 ## Gotchas
 

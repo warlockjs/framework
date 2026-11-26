@@ -14,6 +14,7 @@
  */
 import {
   Application,
+  config,
   requestContext,
   refusalStatusOf,
   type HttpContext,
@@ -179,7 +180,10 @@ function tableOf(tables: Map<string, Map<Method, SiteTable>>, site: string, meth
 }
 
 export function createSiteDispatch(options: SiteDispatchOptions): SiteDispatch {
-  validateSitesAtBoot(options);
+  validateSitesAtBoot({
+    ...options,
+    localeCodes: config.key<readonly string[] | undefined>("app.localeCodes"),
+  });
 
   const selector = createSiteSelector(options);
   const tables = new Map<string, Map<Method, SiteTable>>();

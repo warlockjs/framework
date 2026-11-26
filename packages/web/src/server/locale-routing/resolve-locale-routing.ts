@@ -26,14 +26,23 @@ function isLocaleRoutingStrategy(value: unknown): value is LocaleRoutingStrategy
 }
 
 /** The strategy-only shape accepted from either `web.localeRouting` or one site. */
-export type LocaleRoutingConfig = { readonly strategy?: LocaleRoutingStrategy };
+export type LocaleRoutingConfig = {
+  readonly strategy?: LocaleRoutingStrategy;
+  /** A site's own locale set, a subset of `app.localeCodes`. */
+  readonly locales?: readonly string[];
+  /** A site's own default locale. */
+  readonly defaultLocale?: string;
+};
 
 /**
  * Resolves `web.localeRouting.strategy` (default `"none"`) against
  * `app.localeCodes` / `app.localeCode`, throwing a clear config error rather
  * than booting with a routing table nothing can satisfy.
  */
-export function resolveLocaleRouting(localeRoutingConfig?: LocaleRoutingConfig): LocaleRouting {
+export function resolveLocaleRouting(
+  localeRoutingConfig?: LocaleRoutingConfig,
+  siteKey?: string,
+): LocaleRouting {
   // An explicitly configured site (including `{}`) replaces the global
   // strategy; absence is the only case that inherits `web.localeRouting`.
   const effectiveConfig = localeRoutingConfig ?? config.get("web", {}).localeRouting;
@@ -46,8 +55,14 @@ export function resolveLocaleRouting(localeRoutingConfig?: LocaleRoutingConfig):
     );
   }
 
-  const codes = config.key<string[]>("app.localeCodes", []) ?? [];
-  const defaultLocale = config.key<string>("app.localeCode", "") ?? "";
+  const appCodes = config.key<string[]>("app.localeCodes", []) ?? [];
+  const appDefault = config.key<string>("app.localeCode", "") ?? "";
+  const { codes, defaultLocale } = resolveSiteLocales(
+    localeRoutingConfig,
+    appCodes,
+    appDefault,
+    siteKey,
+  );
 
   if (strategy !== "none") {
     if (codes.length < 1) {
@@ -69,6 +84,45 @@ export function resolveLocaleRouting(localeRoutingConfig?: LocaleRoutingConfig):
 }
 
 /**
+ * A site's `locales` / `defaultLocale` narrow the app's set. A site without
+ * them gets the app's values unchanged. Raised at boot, naming the site, when
+ * a code is not one of `app.localeCodes`.
+ */
+function resolveSiteLocales(
+  siteConfig: LocaleRoutingConfig | undefined,
+  appCodes: string[],
+  appDefault: string,
+  siteKey: string | undefined,
+): { codes: readonly string[]; defaultLocale: string } {
+  if (siteConfig?.locales === undefined && siteConfig?.defaultLocale === undefined) {
+    return { codes: appCodes, defaultLocale: appDefault };
+  }
+
+  const owner = siteKey === undefined ? "web.localeRouting" : `web.sites.${siteKey}.localeRouting`;
+  const listed = (values: readonly string[]) => values.map((code) => `"${code}"`).join(", ");
+  const codes = siteConfig.locales === undefined ? appCodes : [...new Set(siteConfig.locales)];
+  const unknown = codes.filter((code) => !appCodes.includes(code));
+
+  if (codes.length < 1 || unknown.length > 0) {
+    throw new LocaleRoutingConfigError(
+      `${owner}.locales ${codes.length < 1 ? "is empty" : `lists ${listed(unknown)}, which app.localeCodes does not declare (${listed(appCodes)})`}. ` +
+        "Use a non-empty subset of app.localeCodes.",
+    );
+  }
+
+  const defaultLocale =
+    siteConfig.defaultLocale ?? (codes.includes(appDefault) ? appDefault : (codes[0] as string));
+
+  if (!codes.includes(defaultLocale)) {
+    throw new LocaleRoutingConfigError(
+      `${owner}.defaultLocale is "${defaultLocale}", which is not one of the site's locales (${listed(codes)}).`,
+    );
+  }
+
+  return { codes, defaultLocale };
+}
+
+/**
  * The locale routing a client page registry is BUILT with — a fallback only:
  * the browser prefers the routing the server embeds in each document
  * (`../../entry/publish-document-locale-routing.ts`), resolved at boot with
@@ -83,10 +137,11 @@ export function resolveLocaleRouting(localeRoutingConfig?: LocaleRoutingConfig):
  */
 export function resolveClientLocaleRoutingFallback(
   localeRoutingConfig?: LocaleRoutingConfig,
+  siteKey?: string,
 ): LocaleRouting {
   if (!Array.isArray(config.key<unknown>("app.localeCodes"))) {
     return { strategy: "none", codes: [], defaultLocale: "" };
   }
 
-  return resolveLocaleRouting(localeRoutingConfig);
+  return resolveLocaleRouting(localeRoutingConfig, siteKey);
 }

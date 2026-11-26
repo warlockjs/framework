@@ -1,4 +1,9 @@
-import type { HostResolution, HostResolver, SitesConfig } from "./site-config.types";
+import type {
+  HostResolution,
+  HostResolver,
+  SiteLocaleRouting,
+  SitesConfig,
+} from "./site-config.types";
 
 export type SiteConfigErrorCode =
   | "SITE_KEY_INVALID"
@@ -8,6 +13,7 @@ export type SiteConfigErrorCode =
   | "SITE_HOST_INVALID"
   | "SITE_HOST_OVERLAP"
   | "SITE_BASEPATH_INVALID"
+  | "SITE_LOCALES_INVALID"
   | "DYNAMIC_SITE_WITHOUT_RESOLVER"
   | "RESOLVER_WITHOUT_DYNAMIC_SITE"
   | "UNKNOWN_HOST_SITE_MISSING";
@@ -29,15 +35,66 @@ export function normalizeHost(raw: string): string {
   return raw.trim().toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
 }
 
+/** What is wrong with one site's `localeRouting.locales` / `defaultLocale`, as readable messages. */
+function siteLocaleProblems(
+  key: string,
+  routing: SiteLocaleRouting | undefined,
+  appCodes: readonly string[] | undefined,
+): string[] {
+  if (routing === undefined) return [];
+
+  const problems: string[] = [];
+  const { locales, defaultLocale } = routing;
+
+  if (locales !== undefined) {
+    if (
+      !Array.isArray(locales) ||
+      locales.length === 0 ||
+      locales.some((code) => typeof code !== "string")
+    ) {
+      problems.push(
+        `Site "${key}" has invalid localeRouting.locales; it must be a non-empty array of locale codes taken from app.localeCodes.`,
+      );
+    } else if (appCodes !== undefined) {
+      const unknown = locales.filter((code) => !appCodes.includes(code));
+
+      if (unknown.length > 0) {
+        problems.push(
+          `Site "${key}" lists localeRouting.locales ${unknown.map((code) => `"${code}"`).join(", ")} that app.localeCodes does not declare (${appCodes.map((code) => `"${code}"`).join(", ")}). Add the code to app.localeCodes or remove it from the site.`,
+        );
+      }
+    }
+  }
+
+  if (defaultLocale !== undefined) {
+    const allowed = Array.isArray(locales) && locales.length > 0 ? locales : appCodes;
+
+    if (typeof defaultLocale !== "string") {
+      problems.push(
+        `Site "${key}" has invalid localeRouting.defaultLocale; it must be a locale code.`,
+      );
+    } else if (allowed !== undefined && !allowed.includes(defaultLocale)) {
+      problems.push(
+        `Site "${key}" sets localeRouting.defaultLocale "${defaultLocale}", which is not one of its locales (${allowed.map((code) => `"${code}"`).join(", ")}).`,
+      );
+    }
+  }
+
+  return problems;
+}
+
 /** Pure structural validation of `web.sites`; never throws and touches no filesystem. */
 export function validateSitesConfig({
   sites,
   resolveHost,
   unknownHost,
+  localeCodes,
 }: {
   sites: SitesConfig;
   resolveHost?: HostResolver;
   unknownHost?: "not-found" | string;
+  /** `app.localeCodes`; when given, a site's `localeRouting.locales` must be a subset of it. */
+  localeCodes?: readonly string[];
 }): SiteConfigError[] {
   const errors: SiteConfigError[] = [];
   const hostOwner = new Map<string, string>();
@@ -92,6 +149,10 @@ export function validateSitesConfig({
         site: key,
         message: `Site "${key}" has invalid basePath "${String(basePath)}"; it must start with "/", must not end with "/", and must not be "/".`,
       });
+    }
+
+    for (const message of siteLocaleProblems(key, site.localeRouting, localeCodes)) {
+      errors.push({ code: "SITE_LOCALES_INVALID", site: key, message });
     }
 
     if (hasHosts && !hasResolve) {
