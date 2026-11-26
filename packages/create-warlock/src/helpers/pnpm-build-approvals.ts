@@ -94,8 +94,12 @@ export function mergePackageJsonBuildApprovals(
 }
 
 /** Native dependency build scripts required by features the scaffold explicitly selected. */
-const FEATURE_BUILD_APPROVALS: Readonly<Record<string, readonly string[]>> = {
+export const FEATURE_BUILD_APPROVALS: Readonly<Record<string, readonly string[]>> = {
   image: ["sharp"],
+  // bullmq's msgpackr-extract has an install script; pnpm 11+ fails the install without approval.
+  queue: ["msgpackr-extract"],
+  // bull-board requires queue, so it installs bullmq too.
+  "bull-board": ["msgpackr-extract"],
 };
 
 export function requiredPnpmBuildApprovals(features: readonly string[]): readonly string[] {

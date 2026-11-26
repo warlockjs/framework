@@ -1,3 +1,4 @@
+/** A preview of the running app shown on the home page. */
 type RuntimePreviewProps = { statusMessage: string };
 
 export function RuntimePreview({ statusMessage }: RuntimePreviewProps) {

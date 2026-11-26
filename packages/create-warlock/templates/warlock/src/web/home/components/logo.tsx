@@ -1,3 +1,4 @@
+/** The Warlock.js logo mark. */
 type HomeLogoProps = {
   showVersion?: boolean;
 };

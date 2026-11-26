@@ -1,3 +1,4 @@
+/** Loads the home page's data and sets its metadata. */
 import { groupedTranslations } from "@mongez/localization";
 import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
 import { getHomeService } from "app/home/services/home.service";

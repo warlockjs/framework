@@ -1,3 +1,4 @@
+/** Replaces a user's password after the one-time code is confirmed. */
 import { authService } from "@warlock.js/auth";
 import { BadRequestError, t } from "@warlock.js/core";
 import { User } from "app/users/models/user";

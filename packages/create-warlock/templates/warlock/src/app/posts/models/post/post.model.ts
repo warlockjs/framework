@@ -1,3 +1,4 @@
+/** The post model: a titled piece of content. */
 import { randomUUID } from "node:crypto";
 import { Model, RegisterModel } from "@warlock.js/cascade";
 import { useComputedSlug } from "@warlock.js/core";

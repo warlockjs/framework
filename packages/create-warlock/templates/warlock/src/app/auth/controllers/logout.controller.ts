@@ -1,3 +1,4 @@
+/** Signs the current user out of this device by revoking the presented tokens. */
 import { t } from "@warlock.js/core";
 import { v } from "@warlock.js/seal";
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";

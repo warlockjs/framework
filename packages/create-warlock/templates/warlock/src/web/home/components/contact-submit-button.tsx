@@ -1,3 +1,4 @@
+/** The contact form's submit button and its sending state. */
 import { useContactSubmitButton } from "../hooks/use-contact-submit-button";
 import type { ContactSubmitButtonProps } from "../types/contact-controls.type";
 

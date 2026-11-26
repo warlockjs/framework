@@ -1,3 +1,4 @@
+/** Declares the public contact endpoint. */
 import { router } from "@warlock.js/core";
 import { contactController } from "./controllers/contact.controller";
 

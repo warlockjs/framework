@@ -1,3 +1,4 @@
+/** Sends the contact form to the server and tracks its sending, success and error state. */
 import { type FormSubmitOptions, type InferFormValues } from "@mongez/react-form";
 import { useState } from "react";
 import type { contactSchema } from "../../../shared/contact.schema";

@@ -1,3 +1,4 @@
+/** Creates, checks and removes the one-time codes used to reset passwords. */
 import { createHmac } from "node:crypto";
 import { BadRequestError, config, t } from "@warlock.js/core";
 import { OTP } from "../models/otp";

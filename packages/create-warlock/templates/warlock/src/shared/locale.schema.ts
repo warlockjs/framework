@@ -1,3 +1,4 @@
+/** Validates the payload that switches the language. */
 import { v, type Infer } from "@warlock.js/seal";
 import { localeCodes } from "./locales";
 

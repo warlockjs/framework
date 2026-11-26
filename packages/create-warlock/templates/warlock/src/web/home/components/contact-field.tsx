@@ -1,3 +1,4 @@
+/** One labelled input or textarea of the contact form, with its error. */
 import { useContactField } from "../hooks/use-contact-field";
 import type { ContactFieldProps } from "../types/contact-controls.type";
 

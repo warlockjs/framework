@@ -1,3 +1,4 @@
+/** Shows the server's validation errors next to the form fields they name. */
 import type { FormInterface } from "@mongez/react-form";
 
 export type FormErrorResponseKeys = {

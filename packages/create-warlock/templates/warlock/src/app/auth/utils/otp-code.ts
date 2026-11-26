@@ -1,3 +1,4 @@
+/** Generates the random digits of a one-time code. */
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 
 const DIGITS = "0123456789";

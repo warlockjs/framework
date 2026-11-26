@@ -1,3 +1,4 @@
+/** The error codes the auth module reports for one-time code failures. */
 export enum AuthErrorCode {
   OTP_NOT_FOUND = "OTX001", // OTP Not Found
   OTP_EXPIRED = "OTX002", // OTP Expired

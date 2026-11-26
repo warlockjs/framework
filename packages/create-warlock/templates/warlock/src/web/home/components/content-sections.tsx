@@ -1,3 +1,4 @@
+/** The home page's content sections below the hero. */
 import type { HomePageData } from "app/home/services/home.service";
 
 type ContentSectionsProps = {

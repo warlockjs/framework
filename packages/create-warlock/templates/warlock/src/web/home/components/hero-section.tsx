@@ -1,3 +1,4 @@
+/** The home page's opening section. */
 import { RuntimePreview } from "./runtime-preview";
 
 type HeroSectionProps = { statusMessage: string };

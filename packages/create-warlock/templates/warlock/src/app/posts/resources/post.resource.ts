@@ -1,3 +1,4 @@
+/** Shapes a post for the API response. */
 import { defineResource } from "@warlock.js/core";
 
 export const PostResource = defineResource({

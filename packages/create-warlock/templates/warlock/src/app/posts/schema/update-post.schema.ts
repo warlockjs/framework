@@ -1,3 +1,4 @@
+/** Validates the payload for updating a post. */
 import { v, type Infer } from "@warlock.js/seal";
 
 export const updatePostSchema = v.object({

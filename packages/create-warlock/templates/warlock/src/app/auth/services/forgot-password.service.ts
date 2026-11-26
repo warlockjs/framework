@@ -1,3 +1,4 @@
+/** Creates a one-time code for an account and emails it to the owner of that account. */
 import { log } from "@warlock.js/logger";
 import { User } from "app/users/models/user";
 import { createOtpService, otpHashKey } from "./otp.service";

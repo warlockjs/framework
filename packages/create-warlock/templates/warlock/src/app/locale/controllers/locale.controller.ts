@@ -1,3 +1,4 @@
+/** Switches the visitor's language and returns the new direction. */
 import { type Request, type RequestHandler } from "@warlock.js/core";
 import { localeSchema, type LocaleSchema } from "@shared/locale.schema";
 

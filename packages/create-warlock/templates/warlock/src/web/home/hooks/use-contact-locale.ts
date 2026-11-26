@@ -1,3 +1,4 @@
+/** Switches the page's language and direction from the contact section. */
 import { changeLocaleCode, useLocale, useTextDirection } from "@warlock.js/web";
 import { useState } from "react";
 

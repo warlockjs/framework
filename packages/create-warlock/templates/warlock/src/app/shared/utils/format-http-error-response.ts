@@ -1,3 +1,4 @@
+/** Turns framework error responses into the app's public error shape. */
 import type { HttpErrorResponseContext } from "@warlock.js/core";
 
 const statusCodes: Record<number, string> = {

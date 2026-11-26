@@ -86,7 +86,8 @@ single skills with `agentKit.omit`.
 ## Project map (Grimoire, experimental)
 
 `grimoire/` describes what this app does and where things are. Read the **`use-the-grimoire`** skill
-before you search the code, then for every task:
+before you search the code. Use the Grimoire MCP tools when your client has them; otherwise
+`warlock scry --search "<request>"` first, since its answer now includes the files that change with the top hit. For every task:
 
 1. `npx warlock scry --search "<the whole request>"`.
 2. `npx warlock scry --impact <top file>` and read the `changes with` lines: they are the files that usually
@@ -110,9 +111,10 @@ When you add or change behaviour, follow its sibling skills (`write-a-feature`, 
 
 - Write the `design-system` feature first, and name `design-system` under `## Affects and affected by` in every flow with a `page` step. Its flows cover direction (RTL), components and error messages.
 - Show a criterion with a scene in `e2e/*.e2e.ts`: `// @shows <feature>/<flow> AC-n` directly above `await shows(context, "<feature>/<flow> AC-n", async ({ page, language, path }) => { … })`. The scene runs once per language in `grimoire/settings.md` and saves one screenshot each; a throw fails that language. `page.mockRequests([...])` fakes a failed or unreachable server for the failure cases.
+- `warlock e2e` starts a copy of the app with the environment from `.env.e2e` (else `.env`) and sets `WARLOCK_E2E=1`. Put the test database and `CACHE_DRIVER=memory` in `.env.e2e`; it is git-ignored like every env file.
 - Screenshots are captured for the features a change touches (`screenshots: changed`); `GRIMOIRE_SHOTS=all npx warlock e2e` captures everything. A flow that has nothing to look at says `screenshots: false` in its front matter.
 - The owner approves images and changed flows, criteria and cases: `warlock grimoire approve <id|feature/flow>` (or the tab). Never edit `grimoire/approved/` or `grimoire/screenshots/approved/` yourself, and list every `GR4017`, `GR4018` and `GR4019` from `warlock grimoire check` in your report.
-- `src/web/dev/components.page.tsx` renders the app's controls for review; it answers "not found" outside development. Add a control there when you add one to the app.
+- `src/web/dev/components.page.tsx` renders the app's controls for review; it answers "not found" outside development and end-to-end runs (`WARLOCK_E2E=1`). Add a control there when you add one to the app. In a multi-site app the page lives under the site that reviews controls: `src/web/$sites/<key>/dev/components.page.tsx`.
 
 ## Commands
 
@@ -122,6 +124,7 @@ When you add or change behaviour, follow its sibling skills (`write-a-feature`, 
 - `npm run migrate` / `npm run migrate.fresh` / `npm run migrate.list` — run migrations
 - `npm run seed` — run database seeders
 - `npm run lint` / `npm run format` / `npm run tsc` — lint and format with the selected toolchain, and type-check (`tsc --noEmit`)
+- `pnpm format:file <paths>` — format only the files you changed (`npm run format` and `format:check` cover the whole `./src` tree, so other people's work gets rewritten); run it on your own files after editing them
 - `npx warlock check` — verify a change: typecheck, lint, the affected tests and the framework's conventions in one report (`--changed` for only what changed); run it after every change and loop until it exits 0
 - `npm run skills:sync` — re-sync skills from `node_modules` and regenerate the
   derived per-agent files from this `AGENTS.md`

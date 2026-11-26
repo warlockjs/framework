@@ -1,3 +1,4 @@
+/** Signs a user in with email and password and returns the access and refresh tokens. */
 import { type Request, type RequestHandler } from "@warlock.js/core";
 import { UserResource } from "app/users/resources/user.resource";
 import { loginSchema, type LoginSchema } from "../schema/login.schema";

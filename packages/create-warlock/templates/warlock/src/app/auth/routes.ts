@@ -1,3 +1,4 @@
+/** Declares the auth endpoints: login, logout, refresh, profile and password reset. */
 import {
   loginThrottleMiddleware,
   tokenConsumeThrottleMiddleware,

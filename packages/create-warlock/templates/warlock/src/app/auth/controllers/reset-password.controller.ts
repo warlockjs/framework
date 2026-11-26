@@ -1,3 +1,4 @@
+/** Sets a new password once the emailed one-time code is confirmed. */
 import { t, type Request, type RequestHandler } from "@warlock.js/core";
 import { resetPasswordSchema, type ResetPasswordSchema } from "../schema/reset-password.schema";
 import { resetPasswordService } from "../services/reset-password.service";

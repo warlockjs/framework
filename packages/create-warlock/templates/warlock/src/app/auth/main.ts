@@ -1,3 +1,4 @@
+/** Registers the auth module's scheduled cleanup jobs when the app boots. */
 import { authService } from "@warlock.js/auth";
 import { scheduler } from "app/shared/services/scheduler.service";
 import { cleanupExpiredOtpsService } from "./services/otp.service";

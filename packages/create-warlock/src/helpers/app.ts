@@ -240,6 +240,7 @@ export class App {
       lint: "oxlint --fix ./src --max-warnings=0",
       "lint:check": "oxlint ./src --max-warnings=0",
       format: "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore --write ./src",
+      "format:file": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore --write",
       "format:check": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore --check ./src",
     });
     pkg.save();

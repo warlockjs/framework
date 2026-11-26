@@ -1,3 +1,4 @@
+/** Renders every form control the app uses, for review in each language. */
 import { useTextDirection, useTrans } from "@warlock.js/web";
 
 /**

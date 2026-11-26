@@ -1,3 +1,4 @@
+/** Starts a password reset by sending a one-time code to the account's email. */
 import { t, type RequestHandler } from "@warlock.js/core";
 import { v } from "@warlock.js/seal";
 import { forgotPasswordService } from "../services/forgot-password.service";

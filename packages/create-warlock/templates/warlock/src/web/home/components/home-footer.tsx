@@ -1,3 +1,4 @@
+/** The home page's footer. */
 import { HomeLogo } from "./logo";
 
 const copyrightYear = new Date().getFullYear();

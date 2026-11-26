@@ -1,3 +1,4 @@
+/** Creates the table that stores posts. */
 import { integer, Migration, string, text, timestamp } from "@warlock.js/cascade";
 import { Post } from "../post.model";
 

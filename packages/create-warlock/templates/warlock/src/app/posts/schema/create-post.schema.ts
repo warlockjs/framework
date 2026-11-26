@@ -1,3 +1,4 @@
+/** Validates the payload for creating a post. */
 import { v, type Infer } from "@warlock.js/seal";
 
 export const createPostSchema = v.object({

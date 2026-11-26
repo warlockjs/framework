@@ -1,3 +1,4 @@
+/** Helpers that group routes as public or authenticated. */
 import { authMiddleware } from "@warlock.js/auth";
 import { router } from "@warlock.js/core";
 

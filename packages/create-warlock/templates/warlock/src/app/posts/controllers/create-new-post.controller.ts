@@ -1,3 +1,4 @@
+/** Creates a post from the validated payload. */
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { PostResource } from "app/posts/resources/post.resource";
 import { Post } from "../models/post/post.model";

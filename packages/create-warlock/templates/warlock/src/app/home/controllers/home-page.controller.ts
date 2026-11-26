@@ -1,3 +1,4 @@
+/** Returns the data the home page shows. */
 import { Application, type RequestHandler } from "@warlock.js/core";
 
 /** The dependency-free home response for applications without the web feature. */

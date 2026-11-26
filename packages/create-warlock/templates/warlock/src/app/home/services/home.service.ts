@@ -1,3 +1,4 @@
+/** Holds the copy the home page shows: capabilities and how to start. */
 const capabilities = [
   {
     index: "01",

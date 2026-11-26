@@ -2,9 +2,12 @@ import { groupedTranslations } from "@mongez/localization";
 import { environment } from "@warlock.js/core";
 import type { PageConfig, PageLoaderContext } from "@warlock.js/web";
 
-/** Development only: a production build answers "not found" so the page is never public. */
+/**
+ * Development and end-to-end runs (`WARLOCK_E2E=1`, set by `warlock e2e`) only: any
+ * other production build answers "not found" so the page is never public.
+ */
 export async function loader({ response }: PageLoaderContext<undefined, undefined>) {
-  if (environment() !== "development") {
+  if (environment() !== "development" && process.env.WARLOCK_E2E !== "1") {
     return response.notFound();
   }
 

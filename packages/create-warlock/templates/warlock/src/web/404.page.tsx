@@ -1,3 +1,4 @@
+/** The page shown when no route matches. */
 export default function NotFoundPage() {
   return (
     <main className="not-found">
