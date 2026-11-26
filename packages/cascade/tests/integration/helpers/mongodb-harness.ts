@@ -3,6 +3,7 @@ import type { Db } from "mongodb";
 import { DataSource } from "../../../src/data-source/data-source";
 import { dataSourceRegistry } from "../../../src/data-source/data-source-registry";
 import { MongoDbDriver } from "../../../src/drivers/mongodb/mongodb-driver";
+import type { ModelDefaults } from "../../../src/types";
 import { hasLocalMongodb, startLocalMongodbHarness } from "./local-mongodb-harness";
 
 /**
@@ -33,6 +34,12 @@ export type MongodbHarnessOptions = {
   isDefault?: boolean;
   /** Enable cascade's command logging. Defaults to `false` (quiet test output). */
   logging?: boolean;
+  /**
+   * Model defaults set on the data source (they win over the driver's). The
+   * MongoDB driver infers camelCase relation keys (`userId`); a suite whose
+   * fixtures store snake_case keys passes `{ namingConvention: "snake_case" }`.
+   */
+  modelDefaults?: Partial<ModelDefaults>;
 };
 
 /**
@@ -104,7 +111,12 @@ export async function startMongodbHarness(
   // An existing server named by LOCAL_MONGO_* replaces the container: no
   // Docker, and teardown only disconnects. See tests/integration/README.md.
   if (hasLocalMongodb()) {
-    return startLocalMongodbHarness({ dataSourceName, isDefault, logging: options.logging });
+    return startLocalMongodbHarness({
+      dataSourceName,
+      isDefault,
+      logging: options.logging,
+      modelDefaults: options.modelDefaults,
+    });
   }
 
   const image = options.image ?? DEFAULT_MONGODB_IMAGE;
@@ -125,6 +137,7 @@ export async function startMongodbHarness(
     name: dataSourceName,
     driver,
     isDefault,
+    modelDefaults: options.modelDefaults,
   });
 
   dataSourceRegistry.register(dataSource);

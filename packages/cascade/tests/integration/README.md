@@ -31,6 +31,8 @@ Rules for the shared database:
 - Point it at a dedicated throwaway database. Suites create their own tables and collections and drop only the ones
   they created; they do not isolate themselves from other data in the same database.
 - Teardown only disconnects. The server is never stopped or reset.
+- Run the suites with `vitest run -c vitest.integration.config.ts tests/integration/...`; that config runs the files one
+  after another when a shared database is named, because the files reuse table and collection names.
 - MongoDB features that need a replica set (multi-document transactions) need `LOCAL_MONGO_URI` to point at a
   single-node replica set.
 

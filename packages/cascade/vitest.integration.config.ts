@@ -29,5 +29,11 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/dist/**"],
     testTimeout: 120000,
     hookTimeout: 120000,
+    // Suites that share one database named by LOCAL_PG_* / LOCAL_MONGO_* reuse table and
+    // collection names, so their files must not run at the same time.
+    fileParallelism: !(
+      (process.env.LOCAL_PG_DATABASE && process.env.LOCAL_PG_USER) ||
+      (process.env.LOCAL_MONGO_URI && process.env.LOCAL_MONGO_DATABASE)
+    ),
   },
 });

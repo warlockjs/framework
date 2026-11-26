@@ -47,7 +47,9 @@ describe("MongoDB integration — relations", () => {
   let harness: MongodbHarness;
 
   beforeAll(async () => {
-    harness = await startMongodbHarness();
+    // The fixtures store snake_case keys (`rel_user_id`); the MongoDB driver infers
+    // camelCase ones (`relUserId`) unless the data source says otherwise.
+    harness = await startMongodbHarness({ modelDefaults: { namingConvention: "snake_case" } });
   });
 
   afterAll(async () => {
