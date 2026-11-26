@@ -1,4 +1,15 @@
 {
+  "5.65.1": {
+    "publishedAt": "2026-11-26T14:20:19.310Z",
+    "matrix": "none",
+    "headline": "Failed form actions show their errors in apps that set an `http.errorResponse` formatter.",
+    "highlights": [
+      "`http.errorResponse` never rewrites a reply to a request carrying `x-warlock-data`: a failed page action's 422 `{ actionData }` reaches `useActionData()`, and the data 404 and loader errors on a client navigation keep their own format. JSON API errors are still formatted."
+    ],
+    "upgradeNotes": [
+      "A formatter that returns `undefined` for requests carrying `x-warlock-data` (the workaround) can drop that branch."
+    ]
+  },
   "5.65.0": {
     "publishedAt": "2026-11-26T11:30:21.249Z",
     "matrix": "none",

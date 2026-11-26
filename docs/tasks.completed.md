@@ -5,7 +5,8 @@ Newest first. Each entry records the release that shipped it and how it was veri
 ## 5.65.1 (2026-11-26)
 
 Source: owner ask 2026-11-26 ("fix and release"), from the Manazil wave-12 findings page.
-Shipped in release v5.65.1 (fix commit 6ce5e7c40). Verification: one verify pass under heavy-run (format, lint, public
+Shipped in release v5.65.1 (fix commit 6ce5e7c40, tag `v5.65.1` on cf6eb4827, publish run 45833301833, on npm 2026-11-26
+14:20 UTC). Verification: one verify pass under heavy-run (format, lint, public
 text, release notes, skills, strictness, typecheck, every package's tests, devtools UI gate, docs build); the new web
 spec fails on the 5.65.0 core source and passes with the fix.
 

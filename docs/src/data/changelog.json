@@ -140,6 +140,41 @@
   ],
   "releases": [
     {
+      "version": "5.65.1",
+      "id": "v5-65-1",
+      "date": "November 26, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Failed form actions show their errors again in apps that set an <code>http.errorResponse</code> formatter.",
+      "highlights": [
+        "<code>http.errorResponse</code> never rewrites a reply to a request carrying <code>x-warlock-data</code>: a failed page action's 422 <code>{ actionData }</code> reaches <code>useActionData()</code>, and the data 404 and loader errors on a client navigation keep their own format. JSON API errors are still formatted."
+      ],
+      "upgradeNotes": [
+        "A formatter that returns <code>undefined</code> for requests carrying <code>x-warlock-data</code> (the workaround) can drop that branch."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.65.1-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "An app <code>http.errorResponse</code> formatter no longer rewrites web data replies. A reply to a request carrying the <code>x-warlock-data</code> header (client navigations, <code>refresh()</code> and JavaScript <code>&lt;Form&gt;</code> submits) now reaches the browser untouched, so a failed page action's 422 <code>{ actionData }</code> arrives in <code>useActionData()</code> instead of the app's error envelope, and the data 404 and loader errors on a client navigation keep their own format. JSON API errors are still formatted."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.65.0",
       "id": "v5-65-0",
       "date": "November 26, 2026",
