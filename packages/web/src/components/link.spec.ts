@@ -106,7 +106,7 @@ describe("Link — the existing route-name surface", () => {
     const rendered = render({ to: "main.home" });
     const { preventDefault } = clickOn(rendered);
 
-    expect(navigate).toHaveBeenCalledWith("/");
+    expect(navigate).toHaveBeenCalledWith("/", { source: "link" });
     expect(preventDefault).toHaveBeenCalledOnce();
   });
 });
@@ -121,7 +121,7 @@ describe("Link — `href` as an alias of `to`", () => {
   it("navigates in-app, because it is the same destination `to` names", () => {
     clickOn(render({ href: "main.home" }));
 
-    expect(navigate).toHaveBeenCalledWith("/");
+    expect(navigate).toHaveBeenCalledWith("/", { source: "link" });
   });
 });
 
@@ -243,7 +243,7 @@ describe("Link — `component`", () => {
 
     clickOn(rendered);
 
-    expect(navigate).toHaveBeenCalledWith("/");
+    expect(navigate).toHaveBeenCalledWith("/", { source: "link" });
   });
 
   it("does not leak `component` onto the element as a prop", () => {
@@ -316,7 +316,7 @@ describe("Link — literal URLs and paths", () => {
   it("client-navigates an absolute path, which is a page in this app", () => {
     const { preventDefault } = clickOn(render({ href: "/pricing" }));
 
-    expect(navigate).toHaveBeenCalledWith("/pricing");
+    expect(navigate).toHaveBeenCalledWith("/pricing", { source: "link" });
     expect(preventDefault).toHaveBeenCalledOnce();
   });
 
@@ -764,7 +764,7 @@ describe("Link — prefetch", () => {
 
     const { preventDefault } = clickOn(rendered);
 
-    expect(navigate).toHaveBeenCalledWith("/");
+    expect(navigate).toHaveBeenCalledWith("/", { source: "link" });
     expect(preventDefault).toHaveBeenCalledOnce();
   });
 });

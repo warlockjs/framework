@@ -354,3 +354,66 @@ describe("the shared singleton", () => {
     unsubscribe();
   });
 });
+
+describe("onBeforeNavigate", () => {
+  const navigation = { to: "/b", from: "/a", type: "link" } as const;
+
+  it("answers true synchronously when no listener objects", () => {
+    const events = createRouterEvents();
+    const listener = vi.fn();
+
+    events.onBeforeNavigate(listener);
+
+    expect(events.emitBeforeNavigate(navigation)).toBe(true);
+    expect(listener).toHaveBeenCalledExactlyOnceWith(navigation);
+  });
+
+  it("cancels on the first false and skips the listeners after it", () => {
+    const events = createRouterEvents();
+    const after = vi.fn();
+
+    events.onBeforeNavigate(() => undefined);
+    events.onBeforeNavigate(() => false);
+    events.onBeforeNavigate(after);
+
+    expect(events.emitBeforeNavigate(navigation)).toBe(false);
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it("waits for a promised answer and keeps registration order", async () => {
+    const events = createRouterEvents();
+    const order: string[] = [];
+
+    events.onBeforeNavigate(async () => {
+      order.push("first");
+
+      return true;
+    });
+    events.onBeforeNavigate(async () => {
+      order.push("second");
+
+      return false;
+    });
+
+    await expect(events.emitBeforeNavigate(navigation)).resolves.toBe(false);
+    expect(order).toEqual(["first", "second"]);
+  });
+
+  it("ignores a listener that throws and stops delivering after unsubscribe", () => {
+    const events = createRouterEvents();
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const listener = vi.fn(() => false as const);
+
+    events.onBeforeNavigate(() => {
+      throw new Error("broken");
+    });
+    const stop = events.onBeforeNavigate(listener);
+
+    expect(events.emitBeforeNavigate(navigation)).toBe(false);
+    expect(error).toHaveBeenCalledTimes(1);
+
+    stop();
+
+    expect(events.emitBeforeNavigate(navigation)).toBe(true);
+  });
+});

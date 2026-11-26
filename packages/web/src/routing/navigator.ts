@@ -21,7 +21,10 @@
  * suppress the browser's default. `false` means "not mine" — let the browser do
  * what it was going to do.
  */
-export type Navigator = (url: string, options?: { replace?: boolean }) => boolean;
+export type Navigator = (
+  url: string,
+  options?: { replace?: boolean; source?: "link" | "navigate" },
+) => boolean;
 
 let navigator: Navigator | undefined;
 

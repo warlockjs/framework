@@ -112,6 +112,30 @@ export type NavigationErrorPayload = {
   error: unknown;
 };
 
+/** What started a navigation that a before-navigate listener is asked about. */
+export type BeforeNavigateType = "link" | "navigate" | "pop";
+
+/** What a before-navigate listener is told about the navigation about to start. */
+export type BeforeNavigatePayload = {
+  /** The URL being navigated to, verbatim and unparsed. */
+  to: string;
+  /** The URL of the page the user is leaving. */
+  from: string;
+  /**
+   * `"link"` for a `<Link>` click, `"navigate"` for `navigateTo()`, `"pop"` for
+   * the browser's Back and Forward buttons.
+   */
+  type: BeforeNavigateType;
+};
+
+/**
+ * A before-navigate listener. Return `false` (or a promise of `false`) to cancel
+ * the navigation; any other return value lets it go ahead.
+ */
+export type BeforeNavigateListener = (
+  payload: BeforeNavigatePayload,
+) => boolean | void | Promise<boolean | void>;
+
 /** A listener for one navigation event. Its return value is ignored. */
 type RouterEventListener<Payload> = (payload: Payload) => void;
 
@@ -135,6 +159,19 @@ export type RouterEvents = {
   onNavigationError: (
     listener: RouterEventListener<NavigationErrorPayload>,
   ) => RouterEventUnsubscribe;
+  /**
+   * Subscribe to every navigation BEFORE it starts, with the power to cancel it:
+   * return `false` or a promise of `false`. Listeners run in registration order
+   * and the first `false` wins; a listener that throws is reported and ignored.
+   * @returns the unsubscribe function.
+   */
+  onBeforeNavigate: (listener: BeforeNavigateListener) => RouterEventUnsubscribe;
+  /**
+   * Ask the before-navigate listeners whether a navigation may start. Called by
+   * the navigation runtime. Answers `true`/`false` synchronously when every
+   * listener answered synchronously, and with a promise otherwise.
+   */
+  emitBeforeNavigate: (payload: BeforeNavigatePayload) => boolean | Promise<boolean>;
   /** Announce that a navigation has begun. Called by the navigation runtime. */
   emitNavigating: (payload: NavigationStartPayload) => void;
   /** Announce that a navigation has completed. Called by the navigation runtime. */
@@ -223,12 +260,75 @@ function createSignal<Payload>(eventName: string): Signal<Payload> {
  * the escape hatch for anything that needs a private lifecycle bus. The
  * shared {@link routerEvents} is one of these, created once.
  */
+function createBeforeNavigateGate(): Pick<RouterEvents, "onBeforeNavigate" | "emitBeforeNavigate"> {
+  const listeners = new Set<{ listener: BeforeNavigateListener }>();
+
+  const report = (error: unknown): void => {
+    console.error("Warlock routerEvents: a before-navigate listener threw:", error);
+  };
+
+  return {
+    onBeforeNavigate: (listener) => {
+      const registration = { listener };
+
+      listeners.add(registration);
+
+      return () => {
+        listeners.delete(registration);
+      };
+    },
+    emitBeforeNavigate: (payload) => {
+      const snapshot = [...listeners];
+
+      // Walks the listeners in order from `index`; stays synchronous until a
+      // listener hands back a promise, so a navigation that nobody guards (or
+      // guards synchronously) is never delayed by a microtask.
+      const run = (index: number): boolean | Promise<boolean> => {
+        for (let position = index; position < snapshot.length; position++) {
+          const registration = snapshot[position]!;
+
+          if (!listeners.has(registration)) continue;
+
+          let result: ReturnType<BeforeNavigateListener>;
+
+          try {
+            result = registration.listener(payload);
+          } catch (error) {
+            report(error);
+            continue;
+          }
+
+          if (result === false) return false;
+
+          if (result !== null && typeof result === "object" && "then" in result) {
+            return result.then(
+              (value) => (value === false ? false : run(position + 1)),
+              (error: unknown) => {
+                report(error);
+
+                return run(position + 1);
+              },
+            );
+          }
+        }
+
+        return true;
+      };
+
+      return run(0);
+    },
+  };
+}
+
 export function createRouterEvents(): RouterEvents {
   const navigating = createSignal<NavigationStartPayload>("navigating");
   const navigated = createSignal<NavigationEndPayload>("navigated");
   const navigationError = createSignal<NavigationErrorPayload>("navigation-error");
 
+  const beforeNavigate = createBeforeNavigateGate();
+
   return {
+    ...beforeNavigate,
     onNavigating: navigating.subscribe,
     onNavigated: navigated.subscribe,
     onNavigationError: navigationError.subscribe,
