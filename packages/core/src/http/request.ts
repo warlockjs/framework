@@ -1,4 +1,5 @@
 import { colors } from "@mongez/copper";
+import { readRawBody } from "./raw-body";
 import events from "@mongez/events";
 import { trans, transFrom } from "@mongez/localization";
 import { Random, except, get, only, set, unset } from "@mongez/reinforcements";
@@ -788,6 +789,20 @@ export class Request<RequestValidation = any> {
    */
   public get authorization() {
     return this.header("authorization");
+  }
+
+  /**
+   * The exact bytes of the request body, for a route declared with
+   * `rawBody: true`. `undefined` on other routes and when no body was sent.
+   * Use it to verify a signature computed over the body as the client sent it.
+   */
+  public get rawBody(): Buffer | undefined {
+    return readRawBody(this.baseRequest);
+  }
+
+  /** {@link rawBody} decoded as UTF-8 text. */
+  public rawBodyText(): string | undefined {
+    return this.rawBody?.toString("utf8");
   }
 
   /**

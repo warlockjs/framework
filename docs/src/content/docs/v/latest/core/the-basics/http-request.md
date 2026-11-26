@@ -172,6 +172,10 @@ request.setParam("id", String(canonicalId));
 
 These mutate the request's parsed payload. The merged `all()` and validated views update accordingly.
 
+### Exact body bytes
+
+A route declared with `rawBody: true` also exposes `request.rawBody` (a `Buffer`) and `request.rawBodyText()`, for signature checks. See [Reading the raw body for signatures](./routing-deep.md#reading-the-raw-body-for-signatures).
+
 ### Body content types
 
 `input()`, `all()`, and `validated()` work the same way however the body
@@ -198,6 +202,10 @@ exactly as the same key would in JSON or a query string.
 
 `http.bodyLimit` applies to all three content types. An urlencoded body over
 the limit gets the same `413` as a JSON body.
+
+### Dotted query keys
+
+A query key with dots becomes a nested object: `?createdAt.from=2026-01-01&createdAt.to=2026-02-01` is read as `request.input("createdAt")` → `{ from: "2026-01-01", to: "2026-02-01" }`, or one leaf at a time with `request.input("createdAt.from")`. The same nesting applies to urlencoded bodies. A JSON body is the exception: its keys stay exactly as sent, so `{ "createdAt.from": "…" }` is read with `request.body["createdAt.from"]`, not by a dotted path.
 
 ### `has`, `set`, `setDefault`, `unset`
 
