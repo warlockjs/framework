@@ -482,7 +482,12 @@ export function installPageRoutesFromManifest(
     {
       localeCodes: config.key<readonly string[] | undefined>("app.localeCodes"),
       localeCode: config.key<string | undefined>("app.localeCode"),
-      siteLocaleCodes: siteLocaleCodesOf(options.siteDispatch?.sites),
+      // Each site installs on its own (the multi-site split above recurses with
+      // its slice), so only this site's own locales apply here.
+      siteLocaleCodes:
+        siteSlice === undefined
+          ? undefined
+          : siteLocaleCodesOf({ [siteSlice.site]: siteSlice.localeRouting ?? {} }),
       readSource: (sourceFile) => {
         const source = localeSourceByFile.get(sourceFile);
         if (source === undefined) {

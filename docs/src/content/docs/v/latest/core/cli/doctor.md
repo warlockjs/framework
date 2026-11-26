@@ -120,30 +120,30 @@ Every `warn` or `fail` finding carries a stable [error code](./error-codes.md), 
 }
 ```
 
-| Check                   | Codes it reports                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------ |
-| `routes`                | `WL2001` a module failed to load, `WL2002` discovery failed, `WL3005` no routes registered       |
-| `handler-signature`     | `WL3006` a v4 `(request, response)` handler                                                      |
-| `config`                | `WL1001` a required section is missing                                                           |
-| `connectors`            | `WL1009` the connectors list was refused, `WL2003` a connector failed to boot                    |
-| `optional-peers`        | `WL2007` a configured driver's package is not installed                                          |
-| `jwt-secret`            | `WL1002` no JWT signing secret                                                                   |
-| `upload-limits`         | `WL1011`                                                                                         |
-| `cors`                  | `WL1012`                                                                                         |
-| `auth-tokens`           | `WL1013`                                                                                         |
-| `trust-proxy`           | `WL1014`                                                                                         |
-| `request-timeout`       | `WL1015`                                                                                         |
-| `production-logging`    | `WL1016`                                                                                         |
-| `env-files`             | `WL1017`                                                                                         |
-| `memory-cache`          | `WL1018`                                                                                         |
-| `key-rotation`          | `WL1019`                                                                                         |
-| `compression`           | `WL1020` on its `ok` line, only when compression is off                                          |
-| `health`                | `WL5002` a route claims a probe path, `WL5003` probes not registered                             |
-| `sites`                 | `WL5005` a site's root page answered 5xx in development                                          |
-| `capabilities`          | `WL2008` a required capability has no provider after boot                                        |
-| `locales-ts-deprecated` | `WL9101` a legacy `utils/locales.ts`; the detail names each file and whether `--fix` converts it |
+| Check                   | Codes it reports                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------------------------- |
+| `routes`                | `WL2001` a module failed to load, `WL2002` discovery failed, `WL3005` no routes registered               |
+| `handler-signature`     | `WL3006` a v4 `(request, response)` handler                                                              |
+| `config`                | `WL1001` a required section is missing                                                                   |
+| `connectors`            | `WL1009` the connectors list was refused, `WL2003` a connector failed to boot                            |
+| `optional-peers`        | `WL2007` a configured driver's package is not installed                                                  |
+| `jwt-secret`            | `WL1002` no JWT signing secret                                                                           |
+| `upload-limits`         | `WL1011`                                                                                                 |
+| `cors`                  | `WL1012`                                                                                                 |
+| `auth-tokens`           | `WL1013`                                                                                                 |
+| `trust-proxy`           | `WL1014`                                                                                                 |
+| `request-timeout`       | `WL1015`                                                                                                 |
+| `production-logging`    | `WL1016`                                                                                                 |
+| `env-files`             | `WL1017`                                                                                                 |
+| `memory-cache`          | `WL1018`                                                                                                 |
+| `key-rotation`          | `WL1019`                                                                                                 |
+| `compression`           | `WL1020` on its `ok` line, only when compression is off                                                  |
+| `health`                | `WL5002` a route claims a probe path, `WL5003` probes not registered                                     |
+| `sites`                 | `WL5005` a site's root page answered 5xx in development                                                  |
+| `capabilities`          | `WL2008` a required capability has no provider after boot                                                |
+| `locales-ts-deprecated` | `WL9101` a legacy `utils/locales.ts`; the detail names each file and whether `--fix` converts it         |
 | `migrations`            | `WL9106` a `*.migration.ts` file outside the folders `warlock migrate` reads; the detail names each file |
-| `release-hygiene`       | `WL9102` version and changelog disagree, `WL9103` changelog missing or unparseable               |
+| `release-hygiene`       | `WL9102` version and changelog disagree, `WL9103` changelog missing or unparseable                       |
 
 ## Multi-site render
 

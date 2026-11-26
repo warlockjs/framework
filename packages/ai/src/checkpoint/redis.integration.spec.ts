@@ -62,11 +62,11 @@ describe.skipIf(!enabled)("real Redis checkpoint store", () => {
     const keys = await client.keys(`${PREFIX}*`);
     // session head + three turn keys + the session index
     expect(keys.length).toBeGreaterThanOrEqual(4);
-    expect(await store().list("support")).toEqual(["s1"]);
+    expect(await store().list!("support")).toEqual(["s1"]);
   });
 
   it("prunes older turn keys and keeps the latest loadable", async () => {
-    await store().prune("support", "s1", 2);
+    await store().prune!("support", "s1", 2);
 
     expect((await store().load("support", "s1"))?.turn_index).toBe(2);
     const turnKeys = (await client.keys(`${PREFIX}*`)).filter((key) => /[:/]2$|turn/.test(key));
@@ -75,13 +75,13 @@ describe.skipIf(!enabled)("real Redis checkpoint store", () => {
 
   it("lists by prefix and deletes a session with its index entry", async () => {
     await store().save(record(0, {}, { session_id: "t_2" }));
-    expect((await store().list("support", "t_")).sort()).toEqual(["t_2"]);
+    expect((await store().list!("support", "t_")).sort()).toEqual(["t_2"]);
 
     await store().delete("support", "s1");
     await store().delete("support", "t_2");
 
     expect(await store().load("support", "s1")).toBeUndefined();
-    expect(await store().list("support")).toEqual([]);
+    expect(await store().list!("support")).toEqual([]);
     expect(await client.keys(`${PREFIX}*`)).toEqual([]);
   });
 });

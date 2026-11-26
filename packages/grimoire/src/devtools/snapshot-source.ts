@@ -32,7 +32,8 @@ import type { BookAdapter } from "../contracts/adapter";
 import type { GrimoireSnapshot } from "../contracts/snapshot";
 import { GRIMOIRE_PATHS } from "../paths";
 import { resolveResultsFile } from "../test-results";
-import { openGrimoire, openStoredGrimoire } from "../workspace";
+import { openGrimoire } from "../workspace";
+import { openStoredGrimoire } from "../workspace/stored";
 
 /** Options of the panel's snapshot source. */
 export type SnapshotSourceOptions = {

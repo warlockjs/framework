@@ -105,6 +105,28 @@ describe("pii detector", () => {
       }
     });
 
+    it("redacts only Luhn-valid card numbers and keeps the space after them", () => {
+      const guard = pii({ detect: ["credit-card"], mask: "[REDACTED:{label}]" });
+      const reference = guard.check("Ref 1716628171234 for rent", ctx);
+      const failsLuhn = guard.check("card 4111 1111 1111 1112 x", ctx);
+      const valid = guard.check("card 4111 1111 1111 1111 x", ctx);
+      const nineteen = guard.check("pan 4111-1111-1111-1111-003 ok", ctx);
+
+      expect(reference.type).toBe("allow");
+      expect(failsLuhn.type).toBe("allow");
+      expect(valid.type).toBe("redact");
+
+      if (valid.type === "redact") {
+        expect(valid.text).toBe("card [REDACTED:credit-card] x");
+      }
+
+      expect(nineteen.type).toBe("redact");
+
+      if (nineteen.type === "redact") {
+        expect(nineteen.text).toBe("pan [REDACTED:credit-card] ok");
+      }
+    });
+
     it("substitutes {label} in the mask template with the matched category", () => {
       const verdict = pii({ detect: ["email"], mask: "[PII:{label}]" }).check(
         "ping a@b.com now",

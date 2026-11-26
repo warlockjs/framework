@@ -20,6 +20,7 @@ import type {
   ScryResult,
   ScryRoutePage,
   ScryRouteResult,
+  ScryHit,
   ScrySearchImpact,
   ScrySearchResult,
 } from "../contracts/scry";

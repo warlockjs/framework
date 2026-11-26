@@ -22,7 +22,9 @@ const DEFAULT_MASK = "[REDACTED]";
  * - `ssn`         — US Social Security number, `123-45-6789` / `123 45 6789`.
  * - `email`       — a pragmatic address shape, not full RFC 5322.
  * - `phone`       — North-American style, optional `+1`, separators, parens.
- * - `credit-card` — 13–16 digit runs, optional space / hyphen grouping.
+ * - `credit-card` — Luhn-valid card numbers: 13–19 digits, with single spaces
+ *                   or hyphens only between digits (a trailing separator is
+ *                   never part of the match).
  * - `ipv4`        — four dotted octets (loosely; out-of-range octets still match).
  *
  * `email` is not scanned with this table: a single address regex restarts
@@ -33,7 +35,7 @@ const DEFAULT_MASK = "[REDACTED]";
 const CATEGORY_PATTERNS: Record<Exclude<PiiCategory, "email">, RegExp> = {
   ssn: /\b\d{3}[-\s]\d{2}[-\s]\d{4}\b/g,
   phone: /(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
-  "credit-card": /\b(?:\d[ -]?){13,16}\b/g,
+  "credit-card": /\b\d(?:[ -]?\d){12,18}\b/g,
   ipv4: /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g,
 };
 
@@ -73,6 +75,30 @@ function applyMask(template: string | undefined, label: string): string {
   return template.replace(/\{label\}/g, label);
 }
 
+/** Whether the digits of `value` (separators ignored) pass the Luhn check. */
+function passesLuhn(value: string): boolean {
+  let sum = 0;
+  let double = false;
+
+  for (let index = value.length - 1; index >= 0; index -= 1) {
+    const code = value.charCodeAt(index);
+
+    if (code < 48 || code > 57) continue;
+
+    let digit = code - 48;
+
+    if (double) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+
+    sum += digit;
+    double = !double;
+  }
+
+  return sum % 10 === 0;
+}
+
 /**
  * Collect every built-in-category hit in `text` for the requested
  * categories, in document order per category.
@@ -97,11 +123,15 @@ function scanCategories(text: string, categories: readonly PiiCategory[]): RawHi
     let match = pattern.exec(text);
 
     while (match !== null) {
-      hits.push({
-        label: category,
-        start: match.index,
-        end: match.index + match[0].length - 1,
-      });
+      // A digit run is a card number only when its check digit is right, so
+      // order, listing and reference numbers of the same length stay visible.
+      if (category !== "credit-card" || passesLuhn(match[0])) {
+        hits.push({
+          label: category,
+          start: match.index,
+          end: match.index + match[0].length - 1,
+        });
+      }
 
       // Guard the zero-length-match case so `exec` can never spin forever.
       if (match[0].length === 0) {

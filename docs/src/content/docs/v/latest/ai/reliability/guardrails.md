@@ -149,7 +149,7 @@ ai.guardrail.pii({
 });
 ```
 
-Categories: `ssn`, `email`, `phone`, `credit-card`, `ipv4`. `onMatch` is one of `redact` (default) / `block` / `flag`. Overlapping spans are deduped (earliest, widest kept) so a span is never masked twice. Scanning, deduping and redaction are linear in the length of the text, so a large crafted input (a long run of `a.a.a…`, thousands of address-shaped hits) cannot stall the server.
+Categories: `ssn`, `email`, `phone`, `credit-card` (Luhn-valid card numbers of 13–19 digits, spaces or hyphens only between digits, so order and reference numbers stay visible), `ipv4`. `onMatch` is one of `redact` (default) / `block` / `flag`. Overlapping spans are deduped (earliest, widest kept) so a span is never masked twice. Scanning, deduping and redaction are linear in the length of the text, so a large crafted input (a long run of `a.a.a…`, thousands of address-shaped hits) cannot stall the server.
 
 ### `ai.guardrail.topic(options)`
 

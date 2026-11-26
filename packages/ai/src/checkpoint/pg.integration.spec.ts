@@ -86,10 +86,10 @@ describe.skipIf(!enabled)("real PostgreSQL checkpoint store", () => {
   it("lists sessions by escaped prefix and prunes old turns", async () => {
     await store().save(record(0, {}, { session_id: "other%1" }));
 
-    expect((await store().list("support", "session_")).sort()).toEqual(["session_1"]);
-    expect(await store().list("support", "other%")).toEqual(["other%1"]);
+    expect((await store().list!("support", "session_")).sort()).toEqual(["session_1"]);
+    expect(await store().list!("support", "other%")).toEqual(["other%1"]);
 
-    await store().prune("support", "session_1", 1);
+    await store().prune!("support", "session_1", 1);
     const rows = await pool.query(`SELECT turn_index FROM ${TABLE} WHERE session_id = 'session_1'`);
     expect(rows.rows.map((row) => row.turn_index)).toEqual([1]);
 

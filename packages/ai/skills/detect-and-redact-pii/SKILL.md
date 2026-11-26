@@ -24,7 +24,7 @@ Scans for these `PiiCategory` values; `detect` narrows the set (default: all). E
 | `ssn`         | US Social Security numbers |
 | `email`       | email addresses            |
 | `phone`       | phone numbers              |
-| `credit-card` | credit-card numbers        |
+| `credit-card` | Luhn-valid card numbers    |
 | `ipv4`        | IPv4 addresses             |
 
 ```ts

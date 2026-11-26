@@ -40,7 +40,11 @@ export function useBlocker(
 ): void {
   const latest = useRef({ when, confirm });
 
-  latest.current = { when, confirm };
+  // Kept current after each render, so a navigation reads the latest `when`
+  // and `confirm` without re-subscribing.
+  useEffect(() => {
+    latest.current = { when, confirm };
+  });
 
   useEffect(() => {
     const isActive = (): boolean => {

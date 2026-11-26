@@ -91,7 +91,9 @@ describe("browser page over a fake CDP endpoint", () => {
     // Only Date is faked, so the deadline does not depend on how fast this machine is:
     // the clock moves when the second probe arrives, never because wall time passed.
     vi.useFakeTimers({ toFake: ["Date"] });
-    cleanups.push(() => vi.useRealTimers());
+    cleanups.push(() => {
+      vi.useRealTimers();
+    });
     let probes = 0;
     const endpoint = await fakeCdp((command: FakeCommand) => {
       if (command.method !== "Runtime.evaluate") return { result: {} };

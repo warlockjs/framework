@@ -110,15 +110,15 @@ for (const job of registeredJobs()) {
 
 ### `DispatchOptions`
 
-| Field            | Type         | Notes                                                          |
-| ---------------- | ------------ | -------------------------------------------------------------- |
-| `delay?`         | `Duration`   | `number` (ms) or `` `${number}${"ms"\|"s"\|"m"\|"h"\|"d"}` ``  |
-| `priority?`      | `number`     | `1` is highest; omitted runs ahead of any prioritized job      |
+| Field            | Type         | Notes                                                                                                                 |
+| ---------------- | ------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `delay?`         | `Duration`   | `number` (ms) or `` `${number}${"ms"\|"s"\|"m"\|"h"\|"d"}` ``                                                         |
+| `priority?`      | `number`     | `1` is highest; omitted runs ahead of any prioritized job                                                             |
 | `jobId?`         | `string`     | Dispatching again with a still-live id is a no-op — idempotent. No `:`, not only digits (`InvalidJobDefinitionError`) |
-| `attempts?`      | `number`     | Overrides `defineJob` for this dispatch                        |
-| `backoff?`       | `JobBackoff` | Overrides `defineJob` for this dispatch                        |
-| `timeout?`       | `Duration`   | Overrides `defineJob` for this dispatch                        |
-| `failOnTimeout?` | `boolean`    | Overrides `defineJob` for this dispatch                        |
+| `attempts?`      | `number`     | Overrides `defineJob` for this dispatch                                                                               |
+| `backoff?`       | `JobBackoff` | Overrides `defineJob` for this dispatch                                                                               |
+| `timeout?`       | `Duration`   | Overrides `defineJob` for this dispatch                                                                               |
+| `failOnTimeout?` | `boolean`    | Overrides `defineJob` for this dispatch                                                                               |
 
 Precedence: dispatch options > `defineJob` > `queue.defaultJobOptions`.
 
