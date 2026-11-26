@@ -1,6 +1,6 @@
 {
   "name": "@warlock.js/devtools",
-  "version": "5.64.0",
+  "version": "5.65.0",
   "type": "module",
   "description": "Dashboard for Warlock.js apps: request timeline, queries with EXPLAIN, N+1 detection, resources, health, errors, logs and jobs. Loopback-only at /__warlock in development; an opt-in, signed-in monitor at a secret path in production.",
   "main": "./src/index.ts",
@@ -41,13 +41,13 @@
   },
   "peerDependencies": {
     "@simplewebauthn/server": "^13.1.0",
-    "@warlock.js/ai-panoptic": "5.64.0",
-    "@warlock.js/cache": "5.64.0",
-    "@warlock.js/cascade": "5.64.0",
-    "@warlock.js/core": "5.64.0",
-    "@warlock.js/logger": "5.64.0",
-    "@warlock.js/queue": "5.64.0",
-    "@warlock.js/scheduler": "5.64.0"
+    "@warlock.js/ai-panoptic": "5.65.0",
+    "@warlock.js/cache": "5.65.0",
+    "@warlock.js/cascade": "5.65.0",
+    "@warlock.js/core": "5.65.0",
+    "@warlock.js/logger": "5.65.0",
+    "@warlock.js/queue": "5.65.0",
+    "@warlock.js/scheduler": "5.65.0"
   },
   "peerDependenciesMeta": {
     "@simplewebauthn/server": {

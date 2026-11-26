@@ -1,15 +1,15 @@
 /** Lists users with the filters and paging the request asks for. */
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { UserResource } from "app/users/resources/user.resource";
-import { usersRepository } from "../repositories/users.repository";
 import { listUsersSchema, type ListUsersSchema } from "../schema/list-users.schema";
+import { listUsersService } from "../services/list-users.service";
 
 export const listUsersController: GuardedRequestHandler<ListUsersSchema> = async ({
   request,
   response,
 }) => {
   const { id, ...filters } = request.validated();
-  const { data: users, pagination } = await usersRepository.listCached({
+  const { data: users, pagination } = await listUsersService({
     ...filters,
     publicId: id,
   });

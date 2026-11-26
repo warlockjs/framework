@@ -19,7 +19,7 @@ export const userSchema = v.object({
   // never get an avatar at all.
   image: v.string().optional(),
   password: v.string().min(6).requiredIfEmpty("id").addTransformer(useHashedPassword()),
-  // Written by the social-login handler (`app/users/services/login-social.ts`).
+  // Written by a social-login handler once the project adds one.
   // A field only reachable through `save({ merge })` still has to be declared
   // here — `merge` is typed against this schema, so an undeclared key is a
   // compile error, not a silent write. Optional: a user who has never logged

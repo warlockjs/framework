@@ -1,3 +1,4 @@
+/** The document every page renders into: the head, the body and the scripts. */
 import type { AppProps } from "@warlock.js/web";
 import { Head, Scripts, useLocale, useTextDirection } from "@warlock.js/web";
 import "./app.css";

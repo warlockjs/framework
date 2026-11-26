@@ -1,3 +1,4 @@
+/** Loads the design-system page for development and end-to-end runs only. */
 import { groupedTranslations } from "@mongez/localization";
 import { environment } from "@warlock.js/core";
 import type { PageConfig, PageLoaderContext } from "@warlock.js/web";

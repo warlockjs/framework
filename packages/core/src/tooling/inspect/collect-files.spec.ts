@@ -205,6 +205,9 @@ describe("source file inspection", () => {
     ["src/app/jobs/components/JobCard.tsx", "component"],
     ["src/app/clients/types/client.ts", "type"],
     ["src/app/events/jobs/close-event.ts", "job"],
+    // A migration inside a model folder is a migration, not the model.
+    ["src/app/auth/models/otp/migrations/22-12-2025_10-30-20.otp-migration.ts", "migration"],
+    ["src/app/users/models/user/user.model.ts", "model"],
   ])("infers %s as %s", (file, role) => expect(fileRole(file)).toBe(role));
 
   it("explains transitive route and page reachability including layouts without looping on cycles", async () => {

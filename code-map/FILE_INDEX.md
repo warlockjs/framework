@@ -494,7 +494,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `docs/src/content/docs/v/latest/core/cli/custom-cli-command.md` - Custom CLI command - Add your own `warlock &lt;my-cmd&gt;` — author with the `command()` factory, register in …
 - `docs/src/content/docs/v/latest/core/cli/custom-connector.md` - Custom connector - Plug a new subsystem (queue worker, scheduler, search client, custom broker) into Warlock…
 - `docs/src/content/docs/v/latest/core/cli/doctor.md` - warlock doctor - The read-only diagnostics command — runs routes / config / connectors / optional-peers / …
-- `docs/src/content/docs/v/latest/core/cli/error-codes.md` - Error codes - Every stable Warlock error code (WL1001…WL9105) — what it means, what to do, and the skil…
+- `docs/src/content/docs/v/latest/core/cli/error-codes.md` - Error codes - Every stable Warlock error code (WL1001…WL9106) — what it means, what to do, and the skil…
 - `docs/src/content/docs/v/latest/core/cli/file-health-checks.md` - Background file health checks - Configure TypeScript and Oxlint checks while developing an app.
 - `docs/src/content/docs/v/latest/core/cli/generators.md` - Generators - The scaffolding family — make endpoint, add, generate.module, generate.controller, genera…
 - `docs/src/content/docs/v/latest/core/cli/inspect.md` - warlock inspect - Print the facts of a running app from its registries — routes with middleware, guard, rat…
@@ -559,7 +559,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `docs/src/content/docs/v/latest/core/recipes/upload-to-s3.md` - Upload to S3 - Wire an S3 (or R2 / DigitalOcean Spaces) disk into Warlock&#x27;s storage layer, accept m…
 - `docs/src/content/docs/v/latest/core/testing/browser-e2e.mdx` - Browser end-to-end tests - Own an app fixture and Chrome or Edge, exercise real interactions over CDP, and retain sc…
 - `docs/src/content/docs/v/latest/core/testing/integration-tests.md` - Integration tests - End-to-end walkthrough — install the test feature, wire global + worker setup, write the …
-- `docs/src/content/docs/v/latest/core/testing/testing.md` - Testing - How Warlock tests work — the two-worlds model (per-file or opt-in worker bootstrap + one …
+- `docs/src/content/docs/v/latest/core/testing/testing.md` - Testing - How Warlock tests work — one world per Vitest worker (its own bootstrap, database and HTT…
 - `docs/src/content/docs/v/latest/core/the-basics/02-routing.md` - Routing - The router singleton, path params, prefix groups, middleware groups, the RESTful resource…
 - `docs/src/content/docs/v/latest/core/the-basics/03-controllers.md` - Controllers - The RequestHandler signature, reading inputs, returning through response helpers, attachi…
 - `docs/src/content/docs/v/latest/core/the-basics/04-use-cases.md` - Use-cases - A structured pipeline for business work — guards, schema validation, before, handler, aft…
@@ -794,7 +794,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/access/src/utils/index.ts` - access/src/utils/index.ts
 - `packages/access/vitest.config.ts` - access/vitest.config.ts
 
-## packages/ai (235 test files not listed)
+## packages/ai (237 test files not listed)
 
 - `packages/ai/README.md`
 - `packages/ai/scripts/generate-llms.mjs` - ai/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -1046,7 +1046,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/ai/src/guard/detectors/injection.ts` - CompiledMarker, InjectionDetector, NormalizedText, BUILT_IN_MARKERS, CONFUSABLES, normalizeForMatch, compileMarkers, injection
 - `packages/ai/src/guard/detectors/links.ts` - LinkKind, Edit, LinkHit, ScanSettings, Destination, UnclosedTitles, ParsedTag, detectors/links.ts
 - `packages/ai/src/guard/detectors/moderation.ts` - OpenAiModerationDetector, loadOpenAi, moderation
-- `packages/ai/src/guard/detectors/pii.ts` - RawHit, CATEGORY_PATTERNS, ALL_CATEGORIES, escapeRegExp, applyMask, scanCategories, isLocalPartChar, isWordChar
+- `packages/ai/src/guard/detectors/pii.ts` - RawHit, CATEGORY_PATTERNS, ALL_CATEGORIES, escapeRegExp, applyMask, passesLuhn, scanCategories, isLocalPartChar
 - `packages/ai/src/guard/detectors/topic.ts` - locate, describeTerm, topic, verdict
 - `packages/ai/src/guard/errors.ts` - guard/errors.ts, OPENAI_INSTALL_INSTRUCTIONS
 - `packages/ai/src/guard/guard.ts` - FlagRecord, PhaseOutcome, guard/guard.ts, flagsKey, recordFlag, runDetectors, allowedInputKey, block
@@ -1788,7 +1788,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/auth/src/contracts/index.ts` - auth/src/contracts/index.ts
 - `packages/auth/src/contracts/providers.ts` - ProviderAuthorizationState, ProviderCallbackParams, ProviderProfile, AuthProvider, GoogleProviderConfig, GitHubProviderConfig, DiscordProviderConfig, LinkedInProviderConfig
 - `packages/auth/src/contracts/request-locals.ts` - RequestUser, RequestLocals, @warlock.js/core
-- `packages/auth/src/contracts/types.ts` - LogoutWithoutTokenBehavior, TokenFrom, AuthCredentialDescriptor, AuthRefreshCredentialDescriptor, AuthMiddlewareOptions, CanAuthenticate, AuthCredentials, NormalizeCredentials
+- `packages/auth/src/contracts/types.ts` - LogoutWithoutTokenBehavior, TokenFrom, AuthCredentialDescriptor, AuthRefreshCredentialDescriptor, AuthMiddlewareOptions, AuthenticationMethod, AuthenticationContext, CanAuthenticate
 - `packages/auth/src/errors/auth-provider-sdk-missing.error.ts` - AuthProviderSdkMissingError
 - `packages/auth/src/errors/email-not-verified.error.ts` - EmailNotVerifiedError
 - `packages/auth/src/errors/index.ts` - auth/src/errors/index.ts
@@ -1975,7 +1975,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/cache/src/utils.ts` - CACHE_FOR, cache/src/utils.ts, escapeCacheKeySegment, escapeKeyObject, parseCacheKey, parseTtl, expiresAtToTtl, normalizeToOptions
 - `packages/cache/vitest.config.ts` - cache/vitest.config.ts
 
-## packages/cascade (160 test files not listed)
+## packages/cascade (164 test files not listed)
 
 - `packages/cascade/README.md`
 - `packages/cascade/bin/cascade.js`
@@ -2218,7 +2218,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/context/src/shared-storage.ts` - ContextFrame, ContextStorage, ContextSlot, sharedStorage, NO_SCOPE, currentContextScope, runWithSlots, withSlots
 - `packages/context/vitest.config.ts` - context/vitest.config.ts
 
-## packages/core (688 test files not listed)
+## packages/core (695 test files not listed)
 
 - `packages/core/README.md`
 - `packages/core/TODO.md`
@@ -2333,7 +2333,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/capabilities/index.ts` - capabilities/index.ts
 - `packages/core/src/cli/CLI2_REVIEW.md`
 - `packages/core/src/cli/README.md`
-- `packages/core/src/cli/cli-commands.manager.ts` - CommandRunVerdict, CLICommandsManager, exitAfterFlush, isRespawnedWorker, configuredEarlyConnectorNames
+- `packages/core/src/cli/cli-commands.manager.ts` - CommandRunVerdict, CLICommandsManager, shouldExitOnAsyncError, exitAfterFlush, isRespawnedWorker, configuredEarlyConnectorNames
 - `packages/core/src/cli/cli-commands.utils.ts` - StartBannerOptions, ProductionReadyBannerOptions, HelpCommandInfo, isMatchingCommandName, displayWarlockVersionInTerminal, getTextColorMethod, displayStartupBanner, displayProductionReadyBanner
 - `packages/core/src/cli/commands-loader.ts` - CLICommandsLoader, commandFiles, cliCommandsLoader
 - `packages/core/src/cli/commands/add.command.ts` - addCommand
@@ -2372,6 +2372,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/cli/commands/doctor/checks/key-rotation.check.ts` - rotationSettings, countEntries, keyRotationCheck
 - `packages/core/src/cli/commands/doctor/checks/locales-ts-deprecated.check.ts` - LocaleSource, LocaleInspection, localeSources, literalObject, flattenLiteral, targetOf, overlappingKeys, inspect
 - `packages/core/src/cli/commands/doctor/checks/memory-cache.check.ts` - isMemoryDriver, memoryCacheCheck
+- `packages/core/src/cli/commands/doctor/checks/migrations.check.ts` - migrationsCheck
 - `packages/core/src/cli/commands/doctor/checks/optional-peers.check.ts` - RequiredPeer, projectRequire, isInstalled, text, databasePeer, cachePeer, storagePeer, mailPeer
 - `packages/core/src/cli/commands/doctor/checks/production-logging.check.ts` - ChannelLike, isConsoleChannel, printsDebug, channelList, productionLoggingCheck
 - `packages/core/src/cli/commands/doctor/checks/release-hygiene.check.ts` - ChangelogHeading, ProjectManifest, parseTopHeading, isPublishable, releaseHygieneCheck
@@ -2509,6 +2510,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/database/index.ts` - src/database/index.ts
 - `packages/core/src/database/migrate-action.ts` - listMigrationsAction, printExecutedMigrations, printPendingMigrations, pendingMigrationsAction, allMigrationsFilesAction, migrateAction, runMigrateAction, confirmDestructiveRollback
 - `packages/core/src/database/migrate-shutdown.ts` - MIGRATE_SHUTDOWN_BUDGET_MS, shutdownMigrateConnections, resetMigrateShutdown, closeAll, installMigrateInterruptHandlers
+- `packages/core/src/database/migration-discovery.ts` - MIGRATION_PATTERNS, discoverMigrationFiles, findUndiscoveredMigrations
 - `packages/core/src/database/models/database-log/database-log.ts` - LogSchema, DatabaseLogModel, database-log/database-log.ts, schema
 - `packages/core/src/database/models/database-log/index.ts` - database-log/index.ts
 - `packages/core/src/database/pending-exit-code.ts` - PendingExitCode, PENDING_EXIT_CODE, exitCodeFor
@@ -2523,7 +2525,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/database/seeds/seeds-table-migration.ts` - SeedsTableMigration
 - `packages/core/src/database/seeds/types.ts` - SeedResult, SeederMetadata, TrackableModel, SeedRecordRef, Track, SeedClock, SeedContext, seeds/types.ts
 - `packages/core/src/database/seeds/utils.ts` - seeds/utils.ts, seedsTableName, seedRecordsTableName
-- `packages/core/src/database/utils.ts` - ComputedCallbackModel, database/utils.ts, useHashedPassword, useComputedModel, useComputedSlug
+- `packages/core/src/database/utils.ts` - HashedPasswordOptions, ComputedCallbackModel, database/utils.ts, useHashedPassword, useComputedModel, useComputedSlug
 - `packages/core/src/dev-server/${stripExt(fileA)}`
 - `packages/core/src/dev-server/app-module-registry.ts` - DevelopmentAppModuleRegistry, normalizeKey, getDevelopmentAppModuleRegistry
 - `packages/core/src/dev-server/boot-precondition-error.ts` - BootPreconditionError, isBootPreconditionError
@@ -2598,10 +2600,10 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/dev-server/update-check-cache.ts` - UpdateCheckCache, CACHE_PATH, CACHE_TTL_MS, readCachedLatestVersion, writeCachedLatestVersion, clearCachedLatestVersion
 - `packages/core/src/dev-server/utils.ts` - dev-server/utils.ts, ensureWarlockDirectory, getFilesFromDirectory, getCertainFilesFromDirectory, areSetsEqual
 - `packages/core/src/dev-server/x`
-- `packages/core/src/e2e/browser.ts` - OwnedBrowser, browserCandidates, findBrowserBinary
+- `packages/core/src/e2e/browser.ts` - OwnedBrowser, browserCandidates, findBrowserBinary, browserFlags
 - `packages/core/src/e2e/cdp.ts` - RemoteObject, ExceptionDetails, CdpMethods, CdpEvents, Pending, CdpTimeoutError, CdpConnection
 - `packages/core/src/e2e/fake-cdp.test-support.ts` - FakeCommand, Reply, fakeCdp
-- `packages/core/src/e2e/fixture.ts` - AppFixture, WINDOWS_SYSTEM_VARIABLES, isolatedEnvironment, reservePort, linkDependencies, linkModules
+- `packages/core/src/e2e/fixture.ts` - AppFixture, WINDOWS_SYSTEM_VARIABLES, isolatedEnvironment, parseEnvFile, readAppEnvFile, reservePort, linkDependencies, linkModules
 - `packages/core/src/e2e/index.ts` - src/e2e/index.ts
 - `packages/core/src/e2e/owned-process.ts` - OwnedProcess, utility, commandLineOwns
 - `packages/core/src/e2e/page-connection.ts` - pageConnections
@@ -2622,7 +2624,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/errors/unknown-locale-error.ts` - UnknownLocaleError
 - `packages/core/src/errors/warlock-error.ts` - WarlockError
 - `packages/core/src/generations/README.md`
-- `packages/core/src/generations/add-command.action.ts` - ProjectPackageJson, allowedFeatures, isWarlockPackage, resolveWarlockDependencyVersions, resolveFeatures, addCommandAction, appendAgentKitPick, approvePnpmSharpBuild
+- `packages/core/src/generations/add-command.action.ts` - ProjectPackageJson, allowedFeatures, isWarlockPackage, resolveWarlockDependencyVersions, resolveFeatures, addCommandAction, appendAgentKitPick, nativeBuildApprovals
 - `packages/core/src/generations/features/access.feature.ts` - registerAccessLocale, scaffoldAccessFiles, completeAccessInstallation, accessFeature
 - `packages/core/src/generations/features/ai-anthropic.feature.ts` - aiAnthropicFeature
 - `packages/core/src/generations/features/ai-bedrock.feature.ts` - aiBedrockFeature
@@ -2671,7 +2673,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/generations/features/sitemap.feature.ts` - installSitemapConfig, sitemapFeature
 - `packages/core/src/generations/features/socket.feature.ts` - socketFeature
 - `packages/core/src/generations/features/tailwind.feature.ts` - POSTCSS_CONFIG_FILES, createStylesheet, writePostcssConfig, importStylesheetFromRoot, completeTailwindInstallation, tailwindFeature
-- `packages/core/src/generations/features/test.feature.ts` - usesGrimoire, usesWeb, completeTestInstallation, testFeature
+- `packages/core/src/generations/features/test.feature.ts` - usesGrimoire, completeTestInstallation, testFeature
 - `packages/core/src/generations/features/types.ts` - FeatureDefinition, features/types.ts, INSTALLED_WARLOCK_VERSION
 - `packages/core/src/generations/features/web.feature.ts` - VITE_RANGE, registerWebConnector, completeWebInstallation, webFeature
 - `packages/core/src/generations/generation-fs.ts` - fileExistsAsync, directoryExistsAsync, getFileAsync, getJsonFileAsync, putFileAsync, putJsonFileAsync, ensureDirectoryAsync
@@ -2696,7 +2698,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/http/database/RequestLog.ts` - RequestLogSchema, RequestLog, schema
 - `packages/core/src/http/error-codes.ts` - HttpErrorCodes, http/error-codes.ts, IdempotencyKeyConflict, IdempotencyKeyInvalid, RateLimitExceeded, ConcurrencyLimitReached, BodyTooLarge, IpForbidden
 - `packages/core/src/http/error-mapper.ts` - HttpErrorMapping, HttpErrorMapper, mapRequestError, mapBuiltInError, applyErrorMapper
-- `packages/core/src/http/error-response.ts` - HttpErrorResponseContext, HttpErrorResponseFormatter, appErrors, setResponseAppError, registerErrorResponseFormatter
+- `packages/core/src/http/error-response.ts` - HttpErrorResponseContext, HttpErrorResponseFormatter, appErrors, replyRequests, replyErrors, setResponseRequest, setResponseThrown, setResponseAppError
 - `packages/core/src/http/errors/errors.ts` - AppError, HttpError, ResourceNotFoundError, UnAuthorizedError, ForbiddenError, BadRequestError, ServerError, ConflictError
 - `packages/core/src/http/errors/index.ts` - http/errors/index.ts
 - `packages/core/src/http/escape-header-value.ts` - escapeHeaderValue
@@ -2728,6 +2730,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/http/plugins.ts` - registerHttpPlugins, resolvePublicRoot
 - `packages/core/src/http/port-preflight.ts` - PortInUseError, isPortAvailable, assertPortIsAvailable
 - `packages/core/src/http/rate-limit-cache-store.ts` - UnsupportedRateLimitDriverError, ChildRouteOptions, CacheRateLimitStore, UNSUPPORTED_DRIVERS, assertSupportedDriver, shortHash, windowKey, namespacePrefixes
+- `packages/core/src/http/raw-body.ts` - rawBodies, captureRawBody, rawBodyPreParsing, readRawBody
 - `packages/core/src/http/ready-report.ts` - HttpReadyReport, setHttpReadyReport, getHttpReadyReport, resetHttpReadyReport
 - `packages/core/src/http/refusal-dispatch.ts` - RefusalCarrier, RefusalDispatcher, REFUSAL_STATUS, setRefusalDispatcher, dispatchRefusal, refusalStatusOf, requestAcceptsHtml
 - `packages/core/src/http/reload-gate.ts` - Waiter, ReloadGate, RELOAD_RETRY_AFTER_SECONDS, reloadGate, whenReloadSettled, registerReloadGate
@@ -2875,6 +2878,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/production/locales`
 - `packages/core/src/production/main`
 - `packages/core/src/production/native-addons.ts` - NativePackage, Manifest, StagedNativePackages, readManifest, findPackageDirectory, IGNORED_DIRECTORIES, containsNodeBinary, locatePackage
+- `packages/core/src/production/pre-boot-rejection.ts` - isPreBootRejectionFatal
 - `packages/core/src/production/production-builder.ts` - ProductionBuilder, mergeBanner
 - `packages/core/src/production/production-supervisor.ts` - ProductionSupervisorOptions, ProductionSupervisorResult, DEFAULT_READINESS_NOTICE_DELAY_MS, superviseProductionProcess
 - `packages/core/src/production/promote-dist.ts` - StagedDist, createTempOutputDir, stageDistAsync, commitDistAsync, rollbackDistAsync
@@ -3003,6 +3007,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tests/fakes/test-fakes.ts` - TestFakeName, TestFakesSelection, TEST_FAKE_NAMES, fakes, active, readConfiguredFakes, validateSelection, resolveTestFakes
 - `packages/core/src/tests/fresh-module-graph.ts` - ManagerHost, FreshModuleGraphReport, ReRegistrationSilencer, MANAGER_KEY, resetFileModuleGraph, SILENCER_KEY, installReRegistrationSilencer, prepareFreshFile
 - `packages/core/src/tests/index.ts` - tests/index.ts
+- `packages/core/src/tests/load-app-modules-once.ts` - loadAppModulesOnce
 - `packages/core/src/tests/load-test-app-modules.ts` - appModuleEntriesOnDisk, disposeLoadedAppModules, loadTestAppModules, loadFiles
 - `packages/core/src/tests/load-unit-config.ts` - loadUnitConfig
 - `packages/core/src/tests/open-test-servers.ts` - openServers, trackOpenTestServer, forgetOpenTestServer, closeOpenTestHttpServers
@@ -3015,7 +3020,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tests/start-http-development-server.ts` - StartHttpTestServerOptions, startTestServerPhase, applyTestServerPort, publishEphemeralPort, startHttpTestServer, reportServerBootProfile, unwindPartialStartup, warnAboutConnectorsLeftActive
 - `packages/core/src/tests/test-connectors-selection.ts` - TestConnectorsSelection, RequestedTestConnectors, readRequestedConnectors, readConfiguredConnectors, resolveEffectiveConnectors, normalizeConnectorNames, isSameConnectorsSelection, describeConnectorsSelection
 - `packages/core/src/tests/test-helpers.ts` - TestRequestClient, tests/test-helpers.ts, getTestServerUrl, testRequest, sendRequest, jsonBody, createTestRequestClient, sharedServer
-- `packages/core/src/tests/test-http-server.ts` - CreateTestHttpServerOptions, TestHttpServer, loadAppModulesOnce, boundPort, createTestHttpServer
+- `packages/core/src/tests/test-http-server.ts` - CreateTestHttpServerOptions, TestHttpServer, boundPort, createTestHttpServer
 - `packages/core/src/tests/test-lifecycle-state.ts` - TestLifecycleState, TestSetupAttempt, TestLifecycleRegistry, TestLifecycleHost, TEST_LIFECYCLE_REGISTRY_KEY, getTestLifecycleRegistry
 - `packages/core/src/tests/test-locales.ts` - loadTestLocales
 - `packages/core/src/tests/test-runtime-scope.ts` - TestWorkerConfiguration, TestSetupProfile, RuntimeScope, TestServerBootProfile, KEY, testRuntimeScope, configureTestWorker, selectTestLifetime
@@ -3023,6 +3028,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/src/tests/test-setup-timeout.ts` - TestTimeoutHandle, TestTimeoutScheduler, DEFAULT_TEST_SETUP_TIMEOUT, scheduleRealTimeout, readConfiguredSetupTimeout, describeExpiredSetup
 - `packages/core/src/tests/vitest-setup.ts` - TestRuntimeConfiguration, TestSetupOptions, TestLifecycleError, SetupBound, IMPORT_MODULE_WARNED_KEY, warnMissingImportModule, setupTest, teardownTest
 - `packages/core/src/tests/worker-test-server.ts` - enableWorkerTestServer, usesWorkerTestServer, resolveTestServerUrl, startWorkerServer, closeWorkerTestServer
+- `packages/core/src/tests/worker-web-connector.ts` - findWebConnector, startWebConnectorOn
 - `packages/core/src/tooling/agents-md/agents-md-markers.ts` - AGENTS_MD_FILE, AGENTS_MD_START, AGENTS_MD_END, occurrences, lineBreakOf, upsertGeneratedSection
 - `packages/core/src/tooling/agents-md/agents-md-refresher.ts` - AgentsMdRefresherOptions, AgentsMdRefresher, createAgentsMdRefresher
 - `packages/core/src/tooling/agents-md/collect-agents-md-report.ts` - CollectAgentsMdReportOptions, AGENTS_MD_SECTIONS, collectAgentsMdReport, collectDevModelModules
@@ -3275,7 +3281,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/core/tooling/index.ts` - core/tooling/index.ts
 - `packages/core/vitest.config.ts` - core/vitest.config.ts, workspaceSource
 
-## packages/create-warlock (44 test files not listed)
+## packages/create-warlock (55 test files not listed)
 
 - `packages/create-warlock/README.md`
 - `packages/create-warlock/bin/create-app.js` - bin/create-app.js
@@ -3404,12 +3410,20 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/templates/warlock/docs/new-module.md`
 - `packages/create-warlock/templates/warlock/e2e/home.e2e.ts`
 - `packages/create-warlock/templates/warlock/e2e/shows.e2e.ts` - VALID
+- `packages/create-warlock/templates/warlock/grimoire/apps/default/README.md`
+- `packages/create-warlock/templates/warlock/grimoire/features/accounts/README.md` - Accounts and content
+- `packages/create-warlock/templates/warlock/grimoire/features/accounts/flows/posts.md`
+- `packages/create-warlock/templates/warlock/grimoire/features/accounts/flows/reset-password.md`
+- `packages/create-warlock/templates/warlock/grimoire/features/accounts/flows/sign-in.md`
+- `packages/create-warlock/templates/warlock/grimoire/features/accounts/flows/uploads.md`
+- `packages/create-warlock/templates/warlock/grimoire/features/accounts/flows/users.md`
 - `packages/create-warlock/templates/warlock/grimoire/features/contact/README.md` - Contact form
 - `packages/create-warlock/templates/warlock/grimoire/features/contact/flows/send-message.md`
 - `packages/create-warlock/templates/warlock/grimoire/features/design-system/README.md` - Design system
 - `packages/create-warlock/templates/warlock/grimoire/features/design-system/flows/components.md`
 - `packages/create-warlock/templates/warlock/grimoire/features/design-system/flows/direction.md`
 - `packages/create-warlock/templates/warlock/grimoire/features/design-system/flows/error-messages.md`
+- `packages/create-warlock/templates/warlock/grimoire/features/design-system/flows/language.md`
 - `packages/create-warlock/templates/warlock/grimoire/settings.md`
 - `packages/create-warlock/templates/warlock/postcss.config.mjs`
 - `packages/create-warlock/templates/warlock/skills/api-design/SKILL.md` - api-design - HTTP envelopes, camelCase resources, opaque public IDs, status codes, pagination, respons…
@@ -3476,9 +3490,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/templates/warlock/src/app/users/schema/create-user.schema.ts` - CreateUserSchema, createUserSchema
 - `packages/create-warlock/templates/warlock/src/app/users/schema/list-users.schema.ts` - ListUsersSchema, listUsersSchema
 - `packages/create-warlock/templates/warlock/src/app/users/seeds/users.seed.ts`
-- `packages/create-warlock/templates/warlock/src/app/users/services/get-users.service.ts` - getUsersService
 - `packages/create-warlock/templates/warlock/src/app/users/services/list-users.service.ts` - listUsersService, getFirstUserService
-- `packages/create-warlock/templates/warlock/src/app/users/services/login-social.ts` - loginSocial
 - `packages/create-warlock/templates/warlock/src/config/app.ts` - warlock/src/config/app.ts, appConfigurations
 - `packages/create-warlock/templates/warlock/src/config/auth.ts` - authConfigurations
 - `packages/create-warlock/templates/warlock/src/config/cache.ts` - warlock/src/config/cache.ts, globalPrefix, cacheConfigurations
@@ -3511,6 +3523,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/create-warlock/templates/warlock/src/web/home/components/home-header.tsx` - HomeHeader
 - `packages/create-warlock/templates/warlock/src/web/home/components/logo.tsx` - HomeLogoProps, HomeLogo
 - `packages/create-warlock/templates/warlock/src/web/home/components/runtime-preview.tsx` - RuntimePreviewProps, RuntimePreview
+- `packages/create-warlock/templates/warlock/src/web/home/hooks/describe-contact-failure.ts` - ContactFailure, describeContactFailure
 - `packages/create-warlock/templates/warlock/src/web/home/hooks/use-contact-field.ts` - useContactField
 - `packages/create-warlock/templates/warlock/src/web/home/hooks/use-contact-form.ts` - ContactValues, ContactResponse, ContactErrorBody, ContactStatus, useContactForm, submitContact
 - `packages/create-warlock/templates/warlock/src/web/home/hooks/use-contact-locale.ts` - useContactLocale, toggleLocale
@@ -3828,7 +3841,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/devtools/ui-src/tests/panels/helpers.tsx` - Answer, Route, ApiCall, FakeEventSource, instanceA, instanceB, session, devSession
 - `packages/devtools/ui-src/tests/setup.ts` - tests/setup.ts
 - `packages/devtools/ui-src/vite.config.ts` - ui-src/vite.config.ts, devBase, proxied
-- `packages/devtools/ui/dashboard/assets/app.js` - ae, C, ce, ee, ne, oe, re, se
+- `packages/devtools/ui/dashboard/assets/app.js` - be, C, me, ve, xe, ye, pe, y
 - `packages/devtools/ui/docs-swagger.js`
 - `packages/devtools/ui/panels/processes.js` - renderProcesses
 - `packages/devtools/vitest.config.ts` - devtools/vitest.config.ts
@@ -3880,7 +3893,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/fs/tests/helpers.ts` - tests/helpers.ts, withTempDir
 - `packages/fs/vitest.config.ts` - fs/vitest.config.ts
 
-## packages/grimoire (87 test files not listed)
+## packages/grimoire (88 test files not listed)
 
 - `packages/grimoire/README.md`
 - `packages/grimoire/scripts/generate-llms.mjs` - grimoire/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -3998,6 +4011,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/grimoire/src/warlock/adapter.ts` - WarlockInspect, WarlockAdapterOptions, LiveInspectTooling, ExportIndex, warlock/adapter.ts, versionIn, installedVersion, coreVersion
 - `packages/grimoire/src/warlock/api-command.ts` - runApproveApi
 - `packages/grimoire/src/warlock/approve-command.ts` - openFor, targetsOf, print, runApprove, runReject
+- `packages/grimoire/src/warlock/collect-off-thread.ts` - OffThreadScan, collectOffThread
 - `packages/grimoire/src/warlock/commands.ts` - warlock/commands.ts, BOOT, WEB_CONFIG, preloadFor, GRIMOIRE_ACTIONS, io, exitWith, explainCode
 - `packages/grimoire/src/warlock/guard-command.ts` - GuardCommandOptions, text, readHookInput, stopHookActive, runGuard
 - `packages/grimoire/src/warlock/index.ts` - warlock/index.ts
@@ -4115,7 +4129,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/grimoire/ui/product-map.js` - PRODUCT_STATUS, PRODUCT_LIGHT, PRODUCT_PROOF, PRODUCT_CHANGE, productKit, productPlural, productDecode, productEncode
 - `packages/grimoire/vitest.config.ts` - grimoire/vitest.config.ts
 
-## packages/herald (14 test files not listed)
+## packages/herald (15 test files not listed)
 
 - `packages/herald/.agent/skills/herald-skill/SKILL.md` - herald-internals - How to develop, maintain, and extend the @warlock.js/herald package — architecture, conve…
 - `packages/herald/.agent/skills/herald-usage/SKILL.md` - herald-usage - How to use @warlock.js/herald in this project — connecting brokers, publishing events, cr…
@@ -4277,7 +4291,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/process/src/windows-helper.ts` - HelperChild, HelperSpawn, WindowsHelperOptions, Waiter, Batch, Flight, Snapshot, WindowsProcessHelper
 - `packages/process/vitest.config.ts` - process/vitest.config.ts
 
-## packages/queue (20 test files not listed)
+## packages/queue (21 test files not listed)
 
 - `packages/queue/README.md`
 - `packages/queue/scripts/generate-llms.mjs` - queue/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -4304,7 +4318,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/queue/src/errors.ts` - QueueNotConfiguredError, InvalidDurationError, InvalidJobDefinitionError, FailedJobNotFoundError, QueueDashboardDependencyError, UnrecoverableJobError, JobTimeoutError, queue/src/errors.ts
 - `packages/queue/src/failed-jobs.ts` - FailedJobsOptions, failedJobs, retryFailedJob
 - `packages/queue/src/index.ts` - queue/src/index.ts
-- `packages/queue/src/job-options.ts` - ResolvedJobRetention, ResolvedJobOptions, DEFAULT_REMOVE_ON_COMPLETE, DEFAULT_REMOVE_ON_FAIL, resolveJobOptions, resolveRetention
+- `packages/queue/src/job-options.ts` - ResolvedJobRetention, ResolvedJobOptions, DEFAULT_REMOVE_ON_COMPLETE, DEFAULT_REMOVE_ON_FAIL, assertJobId, resolveJobOptions, resolveRetention
 - `packages/queue/src/job-registry.ts` - RegisteredJob, RegistryListener, jobs, listeners, registerJob, findRegisteredJob, registeredJobs, queueOf
 - `packages/queue/src/job-timeout.ts` - JobTimeoutSettings, JobAbort, resolveTimeout, assertFailOnTimeout, createJobAbort
 - `packages/queue/src/process-job.ts` - processJob
@@ -4533,7 +4547,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/sitemap/src/xml.ts` - XML_ESCAPES, escapeXml, XHTML_NAMESPACE_ATTR, IMAGE_NAMESPACE_ATTR, renderUrlBlock, buildSitemapXml, buildSitemapXmlFromBlocks
 - `packages/sitemap/vitest.config.ts` - sitemap/vitest.config.ts
 
-## packages/web (485 test files not listed)
+## packages/web (488 test files not listed)
 
 - `packages/web/README.md`
 - `packages/web/scripts/generate-llms.mjs` - web/scripts/generate-llms.mjs, scriptDir, pkgRoot, skillsDir, llmsTxtPath, llmsFullPath, pkgJson, shortName
@@ -4587,7 +4601,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/web/src/client/navigation/history-entry-key.ts` - EntryKeyHistory, generateEntryKey, isRecord, readEntryKey, withEntryKey, ensureEntryKey, createEntryKey
 - `packages/web/src/client/navigation/live-page-data.ts` - LivePageSocket, navigation/live-page-data.ts, configurationListeners, configureLivePageData, isDocumentHidden, startLivePageData
 - `packages/web/src/client/navigation/navigation-pending-store.ts` - Listener, listeners, notify, subscribeNavigationPending, readNavigationPending, readNavigationPendingOnServer, beginNavigationPending, waitForNavigationIdle
-- `packages/web/src/client/navigation/navigation-root.tsx` - NavigationRootProps, Current, applyScrollDecision, NavigationRoot, untilAborted
+- `packages/web/src/client/navigation/navigation-root.tsx` - NavigationRootProps, Current, applyScrollDecision, NavigationRoot, startNavigation, untilAborted
 - `packages/web/src/client/navigation/prefetch.ts` - PrefetchedPageData, CacheEntry, InFlightPrefetch, PREFETCH_CACHE_LIMIT, PREFETCH_TTL_MS, PREFETCH_HOVER_DELAY_MS, cache, inFlight
 - `packages/web/src/client/navigation/refresh.ts` - RefreshablePage, RefreshRuntime, RefreshOptions, Refresher, REFRESH_MODE, createRefresher, connectRefresher, refresh
 - `packages/web/src/client/navigation/resolve-error-page-component.ts` - resolveErrorPageComponent
@@ -4598,6 +4612,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/web/src/client/navigation/submit-page-action.ts` - SubmitPageActionResult, ACTION_REDIRECT_HEADER, isPlainRecord, submitPageAction
 - `packages/web/src/client/navigation/submitting-store.ts` - Listener, activeTickets, listeners, notify, subscribeSubmitting, readSubmitting, readSubmittingOnServer, beginSubmitting
 - `packages/web/src/client/navigation/sync-document-locale.ts` - syncDocumentLocale
+- `packages/web/src/client/navigation/use-blocker.ts` - BlockerConfirm, UseBlockerOptions, useBlocker
 - `packages/web/src/client/navigation/use-change-locale-code.ts` - UseChangeLocaleCode, useChangeLocaleCode
 - `packages/web/src/client/navigation/use-is-navigating.ts` - useIsNavigating
 - `packages/web/src/client/navigation/use-query-string.ts` - QueryStringCache, readQueryStringValue, useQueryString
@@ -4702,7 +4717,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/web/src/routing/route-path-parameters.ts` - RoutePathParameter, RoutePathParameterParse, RoutePathParameterParseOptions, parseRoutePathParameters
 - `packages/web/src/routing/route-table.ts` - RouteTableEntry, RegisteredSite, RegisteredSites, RouteParameters, RouteQuery, RouteTableSlot, RouteTableHost, RouteTableNotPublishedError
 - `packages/web/src/routing/route-types.ts` - RouteParamValue, PageRouteDefinition, ApiRouteDefinition, RuntimeRouteName, RegistryName, RegistryHasNames, RegistryEntry, EntryParams
-- `packages/web/src/routing/router-events.ts` - NavigationMode, RefreshReason, NavigationStartPayload, NavigationEndPayload, NavigationErrorPayload, RouterEventListener, RouterEventUnsubscribe, RouterEvents
+- `packages/web/src/routing/router-events.ts` - NavigationMode, RefreshReason, NavigationStartPayload, NavigationEndPayload, NavigationErrorPayload, BeforeNavigateType, BeforeNavigatePayload, BeforeNavigateListener
 - `packages/web/src/routing/safe-redirect-url.ts` - isSafeRedirectUrl, assertSafeRedirectUrl
 - `packages/web/src/routing/site-url.ts` - CurrentSite, CurrentSiteResolver, CurrentSiteResolverHost, CURRENT_SITE_RESOLVER_SLOT, connectCurrentSite, currentSite, registerClientSite, requestProtocolAndPort
 - `packages/web/src/routing/url-fragment.ts` - fragmentOf, withoutFragment, withFragmentFrom, fragmentTargetId, samePageFragment
@@ -4756,7 +4771,8 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/web/src/server/locale-routing/locale-param-routing-conflict.ts` - LocaleParamRoutingConflictError
 - `packages/web/src/server/locale-routing/locale-prefixed-page-handler.ts` - localePrefixedPageHandler
 - `packages/web/src/server/locale-routing/locale-redirect-route-handler.ts` - splitPathAndQuery, sameOriginPath, withQueryString, stripDefaultLocalePrefix, defaultLocaleRedirectHandler, resolvedLocaleRedirectHandler
-- `packages/web/src/server/locale-routing/resolve-locale-routing.ts` - LocaleRoutingConfigError, LocaleRoutingConfig, STRATEGIES, isLocaleRoutingStrategy, resolveLocaleRouting, resolveClientLocaleRoutingFallback
+- `packages/web/src/server/locale-routing/resolve-locale-routing.ts` - LocaleRoutingConfigError, LocaleRoutingConfig, STRATEGIES, isLocaleRoutingStrategy, resolveLocaleRouting, resolveSiteLocales, resolveClientLocaleRoutingFallback
+- `packages/web/src/server/locale-routing/site-locale-guard.ts` - notFoundLocaleCodes, siteDeclaresLocales, restrictToSiteLocales
 - `packages/web/src/server/match-page-route.ts` - splitSegments, matchMixedSegment, matchPath, matchRoute
 - `packages/web/src/server/metadata-deferred-guard.ts` - DeferredKeyInMetadataError, guardMetadataAgainstDeferredKeys
 - `packages/web/src/server/named-api-routes.ts` - ResolveNamedApiRoutesOptions, RouteNamesFunction, CachedTables, server/named-api-routes.ts, matchesPattern, isUnderPrivatePrefix, readConfig, readRegistry
@@ -4877,7 +4893,7 @@ Test files are counted per group, not listed. Search this file for a keyword to 
 - `packages/web/src/sites/site-config.types.ts` - HostResolverInput, HostResolution, HostResolver, SiteLocaleRouting, FixedSiteConfig, DynamicSiteConfig, SiteConfig, SitesConfig
 - `packages/web/src/sites/site-folder.ts` - siteFolder
 - `packages/web/src/sites/site-selector.ts` - SiteSelectionInput, SiteSelection, ResolveCacheOptions, SiteSelectorOptions, CacheEntry, DEFAULT_RESOLVE_CACHE_MAX_ENTRIES, prefixes, createSiteSelector
-- `packages/web/src/sites/validate-sites-config.ts` - SiteConfigErrorCode, SiteConfigError, normalizeHost, validateSitesConfig, assertResolvedSite
+- `packages/web/src/sites/validate-sites-config.ts` - SiteConfigErrorCode, SiteConfigError, normalizeHost, siteLocaleProblems, validateSitesConfig, assertResolvedSite
 - `packages/web/src/text-direction.ts` - TextDirection, RTL_SCRIPTS, RTL_LANGUAGES, readIntlTextDirection, readTableDirection, localeDirection
 - `packages/web/src/translations/delivery.ts` - TranslationSourceEntries, SharedTranslationAsset, TranslationKeyMatcher, EVERYTHING_USAGE, groupOf, localeCodesOf, setLeaf, sharedTableFor
 - `packages/web/src/translations/types.ts` - HydrationTranslationAssets, SerializedTranslationUsage, PageManifestTranslations, translations/types.ts, DEFAULT_SHARED_TRANSLATION_GROUPS, TRANSLATION_TABLE_ROUTE_PREFIX, TRANSLATION_ASSET_DIRECTORY

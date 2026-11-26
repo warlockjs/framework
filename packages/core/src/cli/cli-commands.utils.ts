@@ -240,6 +240,20 @@ export function displayCommandError(commandName: string, error: Error) {
 }
 
 /**
+ * Display an error a persistent command survives (the dev server after an
+ * unhandled rejection): it says the command is still running, so the line is
+ * not read as the process having stopped.
+ */
+export function displayRecoveredCommandError(commandName: string, error: Error) {
+  console.error();
+  console.error(
+    `  ${colors.yellow("⚠")} ${colors.bold(commandDisplayName(commandName))} is still running after an unhandled error`,
+  );
+  console.error(`  ${colors.dim(error.message)}`);
+  console.error();
+}
+
+/**
  * Display a FATAL boot/preload failure and exit information.
  *
  * Preload failures — a bad import in a config file, a connector that throws

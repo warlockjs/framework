@@ -110,7 +110,8 @@ export default {
   if (!(await fileExistsAsync(runnerPath))) {
     await putFileAsync(
       runnerPath,
-      `import { configureTestWorker } from "@warlock.js/core/tests";
+      `/** Runs Vitest with the Warlock worker lifetime: one booted framework per worker. */
+import { configureTestWorker } from "@warlock.js/core/tests";
 import { TestRunner } from "vitest";
 
 // Vitest awaits onCleanupWorkerContext callbacks before recycling the fork.

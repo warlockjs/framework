@@ -5,7 +5,7 @@ status: shipped
 version: 1.0
 updated: 2026-11-23
 apps: [default]
-folders: [src/web/dev]
+folders: [src/web/dev, src/app/locale]
 origin: confirmed
 audience: [developers, designers]
 ---
@@ -24,6 +24,7 @@ feature point at them instead of repeating them.
 - direction text and layout follow the reading direction of the language
 - components every form control renders in each language
 - error-messages every error says what failed and what to do next
+- language the visitor switches the language of the site
 
 ## Affects and affected by
 

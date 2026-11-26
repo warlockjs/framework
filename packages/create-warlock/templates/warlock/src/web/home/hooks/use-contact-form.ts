@@ -3,6 +3,7 @@ import { type FormSubmitOptions, type InferFormValues } from "@mongez/react-form
 import { useState } from "react";
 import type { contactSchema } from "../../../shared/contact.schema";
 import { setFormErrors } from "../../shared/utils/set-form-errors";
+import { describeContactFailure } from "./describe-contact-failure";
 
 type ContactValues = InferFormValues<typeof contactSchema>;
 
@@ -47,17 +48,20 @@ export function useContactForm() {
 
         setStatus({
           state: "error",
-          message: body.error?.message || "The request was not accepted.",
+          message: describeContactFailure({
+            status: response.status,
+            message: body.error?.message,
+          }),
         });
         return;
       }
 
       setStatus({ state: "success", message: body.message ?? "" });
       form.reset();
-    } catch (error) {
+    } catch {
       setStatus({
         state: "error",
-        message: error instanceof Error ? error.message : "Could not reach the backend.",
+        message: describeContactFailure({}),
       });
     }
   }

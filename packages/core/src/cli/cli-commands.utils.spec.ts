@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { stripVTControlCharacters } from "node:util";
 import {
   commandDisplayName,
+  displayRecoveredCommandError,
   displayCommandSuccess,
   displayExecutingCommand,
 } from "./cli-commands.utils";
@@ -42,5 +43,17 @@ describe("command display name", () => {
     expect(running).not.toContain("[file]");
     expect(done).toContain("grimoire build");
     expect(stripVTControlCharacters(done)).not.toMatch(/[<[]/);
+  });
+});
+
+describe("recovered command error", () => {
+  it("says the command is still running, never that it failed", () => {
+    const output = stripVTControlCharacters(
+      capture(() => displayRecoveredCommandError("dev", new Error("deliberate rejection"))),
+    );
+
+    expect(output).toContain("still running after an unhandled error");
+    expect(output).toContain("deliberate rejection");
+    expect(output).not.toContain("failed");
   });
 });

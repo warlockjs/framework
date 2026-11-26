@@ -18,6 +18,7 @@ import { CLICommand } from "../commands/cli-command";
 import {
   displayBootError,
   displayCommandError,
+  displayRecoveredCommandError,
   displayCommandHelp,
   displayCommandNotFound,
   displayCommandSuccess,
@@ -742,16 +743,18 @@ export class CLICommandsManager {
       // if displaying the error yields.
       this.fatalAsyncErrorReported = true;
 
-      displayCommandError(command.name, error);
+      const exits = shouldExitOnAsyncError(command, {
+        isProduction: Application.isProduction,
+        isBooted: Application.isBooted,
+      });
 
-      if (
-        shouldExitOnAsyncError(command, {
-          isProduction: Application.isProduction,
-          isBooted: Application.isBooted,
-        })
-      ) {
-        exitAfterFlush(1);
+      if (!exits) {
+        displayRecoveredCommandError(command.name, error);
+        return;
       }
+
+      displayCommandError(command.name, error);
+      exitAfterFlush(1);
     };
 
     process.on("unhandledRejection", onFatalAsyncError);

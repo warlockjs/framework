@@ -88,7 +88,7 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
     application.configureLintToolchain();
     application.configureAgentKitTargets(options.agents ?? ["claude"]);
   } catch (error) {
-    templateSpinner.stop(spinnerMessages.templateFailed);
+    templateSpinner.stop(spinnerMessages.templateFailed, 2);
 
     failFatally({
       step: "Template copy",
@@ -114,7 +114,7 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
   const baseInstallResult = await baseInstall.result;
 
   if (!baseInstalled) {
-    installSpinner.stop(spinnerMessages.depsFailed);
+    installSpinner.stop(spinnerMessages.depsFailed, 2);
 
     failFatally({
       step: "Dependency install",
@@ -197,6 +197,7 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
     } else {
       featuresSpinner.stop(
         addedFeatures.length > 0 ? spinnerMessages.featuresPartial : spinnerMessages.featuresFailed,
+        2,
       );
 
       problems.push({
@@ -225,7 +226,10 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
 
     const initialized = await application.git();
 
-    gitSpinner.stop(initialized ? spinnerMessages.gitInitialized : spinnerMessages.gitFailed);
+    gitSpinner.stop(
+      initialized ? spinnerMessages.gitInitialized : spinnerMessages.gitFailed,
+      initialized ? 0 : 2,
+    );
 
     if (!initialized) {
       const failure = takeLastCommandOutput();
@@ -257,7 +261,10 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
     const command = runPackageManagerCommand("jwt");
     const generated = await application.exec(command);
 
-    jwtSpinner.stop(generated ? spinnerMessages.jwtGenerated : spinnerMessages.jwtFailed);
+    jwtSpinner.stop(
+      generated ? spinnerMessages.jwtGenerated : spinnerMessages.jwtFailed,
+      generated ? 0 : 2,
+    );
 
     if (!generated) {
       const failure = takeLastCommandOutput();
@@ -277,7 +284,10 @@ export async function createWarlockApp(application: App): Promise<ScaffoldOutcom
 
     const warmed = await application.exec("npx --no warlock --warm-cache");
 
-    warmSpinner.stop(warmed ? spinnerMessages.cacheWarmed : spinnerMessages.cacheWarmFailed);
+    warmSpinner.stop(
+      warmed ? spinnerMessages.cacheWarmed : spinnerMessages.cacheWarmFailed,
+      warmed ? 0 : 1,
+    );
 
     if (!warmed) takeLastCommandOutput();
   }

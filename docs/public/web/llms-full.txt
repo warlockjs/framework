@@ -148,7 +148,7 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 
 ## Fewer client files for a desktop or offline app
 
-`webConnector({ build: { chunks, precompress } })` shapes the browser bundle: `chunks: "split"` (default), `"merged"` (small shared chunks packed together, pages still lazy) or `"single"` (one JavaScript entry and one stylesheet; single-site apps only), and `precompress: false` to skip the `.br` and `.gz` copies. Pair it with `build: { singleBundle: true }` in core's config for a server that runs with `node dist/app.js` and no `node_modules`; `singleBundle` does not change these options. Run the server with the `client/` folder next to `app.js`.
+`webConnector({ build: { chunks, precompress } })` shapes the browser bundle: `chunks: "split"` (default), `"merged"` (small shared chunks packed together, pages still lazy) or `"single"` (one JavaScript entry and one stylesheet; single-site apps only), and `precompress: false` to skip the `.br` and `.gz` copies. Pair it with `build: { singleBundle: true }` in core's config for a server that runs with `node dist/app.js` and no `node_modules`; `singleBundle` does not change these options. Run the server with the `client/` folder next to `app.js`. A failure while the app boots under `warlock start` exits non-zero after it is logged, so a process manager shows the app as errored.
 
 ## Gotchas
 
@@ -2391,7 +2391,7 @@ export default web;
 | `"prefix"`                                    | `/en/about`, `/ar/about`; a bare `/about` answers a 302 to the resolved locale's URL | the path prefix                                                                                                                      |
 | `"prefix-except-default"`                     | `/about` (default locale), `/ar/about`; `/en/about` answers a 301 to `/about`        | the path prefix, else the default locale                                                                                             |
 
-Any other value, an empty `app.localeCodes`, or an `app.localeCode` that is not in `app.localeCodes` throws a `LocaleRoutingConfigError` at boot. A multi-site app can override the strategy per site with `sites.<key>.localeRouting` (see the `multi-site` topic). A page whose filesystem route begins with `[locale]` carries its own locale segment and cannot be combined with a non-`none` strategy (`LocaleParamRoutingConflictError` at boot). To build a locale-correct URL by hand, for a canonical link for example, use `localizedPath(path, locale?)` from `@warlock.js/web`; `<Link>` prefixes literal in-app paths itself (see the `navigate-on-the-client` topic for its `locale` prop).
+Any other value, an empty `app.localeCodes`, or an `app.localeCode` that is not in `app.localeCodes` throws a `LocaleRoutingConfigError` at boot. `warlock build` parses every `locales.json` against `app.localeCodes`, so a file boot would refuse fails the build with the same error. A multi-site app can override the strategy, and narrow the locales, per site with `sites.<key>.localeRouting` (see the `multi-site` topic). A page whose filesystem route begins with `[locale]` carries its own locale segment and cannot be combined with a non-`none` strategy (`LocaleParamRoutingConflictError` at boot). To build a locale-correct URL by hand, for a canonical link for example, use `localizedPath(path, locale?)` from `@warlock.js/web`; `<Link>` prefixes literal in-app paths itself (see the `navigate-on-the-client` topic for its `locale` prop).
 
 The not-found page and the page for a core-level refusal (for example `/ar/public/../x`) answer in the locale a leading URL prefix names; a refusal page's `error.errorCode` is the request id.
 
@@ -2550,11 +2550,13 @@ scope in anything reachable from the server render — a page, layout, or
 and evaluated during SSR, so `web-vitals`' own `window` access at call time
 would need guarding anyway. The two supported places to call it:
 
-**An effect component in the top-level layout.** `root.tsx` is the document
-shell and is not hydrated, so a reporter rendered there never runs in the
-browser. Put the small client component in `src/web/layout.tsx`, which renders
-under `#vessel` and is hydrated with every page. It fires the registration
-from a `useEffect`:
+**An effect component in the top-level layout.** `root.tsx` is hydrated too
+(the entry hydrates the whole document), so an effect there would run; only its
+`<head>` content is not hydrated, so a reporter must not live inside `<head>`.
+The top-level layout is the better home: it renders under `#vessel`, stays
+mounted across client navigations, and keeps the document shell free of
+behaviour. Put the small client component in `src/web/layout.tsx`. It fires the
+registration from a `useEffect`:
 
 ```tsx title="src/web/vitals-reporter.tsx"
 import { useEffect } from "react";
@@ -2879,7 +2881,7 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 
 `basePath` selects a site below a path prefix; the longest matching prefix wins. `unknownHost` is `"not-found"` by default, or may name a configured fallback site. During development use hosts such as `acme.localhost:2030`. `warlock dev` answers only `localhost`, `*.localhost`, IP addresses, fixed sites' `hosts` and `web.devAllowedHosts` (default none; `".tenant.test"` also matches subdomains) — list dynamic tenants' dev hosts there, or they get a 403 "Blocked request" whose text names `web.devAllowedHosts`. `devAllowedHosts: true` disables the host check (DNS-rebinding exposure; avoid).
 
-`localeRouting` on a site replaces global `web.localeRouting`; omit it to inherit, and use `{}` to disable it for one site. Locale codes and the default locale still come from `app.localeCodes` and `app.localeCode`.
+`localeRouting` on a site replaces global `web.localeRouting`; omit it to inherit, and use `{}` to disable it for one site. Locale codes and the default locale still come from `app.localeCodes` and `app.localeCode`, unless the site narrows them: `localeRouting: { strategy, locales: ["en", "ar"], defaultLocale: "en" }` (type `SiteLocaleRouting`) makes the site serve only that subset of `app.localeCodes`. Prefix routes, the not-found locale pin and route `locales.json` checks use the site's set, and a `?locale=`, cookie or header value outside it is answered in the site's default. A code outside `app.localeCodes`, or a `defaultLocale` outside `locales`, stops boot with an error naming the site; without the options a site behaves as before.
 
 ## 4. Read the result in a page handler
 
@@ -3348,6 +3350,29 @@ export function CheckoutButtons() {
 ```
 
 `navigateTo(pathOrTarget, { replace?: boolean })` accepts a path or a `{ name, params, query }` route target. In a browser with no client runtime connected (before hydration), it falls back to a real browser navigation and returns `true`, so callers never hand-write `window.location.assign`. It returns `false` on the server, or when the runtime declines a same-origin URL. `navigateBack()` is a no-op without a browser.
+
+## Guard against leaving a page
+
+`routerEvents.onBeforeNavigate(listener)` (returns an unsubscribe) runs before a
+`<Link>` click, `navigateTo()` or Back/Forward. The listener gets
+`{ to, from, type: "link" | "navigate" | "pop" }`; return `false` or a promise of
+`false` to cancel. Registration order, first `false` wins. Exported types:
+`BeforeNavigateListener`, `BeforeNavigatePayload`, `BeforeNavigateType`.
+
+`useBlocker(when, confirm?, options?)` is the component form: `when` is a
+boolean or a function read per navigation (a clean form never prompts);
+`confirm` is a message for `window.confirm` or a function returning
+`true`/`false` or a promise of it; `{ beforeUnload: true }` also prompts on
+reload and tab close. Exported types: `BlockerConfirm`, `UseBlockerOptions`.
+
+```tsx
+useBlocker(isDirty, "You have unsaved changes. Leave this page?", { beforeUnload: true });
+```
+
+Gotchas: `navigateTo()` still returns `true` for an accepted request even when a
+guard later cancels it; a cancelled Back/Forward puts the old URL back as a new
+history entry (cancelling Forward leaves one extra entry); same-page fragment
+jumps are not guarded.
 
 ## Re-fetch after a mutation
 
@@ -6316,7 +6341,7 @@ export default function AboutPage() {
   (400 by default, or a range such as `"100 900"`), `style`, `unicodeRange`,
   `preload`, `aboveFold`, and optional equivalent TTF/OTF `metricsPath`.
 - `display` defaults to `swap`. `fallback` accepts Arial, Helvetica, Times New
-  Roman, Segoe UI, Roboto, or an array. Use names from this recorded set.
+  Roman, Segoe UI, Roboto, or an array. Use names from this recorded set; any other value (for example one read from JSON) fails before any font is processed with an error that names the family, the value and the supported list.
 - Use the CSS variable; naming only the real family bypasses the adjusted stack.
 - Inspect initial HTML: one cross-origin font preload per critical URL and a
   stylesheet link appear inside the head in development and production.

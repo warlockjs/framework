@@ -46,6 +46,8 @@ export function fileRole(file: string): string {
   if (isWorkerFile(file)) return "worker";
   if (isEventFile(file)) return "event";
   if (isLocaleFile(file)) return "locale";
+  // A migration under `models/<name>/migrations/` is a migration, not a model: check before the folder loop.
+  if (file.split("/").includes("migrations")) return "migration";
   // A file named for one of these says what it is, whatever folder holds it.
   for (const role of NAMED_ROLES) {
     if (stem.endsWith(`.${role}`)) return role;

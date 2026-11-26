@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
-## 5.65.0
+## 5.65.0 - 2026-11-26
 
 ### Added
 
@@ -21,12 +21,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - The request helpers' per-worker server also serves web pages, from the worker's own database, so `warlock add test` no longer generates `src/test-global-setup.ts` or a `globalSetup` line for a web app. An app that still has them keeps working; delete both to move to the worker servers.
 - `setupTest({ importModule })` loads the app's `main.ts` files right after boot, once per worker, so a service spec that sends no request sees what the mains register. A `main.ts` that throws now fails `setupTest()`.
+- `warlock add test` writes a header sentence at the top of the generated `src/test-runner.ts`.
 - The e2e browser starts with `--no-sandbox` when the process runs as root, unless `browser.args` already carries `--no-sandbox` or `--enable-sandbox`.
 - Documented that dotted query keys (`createdAt.from=…`) become nested objects while JSON bodies keep their keys as sent.
 
 ### Fixed
 
 - A failure while a production build boots (`warlock start`, `node dist/app.js`) now exits non-zero after it is logged, instead of leaving a process that is up but serves nothing. Errors after boot, and in the dev server, are still only logged.
+- After an unhandled error the dev server survives, `warlock dev` prints `⚠ dev is still running after an unhandled error` instead of `✖ dev failed`.
+- `collectFiles()` gives a migration under `models/<name>/migrations/` the `migration` role instead of `model`, so Grimoire no longer reports it as a file no flow reaches.
 - `warlock migrate` discovers migrations in `models/<name>/migrations/` folders at any depth below `src/app` (for example `ai/capabilities/models/tool/migrations/`), not only one level down; `<module>/migrations/` is still read.
 - `warlock add queue` (and `warlock add bull-board`) under pnpm approves the install script of `msgpackr-extract`, which the queue installs, as `warlock add image` does for `sharp`; pnpm 11+ no longer fails the install.
 - The e2e spec for a covered click no longer depends on wall-clock time, so it passes on a loaded machine.

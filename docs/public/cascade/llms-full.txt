@@ -1231,6 +1231,8 @@ Quick reference:
 | Replace object columns | `user.set(data).save()`   |
 | After spread mutations | `user.save()`             |
 
+**Unique violations.** When two writes race past a `unique` rule and the database's unique index rejects one, `save()`/`create()` throw `DatabaseWriterValidationError` (never the raw driver error) with `errors: [{ type: "unique", input: "tenantId, receiptFileId", … }]`, `columns` (every column of the index, unquoted), `constraint` (index name when the driver reports it) and `cause` (the driver error).
+
 **Write-heavy MongoDB model?** `public static idReservationBlockSize = 100;` reserves 100 generated ids per counter round-trip instead of one per insert (default `1`). Ids stay unique but are not strictly increasing across processes, and unused ids in a block are lost on restart.
 
 ## Remove a field — `.unset(field)`
@@ -1977,7 +1979,7 @@ Use the outbox pattern above instead when the side effect must survive a crash b
 
 ## Work scheduled inside a transaction (timers, queues, fire-and-forget)
 
-A `setTimeout`, queue push or un-awaited promise started inside `transaction(async () => { ... })` runs after the transaction ended. It runs **outside the transaction, with no session**: its queries are ordinary non-transactional queries, a `transaction()` it starts opens a fresh transaction, and it is **not** rolled back if the transaction rolls back. When it must run only after a successful COMMIT, queue it with `afterCommit(fn)` instead. Do transactional reads and writes before the callback returns.
+A `setTimeout`, queue push or promise started **after the callback returns** runs **outside the transaction, with no session**: its queries are ordinary non-transactional queries, a `transaction()` it starts opens a fresh transaction, and it is **not** rolled back if the transaction rolls back. An async call started while the callback is still running shares the transaction client (it sees uncommitted rows), but nothing waits for it before COMMIT. When work must run only after a successful COMMIT, queue it with `afterCommit(fn)` instead; await anything that belongs in the transaction before the callback returns.
 
 ## Things NOT to do
 
@@ -2509,6 +2511,8 @@ const activeUsers = await User.query().scope("active").get();
 
 **Local scopes** (`addScope`) — opt-in, only when you call `.scope("name")`.
 **Global scopes** (`addGlobalScope`) — run on every query for that model. Useful for multi-tenancy or default soft-delete filtering. Bypass per-query with `.withoutGlobalScope("name")` / `.withoutGlobalScopes()`. A scope may carry `{ stamp: { tenantId } }` (or a function returning it): the values are written into inserts by `create()`, `createMany()`, a new record's `save()` and `upsert()` when the caller left the column unset.
+
+**Bounded bulk updates.** `Model.where(...).orderBy(...).limit(n).update(fields)` changes only the first `n` rows in that order (PostgreSQL through a `ctid` subquery; MongoDB through `_id` selection, or in place for `limit(1)`); the returned count is the number of rows changed. Without `limit()` every match is updated.
 
 ## Things NOT to do
 

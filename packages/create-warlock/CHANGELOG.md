@@ -4,13 +4,14 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
-## 5.65.0
+## 5.65.0 - 2026-11-26
 
 ### Added
 
 - `format:file` script in new apps: `npm run format:file -- <paths>` formats only the files you name, while `format` and `format:check` keep covering `./src`.
 - The starter's design-system scenes now drive `/dev/components`, and the components page also answers when `WARLOCK_E2E=1`.
 - The starter's `.env.example` explains `.env.e2e`, which `warlock e2e` reads.
+- New apps declare their site in `grimoire/apps/default`, an `accounts` feature (sign-in, password reset, posts, users, uploads) and a design-system `language` flow, with tests that prove each criterion, so a fresh app's `warlock grimoire check --all` reports no errors or warnings.
 
 ### Changed
 
@@ -19,11 +20,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Starter source files carry a header sentence, and the contact form has tests proving its criteria.
 - The shadcn design-system components use logical Tailwind classes, so a scaffold passes its own `logical-css` rule.
 - The starter's root comment now says the whole document is hydrated; the scaffold `AGENTS.md` covers the multi-site components page path, `format:file`, `.env.e2e` and the scry-first guidance.
+- The unused starter files `src/app/users/services/get-users.service.ts` and `login-social.ts` are gone; the users list goes through `listUsersService`.
 - The database config comments no longer mention a shared test server: each worker's server serves the API and the pages from the worker's own database.
 
 ### Fixed
 
 - pnpm 11+ scaffolds with the `queue` (or `bull-board`) feature no longer fail the install on `msgpackr-extract`; it is approved in every pnpm layout.
+- A scaffold step that did not succeed (template copy, install, features, git, secret keys, cache warm-up) is printed with a failure mark instead of a check mark.
+- The starter contact form says "Could not reach the server. Check your connection and send the message again." when the request never reaches the server, instead of the browser's own error text.
 
 ## 5.64.0 - 2026-11-23
 

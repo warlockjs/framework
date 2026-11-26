@@ -3192,6 +3192,8 @@ const valid = await verifyPassword("user-password-123", hashed);
 
 Both are async because bcrypt is CPU-bound. The framework uses `bcryptjs` (pure JS — portable across every platform, no native build) under the hood. When the app installs the native `bcrypt` package, both helpers use it automatically: hashing then runs on the libuv thread pool instead of the event loop (worth it on busy login endpoints; raise `UV_THREADPOOL_SIZE` for many concurrent logins). Hashes are the same `$2b$` format either way, so existing hashes keep verifying.
 
+`isPasswordHash(value)` answers whether a string already is a bcrypt or scrypt hash (`useHashedPassword({ keepHashes: true })` uses it to store seeded hashes as they are).
+
 `needsRehash(hash)` is `true` when a stored hash was made with another algorithm or cost than the config asks for (and `false` for an unknown format); `authService.attemptLogin()` uses it to rehash after a correct login (`auth.rehashPasswords`, default `true`). `password.driver: "scrypt"` (with optional `password.scrypt: { cost, blockSize, parallelization }`) hashes new passwords with `node:crypto` scrypt on the thread pool; both formats always verify.
 
 bcrypt reads only the first 72 bytes (UTF-8) of a password. A longer one is hashed with a one-time warning; set `password.rejectLongPasswords: true` to make `hashPassword` throw instead, and cap password length in validation.
@@ -4283,6 +4285,12 @@ the dev server does not. It also warns once at boot when `http.compileResponseSc
 ```ts
 router.post("/avatars", uploadAvatar, { uploads: true });
 ```
+
+### Webhook signatures: `rawBody: true`
+
+`router.post("/webhooks/payments", handler, { rawBody: true })` keeps the exact request bytes: read `request.rawBody`
+(`Buffer`) or `request.rawBodyText()` and verify the HMAC over them. The body is still parsed, `bodyLimit` still applies,
+multipart bodies are not kept, and it works in dev and production. Routes without it buffer nothing.
 
 ## Gotchas
 
@@ -5639,6 +5647,8 @@ allowBuilds:
 ```
 
 pnpm 11 and 12 ignore `package.json`'s `pnpm` field and fail the install when the workspace file has only `onlyBuiltDependencies`, so keep `allowBuilds` there (listing both keys is fine). pnpm before 10.5 rejects a `pnpm-workspace.yaml` without a `packages:` field (`packages field missing or empty`), and adding `packages: ["."]` makes every later dependency add fail with `ERR_PNPM_ADDING_TO_ROOT` — so on those versions use the `package.json` field instead. `create-warlock` 5.30.0 checks the pnpm version and writes the right one, and `warlock add image` follows the same rule when it approves `sharp`.
+
+`warlock add queue` and `warlock add bull-board` approve `msgpackr-extract` (installed with the queue) the same way.
 
 `warlock dev` checks for esbuild's native binary before starting (as `warlock build` already did) and fails fast with `EsbuildBinaryMissingError`, naming the same fix, instead of surfacing an opaque low-level error later from inside the bundler.
 
@@ -7034,6 +7044,11 @@ const errorResponse: HttpErrorResponseFormatter = ({ appError, requestId }) => {
 // Set this function as http.errorResponse in your HTTP configuration.
 ```
 
+The context also has `request` (the Warlock request this reply answers) and `error` (the thrown value); both are
+`undefined` for replies sent before routing (unmatched URL, rejected body, global rate limit). Capture 5xx failures from
+the formatter with `request?.route?.path`, `request?.method`, `request?.locals.user` and `requestId`, and return `undefined`
+to keep the body.
+
 The formatter sees the original instance only for thrown `AppError`s handled
 by the request lifecycle. Early Fastify rejections and returned helper responses
 have no `appError`; use `body` and `status` for those cases. Do not spread an
@@ -7669,8 +7684,9 @@ Use `@warlock.js/core/e2e`, a Node-only subpath, and default-export `defineE2E` 
 `e2e/*.e2e.ts`. Run `npx warlock e2e`. The CLI loads TypeScript itself; no Vitest
 bootstrap, Playwright, Puppeteer or external browser server is needed.
 
-Every run copies the app into a temporary directory, excludes dotenv files and
-symlinks, links installed dependencies for reads, seeds its own environment and
+Every run copies the app into a temporary directory, excludes symlinks and dotenv files
+(the app's `.env.e2e`, else `.env`, is read as the base of the app's environment, `app.envFile`
+names another one or `false` none), links installed dependencies for reads, seeds its own environment and
 owns the app/browser process groups. Keep foreground commands in the fixture;
 never use a shared dev server or daemonize. Map the disposable `dataRoot` into the
 app's actual storage/database config. The harness cannot infer that mapping.
@@ -7732,7 +7748,7 @@ export default defineE2E({
 For an existing app, replace `prepare` and `start`; default start is
 `[process.execPath, "dist/app.js"]`. Optional
 `build: [process.execPath, "node_modules/@warlock.js/core/bin/warlock.js", "build"]`
-builds inside the copy. Supply app-specific test service variables via `env` and
+builds inside the copy. The app runs with `WARLOCK_E2E=1`. Supply app-specific test service variables via `env` and
 exclude production data directories with `exclude: ["storage", "data"]`.
 By default the fixture supplies an OS-assigned `PORT`/`HTTP_PORT`. Prefer the
 port-file handshake above when the app supports binding `0` itself.
@@ -7768,8 +7784,8 @@ port-file handshake above when the app supports binding `0` itself.
 
 Use `--browser /path/to/chrome` or `WARLOCK_E2E_BROWSER` if discovery fails.
 Set `browser.startupTimeoutMs` (default 30 seconds) when the browser is slow to start, for example on shared CI runners.
-`browser: { args: ["--no-sandbox"] }` is an explicit option for controlled root
-containers; it is not a default. On Windows, command arrays should invoke JS tools
+`--no-sandbox` is added automatically when the process runs as root (uid 0); put `--no-sandbox`
+or `--enable-sandbox` in `browser.args` to decide it yourself. On Windows, command arrays should invoke JS tools
 through `process.execPath`, avoiding `.cmd` executables that require a shell.
 
 Read `.warlock/e2e/run-*/evidence.json` and the PNGs/logs on failure. Evidence keeps
@@ -8180,7 +8196,7 @@ The snapshot is `{ status, contentType, body }`; redacted paths read `"[redacted
 
 ## Project wiring — `src/test-setup.ts` + `vite.config.ts`
 
-`warlock add test` creates `src/test-setup.ts` and `vite.config.ts`. In an app with `@warlock.js/web` it also creates `src/test-global-setup.ts` and its `globalSetup` line, because the worker's own server does not start the web connector (a page answers 404 there); the shared server serves the pages. In an API-only app add one only for the shared-server case above; its content is:
+`warlock add test` creates `src/test-setup.ts` and `vite.config.ts`. A web app needs nothing more: the worker's own server starts the web connector (one Vite per worker), so pages render against the worker's database. An app generated earlier may still have `src/test-global-setup.ts` and a `globalSetup` line; it keeps working (its shared server wins while it runs, reading worker 1's database, so use `maxWorkers: 1`), and deleting both moves the app to the worker servers. Add a global setup only for the shared-server case above; its content is:
 
 ```ts title="src/test-global-setup.ts"
 /**
@@ -8221,7 +8237,9 @@ Both files (and this config, with `lowerStage3Decorators()` first so decorated m
 
 **So the service-layer framework is file-scoped: bootstrapped by `setupTest` and closed by the `afterAll(teardownTest)` the setup file registers, once per test file.** ⚠ **`setupTest` alone is not the whole wiring — the paired teardown is mandatory from 4.14.0**; see the `test-service` skill.
 
-**HTTP requests go to a server in the same worker** (started on the first request), so it sees the worker's database; `globalSetup` is only for the shared-server case, which a web app uses for its pages.
+**HTTP requests go to a server in the same worker** (started on the first request), so it sees the worker's database; `globalSetup` is only for the shared-server case.
+
+`setupTest({ importModule })` loads the app's modules right after boot, once per worker, so `main.ts` registrations (listeners, jobs, model events) exist before the first request or service call; only `src/app/main.ts` and `src/app/<module>/main.ts` are loaded, one level deep. `createTestHttpServer({ web: true })` starts the web connector on a server you create yourself (the worker server sets it).
 
 ### Keep Vitest setup out of development
 
@@ -9157,9 +9175,12 @@ const name = process.env.VITEST ? workerDatabaseName("app_test") : "app";
   (`loadAppModules`) load once per worker and are reused.
 - The request helpers (`testGet`, `actingAs`, ...) send to an HTTP server that starts
   in the worker on first use, so it reads the worker's own database and records in the
-  worker's fakes; the runtime closes it with the file. A global `startHttpTestServer()`
+  worker's fakes (in a web app it also serves the pages); the runtime closes it with the file. A global `startHttpTestServer()`
   server (main process, no worker id) reads worker 1's database: run such a suite with
   `maxWorkers: 1`.
+- `setupTest({ importModule })` loads the app's `main.ts` files (only `src/app/main.ts` and
+  `src/app/<module>/main.ts`) once per worker right after boot, so a service spec that sends no
+  request still sees what the mains register; a `main.ts` that throws fails `setupTest()`.
 - `recommendedTestWorkers()` stays within `WARLOCK_TEST_DATABASES` (the number of test
   databases you created) when that variable is set.
 - `isolate: false` shares module state between files of a worker: singletons,
@@ -11687,6 +11708,8 @@ What it does at save time:
 | Existing row, password unchanged | Pass through (no re-hashing — stored hash preserved). |
 | Empty / undefined value          | Pass through untouched.                               |
 
+Seeding rows that already carry a known hash? `useHashedPassword({ keepHashes: true })` stores a value that is already a bcrypt (`$2a$`/`$2b$`/`$2y$`) or scrypt hash as it is and hashes everything else; without the option every new or changed value is hashed, so a seeded hash would be hashed a second time and the password would never verify. The helper `isPasswordHash(value)` (from `@warlock.js/core`) is the same check; the options type is `HashedPasswordOptions`.
+
 Calls `authService.hashPassword(String(value))` under the hood — same bcryptjs path as the standalone `hashPassword()` helper. See the `hash-password` topic for full bcrypt setup (salt rounds, `npm install bcryptjs`).
 
 ### Why declarative wins
@@ -13657,19 +13680,20 @@ A custom check sets `code` on its non-ok results the same way (`{ name, status: 
 
 The default set is `defaultDoctorChecks` (in registration order — runtime-surface checks first, release hygiene last):
 
-| Check               | `ok`                                                                                                 | `warn`                                                 | `fail`                                                                                                     |
-| ------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `routes`            | ≥ 1 route registered                                                                                 | 0 routes (a route module likely failed to load)        | —                                                                                                          |
-| `config`            | required sections (`app`, `http`) present                                                            | —                                                      | a required section is missing                                                                              |
-| `connectors`        | manager enumerable; reports registered + active set                                                  | —                                                      | (only if the probe itself throws)                                                                          |
-| `optional-peers`    | every known optional peer installed                                                                  | a peer is missing → its feature is unavailable         | —                                                                                                          |
-| `jwt-secret`        | `auth.userType` configured and a JWT signing secret set                                              | —                                                      | `auth.userType` is configured but no signing secret (`auth.accessToken.secret` / `auth.jwt.secret`) is set |
-| `validation-labels` | every request-schema field has a label in each configured locale                                     | a field has no label in a locale (WL4002)              | —                                                                                                          |
-| `health`            | `/health` + `/ready` will be exposed                                                                 | `http.health.enabled = false` (probes off)             | —                                                                                                          |
-| `sites`             | each fixed-host site in `web.sites` renders its root page in development without a 5xx               | —                                                      | a site answers 5xx (`WL5005`), with the status, phase and page file                                        |
-| `capabilities`      | every required capability has a provider after boot                                                  | a required capability has none (`WL2008`)              | —                                                                                                          |
-| deployment settings | the setting is within safe bounds (or the line is omitted when it is absent and the default is safe) | the setting to change, named in the detail (see below) | never                                                                                                      |
-| `release-hygiene`   | `package.json` version matches the top `## x.y.z` CHANGELOG heading                                  | no `CHANGELOG.md`, or no parseable heading             | version ≠ top heading                                                                                      |
+| Check               | `ok`                                                                                                 | `warn`                                                                                       | `fail`                                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `routes`            | ≥ 1 route registered                                                                                 | 0 routes (a route module likely failed to load)                                              | —                                                                                                          |
+| `config`            | required sections (`app`, `http`) present                                                            | —                                                                                            | a required section is missing                                                                              |
+| `connectors`        | manager enumerable; reports registered + active set                                                  | —                                                                                            | (only if the probe itself throws)                                                                          |
+| `optional-peers`    | every known optional peer installed                                                                  | a peer is missing → its feature is unavailable                                               | —                                                                                                          |
+| `jwt-secret`        | `auth.userType` configured and a JWT signing secret set                                              | —                                                                                            | `auth.userType` is configured but no signing secret (`auth.accessToken.secret` / `auth.jwt.secret`) is set |
+| `validation-labels` | every request-schema field has a label in each configured locale                                     | a field has no label in a locale (WL4002)                                                    | —                                                                                                          |
+| `health`            | `/health` + `/ready` will be exposed                                                                 | `http.health.enabled = false` (probes off)                                                   | —                                                                                                          |
+| `sites`             | each fixed-host site in `web.sites` renders its root page in development without a 5xx               | —                                                                                            | a site answers 5xx (`WL5005`), with the status, phase and page file                                        |
+| `capabilities`      | every required capability has a provider after boot                                                  | a required capability has none (`WL2008`)                                                    | —                                                                                                          |
+| `migrations`        | (silent when every migration file is discovered)                                                     | a `*.migration.ts` outside `<module>/migrations/` and `models/<name>/migrations/` (`WL9106`) | —                                                                                                          |
+| deployment settings | the setting is within safe bounds (or the line is omitted when it is absent and the default is safe) | the setting to change, named in the detail (see below)                                       | never                                                                                                      |
+| `release-hygiene`   | `package.json` version matches the top `## x.y.z` CHANGELOG heading                                  | no `CHANGELOG.md`, or no parseable heading                                                   | version ≠ top heading                                                                                      |
 
 `validation-labels` is opt-in: it emits no line unless `validation.warnMissingLabels` is `true`, and it stays silent when the app sets its own `validation.translateAttribute`. It lists fields of registered request schemas (`validation.schema`, nested objects included) that have no label under `attributes.<field>` (or `validation.attributes.<field>`, or the configured `validation.attributeGroup`) in each locale of `app.localeCodes`.
 
@@ -17319,6 +17343,8 @@ Quick reference:
 | Replace object columns | `user.set(data).save()`   |
 | After spread mutations | `user.save()`             |
 
+**Unique violations.** When two writes race past a `unique` rule and the database's unique index rejects one, `save()`/`create()` throw `DatabaseWriterValidationError` (never the raw driver error) with `errors: [{ type: "unique", input: "tenantId, receiptFileId", … }]`, `columns` (every column of the index, unquoted), `constraint` (index name when the driver reports it) and `cause` (the driver error).
+
 **Write-heavy MongoDB model?** `public static idReservationBlockSize = 100;` reserves 100 generated ids per counter round-trip instead of one per insert (default `1`). Ids stay unique but are not strictly increasing across processes, and unused ids in a block are lost on restart.
 
 ## Remove a field — `.unset(field)`
@@ -18065,7 +18091,7 @@ Use the outbox pattern above instead when the side effect must survive a crash b
 
 ## Work scheduled inside a transaction (timers, queues, fire-and-forget)
 
-A `setTimeout`, queue push or un-awaited promise started inside `transaction(async () => { ... })` runs after the transaction ended. It runs **outside the transaction, with no session**: its queries are ordinary non-transactional queries, a `transaction()` it starts opens a fresh transaction, and it is **not** rolled back if the transaction rolls back. When it must run only after a successful COMMIT, queue it with `afterCommit(fn)` instead. Do transactional reads and writes before the callback returns.
+A `setTimeout`, queue push or promise started **after the callback returns** runs **outside the transaction, with no session**: its queries are ordinary non-transactional queries, a `transaction()` it starts opens a fresh transaction, and it is **not** rolled back if the transaction rolls back. An async call started while the callback is still running shares the transaction client (it sees uncommitted rows), but nothing waits for it before COMMIT. When work must run only after a successful COMMIT, queue it with `afterCommit(fn)` instead; await anything that belongs in the transaction before the callback returns.
 
 ## Things NOT to do
 
@@ -18597,6 +18623,8 @@ const activeUsers = await User.query().scope("active").get();
 
 **Local scopes** (`addScope`) — opt-in, only when you call `.scope("name")`.
 **Global scopes** (`addGlobalScope`) — run on every query for that model. Useful for multi-tenancy or default soft-delete filtering. Bypass per-query with `.withoutGlobalScope("name")` / `.withoutGlobalScopes()`. A scope may carry `{ stamp: { tenantId } }` (or a function returning it): the values are written into inserts by `create()`, `createMany()`, a new record's `save()` and `upsert()` when the caller left the column unset.
+
+**Bounded bulk updates.** `Model.where(...).orderBy(...).limit(n).update(fields)` changes only the first `n` rows in that order (PostgreSQL through a `ctid` subquery; MongoDB through `_id` selection, or in place for `limit(1)`); the returned count is the number of rows changed. Without `limit()` every match is updated.
 
 ## Things NOT to do
 
@@ -27654,10 +27682,12 @@ await sendInvoice.dispatch(
   {
     delay: "10m", // ms number or "500ms" | "30s" | "10m" | "2h" | "1d"
     priority: 1, // 1 runs first; larger numbers later
-    jobId: "invoice:43", // a second dispatch with a live id is ignored
+    jobId: "invoice-43", // a second dispatch with a live id is ignored
   },
 );
 ```
+
+`jobId` must not contain `:` and must not be only digits; `dispatch()` throws `InvalidJobDefinitionError` for those on every driver (BullMQ, local, `queueFake`). Use `invoice-43`.
 
 ## Timeouts
 
@@ -27873,7 +27903,7 @@ for (const job of failed) {
 }
 
 await failed[0]?.retry(); // back to waiting
-await retryFailedJob("invoice:43"); // by id; throws FailedJobNotFoundError if not failed
+await retryFailedJob("invoice-43"); // by id; throws FailedJobNotFoundError if not failed
 ```
 
 ## Dashboard (optional)
@@ -28480,7 +28510,7 @@ abstract class Auth<TSchema> extends Model<TSchema> implements Authenticable {
 }
 ```
 
-`userType` is the only required override (an abstract getter — return the type slug). Override `generateAccessToken` if you need a non-default payload.
+`userType` is the only required override (an abstract getter — return the type slug). Override `accessTokenPayload()` to add claims: every access token for the user (login, refresh, automatic renewal) is built from it, with `id`, `userType` and `jti` always set from the user. A one-off `deviceInfo.payload` at login is merged over it but is not stored, so a refresh does not carry it; durable claims belong in `accessTokenPayload()`.
 
 `Auth` implements the `Authenticable` contract — that interface mirrors exactly these methods (`userType`, `generateAccessToken`, `generateRefreshToken`, `createTokenPair`, `confirmPassword`), so the class fails to compile if it drifts from the contract. Use `confirmPassword(plaintext)` to check a password against the stored hash (e.g. a "confirm current password" step).
 
@@ -28586,6 +28616,10 @@ authService.login(User, { phone: "+1...", password: hashedOTP });
 Identifiers are normalized before the lookup: string values are trimmed and `email` is lower-cased (`" Sara@x.io"` finds `sara@x.io`). If that finds no user and the normalized value differs from what was sent (trimmed), the lookup is retried once with the value as sent, so legacy rows stored with capitals still log in. The login throttle buckets by the same trimmed, lower-cased email. Configure with `auth.normalizeCredentials`: a function `(identifiers) => identifiers` (everything except `password`), or `false` for exact matching (the function type is `NormalizeCredentials`). Store new emails lower-cased.
 
 For lower-level credential verification (just check, don't issue tokens), use `authService.attemptLogin(Model, credentials)` — returns the user or null without creating tokens.
+
+To tell a wrong password from an account the policy refuses, use `authService.verifyCredentials(Model, credentials, request?)`. It returns a `CredentialsVerification`: `{ type: "ok", user }`, `{ type: "invalid" }` (unknown account or wrong password, same timing) or `{ type: "refused", user }` (right password, `auth.canAuthenticate` said no). It emits no events and does not rehash.
+
+`auth.canAuthenticate(user, context?)` receives an `AuthenticationContext`: `{ via: AuthenticationMethod; request?: Request }`, where `via` is `"password" | "otp" | "passkey" | "oauth" | "token" | "refresh" | "custom"`. The request is present wherever the call site has one (`login(Model, credentials, deviceInfo, request)`, `authMiddleware`, provider and passkey login, `verifyOtp(..., request)`, automatic renewal); a refresh by token string has none. A policy taking only `(user)` still works.
 
 ## Device info
 
@@ -28718,7 +28752,7 @@ const { user, tokens } = await completeProviderLogin(User, "google", request, re
 authService.setAuthCookie(response, tokens.accessToken); // cookie session, or return tokens as JSON
 ```
 
-`authService.completeLogin(user, deviceInfo?)` is that shared ending. It applies `auth.canAuthenticate` (403) and issues tokens. Call it only for a user you have already authenticated.
+`authService.completeLogin(user, deviceInfo?)` is that shared ending. It applies `auth.canAuthenticate` (403) and issues tokens. A third argument `{ via, request }` (an `AuthenticationContext`) is handed to the policy; the provider, passkey and OTP helpers set it for you (`verifyOtp(Model, phone, code, deviceInfo?, request?)` takes the request). Call it only for a user you have already authenticated.
 
 ## Install
 
@@ -29097,7 +29131,7 @@ const pair = await authService.createTokenPair(user, deviceInfo);
 
 `createTokenPair` is the typical issuance path. It respects `config.auth.refreshToken.enabled` — if disabled, returns only `accessToken`.
 
-A custom `payload` (`generateAccessToken(user, payload)` / `deviceInfo.payload`) may add claims, but `id` and `userType` are always stamped from `user`; the route gate also refuses a token whose claims name a different user than its row.
+Claims come from the user model's `accessTokenPayload()` on every issue, refresh and renewal. A custom `payload` (`generateAccessToken(user, payload)` / `deviceInfo.payload`) is merged over them and is not stored for later refreshes. It may add claims, but `id` and `userType` are always stamped from `user`; the route gate also refuses a token whose claims name a different user than its row.
 
 With `auth.hashTokensAtRest: true` the token columns hold SHA-256 digests. `createTokenPair` / `login` still return the raw tokens; the row `createRefreshToken` returns exposes its raw token as `row.plainToken` (`row.get("token")` is the digest).
 
@@ -33205,7 +33239,7 @@ The desired result is one page route at `/` and, when the stock JSON route exist
 
 ## Fewer client files for a desktop or offline app
 
-`webConnector({ build: { chunks, precompress } })` shapes the browser bundle: `chunks: "split"` (default), `"merged"` (small shared chunks packed together, pages still lazy) or `"single"` (one JavaScript entry and one stylesheet; single-site apps only), and `precompress: false` to skip the `.br` and `.gz` copies. Pair it with `build: { singleBundle: true }` in core's config for a server that runs with `node dist/app.js` and no `node_modules`; `singleBundle` does not change these options. Run the server with the `client/` folder next to `app.js`.
+`webConnector({ build: { chunks, precompress } })` shapes the browser bundle: `chunks: "split"` (default), `"merged"` (small shared chunks packed together, pages still lazy) or `"single"` (one JavaScript entry and one stylesheet; single-site apps only), and `precompress: false` to skip the `.br` and `.gz` copies. Pair it with `build: { singleBundle: true }` in core's config for a server that runs with `node dist/app.js` and no `node_modules`; `singleBundle` does not change these options. Run the server with the `client/` folder next to `app.js`. A failure while the app boots under `warlock start` exits non-zero after it is logged, so a process manager shows the app as errored.
 
 ## Gotchas
 
@@ -35448,7 +35482,7 @@ export default web;
 | `"prefix"`                                    | `/en/about`, `/ar/about`; a bare `/about` answers a 302 to the resolved locale's URL | the path prefix                                                                                                                      |
 | `"prefix-except-default"`                     | `/about` (default locale), `/ar/about`; `/en/about` answers a 301 to `/about`        | the path prefix, else the default locale                                                                                             |
 
-Any other value, an empty `app.localeCodes`, or an `app.localeCode` that is not in `app.localeCodes` throws a `LocaleRoutingConfigError` at boot. A multi-site app can override the strategy per site with `sites.<key>.localeRouting` (see the `multi-site` topic). A page whose filesystem route begins with `[locale]` carries its own locale segment and cannot be combined with a non-`none` strategy (`LocaleParamRoutingConflictError` at boot). To build a locale-correct URL by hand, for a canonical link for example, use `localizedPath(path, locale?)` from `@warlock.js/web`; `<Link>` prefixes literal in-app paths itself (see the `navigate-on-the-client` topic for its `locale` prop).
+Any other value, an empty `app.localeCodes`, or an `app.localeCode` that is not in `app.localeCodes` throws a `LocaleRoutingConfigError` at boot. `warlock build` parses every `locales.json` against `app.localeCodes`, so a file boot would refuse fails the build with the same error. A multi-site app can override the strategy, and narrow the locales, per site with `sites.<key>.localeRouting` (see the `multi-site` topic). A page whose filesystem route begins with `[locale]` carries its own locale segment and cannot be combined with a non-`none` strategy (`LocaleParamRoutingConflictError` at boot). To build a locale-correct URL by hand, for a canonical link for example, use `localizedPath(path, locale?)` from `@warlock.js/web`; `<Link>` prefixes literal in-app paths itself (see the `navigate-on-the-client` topic for its `locale` prop).
 
 The not-found page and the page for a core-level refusal (for example `/ar/public/../x`) answer in the locale a leading URL prefix names; a refusal page's `error.errorCode` is the request id.
 
@@ -35607,11 +35641,13 @@ scope in anything reachable from the server render — a page, layout, or
 and evaluated during SSR, so `web-vitals`' own `window` access at call time
 would need guarding anyway. The two supported places to call it:
 
-**An effect component in the top-level layout.** `root.tsx` is the document
-shell and is not hydrated, so a reporter rendered there never runs in the
-browser. Put the small client component in `src/web/layout.tsx`, which renders
-under `#vessel` and is hydrated with every page. It fires the registration
-from a `useEffect`:
+**An effect component in the top-level layout.** `root.tsx` is hydrated too
+(the entry hydrates the whole document), so an effect there would run; only its
+`<head>` content is not hydrated, so a reporter must not live inside `<head>`.
+The top-level layout is the better home: it renders under `#vessel`, stays
+mounted across client navigations, and keeps the document shell free of
+behaviour. Put the small client component in `src/web/layout.tsx`. It fires the
+registration from a `useEffect`:
 
 ```tsx title="src/web/vitals-reporter.tsx"
 import { useEffect } from "react";
@@ -35936,7 +35972,7 @@ Upgrade: move each `src/web/(group)` site folder to `src/web/$sites/<key>` and d
 
 `basePath` selects a site below a path prefix; the longest matching prefix wins. `unknownHost` is `"not-found"` by default, or may name a configured fallback site. During development use hosts such as `acme.localhost:2030`. `warlock dev` answers only `localhost`, `*.localhost`, IP addresses, fixed sites' `hosts` and `web.devAllowedHosts` (default none; `".tenant.test"` also matches subdomains) — list dynamic tenants' dev hosts there, or they get a 403 "Blocked request" whose text names `web.devAllowedHosts`. `devAllowedHosts: true` disables the host check (DNS-rebinding exposure; avoid).
 
-`localeRouting` on a site replaces global `web.localeRouting`; omit it to inherit, and use `{}` to disable it for one site. Locale codes and the default locale still come from `app.localeCodes` and `app.localeCode`.
+`localeRouting` on a site replaces global `web.localeRouting`; omit it to inherit, and use `{}` to disable it for one site. Locale codes and the default locale still come from `app.localeCodes` and `app.localeCode`, unless the site narrows them: `localeRouting: { strategy, locales: ["en", "ar"], defaultLocale: "en" }` (type `SiteLocaleRouting`) makes the site serve only that subset of `app.localeCodes`. Prefix routes, the not-found locale pin and route `locales.json` checks use the site's set, and a `?locale=`, cookie or header value outside it is answered in the site's default. A code outside `app.localeCodes`, or a `defaultLocale` outside `locales`, stops boot with an error naming the site; without the options a site behaves as before.
 
 ## 4. Read the result in a page handler
 
@@ -36405,6 +36441,29 @@ export function CheckoutButtons() {
 ```
 
 `navigateTo(pathOrTarget, { replace?: boolean })` accepts a path or a `{ name, params, query }` route target. In a browser with no client runtime connected (before hydration), it falls back to a real browser navigation and returns `true`, so callers never hand-write `window.location.assign`. It returns `false` on the server, or when the runtime declines a same-origin URL. `navigateBack()` is a no-op without a browser.
+
+## Guard against leaving a page
+
+`routerEvents.onBeforeNavigate(listener)` (returns an unsubscribe) runs before a
+`<Link>` click, `navigateTo()` or Back/Forward. The listener gets
+`{ to, from, type: "link" | "navigate" | "pop" }`; return `false` or a promise of
+`false` to cancel. Registration order, first `false` wins. Exported types:
+`BeforeNavigateListener`, `BeforeNavigatePayload`, `BeforeNavigateType`.
+
+`useBlocker(when, confirm?, options?)` is the component form: `when` is a
+boolean or a function read per navigation (a clean form never prompts);
+`confirm` is a message for `window.confirm` or a function returning
+`true`/`false` or a promise of it; `{ beforeUnload: true }` also prompts on
+reload and tab close. Exported types: `BlockerConfirm`, `UseBlockerOptions`.
+
+```tsx
+useBlocker(isDirty, "You have unsaved changes. Leave this page?", { beforeUnload: true });
+```
+
+Gotchas: `navigateTo()` still returns `true` for an accepted request even when a
+guard later cancels it; a cancelled Back/Forward puts the old URL back as a new
+history entry (cancelling Forward leaves one extra entry); same-page fragment
+jumps are not guarded.
 
 ## Re-fetch after a mutation
 
@@ -39373,7 +39432,7 @@ export default function AboutPage() {
   (400 by default, or a range such as `"100 900"`), `style`, `unicodeRange`,
   `preload`, `aboveFold`, and optional equivalent TTF/OTF `metricsPath`.
 - `display` defaults to `swap`. `fallback` accepts Arial, Helvetica, Times New
-  Roman, Segoe UI, Roboto, or an array. Use names from this recorded set.
+  Roman, Segoe UI, Roboto, or an array. Use names from this recorded set; any other value (for example one read from JSON) fails before any font is processed with an error that names the family, the value and the supported list.
 - Use the CSS variable; naming only the real family bypasses the adjusted stack.
 - Inspect initial HTML: one cross-origin font preload per critical URL and a
   stylesheet link appear inside the head in development and production.
@@ -41146,7 +41205,7 @@ Scans for these `PiiCategory` values; `detect` narrows the set (default: all). E
 | `ssn`         | US Social Security numbers |
 | `email`       | email addresses            |
 | `phone`       | phone numbers              |
-| `credit-card` | credit-card numbers        |
+| `credit-card` | Luhn-valid card numbers    |
 | `ipv4`        | IPv4 addresses             |
 
 ```ts
@@ -53543,13 +53602,19 @@ edits a file you wrote either.
    changes with the top hits:
      src/app/catalog/repositories/products.repository.ts   imported by new-arrivals.service.ts
      src/app/catalog/tests/new-arrivals.test.ts            test
-   next: warlock scry --impact src/app/catalog/services/new-arrivals.service.ts
+   impact of src/app/catalog/services/new-arrivals.service.ts:
+     files  src/app/orders/controllers/orders.controller.ts
+     routes GET /api/products/new-arrivals
    ```
+
+   Where your client supports MCP, prefer the Grimoire MCP tools (`grimoire_search`, `grimoire_impact`, `grimoire_flow`)
+   to the CLI: the same answers, one call each, no shell.
 
    The number in front is the score: hits are in score order, best first, whatever the type.
 
-2. `scry --impact <top file>` (the `next:` line) and read the `changes with` lines: they are the files that usually change
-   with it (what it imports and what imports it inside the same feature, and its tests).
+2. Read the `changes with` and `impact of` lines of that same answer: they are the files that usually change with the
+   top hit (what it imports and what imports it, its routes, flows and tests). The search already includes them; run
+   `scry --impact <top file>` only when you need the full lists (the `next:` line appears when the answer has no impact block).
 3. Use grep only for literal text, or when the answer says `weak match`.
 4. Read the feature's `README.md`, then the flow file. They say what the behaviour should be.
 5. Ask for the flow's book map. It lists the files behind each step, the tests that prove each
@@ -53582,7 +53647,7 @@ build, then ask again. A project with no book stops with `GR9007`. A note
 
 Add `--json` for machine-readable output; a failed call then prints `{ "type": "error", "code", "message", "fix" }` on stdout and exits 1 (the scry MCP tools return the same JSON as their error text). `--impact` lists API routes, pages, flows and features,
 including features that only borrow the file; each list has a count and stops at 20 lines, and `--all`
-prints every line. `--search` takes the whole sentence (the commit title or the bug report, not two keywords): hits whose name or title holds the words come first, every other hit follows by score, and the list is printed in score order with the score in front. It also reads a flow's summary, story, cases and criteria (`AC-5` works); a hit found by written text shows the part that matched in brackets. Page, screen, block and file hits carry their app, and `--app <id>` keeps one app's hits. Specs, locale files and type files rank below code of an equal match. Search reads Arabic and accented Latin text too: accents, Arabic vowel marks, hamza forms and the leading article `ال` do not matter (`شحنة` finds `الشحنة`, `cafe` finds `café`). The answer's `alsoChanges` list (`changes with the top hits:`, at most 10 files) and `next` line come from the top three hits; `weak: true` (the line `weak match: …`) says no hit holds most of the request's words. Read the flows it names and run their tests after
+prints every line. `--search` takes the whole sentence (the commit title or the bug report, not two keywords): hits whose name or title holds the words come first, every other hit follows by score, and the list is printed in score order with the score in front. It also reads a flow's summary, story, cases and criteria (`AC-5` works); a hit found by written text shows the part that matched in brackets. Page, screen, block and file hits carry their app, and `--app <id>` keeps one app's hits. Specs, locale files and type files rank below code of an equal match. Search reads Arabic and accented Latin text too: accents, Arabic vowel marks, hamza forms and the leading article `ال` do not matter (`شحنة` finds `الشحنة`, `cafe` finds `café`). The answer's `alsoChanges` list (`changes with the top hits:`, at most 10 files) comes from the top three hits, and its `impact` block (`impact of <file>:`, the importers, routes, flows and tests that reach the top file, shortened) from the top file, so `--impact` is only for the full lists (its `next` line is printed when there is no impact block); `weak: true` (the line `weak match: …`) says no hit holds most of the request's words. Read the flows it names and run their tests after
 your change.
 
 A file's entry is also at a fixed path: `src/app/auth/controllers/login.controller.ts` is described
@@ -54278,6 +54343,12 @@ Starter controllers include `responseSchema`. Keep these contracts aligned when 
 Feature picker labels stay compact enough for a 40-column terminal; hints are shortened or omitted when necessary. The existing-Tailwind design controls choice keeps its feature value when its display label is shortened.
 
 For generated form controls, return the save promise from `onSubmit` to finish the form's submitting lifecycle before a second submission. In jsdom control tests, provide a scoped ResizeObserver adapter because jsdom does not calculate layout.
+
+## Scaffold details
+
+- Features with a native build script are approved for pnpm: `image` (`sharp`), `queue` and `bull-board` (`msgpackr-extract`).
+- `npm run format:file -- <paths>` formats only the given files; `format` and `format:check` cover all of `./src`.
+- `warlock e2e` reads `.env.e2e` (else `.env`) and sets `WARLOCK_E2E=1`; the starter's components page and memory cache fallback follow it. In a multi-site app the components page lives under `src/web/$sites/<key>/dev/`.
 
 
 ================================================================================
