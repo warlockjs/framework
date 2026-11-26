@@ -15,9 +15,8 @@ import path from "path";
 import type { CommandActionData } from "../commands/types";
 import { filesOrchestrator } from "../dev-server/files-orchestrator";
 import { Path } from "../utils/normalized-path";
-import { getFilesFromDirectory } from "../dev-server/utils";
 import { srcPath } from "../utils";
-import { isTestFile } from "../utils/is-test-file";
+import { discoverMigrationFiles } from "./migration-discovery";
 import { warlockConfigManager } from "../warlock-config/warlock-config.manager";
 import { environment } from "../utils/environment";
 import { resetSeedLedger } from "./seeds/reset-seed-ledger";
@@ -310,17 +309,7 @@ export async function loadMigrationFile(absPath: string) {
  * @returns List of absolute paths to migration files
  */
 async function migrationFiles() {
-  const migrationFiles = await getFilesFromDirectory(srcPath("app"), "*/models/*/migrations/*");
-  const separateMigrationsFolderFIles = await getFilesFromDirectory(
-    srcPath("app"),
-    "*/migrations/*",
-  );
-
-  const migrations = [...migrationFiles, ...separateMigrationsFolderFIles].filter(
-    (file) => !isTestFile(file),
-  );
-
-  return migrations;
+  return discoverMigrationFiles(srcPath("app"));
 }
 
 export async function loadAllMigrations() {

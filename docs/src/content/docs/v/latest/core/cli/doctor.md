@@ -142,6 +142,7 @@ Every `warn` or `fail` finding carries a stable [error code](./error-codes.md), 
 | `sites`                 | `WL5005` a site's root page answered 5xx in development                                          |
 | `capabilities`          | `WL2008` a required capability has no provider after boot                                        |
 | `locales-ts-deprecated` | `WL9101` a legacy `utils/locales.ts`; the detail names each file and whether `--fix` converts it |
+| `migrations`            | `WL9106` a `*.migration.ts` file outside the folders `warlock migrate` reads; the detail names each file |
 | `release-hygiene`       | `WL9102` version and changelog disagree, `WL9103` changelog missing or unparseable               |
 
 ## Multi-site render
