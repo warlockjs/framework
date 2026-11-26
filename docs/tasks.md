@@ -4,6 +4,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Owner decisions waiting
 
+- T-206: drop the `impact of` block from `scry --search` and close the task (recommended), or set new bars and re-measure.
 - Next-major items (T-007, T-009, T-033, and the 6.0 halves of T-042 and T-047) wait for 6.0.
 - Parked until an app asks: T-171, T-196, the streaming half of T-183. Windows-only items (T-100, T-180, T-120) need a
   Windows machine or Windows CI runs.
@@ -51,10 +52,18 @@ PostgreSQL 18.7), 2026-11-22. F1-F3 re-read on `main` at `aaf458c9c`; the report
   - The skill and the generated agent guidance open with "`scry --search` first, then `--impact` on the top hit".
   - Re-run the T-205 test (about $8, 1 hour), adding an arm with the Grimoire MCP tools in place of the CLI.
 - Acceptance: re-run shows recall up with no loss in precision or cost.
-- Status: 5.65.0 folds the top file's impact into `--search` (`impact of <file>:` block, `impact` in `--json`, `next:` only without an impact block) and the skill and MCP descriptions prefer the MCP tools. Open: the acceptance re-run of the agent test (`findings/agent-test-564/`) on the published 5.65.0 code; the coordinator runs it after the publish.
-- Next (coordinator recommendation): `--search` folds the top hit's impact list into its own answer (guidance alone
-  never produced an impact call), and the agent guidance prefers the MCP tools where a client supports them; re-run
-  the same harness (`findings/agent-test-564/`) after the change.
+- Status: 5.65.0 folds the top file's impact into `--search` (`impact of <file>:` block, `impact` in `--json`, `next:` only
+  without an impact block) and the skill and MCP descriptions prefer the MCP tools.
+- Re-run on 5.65.0, 2026-11-26 (`findings/agent-test-565/REPORT.md`, git-ignored; Sonnet 10 tasks x 3 arms x 2, Haiku x 1,
+  $10.69): NOT met. Recall up vs `without` with CI above zero (cli +0.093, CI +0.005..+0.179; mcp +0.132, CI
+  +0.044..+0.234), precision cli 0.370 / mcp 0.346 (bar 0.40, but +0.083 over `without`), median cost cli $0.158 / mcp
+  $0.168 (bar $0.119 dates from 5.63.1; `without` now costs $0.174). Still 0 impact calls in 40 guided runs. The new
+  `impact of` block showed in 95% (cli) / 74% (mcp) of runs, but none of the files agents took from it were correct;
+  the `changes with` list and searching first carry the gain. Haiku: no difference between arms.
+- Coordinator recommendation: drop the `impact of` block from the default `--search` answer (noise: 0 correct files
+  taken from it; keep `--impact` and the `changes with` list), and close T-206 with the recall gain recorded: the cost
+  bar is no longer comparable (the control got dearer) and precision rose over the control.
+- Decision needed: accept that (drop the block in the next release, close the task), or set new bars and measure again.
 
 ## From the 2026-11-21 scry field report
 
