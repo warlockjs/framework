@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contactSchema } from "../../../shared/contact.schema";
+import { contactSchema } from "../../shared/contact.schema";
 
 const valid = {
   name: "Ada Lovelace",

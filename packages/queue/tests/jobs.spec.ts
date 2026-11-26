@@ -5,6 +5,7 @@ import {
   closeQueue,
   defineJob,
   failedJobs,
+  InvalidJobDefinitionError,
   retryFailedJob,
   setQueueConfig,
   startWorkers,
@@ -42,6 +43,23 @@ describe.skipIf(!redisAvailable)("@warlock.js/queue against a real Redis", () =>
     await waitFor(() => received.length === 1);
     expect(received[0]!.payload).toEqual({ invoiceId: "inv-1" });
     expect(received[0]!.context).toMatchObject({ id: "custom-1", attempt: 1, queue: "default" });
+  });
+
+  it("refuses a jobId with a colon or only digits before Redis sees it", async () => {
+    const job = defineJob({
+      name: "spec.job-id",
+      async handle(_payload: { n: number }) {},
+    });
+
+    await expect(job.dispatch({ n: 1 }, { jobId: "invoice:43" })).rejects.toThrow(
+      InvalidJobDefinitionError,
+    );
+    await expect(job.dispatch({ n: 1 }, { jobId: "43" })).rejects.toThrow(
+      InvalidJobDefinitionError,
+    );
+    await expect(job.dispatch({ n: 1 }, { jobId: "invoice-43" })).resolves.toMatchObject({
+      id: "invoice-43",
+    });
   });
 
   it("retries a failing job up to `attempts` then lists it as failed", async () => {

@@ -187,8 +187,14 @@ class AuthService {
     // adds to them. The identity claims always come from the user the row is
     // issued to: a custom payload may add claims, never point the token at
     // someone else.
+    // A plain user object (a test's `actingAs` user, an app's own shape) has no
+    // hook: it gets the default claims.
+    const claims =
+      typeof user.accessTokenPayload === "function"
+        ? user.accessTokenPayload()
+        : this.buildAccessTokenPayload(user);
     const data = {
-      ...user.accessTokenPayload(),
+      ...claims,
       ...payload,
       id: user.id,
       userType: user.userType,

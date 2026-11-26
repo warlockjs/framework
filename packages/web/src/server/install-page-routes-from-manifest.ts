@@ -72,7 +72,6 @@ import {
 import { layoutPrefixesByDirectory } from "./layout-prefixes";
 import { createRefusalPageRenderer } from "./core-refusal-page";
 import type { FailureShell } from "./render-page";
-import { siteLocaleCodesOf } from "../build/site-locale-codes";
 import { notFoundPageHandlerOptions } from "./not-found-handler-options";
 import { normalizePageModule } from "./normalize-page-module";
 import { productionDeclaredStylesheetUrls, productionStylesheetUrls } from "./stylesheet-urls";
@@ -485,9 +484,10 @@ export function installPageRoutesFromManifest(
       // Each site installs on its own (the multi-site split above recurses with
       // its slice), so only this site's own locales apply here.
       siteLocaleCodes:
-        siteSlice === undefined
-          ? undefined
-          : siteLocaleCodesOf({ [siteSlice.site]: siteSlice.localeRouting ?? {} }),
+        siteSlice?.localeRouting?.locales !== undefined &&
+        siteSlice.localeRouting.locales.length > 0
+          ? { [siteSlice.site]: [...siteSlice.localeRouting.locales] }
+          : undefined,
       readSource: (sourceFile) => {
         const source = localeSourceByFile.get(sourceFile);
         if (source === undefined) {
