@@ -1,3 +1,4 @@
+/** Signs the current user out of every device by revoking all of their tokens. */
 import { t } from "@warlock.js/core";
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { logoutAllService } from "../services/auth.service";

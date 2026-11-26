@@ -1,3 +1,4 @@
+/** The contact section of the home page: the pitch and the form. */
 import { Form } from "@mongez/react-form";
 import { useTrans } from "@warlock.js/web";
 import { contactSchema } from "../../../shared/contact.schema";

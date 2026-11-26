@@ -1,3 +1,4 @@
+/** Updates a post from the validated payload. */
 import { ForbiddenError, ResourceNotFoundError } from "@warlock.js/core";
 import { v } from "@warlock.js/seal";
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";

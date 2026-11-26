@@ -1,3 +1,4 @@
+/** Returns the signed-in user's own profile. */
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { UserResource } from "app/users/resources/user.resource";
 

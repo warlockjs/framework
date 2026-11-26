@@ -1,3 +1,4 @@
+/** Signs a user in with a social account. */
 import type { GuardedRequestHandler } from "app/auth/requests/guarded.request";
 
 /**

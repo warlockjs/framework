@@ -1,3 +1,4 @@
+/** Lists users with the filters and paging the request asks for. */
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { UserResource } from "app/users/resources/user.resource";
 import { usersRepository } from "../repositories/users.repository";

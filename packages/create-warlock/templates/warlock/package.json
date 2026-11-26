@@ -21,6 +21,7 @@
     "gen.rs": "warlock generate.resource",
     "lint": "oxlint --fix ./src --max-warnings=0",
     "format": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore --write ./src",
+    "format:file": "oxfmt --ignore-path .gitignore --ignore-path .oxfmtignore --write",
     "tsc": "warlock generate.typings && tsc --noEmit",
     "postinstall": "agent-kit init && agent-kit sync || echo \"warning: AI agent skills were NOT synced, so coding agents will not see the @warlock.js skills. Run the skills:sync script.\"",
     "skills:sync": "agent-kit sync",

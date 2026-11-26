@@ -1,3 +1,4 @@
+/** Validates the payload for creating a user. */
 import { v, type Infer } from "@warlock.js/seal";
 import { User } from "../models/user";
 

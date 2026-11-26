@@ -1,3 +1,4 @@
+/** Declares the post endpoints. */
 import { router } from "@warlock.js/core";
 import { guarded } from "app/shared/utils/router";
 import { createNewPostController } from "./controllers/create-new-post.controller";

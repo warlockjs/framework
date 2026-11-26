@@ -1,3 +1,4 @@
+/** Lists users through the repository with the request's filters. */
 import { ResourceNotFoundError } from "@warlock.js/core";
 import type { UsersListOptions } from "../repositories/users.repository";
 import { usersRepository } from "../repositories/users.repository";

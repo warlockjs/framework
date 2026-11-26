@@ -1,3 +1,4 @@
+/** The home page. */
 import type { PageProps } from "@warlock.js/web";
 import ContactSection from "./components/contact-section";
 import { ContentSections } from "./components/content-sections";

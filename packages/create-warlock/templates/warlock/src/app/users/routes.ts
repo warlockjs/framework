@@ -1,3 +1,4 @@
+/** Declares the user endpoints. */
 import { router } from "@warlock.js/core";
 import { adminMiddleware } from "app/auth/middleware/admin.middleware";
 import { guarded } from "app/shared/utils/router";

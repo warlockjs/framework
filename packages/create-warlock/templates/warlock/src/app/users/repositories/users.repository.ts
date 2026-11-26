@@ -1,3 +1,4 @@
+/** Finds and lists users for the rest of the app. */
 import type { FilterRules, RepositoryOptions } from "@warlock.js/core";
 import { RepositoryManager } from "@warlock.js/core";
 import { User } from "../models/user";

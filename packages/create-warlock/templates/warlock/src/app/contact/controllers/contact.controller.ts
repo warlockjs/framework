@@ -1,3 +1,4 @@
+/** Accepts the starter contact form and confirms the message was received. */
 import { type Request, type RequestHandler } from "@warlock.js/core";
 import { type Infer } from "@warlock.js/seal";
 import { contactSchema } from "@shared/contact.schema";

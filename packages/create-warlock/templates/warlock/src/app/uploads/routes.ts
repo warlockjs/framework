@@ -1,3 +1,4 @@
+/** Serves local uploads and their declared image variants. */
 import { router, uploadedFileController } from "@warlock.js/core";
 
 /**

@@ -1,3 +1,4 @@
+/** The home page's header and navigation. */
 import { HomeLogo } from "./logo";
 
 export function HomeHeader() {

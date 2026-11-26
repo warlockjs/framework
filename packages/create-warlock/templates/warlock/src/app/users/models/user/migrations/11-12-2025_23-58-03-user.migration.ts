@@ -1,3 +1,4 @@
+/** Creates the table that stores users. */
 import { json, Migration, string, timestamp } from "@warlock.js/cascade";
 import { User } from "../user.model";
 

@@ -1,3 +1,4 @@
+/** Lets only admin users through to the routes it guards. */
 import { ForbiddenError, type Middleware } from "@warlock.js/core";
 import type { GuardedRequest } from "app/auth/requests/guarded.request";
 import type { User } from "app/users/models/user";

@@ -1,3 +1,4 @@
+/** Validates the contact form on both the browser and the server. */
 import { v } from "@warlock.js/seal";
 
 export const contactSchema = v.object({

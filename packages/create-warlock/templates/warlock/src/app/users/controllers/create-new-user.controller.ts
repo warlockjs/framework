@@ -1,3 +1,4 @@
+/** Creates a user from the validated payload. */
 import { type GuardedRequestHandler } from "app/auth/requests/guarded.request";
 import { UserResource } from "app/users/resources/user.resource";
 import { User } from "../models/user";

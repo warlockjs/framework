@@ -1,3 +1,4 @@
+/** The language codes the app supports. */
 export const localeCodes = ["en", "ar"] as const;
 
 export type LocaleCode = (typeof localeCodes)[number];

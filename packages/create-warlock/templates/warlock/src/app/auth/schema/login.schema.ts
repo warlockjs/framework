@@ -1,3 +1,4 @@
+/** Validates the login payload: email and password. */
 import { v, type Infer } from "@warlock.js/seal";
 
 export const loginSchema = v.object({

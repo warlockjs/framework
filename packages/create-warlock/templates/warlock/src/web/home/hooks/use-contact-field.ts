@@ -1,3 +1,4 @@
+/** Connects one contact form field to the form's value and error. */
 import { useFormControl, type FormControlProps } from "@mongez/react-form";
 
 /** Keep control identity, validation and DOM wiring in one hook. */

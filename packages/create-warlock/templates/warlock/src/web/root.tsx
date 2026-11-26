@@ -5,8 +5,9 @@ import "./app.css";
 /**
  * The application root.
  *
- * Synchronous server document. Only its children inside #vessel are hydrated;
- * put interactive state in a page or layout beneath that boundary.
+ * Synchronous server document. The whole document is hydrated with this same
+ * root, so hooks here run in the browser too; only the content of <head> is
+ * not hydrated.
  */
 export default function App({ children }: AppProps) {
   const locale = useLocale();

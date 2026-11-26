@@ -1,3 +1,4 @@
+/** The one-time code a user receives to reset a password. */
 import { Model, RegisterModel } from "@warlock.js/cascade";
 import { v, type Infer } from "@warlock.js/seal";
 

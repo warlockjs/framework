@@ -1,3 +1,4 @@
+/** The page shown when a visitor is not allowed to see a route. */
 import type { ErrorPageProps } from "@warlock.js/web";
 
 export default function ForbiddenPage({ status }: ErrorPageProps) {

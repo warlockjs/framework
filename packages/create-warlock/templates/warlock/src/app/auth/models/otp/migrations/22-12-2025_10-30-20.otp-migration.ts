@@ -1,3 +1,4 @@
+/** Creates the table that stores one-time codes. */
 import { integer, json, Migration, string, timestamp } from "@warlock.js/cascade";
 import { OTP } from "../otp.model";
 

@@ -1,3 +1,4 @@
+/** Exchanges a valid refresh token for a new access token. */
 import { type RequestHandler } from "@warlock.js/core";
 import { v } from "@warlock.js/seal";
 import { refreshTokensService } from "../services/auth.service";

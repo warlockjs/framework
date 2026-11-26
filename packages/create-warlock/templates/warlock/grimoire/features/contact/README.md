@@ -5,7 +5,7 @@ status: shipped
 version: 1.0
 updated: 2026-11-23
 apps: [default]
-folders: [src/app/contact]
+folders: [src/app/contact, src/web/home/components]
 origin: confirmed
 audience: [visitors]
 ---

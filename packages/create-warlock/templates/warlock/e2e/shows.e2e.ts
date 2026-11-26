@@ -2,6 +2,7 @@ import { defineE2E } from "@warlock.js/core/e2e";
 import { shows } from "@warlock.js/grimoire/warlock";
 
 const FORM = "#contact-demo";
+const COMPONENTS = "[data-components]";
 const VALID = { name: "Ada Lovelace", email: "ada@example.com", message: "Hello from a scene." };
 
 /** Every input and textarea whose text does not follow the reading direction. */
@@ -77,10 +78,22 @@ export default defineE2E({
       await page.waitFor({ selector: ".warlock-form-status.is-error" });
     });
 
+    // @shows design-system/components AC-1
+    await shows(context, "design-system/components AC-1", async ({ page, path }) => {
+      await page.goto(path("/dev/components"));
+      await page.waitFor({ selector: COMPONENTS });
+    });
+
+    // @shows design-system/error-messages AC-1
+    await shows(context, "design-system/error-messages AC-1", async ({ page, path }) => {
+      await page.goto(path("/dev/components"));
+      await page.waitFor({ selector: `${COMPONENTS} .warlock-field-error` });
+    });
+
     // @shows design-system/direction AC-1
     await shows(context, "design-system/direction AC-1", async ({ page, path }) => {
-      await page.goto(path("/"));
-      await page.waitFor({ selector: FORM });
+      await page.goto(path("/dev/components"));
+      await page.waitFor({ selector: COMPONENTS });
 
       const misaligned = await page.evaluate<string[]>(MISALIGNED);
 
@@ -91,16 +104,16 @@ export default defineE2E({
 
     // @shows design-system/direction AC-2
     await shows(context, "design-system/direction AC-2", async ({ page, language, path }) => {
-      await page.goto(path("/"));
-      await page.waitFor({ selector: "#contact" });
+      await page.goto(path("/dev/components"));
+      await page.waitFor({ selector: COMPONENTS });
 
       const direction = await page.evaluate<string>(
-        'getComputedStyle(document.querySelector("#contact")).direction',
+        'getComputedStyle(document.querySelector("[data-components]")).direction',
       );
       const expected = language === "ar" ? "rtl" : "ltr";
 
       if (direction !== expected) {
-        throw new Error(`The contact section reads ${direction} in ${language}; it should read ${expected}.`);
+        throw new Error(`The components page reads ${direction} in ${language}; it should read ${expected}.`);
       }
     });
   },

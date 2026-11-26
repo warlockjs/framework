@@ -317,3 +317,9 @@ Starter controllers include `responseSchema`. Keep these contracts aligned when 
 Feature picker labels stay compact enough for a 40-column terminal; hints are shortened or omitted when necessary. The existing-Tailwind design controls choice keeps its feature value when its display label is shortened.
 
 For generated form controls, return the save promise from `onSubmit` to finish the form's submitting lifecycle before a second submission. In jsdom control tests, provide a scoped ResizeObserver adapter because jsdom does not calculate layout.
+
+## Scaffold details
+
+- Features with a native build script are approved for pnpm: `image` (`sharp`), `queue` and `bull-board` (`msgpackr-extract`).
+- `pnpm format:file <paths>` formats only the given files; `format` and `format:check` cover all of `./src`.
+- `warlock e2e` reads `.env.e2e` (else `.env`) and sets `WARLOCK_E2E=1`; the starter's components page and memory cache fallback follow it. In a multi-site app the components page lives under `src/web/$sites/<key>/dev/`.

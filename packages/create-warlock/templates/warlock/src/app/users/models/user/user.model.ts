@@ -1,3 +1,4 @@
+/** The user model: an account that can sign in. */
 import { randomUUID } from "node:crypto";
 import { Auth } from "@warlock.js/auth";
 import { RegisterModel } from "@warlock.js/cascade";

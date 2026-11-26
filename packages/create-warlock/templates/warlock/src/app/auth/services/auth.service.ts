@@ -1,3 +1,4 @@
+/** Signs users in and out and issues the tokens they carry. */
 import type { AccessTokenOutput, Auth } from "@warlock.js/auth";
 import { authService, type DeviceInfo, type TokenPair } from "@warlock.js/auth";
 import { t, UnAuthorizedError } from "@warlock.js/core";

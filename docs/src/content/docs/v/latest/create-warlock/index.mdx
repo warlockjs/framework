@@ -147,6 +147,14 @@ npm create warlock@latest my-api -- --yes --no-db --features=test
 You can add a database back at any time by creating a `src/config/database.ts` (add the `DB_*` variables to `.env`) and installing the driver package.
 :::
 
+## Formatting only your own files
+
+`npm run format` and `format:check` cover the whole `./src` tree. To format just the files you changed, run `pnpm format:file <paths>`: it passes your paths to the formatter without adding `./src`, so other people's files are left alone.
+
+## End-to-end runs
+
+`warlock e2e` starts a copy of the app with the environment from `.env.e2e` (else `.env`) and sets `WARLOCK_E2E=1`. Put the test database and `CACHE_DRIVER=memory` in `.env.e2e`. The starter's cache config falls back to the in-memory driver in such a run, and the components page at `/dev/components` answers when `WARLOCK_E2E=1`, so the design-system scenes can capture it. In a multi-site app, move that page under the site that reviews controls: `src/web/$sites/<key>/dev/components.page.tsx`.
+
 ## pnpm versions
 
 With `--pm=pnpm`, `create-warlock` reads `pnpm --version` and writes the pnpm settings that version understands, so esbuild's install script (which `warlock dev` and `warlock build` need) is allowed and installs succeed:
@@ -156,6 +164,8 @@ With `--pm=pnpm`, `create-warlock` reads `pnpm --version` and writes the pnpm se
 | 10.26+, 11, 12   | `pnpm-workspace.yaml` with `allowBuilds`                                                                                 |
 | 10.5 – 10.25     | the same file, plus an `onlyBuiltDependencies` list, which these versions read instead                                   |
 | 7 – 9, 10.0–10.4 | no `pnpm-workspace.yaml` (these versions reject one without `packages:`); `pnpm.onlyBuiltDependencies` in `package.json` |
+
+The same rule covers features that install a dependency with an install script: `image` approves `sharp`, and `queue` (and `bull-board`, which installs it) approves `msgpackr-extract`, in whichever of the three places above your pnpm reads.
 
 Inside an existing pnpm workspace the app gets neither: the parent workspace's settings apply. If you upgrade pnpm later, move the approvals to the row for the new version.
 

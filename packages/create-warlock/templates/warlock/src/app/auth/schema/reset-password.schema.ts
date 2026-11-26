@@ -1,3 +1,4 @@
+/** Validates the password reset payload: email, code and new password. */
 import { v, type Infer } from "@warlock.js/seal";
 
 export const resetPasswordSchema = v.object({

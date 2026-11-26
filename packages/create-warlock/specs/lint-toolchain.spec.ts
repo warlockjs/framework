@@ -116,6 +116,9 @@ describe("generated toolchains", () => {
         Object.keys(pkg.devDependencies).filter((name) => /eslint|prettier/.test(name)),
       ).toEqual([]);
       expect(pkg.scripts.format).toContain("--ignore-path .oxfmtignore");
+      // A path-less script, so `pnpm format:file <paths>` formats only those files.
+      expect(pkg.scripts["format:file"]).toMatch(/^oxfmt .*--write$/);
+      expect(pkg.scripts["format:file"]).not.toContain("./src");
       expect(existsSync(path.join(appPath, ".oxfmtignore"))).toBe(true);
       for (const name of [".oxlintrc.json", ".oxfmtrc.json"])
         expect(existsSync(path.join(appPath, name))).toBe(true);

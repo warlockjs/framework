@@ -1,3 +1,4 @@
+/** Seeds the first users into an empty database. */
 import { Random } from "@mongez/reinforcements";
 import { seeder } from "@warlock.js/core";
 import { User } from "../models/user";

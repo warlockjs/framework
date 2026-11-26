@@ -1,3 +1,4 @@
+/** Validates the filters and paging for listing users. */
 import { v, type Infer } from "@warlock.js/seal";
 
 /**

@@ -41,7 +41,11 @@ const cacheConfigurations: CacheConfigurations<"database"> = {
   // Driven by CACHE_DRIVER so the shipped .env (`memory`) actually wins.
   // Hardcoding "redis" made a `--no-db` scaffold hang forever retrying a
   // Redis connection that was never going to exist.
-  default: env("CACHE_DRIVER") || "redis",
+  // An end-to-end or test run (WARLOCK_E2E=1, or NODE_ENV=test) has no Redis, so it
+  // falls back to the in-memory driver instead of failing the boot.
+  default:
+    env("CACHE_DRIVER") ||
+    (env("WARLOCK_E2E") === "1" || env("NODE_ENV") === "test" ? "memory" : "redis"),
   drivers: {
     file: FileCacheDriver,
     memory: MemoryCacheDriver,

@@ -16,6 +16,8 @@ function criteriaOf(flowFile: string): string[] {
 const SHOWN: Record<string, string[]> = {
   "contact/send-message": ["AC-1", "AC-2", "AC-3", "AC-4"],
   "design-system/direction": ["AC-1", "AC-2"],
+  "design-system/components": ["AC-1"],
+  "design-system/error-messages": ["AC-1"],
 };
 
 describe("starter template: @shows scenes", () => {
@@ -53,8 +55,27 @@ describe("starter template: components page", () => {
     const setup = read("src/web/dev/components.setup.ts");
 
     expect(setup).toContain('environment() !== "development"');
+    expect(setup).toContain('process.env.WARLOCK_E2E !== "1"');
     expect(setup).toContain("response.notFound()");
     expect(setup).toContain('path: "/dev/components"');
+  });
+
+  it("is the page every design-system scene drives", () => {
+    const scenes = read("e2e/shows.e2e.ts");
+
+    expect(scenes).toContain('path("/dev/components")');
+    expect(scenes).not.toContain('#contact"');
+  });
+
+  it("falls back to the memory cache in an end-to-end run", () => {
+    const cache = read("src/config/cache.ts");
+
+    expect(cache).toContain('env("WARLOCK_E2E") === "1"');
+    expect(cache).toContain('"memory" : "redis"');
+  });
+
+  it("keeps the contact UI inside the contact feature's folders", () => {
+    expect(read("grimoire/features/contact/README.md")).toContain("src/web/home/components");
   });
 
   it("renders form controls and headings", () => {
