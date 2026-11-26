@@ -6,6 +6,7 @@ import {
   isInsideParentPnpmWorkspace,
   mergeOnlyBuiltDependencies,
   mergePackageJsonBuildApprovals,
+  mergePnpmBuildApproval,
   mergePnpmSharpApproval,
   pnpmBuildApprovalLayout,
 } from "./pnpm-build-approvals";
@@ -117,5 +118,28 @@ describe("isInsideParentPnpmWorkspace", () => {
     writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n");
 
     expect(isInsideParentPnpmWorkspace(app)).toBe(true);
+  });
+});
+
+describe("mergePnpmBuildApproval", () => {
+  it("adds any package to allowBuilds and keeps existing decisions", () => {
+    expect(mergePnpmBuildApproval("", "msgpackr-extract")).toBe(
+      "\nallowBuilds:\n  msgpackr-extract: true\n",
+    );
+    expect(mergePnpmBuildApproval("allowBuilds:\n  sharp: true\n", "msgpackr-extract")).toBe(
+      "allowBuilds:\n  msgpackr-extract: true\n  sharp: true\n",
+    );
+    const denied = "allowBuilds:\n  msgpackr-extract: false\n";
+    expect(mergePnpmBuildApproval(denied, "msgpackr-extract")).toBe(denied);
+  });
+});
+
+describe("nativeBuildApprovals", () => {
+  it("approves sharp for images and msgpackr-extract for the queue", async () => {
+    const { nativeBuildApprovals } = await import("./add-command.action");
+
+    expect(nativeBuildApprovals({ sharp: "^0.34.0" })).toEqual(["sharp"]);
+    expect(nativeBuildApprovals({ "@warlock.js/queue": "5.65.0" })).toEqual(["msgpackr-extract"]);
+    expect(nativeBuildApprovals({ zod: "^4.0.0" })).toEqual([]);
   });
 });

@@ -124,12 +124,22 @@ export function mergeOnlyBuiltDependencies(yaml: string, packages: readonly stri
 
 /** Add sharp to the workspace `allowBuilds` policy (pnpm 10.26+, 11, 12). */
 export function mergePnpmSharpApproval(yaml: string): string {
+  return mergePnpmBuildApproval(yaml, "sharp");
+}
+
+/**
+ * Add one package to the workspace `allowBuilds` policy (pnpm 10.26+, 11, 12).
+ * An existing `true`/`false` decision is kept; pnpm's generated placeholder is
+ * replaced by `true`.
+ */
+export function mergePnpmBuildApproval(yaml: string, name: string): string {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\/-]/g, "\\$&");
   const block = /^allowBuilds:\s*(?:#.*)?(?:\r?\n|$)/m.exec(yaml);
   if (!block) {
     // Do not hand-edit flow YAML: preserving an existing decision is safer
     // than risking duplicate keys or discarded comments.
     if (/^(?:allowBuilds|"allowBuilds"|'allowBuilds')\s*:/m.test(yaml)) return yaml;
-    return `${yaml.replace(/\s*$/, "")}\nallowBuilds:\n  sharp: true\n`;
+    return `${yaml.replace(/\s*$/, "")}\nallowBuilds:\n  ${name}: true\n`;
   }
 
   const start = block.index + block[0].length;
@@ -137,7 +147,10 @@ export function mergePnpmSharpApproval(yaml: string): string {
   const nextTopLevel = /^(?!\s|#|$)[^\r\n]+/m.exec(tail);
   const end = nextTopLevel ? start + nextTopLevel.index : yaml.length;
   const mapping = yaml.slice(start, end);
-  const entry = /^(\s*)(?:sharp|"sharp"|'sharp')\s*:\s*([^#\r\n]*)(.*)$/m.exec(mapping);
+  const entry = new RegExp(
+    `^(\\s*)(?:${escaped}|"${escaped}"|'${escaped}')\\s*:\\s*([^#\\r\\n]*)(.*)$`,
+    "m",
+  ).exec(mapping);
   if (entry) {
     const value = entry[2]!.trim();
     if (value === "true" || value === "false") return yaml;
@@ -148,9 +161,9 @@ export function mergePnpmSharpApproval(yaml: string): string {
     )
       return yaml;
     const comment = entry[3] ?? "";
-    const replacement = `${entry[1]}sharp: true${comment.startsWith("#") ? " " : ""}${comment}`;
+    const replacement = `${entry[1]}${name}: true${comment.startsWith("#") ? " " : ""}${comment}`;
     return `${yaml.slice(0, start)}${mapping.slice(0, entry.index)}${replacement}${mapping.slice(entry.index + entry[0].length)}${yaml.slice(end)}`;
   }
   const indentation = /^([ \t]+)\S/m.exec(mapping)?.[1] ?? "  ";
-  return `${yaml.slice(0, start)}${indentation}sharp: true\n${mapping}${yaml.slice(end)}`;
+  return `${yaml.slice(0, start)}${indentation}${name}: true\n${mapping}${yaml.slice(end)}`;
 }

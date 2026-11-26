@@ -26,7 +26,7 @@ import {
   isInsideParentPnpmWorkspace,
   mergeOnlyBuiltDependencies,
   mergePackageJsonBuildApprovals,
-  mergePnpmSharpApproval,
+  mergePnpmBuildApproval,
   pnpmBuildApprovalLayout,
 } from "./pnpm-build-approvals";
 
@@ -207,8 +207,9 @@ export async function addCommandAction(options: CommandActionData) {
   } else {
     const resolvedPackageManager =
       (packageManager as PackageManager | undefined) ?? (await detectPackageManager());
-    if (resolvedPackageManager === "pnpm" && dependencies.sharp !== undefined) {
-      await approvePnpmSharpBuild();
+    const approvals = nativeBuildApprovals(dependencies);
+    if (resolvedPackageManager === "pnpm" && approvals.length > 0) {
+      await approvePnpmBuilds(approvals);
     }
     await installDependencies(
       packageManager as PackageManager | undefined,
@@ -285,21 +286,37 @@ export async function appendAgentKitPick(packages: string[]): Promise<void> {
 }
 
 /**
- * Let pnpm run sharp's install script, written where the INSTALLED pnpm reads
- * approvals (see `pnpmBuildApprovalLayout`). pnpm 9 and 10.0–10.4 reject a
- * settings-only `pnpm-workspace.yaml`, so for them the approval goes into
- * package.json and no workspace file is created.
+ * Packages whose install scripts a dependency set needs approved under pnpm:
+ * `sharp` itself, and `msgpackr-extract`, which `@warlock.js/queue` installs
+ * through `bullmq` (the queue and bull-board features).
+ */
+export function nativeBuildApprovals(dependencies: Record<string, string>): string[] {
+  const approvals: string[] = [];
+
+  if (dependencies.sharp !== undefined) approvals.push("sharp");
+  if (dependencies["@warlock.js/queue"] !== undefined || dependencies.bullmq !== undefined) {
+    approvals.push("msgpackr-extract");
+  }
+
+  return approvals;
+}
+
+/**
+ * Let pnpm run the install scripts of `packages`, written where the INSTALLED
+ * pnpm reads approvals (see `pnpmBuildApprovalLayout`). pnpm 9 and 10.0–10.4
+ * reject a settings-only `pnpm-workspace.yaml`, so for them the approval goes
+ * into package.json and no workspace file is created.
  *
  * An app inside a parent pnpm workspace gets no per-app policy: the parent's
  * workspace owns it, and a nested workspace file would make a second root.
  */
-async function approvePnpmSharpBuild(): Promise<void> {
+async function approvePnpmBuilds(packages: string[]): Promise<void> {
   const workspacePath = rootPath("pnpm-workspace.yaml");
   const hasWorkspaceFile = await fileExistsAsync(workspacePath);
 
   if (!hasWorkspaceFile && isInsideParentPnpmWorkspace(rootPath())) {
     console.log(
-      `${colors.yellowBright("sharp")} needs its install script approved in the parent pnpm workspace's settings.`,
+      `${colors.yellowBright(packages.join(", "))} need${packages.length === 1 ? "s" : ""} install scripts approved in the parent pnpm workspace's settings.`,
     );
     return;
   }
@@ -310,15 +327,15 @@ async function approvePnpmSharpBuild(): Promise<void> {
     const packageJsonPath = rootPath("package.json");
     const packageJson = await getJsonFileAsync<ProjectPackageJson>(packageJsonPath);
 
-    await putJsonFileAsync(packageJsonPath, mergePackageJsonBuildApprovals(packageJson, ["sharp"]));
+    await putJsonFileAsync(packageJsonPath, mergePackageJsonBuildApprovals(packageJson, packages));
     return;
   }
 
   const current = hasWorkspaceFile ? await getFileAsync(workspacePath) : "";
   const updated =
     layout === "onlyBuiltDependencies"
-      ? mergeOnlyBuiltDependencies(current, ["sharp"])
-      : mergePnpmSharpApproval(current);
+      ? mergeOnlyBuiltDependencies(current, packages)
+      : packages.reduce((yaml, name) => mergePnpmBuildApproval(yaml, name), current);
 
   if (updated !== current) await putFileAsync(workspacePath, updated);
 }

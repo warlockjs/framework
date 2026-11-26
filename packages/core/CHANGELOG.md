@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - A failure while a production build boots (`warlock start`, `node dist/app.js`) now exits non-zero after it is logged, instead of leaving a process that is up but serves nothing. Errors after boot, and in the dev server, are still only logged.
 - `warlock migrate` discovers migrations in `models/<name>/migrations/` folders at any depth below `src/app` (for example `ai/capabilities/models/tool/migrations/`), not only one level down; `<module>/migrations/` is still read.
+- `warlock add queue` (and `warlock add bull-board`) under pnpm approves the install script of `msgpackr-extract`, which the queue installs, as `warlock add image` does for `sharp`; pnpm 11+ no longer fails the install.
 - The e2e spec for a covered click no longer depends on wall-clock time, so it passes on a loaded machine.
 
 ## 5.64.0 - 2026-11-23

@@ -343,7 +343,7 @@ allowBuilds:
   esbuild: true
 ```
 
-pnpm 11 and 12 ignore `package.json`'s `pnpm` field and fail the install when the workspace file has only `onlyBuiltDependencies`, so keep `allowBuilds` there (listing both keys is fine). pnpm before 10.5 rejects a `pnpm-workspace.yaml` without a `packages:` field (`packages field missing or empty`), and adding `packages: ["."]` makes every later dependency add fail with `ERR_PNPM_ADDING_TO_ROOT` — so on those versions use the `package.json` field instead. `create-warlock` 5.30.0 checks the pnpm version and writes the right one, and `warlock add image` follows the same rule when it approves `sharp`.
+pnpm 11 and 12 ignore `package.json`'s `pnpm` field and fail the install when the workspace file has only `onlyBuiltDependencies`, so keep `allowBuilds` there (listing both keys is fine). pnpm before 10.5 rejects a `pnpm-workspace.yaml` without a `packages:` field (`packages field missing or empty`), and adding `packages: ["."]` makes every later dependency add fail with `ERR_PNPM_ADDING_TO_ROOT` — so on those versions use the `package.json` field instead. `create-warlock` 5.30.0 checks the pnpm version and writes the right one, and `warlock add image` follows the same rule when it approves `sharp`, as do `warlock add queue` and `warlock add bull-board` for `msgpackr-extract`.
 
 `warlock dev` checks for esbuild's native binary before starting (as `warlock build` already did) and fails fast with `EsbuildBinaryMissingError`, naming the same fix, instead of surfacing an opaque low-level error later from inside the bundler.
 
