@@ -4,7 +4,7 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 
 ## Owner decisions waiting
 
-- Next release scope: T-215..T-230 (findings check 2026-11-26; T-230 decided, five features to build).
+- Next release scope: T-215..T-233 (findings check 2026-11-26 and Manazil wave 11; T-230 decided, five features to build).
 - Next-major items (T-007, T-009, T-033, and the 6.0 halves of T-042 and T-047) wait for 6.0.
 - Parked until an app asks: T-171, T-196, the streaming half of T-183. Windows-only items (T-100, T-180, T-120) need a
   Windows machine or Windows CI runs.
@@ -17,6 +17,48 @@ Open work for the framework repository. Finished entries move to `tasks.complete
 - 5.63.1 shipped T-204 (PostgreSQL `date` columns). 5.63.0 shipped T-188..T-195, T-197 (closed), T-198..T-200, T-202, T-203 (closed).
 - 5.62.0 shipped T-185, T-186 and T-187 (see `tasks.completed.md`).
 - 5.61.0 shipped T-142, T-143, T-146, T-149, T-151, T-169 and T-178 (see `tasks.completed.md`).
+
+## From the Manazil wave 11 findings (5.64.0)
+
+Source: Manazil findings page https://claude.ai/artifact/5a2K75ms9ySdibZo6abLhe (private), WJS-30..32, verified on the
+5.64.0 checkout (`abaf604b4`) on 2026-11-26.
+
+### T-231 [bug] web fonts: an unsupported `fallback` from a JSON manifest fails every page render
+
+- What: `fallback` is guarded only by the `SystemFont` type (`packages/web/src/fonts/types.ts:2, :21`).
+  `prepareFonts()` copies it unchecked (`prepare-fonts.ts:62-64`) and `fallbackMetrics()` throws
+  `Unsupported system fallback font: Tahoma` during font preparation (`fallback.ts:12-14`, called at
+  `prepare-fonts.ts:115`), so every page answers 500; the message names neither the allowed list nor the font entry.
+- Repro (run 2026-11-26, tsx on the checkout source): a JSON family with `"fallback": "Tahoma"` →
+  `THROWS Unsupported system fallback font: Tahoma`; with `"Arial"` → OK (415 bytes css).
+- Acceptance: `prepareFonts()` validates every family first and throws
+  `Font "<family>": fallback "<value>" is not supported. Use one of: Arial, Helvetica, Times New Roman, Segoe UI, Roboto.`
+  (array form too); spec in `prepare-fonts.spec.ts`; the same check in `warlock check`/doctor if cheap.
+- Status: open.
+
+### T-232 [bug] web: production 404 for `/ar/missing` renders in the default locale
+
+- What: `installPageRoutesFromManifest` calls `registerNotFoundPageRoute` without `localeCodes`
+  (`packages/web/src/server/install-page-routes-from-manifest.ts:833-835`), although `localeRouting` is resolved in the
+  same function (:538); dev passes them (`install-page-routes.ts:1137-1140`). `not-found-page.ts:435-439` pins
+  `request.locale` only when `localeCodes` is given, so production 404s under prefix routing render `lang="en" dir="ltr"`.
+- Repro (run 2026-11-26): the recording router of `install-page-routes-from-manifest-locale-routing.spec.ts`,
+  `prefix-except-default`, `localeCodes: ["en","ar"]`, call the recorded not-found handler with path `/ar/missing` and
+  `accept: text/html` → `request.locale` stays `en` (`expected 'en' to be 'ar'`).
+- Acceptance: production passes the same `localeCodes` expression as dev through one shared helper; the repro as a
+  spec in the manifest locale-routing spec.
+- Status: open.
+
+### T-233 [bug] ai guard: `pii` credit-card category has no Luhn check and swallows the next space
+
+- What: `packages/ai/src/guard/detectors/pii.ts:36` `/\b(?:\d[ -]?){13,16}\b/g` redacts any 13–16 digit run (listing
+  and order references) and its trailing separator is part of the match.
+- Repro (run 2026-11-26, tsx on the checkout source): `"Ref 1716628171234 for rent"` → `Ref [REDACTED:credit-card]for rent`;
+  `"card 4111 1111 1111 1112 x"` (fails Luhn) → redacted; `4111 1111 1111 1111` → redacted (correct). The suggested
+  pattern `/\b\d(?:[ -]?\d){12,18}\b/g` plus Luhn keeps only the valid PAN and leaves the space.
+- Acceptance: 13–19 digits with inner separators only, Luhn-filtered (like `scanEmails` post-filters email); doc
+  comment (:25) and docs say "Luhn-valid card numbers"; spec in `pii.spec.ts`.
+- Status: open.
 
 ## From the 2026-11-26 findings check (5.64.0)
 
