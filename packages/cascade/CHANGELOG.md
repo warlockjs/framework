@@ -4,6 +4,17 @@ All notable changes to `@warlock.js/cascade` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.65.0
+
+### Changed
+
+- A unique-index violation that slips past the `unique` rule now names every column of the index without quotes (`tenantId, receiptFileId`), and the thrown `DatabaseWriterValidationError` carries `constraint`, `columns` and `cause` (the driver error), on PostgreSQL and MongoDB.
+
+### Fixed
+
+- `query().limit(n).update(...)` now changes only the rows `limit()` (with `orderBy()` and `skip()`) selects instead of every match, on PostgreSQL and MongoDB; the returned count is the number of rows changed.
+- The transactions skill and docs now say what really shares the transaction: an async call started while the callback runs shares it, work started after the callback returns runs outside it; use `afterCommit()` for events.
+
 ## 5.64.0 - 2026-11-23
 
 ### Added

@@ -4,6 +4,27 @@ All notable changes to `create-warlock` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.65.0
+
+### Added
+
+- `format:file` script in new apps: `pnpm format:file <paths>` formats only the files you name, while `format` and `format:check` keep covering `./src`.
+- The starter's design-system scenes now drive `/dev/components`, and the components page also answers when `WARLOCK_E2E=1`.
+- The starter's `.env.example` explains `.env.e2e`, which `warlock e2e` reads.
+
+### Changed
+
+- The starter's cache config falls back to the in-memory driver in an end-to-end or test run when `CACHE_DRIVER` is unset.
+- The contact feature's folders now include its home-page UI, so a contact task may edit it.
+- Starter source files carry a header sentence, and the contact form has tests proving its criteria.
+- The shadcn design-system components use logical Tailwind classes, so a scaffold passes its own `logical-css` rule.
+- The starter's root comment now says the whole document is hydrated; the scaffold `AGENTS.md` covers the multi-site components page path, `format:file`, `.env.e2e` and the scry-first guidance.
+- The database config comments no longer mention a shared test server: each worker's server serves the API and the pages from the worker's own database.
+
+### Fixed
+
+- pnpm 11+ scaffolds with the `queue` (or `bull-board`) feature no longer fail the install on `msgpackr-extract`; it is approved in every pnpm layout.
+
 ## 5.64.0 - 2026-11-23
 
 ### Added

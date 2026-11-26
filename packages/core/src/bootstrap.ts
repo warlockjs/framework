@@ -1,6 +1,7 @@
 import { initializeDayjs } from "@mongez/time-wizard";
 import { captureAnyUnhandledRejection } from "@warlock.js/logger";
 import { Application } from "./application";
+import { isPreBootRejectionFatal } from "./production/pre-boot-rejection";
 import { loadEnvironmentFiles } from "./utils/load-environment";
 
 let unhandledCaptureInstalled = false;
@@ -25,17 +26,23 @@ export async function bootstrap() {
   captureAnyUnhandledRejection({ exitOnUncaughtException: Application.isProduction });
 
   // A rejection before the app has finished booting leaves a process that is
-  // up but serves nothing (a connector failed to boot). In production that is
-  // fatal: the logger listener above has already recorded it, so exit non-zero
-  // after a short flush and let the process manager show the app as errored.
-  // After boot a rejection stays a logged error.
-  if (Application.isProduction) {
-    process.on("unhandledRejection", () => {
-      if (Application.isBooted) return;
+  // up but serves nothing (a connector failed to boot). Under the production
+  // runtime that is fatal: the logger listener above has already recorded it,
+  // so exit non-zero after a short flush and let the process manager show the
+  // app as errored. After boot a rejection stays a logged error. The state is
+  // read when the rejection happens, so the listener is installed always.
+  process.on("unhandledRejection", () => {
+    if (
+      !isPreBootRejectionFatal({
+        runtimeStrategy: Application.runtimeStrategy,
+        isBooted: Application.isBooted,
+      })
+    ) {
+      return;
+    }
 
-      process.exitCode = 1;
-      const timer = setTimeout(() => process.exit(1), 1000);
-      timer.unref?.();
-    });
-  }
+    process.exitCode = 1;
+    const timer = setTimeout(() => process.exit(1), 1000);
+    timer.unref?.();
+  });
 }

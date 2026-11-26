@@ -2,6 +2,23 @@
 
 `@warlock.js/grimoire` is new in 5.55.0 and experimental: its file layout, `GR` codes and API may change in any release until it is marked stable.
 
+## 5.65.0
+
+### Added
+
+- `warlock scry --search` (and the `grimoire_search` MCP tool) now folds the top file's impact into its answer: an `impact of <file>:` block with the importers not already listed (at most 8, with a `+n more` count) and the routes, flows and tests that reach it (at most 5 each). `--json` carries it as `impact`. One search answers "what changes with it" without a second `--impact` call; the `next:` line stays only when the answer has no impact block.
+- The devtools panel takes a `warm` option to open the book ahead of the first tab view (default: on in development with the default adapter, off otherwise).
+
+### Changed
+
+- Creating the devtools panel never scans the app. In production the book opens on the first tab view, from the stored book when it is current and built in memory otherwise; in development the optional warm-up starts after boot instead of during it.
+- The source scan of a book build runs in a worker thread when the framework's tooling can be loaded there, so a large app keeps answering requests while the book builds.
+- The `use-the-grimoire` skill and the MCP tool descriptions prefer the Grimoire MCP tools where a client supports them, and say the search answer already includes the impact list.
+
+### Fixed
+
+- The Grimoire devtools tab no longer blocks the event loop for seconds at server start on large apps.
+
 ## 5.64.0 - 2026-11-23
 
 ### Added

@@ -61,6 +61,22 @@ describe("DatabaseWriter unique violations", () => {
     expect(mapped.cause).toBe(driverError);
   });
 
+  it("mongodb without keyPattern: reads a single field from the index name only", () => {
+    const single = mapViolation({
+      code: 11000,
+      message: "E11000 duplicate key error collection: db.users index: email_1 dup key",
+    });
+    const compound = mapViolation({
+      code: 11000,
+      message:
+        "E11000 duplicate key error collection: db.receipts index: tenantId_1_fileId_-1 dup key",
+    });
+
+    expect(single.columns).toEqual(["email"]);
+    expect(compound.columns).toEqual([]);
+    expect(compound.constraint).toBe("tenantId_1_fileId_-1");
+  });
+
   it("returns other errors untouched", () => {
     const other = new Error("boom");
 

@@ -4,6 +4,23 @@ All notable changes to `@warlock.js/auth` are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). `@warlock.js/*` packages are released in lockstep — every package shares the same version number, so a version below may list only the changes that affected this package.
 
+## 5.65.0
+
+### Added
+
+- `authService.verifyCredentials(Model, credentials, request?)` returns `{ type: "ok", user }`, `{ type: "invalid" }` or `{ type: "refused", user }`, so an app can reveal a suspended account only after the right password. Unknown accounts still spend the same hashing time. New exported type `CredentialsVerification`.
+- `auth.canAuthenticate(user, context?)` now receives `{ via, request? }` (types `AuthenticationContext` and `AuthenticationMethod`); `via` is `"password"`, `"otp"`, `"passkey"`, `"oauth"`, `"token"`, `"refresh"` or `"custom"`. `login`, `attemptLogin` and `verifyOtp` take the request, `completeLogin` takes the context, and the auth middleware and automatic renewal pass theirs. One-argument policies keep working.
+
+### Changed
+
+- Access tokens are built from the user model's `accessTokenPayload()` on login, refresh and automatic renewal, so a claim added by the override stays on the session. A payload passed at login is merged over those claims (it no longer replaces them) and is not kept for later refreshes; `id`, `userType` and `jti` are always set from the user.
+- `deleteForUser` and `findForUser` on the access and refresh token models also match `user_type`.
+
+### Fixed
+
+- `removeAllAccessTokens()` (and so logout without a refresh token, `revokeAllTokens` and password reset) no longer deletes the access tokens of another user type that has the same id.
+- The documented `accessTokenPayload()` override is now used when issuing tokens.
+
 ## 5.54.0 - 2026-11-16
 
 ### Upgrading

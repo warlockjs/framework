@@ -2,6 +2,22 @@
 
 All notable changes to `@warlock.js/web` are documented here.
 
+## 5.65.0
+
+### Added
+
+- `routerEvents.onBeforeNavigate(listener)` runs before a `<Link>` click, `navigateTo()` or Back/Forward and cancels the navigation when a listener returns `false` or a promise of `false`; the listener receives `{ to, from, type }`.
+- `useBlocker(when, confirm?, options?)` guards a page with unsaved changes, with an opt-in `beforeUnload` prompt for reloads and closing the tab.
+- A site's `localeRouting` accepts `locales` (a subset of `app.localeCodes`) and `defaultLocale`. Prefix routes, the not-found locale pin, route `locales.json` checks and `?locale=`/cookie/header switching use the site's own set, and a code outside it is answered in the site's default. A code that `app.localeCodes` does not declare stops boot with an error naming the site. Sites without the options behave as before. New exported type `SiteLocaleRouting`.
+
+### Fixed
+
+- Chunk-cycle members with equal code no longer share one output file: each member's identity is part of its name, and the build stops with an error naming both chunks if two chunks would be written to one file.
+- `warlock build` parses route `locales.json` files against `app.localeCodes`, so a file that boot refuses (for example locale codes mixed with nested entries) fails the build with the same error and file path.
+- An unsupported font `fallback` (for example `"Tahoma"` from a JSON manifest) is refused before any font work with `Font "<family>": fallback "<value>" is not supported. Use one of: …` instead of failing every page render.
+- The production 404 page for a prefixed URL such as `/ar/missing` renders in that locale, as development does.
+- The `measure-web-vitals` skill no longer claims `root.tsx` is not hydrated; only its `<head>` content is.
+
 ## 5.63.0 - 2026-11-22
 
 ### Fixed

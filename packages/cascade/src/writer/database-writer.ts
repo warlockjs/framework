@@ -693,9 +693,11 @@ export class DatabaseWriter implements WriterContract {
     }
 
     if (columns.length === 0 && mongoIndex) {
+      // Only a single-field index name ("email_1") says which field it is; a
+      // compound one ("a_1_b_-1") is reported by its constraint name alone.
       const single = /^(.+?)_-?1$/.exec(mongoIndex)?.[1];
 
-      if (single) {
+      if (single && !/_-?1_/.test(mongoIndex)) {
         columns = [single];
       }
     }

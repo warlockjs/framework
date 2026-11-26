@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 > ⚠ **Versioning: `@warlock.js/*` does not follow SemVer strictly — breaking changes may ship in a minor.** This is a deliberate decision, not an oversight: the framework is pre-adoption and the cost of a major per behaviour fix currently outweighs the benefit. **Pin an exact version or a tilde range (`~4.13.0`) if you need to opt into changes rather than receive them.** Every breaking change is marked **BREAKING** in its entry and summarised in an _Upgrading_ section at the top of the release. **This policy will change once the framework has consumers beyond its author.**
 
+## 5.65.0
+
+### Added
+
+- Route option `rawBody: true` keeps the exact request body as `request.rawBody` (a `Buffer`) and `request.rawBodyText()`, so webhook signatures can be verified over the bytes the sender signed. It works in production and in the dev server, and body limits still apply.
+- The `http.errorResponse` context now carries `request` (the Warlock request the reply answers) and `error` (the thrown value), so a formatter can capture 5xx failures with their route, method, user and request id. Both are `undefined` for replies sent before routing.
+- `useHashedPassword({ keepHashes: true })` stores a value that already is a bcrypt or scrypt hash as it is (seeding, imports) and hashes everything else; `isPasswordHash(value)` and the `HashedPasswordOptions` type are exported.
+- `warlock doctor` warns (`WL9106`) about a `*.migration.ts` file under `src/app` that `warlock migrate` would never run.
+- `createTestHttpServer({ web: true })` starts the app's web connector on the test server, so pages render next to API routes; the per-worker server of the request helpers sets it.
+- `warlock e2e` starts the disposable app with the app's `.env.e2e` (else `.env`) as the base of its environment, sets `WARLOCK_E2E=1`, and takes an `envFile` option (a path inside the app, or `false`) on the app fixture.
+
+### Changed
+
+- The request helpers' per-worker server also serves web pages, from the worker's own database, so `warlock add test` no longer generates `src/test-global-setup.ts` or a `globalSetup` line for a web app. An app that still has them keeps working; delete both to move to the worker servers.
+- `setupTest({ importModule })` loads the app's `main.ts` files right after boot, once per worker, so a service spec that sends no request sees what the mains register. A `main.ts` that throws now fails `setupTest()`.
+- The e2e browser starts with `--no-sandbox` when the process runs as root, unless `browser.args` already carries `--no-sandbox` or `--enable-sandbox`.
+- Documented that dotted query keys (`createdAt.from=…`) become nested objects while JSON bodies keep their keys as sent.
+
+### Fixed
+
+- A failure while a production build boots (`warlock start`, `node dist/app.js`) now exits non-zero after it is logged, instead of leaving a process that is up but serves nothing. Errors after boot, and in the dev server, are still only logged.
+- `warlock migrate` discovers migrations in `models/<name>/migrations/` folders at any depth below `src/app` (for example `ai/capabilities/models/tool/migrations/`), not only one level down; `<module>/migrations/` is still read.
+- The e2e spec for a covered click no longer depends on wall-clock time, so it passes on a loaded machine.
+
 ## 5.64.0 - 2026-11-23
 
 ### Added

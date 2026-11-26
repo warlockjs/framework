@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: How Warlock tests work — the two-worlds model (per-file or opt-in worker bootstrap + one global HTTP server), `setupTest` for unit tests, `startHttpTestServer` for integration tests, fakes that are on by default, model factories, an in-process server with the production plugins, and `warlock test --changed`.
+description: How Warlock tests work — one world per Vitest worker (its own bootstrap, database and HTTP server), `setupTest` for unit tests, `startHttpTestServer` for integration tests, fakes that are on by default, model factories, an in-process server with the production plugins, and `warlock test --changed`.
 sidebar:
   order: 1
   label: "Testing"
@@ -64,39 +64,36 @@ if (process.env.VITEST) {
 }
 ```
 
-## The two-worlds architecture
+## One world per worker
 
-The generated integration project uses Vitest **fork workers**. File setup runs before each file; the pool can execute files in parallel. The HTTP server needs to live somewhere that all those workers can reach. So the framework splits the bootstrap into two layers:
+The generated integration project uses Vitest **fork workers**. File setup runs before each file; the pool can execute files in parallel. Each worker is its own world: it boots the app, owns its database connection, and starts its own HTTP server on the first request:
 
 ```
-┌─── Main vitest process (one) ────────────────────────────┐
-│                                                          │
-│   globalSetup: ./src/test-global-setup.ts                │
-│     └─ startHttpTestServer()                             │
-│         • boots ALL connectors (db, http, socket, …)     │
-│         • listens on an OS-assigned ephemeral port               │
-│         • owns its own DB connection                     │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
-            │ HTTP fetch requests
-            ▼
 ┌─── Fork worker N (setup before each file) ──────────────────┐
-│                                                          │
-│   setupFiles: ./src/test-setup.ts                        │
-│     └─ setupTest({ connectors: true })                   │
-│         • boots Early-phase connectors EXCEPT http        │
-│         • owns ITS OWN db / cache connection             │
-│         • calls services, repositories, models directly   │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
+│                                                             │
+│   setupFiles: ./src/test-setup.ts                           │
+│     └─ setupTest({ connectors: true })                      │
+│         • boots Early-phase connectors EXCEPT http          │
+│         • owns ITS OWN db / cache connection                │
+│         • loads the app's main.ts files once                │
+│         • calls services, repositories, models directly     │
+│                                                             │
+│   first testGet / testPost / actingAs in a file             │
+│     └─ worker test server (createTestHttpServer)            │
+│         • the production HTTP plugins and the app routes    │
+│         • the web connector too, when the app has one       │
+│         • listens on an OS-assigned ephemeral port          │
+│         • reads the worker's own database                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
-
-The HTTP server runs once and stays up for the whole `vitest` run. Each worker owns a parallel set of connections so service-level tests don't fight over a shared DB pool.
 
 Two consequences worth pulling out:
 
-- **Per-worker writes go to a different connection than HTTP-server reads.** Both point at the same physical DB, so committed data is mutually visible — but uncommitted transactions are not.
+- **A request reads what its own worker wrote.** The worker's server shares the worker's database (`<name>_test_<worker id>`), so a row a spec inserts is visible to the request it sends next, in API routes and pages alike. Create one test database per worker and set `WARLOCK_TEST_DATABASES` so Vitest never starts more workers than databases.
 - **The HTTP server is a real server.** Real routing, real middleware, real validation, real responses. You don't need a separate "mode" — production code is the test code.
+
+A `src/test-global-setup.ts` that calls `startHttpTestServer()` still works: while its port is published, the helpers send to that one shared server in Vitest's main process instead, and it reads worker 1's database. Keep it only for a suite that needs one shared server, and run that suite with `maxWorkers: 1`.
 
 ## Mode 1 — Unit tests
 
@@ -498,7 +495,7 @@ Node process, preserve the source package's module mode. ESM fixtures need a
 CommonJS and named exports fail before the behavior under test runs. Assert the
 child process exit status with its captured stderr before checking stdout.
 
-- **The two-worlds connection split is intentional.** Don't fight it by trying to share connections — it would deadlock test parallelism. Instead, design tests so the worker write commits before the HTTP read.
+- **Each worker owns its connections.** Don't try to share connections between workers — it would deadlock test parallelism. A request goes to the worker's own server and database, so a write is visible to the next request once it is committed.
 - **Test data persists across files unless you clean it up.** Vitest doesn't wrap test files in transactions. Use `afterEach` truncates or design idempotent fixtures.
 - **The HTTP server is started in dev mode (`runtimeStrategy: development`).** That's so routes get re-resolved properly under the framework's dev orchestrator. It's still a real server with real routing — just not the production builder pipeline.
 - **Vitest 5 defaults `clearMocks` to true, which also clears calls a module made when it was imported.** A scheduler that registers jobs, or an event bus that subscribes, from a `main.ts` imported at the top of a spec has those recorded calls cleared before the first test, so asserting them fails although the code ran. Import the module inside the test (`await import("./main")`) after the mocks are set up, or set `clearMocks: false` for the project. The Warlock fakes record on their own and are not affected.
