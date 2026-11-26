@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `format:file` script in new apps: `pnpm format:file <paths>` formats only the files you name, while `format` and `format:check` keep covering `./src`.
+- `format:file` script in new apps: `npm run format:file -- <paths>` formats only the files you name, while `format` and `format:check` keep covering `./src`.
 - The starter's design-system scenes now drive `/dev/components`, and the components page also answers when `WARLOCK_E2E=1`.
 - The starter's `.env.example` explains `.env.e2e`, which `warlock e2e` reads.
 

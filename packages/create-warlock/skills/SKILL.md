@@ -321,5 +321,5 @@ For generated form controls, return the save promise from `onSubmit` to finish t
 ## Scaffold details
 
 - Features with a native build script are approved for pnpm: `image` (`sharp`), `queue` and `bull-board` (`msgpackr-extract`).
-- `pnpm format:file <paths>` formats only the given files; `format` and `format:check` cover all of `./src`.
+- `npm run format:file -- <paths>` formats only the given files; `format` and `format:check` cover all of `./src`.
 - `warlock e2e` reads `.env.e2e` (else `.env`) and sets `WARLOCK_E2E=1`; the starter's components page and memory cache fallback follow it. In a multi-site app the components page lives under `src/web/$sites/<key>/dev/`.
