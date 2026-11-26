@@ -92,7 +92,9 @@ The singleton orchestrator. Selected methods:
 
 ```ts
 login<T>(Model, credentials, deviceInfo?): Promise<LoginResult<T> | null>;
-attemptLogin<T>(Model, data): Promise<T | null>;
+attemptLogin<T>(Model, data, request?): Promise<T | null>;
+verifyCredentials<T>(Model, data, request?): Promise<CredentialsVerification<T>>; // { type: "ok" | "invalid" | "refused", user? }
+canAuthenticate(user, context?: AuthenticationContext): Promise<boolean>; // context: { via, request? }
 logout(user, accessToken?, refreshToken?): Promise<void>;
 
 generateAccessToken(user, payload?): Promise<AccessTokenOutput>;

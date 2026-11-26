@@ -135,16 +135,17 @@ export class AccessToken extends Model {
    */
   public static deleteForUser(user: Auth, token: string) {
     return this.query()
-      .where({ user_id: user.id })
+      .where({ user_id: user.id, user_type: user.userType })
       .whereIn("token", storedTokenForms(token))
       .delete();
   }
 
   /**
-   * Delete every access token belonging to the user.
+   * Delete every access token belonging to the user. Matches the user type as
+   * well as the id, so another identity with the same id keeps its tokens.
    */
   public static deleteAllForUser(user: Auth) {
-    return this.delete({ user_id: user.id });
+    return this.delete({ user_id: user.id, user_type: user.userType });
   }
 
   /**

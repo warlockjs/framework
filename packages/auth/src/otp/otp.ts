@@ -1,5 +1,6 @@
 import type { ChildModel } from "@warlock.js/cascade";
 import { log } from "@warlock.js/logger";
+import type { Request } from "@warlock.js/core";
 import { createHmac, randomBytes, randomInt } from "node:crypto";
 import type { OtpMessage, OtpSender } from "../contracts/providers";
 import type { DeviceInfo, LoginResult } from "../contracts/types";
@@ -148,6 +149,8 @@ export async function requestOtp<T extends Auth>(
  * most that many times even under concurrent guesses. A correct code is
  * consumed single-use. Throttle the route with `otpVerifyThrottleMiddleware()`.
  *
+ * Pass the `request` so `auth.canAuthenticate` receives it.
+ *
  * @throws InvalidOneTimeTokenError (400, EC008) — the same for an unknown
  *   phone, a wrong, expired, used or exhausted code.
  */
@@ -156,6 +159,7 @@ export async function verifyOtp<T extends Auth>(
   phone: string,
   code: string,
   deviceInfo?: DeviceInfo,
+  request?: Request,
 ): Promise<LoginResult<T>> {
   if (typeof phone !== "string" || phone.length === 0) throw invalidCode();
   if (typeof code !== "string" || !CODE_PATTERN.test(code)) throw invalidCode();
@@ -178,5 +182,5 @@ export async function verifyOtp<T extends Auth>(
 
   if (!(await row.consumeIfActive())) throw invalidCode();
 
-  return authService.completeLogin(user, deviceInfo);
+  return authService.completeLogin(user, deviceInfo, { via: "otp", request });
 }

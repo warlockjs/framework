@@ -169,9 +169,10 @@ describe("verifyOtp", () => {
 
     const result = await verifyOtp(User as never, PHONE, code, { ip: "1.2.3.4" });
 
-    expect(completeLogin).toHaveBeenCalledWith(expect.objectContaining({ id: user.id }), {
-      ip: "1.2.3.4",
-    });
+    expect(completeLogin).toHaveBeenCalledWith(expect.objectContaining({ id: user.id }),
+      { ip: "1.2.3.4" },
+      { via: "otp", request: undefined },
+    );
     expect(result.tokens.accessToken.token).toBe("t");
     await expect(verifyOtp(User as never, PHONE, code)).rejects.toBeInstanceOf(
       InvalidOneTimeTokenError,

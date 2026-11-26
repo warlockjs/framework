@@ -124,7 +124,7 @@ abstract class Auth<TSchema> extends Model<TSchema> implements Authenticable {
   // all Model<> methods, plus:
   abstract get userType(): string;
 
-  public accessTokenPayload(): { id; userType; created_at };
+  public accessTokenPayload(): Record<string, unknown>; // default: { id, userType, created_at }
 
   public createTokenPair(deviceInfo?): Promise<TokenPair>;
   public generateAccessToken(payload?): Promise<AccessTokenOutput>;
@@ -166,7 +166,9 @@ export class Admin extends Auth<typeof adminSchema> {
 }
 ```
 
-This payload rides on every admin access token and shows up on `request.decodedAccessToken` in admin-protected controllers.
+Every access token issued for the user is built from this hook: at login, on a token refresh and on automatic session renewal, so a claim you add here stays on the user's tokens for as long as the session lives. The claims show up on `request.decodedAccessToken` in admin-protected controllers.
+
+A payload passed when issuing a token (`generateAccessToken(payload)` or `deviceInfo.payload` at login) is merged over the hook's claims. The identity claims `id`, `userType` and `jti` are always set from the user, so they cannot be replaced. A one-off payload given at login is not stored with the session, so a later refresh does not carry it. Put every claim that must survive a refresh in `accessTokenPayload()`.
 
 ## Things to avoid
 

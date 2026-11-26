@@ -12,7 +12,7 @@ const { user, tokens } = await completeProviderLogin(User, "google", request, re
 authService.setAuthCookie(response, tokens.accessToken); // cookie session, or return tokens as JSON
 ```
 
-`authService.completeLogin(user, deviceInfo?)` is that shared ending. It applies `auth.canAuthenticate` (403) and issues tokens. Call it only for a user you have already authenticated.
+`authService.completeLogin(user, deviceInfo?)` is that shared ending. It applies `auth.canAuthenticate` (403) and issues tokens. A third argument `{ via, request }` (an `AuthenticationContext`) is handed to the policy; the provider, passkey and OTP helpers set it for you (`verifyOtp(Model, phone, code, deviceInfo?, request?)` takes the request). Call it only for a user you have already authenticated.
 
 ## Install
 

@@ -15,7 +15,7 @@ Your app's `User` (and `Admin`, `Vendor`, etc.) is a Cascade model. To plug into
 ```ts
 abstract get userType(): string;
 
-public accessTokenPayload(): { id, userType, created_at };
+public accessTokenPayload(): Record<string, unknown>; // default { id, userType, created_at }; every issued access token is built from it
 
 public async createTokenPair(deviceInfo?): Promise<TokenPair>;
 public async generateAccessToken(data?): Promise<AccessTokenOutput>;

@@ -152,7 +152,7 @@ abstract class Auth<TSchema> extends Model<TSchema> implements Authenticable {
 }
 ```
 
-`userType` is the only required override (an abstract getter — return the type slug). Override `generateAccessToken` if you need a non-default payload.
+`userType` is the only required override (an abstract getter — return the type slug). Override `accessTokenPayload()` to add claims: every access token for the user (login, refresh, automatic renewal) is built from it, with `id`, `userType` and `jti` always set from the user. A one-off `deviceInfo.payload` at login is merged over it but is not stored, so a refresh does not carry it; durable claims belong in `accessTokenPayload()`.
 
 `Auth` implements the `Authenticable` contract — that interface mirrors exactly these methods (`userType`, `generateAccessToken`, `generateRefreshToken`, `createTokenPair`, `confirmPassword`), so the class fails to compile if it drifts from the contract. Use `confirmPassword(plaintext)` to check a password against the stored hash (e.g. a "confirm current password" step).
 

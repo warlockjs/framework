@@ -9,7 +9,7 @@ sidebar:
 Services only, like password login: `@warlock.js/auth` ships no routes. Every
 method below ends in `authService.completeLogin(user, deviceInfo?)`, which
 returns the same `LoginResult` as `authService.login` — apply `auth.canAuthenticate`
-(403 on refusal), issue tokens, and hand back to the app the same way:
+(403 on refusal; the policy receives `{ via: "oauth" | "passkey" | "otp", request }`), issue tokens, and hand back to the app the same way:
 
 ```ts
 const { user, tokens } = await completeProviderLogin(User, "google", request, response);

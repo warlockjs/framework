@@ -36,7 +36,7 @@ const pair = await authService.createTokenPair(user, deviceInfo);
 
 `createTokenPair` is the typical issuance path. It respects `config.auth.refreshToken.enabled` — if disabled, returns only `accessToken`.
 
-A custom `payload` (`generateAccessToken(user, payload)` / `deviceInfo.payload`) may add claims, but `id` and `userType` are always stamped from `user`; the route gate also refuses a token whose claims name a different user than its row.
+Claims come from the user model's `accessTokenPayload()` on every issue, refresh and renewal. A custom `payload` (`generateAccessToken(user, payload)` / `deviceInfo.payload`) is merged over them and is not stored for later refreshes. It may add claims, but `id` and `userType` are always stamped from `user`; the route gate also refuses a token whose claims name a different user than its row.
 
 With `auth.hashTokensAtRest: true` the token columns hold SHA-256 digests. `createTokenPair` / `login` still return the raw tokens; the row `createRefreshToken` returns exposes its raw token as `row.plainToken` (`row.get("token")` is the digest).
 
