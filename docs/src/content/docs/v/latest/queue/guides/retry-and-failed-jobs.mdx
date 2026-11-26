@@ -99,7 +99,7 @@ import { retryFailedJob } from "@warlock.js/queue";
 
 await failed[0]?.retry(); // move that job back to waiting
 
-await retryFailedJob("invoice:43"); // by id
+await retryFailedJob("invoice-43"); // by id
 // throws FailedJobNotFoundError if no FAILED job has that id, in that queue
 ```
 

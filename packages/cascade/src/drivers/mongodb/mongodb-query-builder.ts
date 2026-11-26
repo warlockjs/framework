@@ -2481,10 +2481,63 @@ export class MongoQueryBuilder<T = unknown>
    * Update the given fields for all documents matching the query.
    */
   public async update(fields: Record<string, unknown>): Promise<number> {
+    const hasLimit = this.operations.some((op) => op.type === "limit");
+    const hasSkip = this.operations.some((op) => op.type === "skip");
+
+    if (hasLimit || hasSkip) {
+      return await this.updateBounded(fields);
+    }
+
     const filter = this.buildFilter();
     const result = await this.dataSource.driver.updateMany(this.table, filter, {
       $set: fields,
     });
+    return result.modifiedCount;
+  }
+
+  /**
+   * Update only the documents `limit()` / `skip()` (with `orderBy()`) select:
+   * one document is updated in place with the chain's sort; several are
+   * selected first, then updated by `_id`.
+   */
+  private async updateBounded(fields: Record<string, unknown>): Promise<number> {
+    const limitOp = this.operations.find((op) => op.type === "limit");
+    const hasSkip = this.operations.some((op) => op.type === "skip");
+    const limit = limitOp?.data?.value as number | undefined;
+
+    if (limit === 1 && !hasSkip) {
+      const sort: Record<string, 1 | -1> = {};
+
+      for (const op of this.operations) {
+        if (op.stage === "$sort" && op.type === "orderBy") {
+          sort[op.data.field as string] =
+            String(op.data.direction).toLowerCase() === "desc" ? -1 : 1;
+        }
+      }
+
+      const filter = this.buildFilter();
+      const updated = await this.dataSource.driver.findOneAndUpdate(
+        this.table,
+        filter,
+        { $set: fields },
+        { sort, returnDocument: "after" },
+      );
+
+      return updated ? 1 : 0;
+    }
+
+    const ids = await this.pluck("_id");
+
+    if (ids.length === 0) {
+      return 0;
+    }
+
+    const result = await this.dataSource.driver.updateMany(
+      this.table,
+      { _id: { $in: ids } },
+      { $set: fields },
+    );
+
     return result.modifiedCount;
   }
 

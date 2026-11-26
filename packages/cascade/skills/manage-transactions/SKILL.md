@@ -235,7 +235,7 @@ Use the outbox pattern above instead when the side effect must survive a crash b
 
 ## Work scheduled inside a transaction (timers, queues, fire-and-forget)
 
-A `setTimeout`, queue push or un-awaited promise started inside `transaction(async () => { ... })` runs after the transaction ended. It runs **outside the transaction, with no session**: its queries are ordinary non-transactional queries, a `transaction()` it starts opens a fresh transaction, and it is **not** rolled back if the transaction rolls back. When it must run only after a successful COMMIT, queue it with `afterCommit(fn)` instead. Do transactional reads and writes before the callback returns.
+A `setTimeout`, queue push or promise started **after the callback returns** runs **outside the transaction, with no session**: its queries are ordinary non-transactional queries, a `transaction()` it starts opens a fresh transaction, and it is **not** rolled back if the transaction rolls back. An async call started while the callback is still running shares the transaction client (it sees uncommitted rows), but nothing waits for it before COMMIT. When work must run only after a successful COMMIT, queue it with `afterCommit(fn)` instead; await anything that belongs in the transaction before the callback returns.
 
 ## Things NOT to do
 

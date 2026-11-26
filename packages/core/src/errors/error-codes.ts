@@ -928,6 +928,14 @@ export const ERROR_CODES = {
     fix: "Add the missing locale to the key in its locales.json (or locales/<feature>.json) file; the configured locales are app.localeCodes, or `localeCodes` in .warlock-check.json.",
     skill: "use-localization",
   },
+  WL9106: {
+    code: "WL9106",
+    area: "convention",
+    category: "code",
+    title: "A migration file is outside the folders `warlock migrate` reads",
+    fix: "Move the file into <module>/migrations/ or <module>/models/<name>/migrations/ (nested models folders are read too); a migration anywhere else never runs.",
+    skill: "warlock-doctor",
+  },
 } as const satisfies Record<string, ErrorCodeDefinition>;
 
 /** Every registered code, as a union. */

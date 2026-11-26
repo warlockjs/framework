@@ -220,7 +220,7 @@ database: {
 }
 ```
 
-Migrations from `src/app/<module>/models/<entity>/migrations/*.migration.ts` are auto-discovered. But migrations shipped INSIDE an external package — `@warlock.js/auth` ships its own auth-schema migrations, for instance — aren't on the disk you scan. This field is how you opt them into your project's migration runs.
+Migrations from `src/app/<module>/migrations/` and from `models/<entity>/migrations/` folders at any depth below `src/app` (for example `src/app/ai/capabilities/models/tool/migrations/`) are auto-discovered; `warlock doctor` warns about a `*.migration.ts` outside those folders. But migrations shipped INSIDE an external package — `@warlock.js/auth` ships its own auth-schema migrations, for instance — aren't on the disk you scan. This field is how you opt them into your project's migration runs.
 
 The value is an array of `MigrationConstructor` (the class produced by `Migration` decorators in `@warlock.js/cascade`). External packages export named arrays you import:
 

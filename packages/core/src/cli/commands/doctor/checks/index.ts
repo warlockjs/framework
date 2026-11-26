@@ -13,6 +13,7 @@ import { jwtSecretCheck } from "./jwt-secret.check";
 import { localesTsDeprecatedCheck } from "./locales-ts-deprecated.check";
 import { keyRotationCheck } from "./key-rotation.check";
 import { memoryCacheCheck } from "./memory-cache.check";
+import { migrationsCheck } from "./migrations.check";
 import { optionalPeersCheck } from "./optional-peers.check";
 import { productionLoggingCheck } from "./production-logging.check";
 import { releaseHygieneCheck } from "./release-hygiene.check";
@@ -49,6 +50,7 @@ export const defaultDoctorChecks: DoctorCheck[] = [
   sitesCheck,
   capabilitiesCheck,
   localesTsDeprecatedCheck,
+  migrationsCheck,
   uploadLimitsCheck,
   corsCheck,
   authTokensCheck,

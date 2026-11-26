@@ -266,6 +266,8 @@ Useful for migrations, bulk seeders, and replaying state without re-triggering s
 
 `Model.where(...).update(data)` and `Model.where(...).delete()` run one statement against the database; they never load the rows, so `updating`/`updated`/`deleting`/`deleted` do **not** fire. Global scopes **do** apply to them, so a tenant scope still limits which rows a bulk write touches.
 
+`limit()` (with `orderBy()` and `skip()`) bounds a bulk `update()` as well: `Job.where("status", "queued").orderBy("createdAt").limit(1).update({ status: "running" })` changes only the first row in that order, and the returned count is the number of rows changed.
+
 When a write needs its listeners (a guard, an audit log, cleanup), load the rows and save or destroy each one:
 
 ```ts

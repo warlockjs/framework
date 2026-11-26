@@ -24,6 +24,8 @@ const valid = await verifyPassword("user-password-123", hashed);
 
 Both are async because bcrypt is CPU-bound. The framework uses `bcryptjs` (pure JS — portable across every platform, no native build) under the hood. When the app installs the native `bcrypt` package, both helpers use it automatically: hashing then runs on the libuv thread pool instead of the event loop (worth it on busy login endpoints; raise `UV_THREADPOOL_SIZE` for many concurrent logins). Hashes are the same `$2b$` format either way, so existing hashes keep verifying.
 
+`isPasswordHash(value)` answers whether a string already is a bcrypt or scrypt hash (`useHashedPassword({ keepHashes: true })` uses it to store seeded hashes as they are).
+
 `needsRehash(hash)` is `true` when a stored hash was made with another algorithm or cost than the config asks for (and `false` for an unknown format); `authService.attemptLogin()` uses it to rehash after a correct login (`auth.rehashPasswords`, default `true`). `password.driver: "scrypt"` (with optional `password.scrypt: { cost, blockSize, parallelization }`) hashes new passwords with `node:crypto` scrypt on the thread pool; both formats always verify.
 
 bcrypt reads only the first 72 bytes (UTF-8) of a password. A longer one is hashed with a one-time warning; set `password.rejectLongPasswords: true` to make `hashPassword` throw instead, and cap password length in validation.

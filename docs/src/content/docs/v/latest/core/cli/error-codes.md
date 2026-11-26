@@ -1,6 +1,6 @@
 ---
 title: "Error codes"
-description: Every stable Warlock error code (WL1001…WL9105) — what it means, what to do, and the skill that explains it. Thrown framework errors, `warlock doctor --json` findings and `warlock check --json` problems all carry these codes; `warlock explain <CODE>` prints one.
+description: Every stable Warlock error code (WL1001…WL9106) — what it means, what to do, and the skill that explains it. Thrown framework errors, `warlock doctor --json` findings and `warlock check --json` problems all carry these codes; `warlock explain <CODE>` prints one.
 sidebar:
   order: 10
   label: "Error codes"
@@ -738,4 +738,12 @@ A translation key in a module's `locales.json` or `locales/<feature>.json` is mi
 
 ```bash
 npx warlock explain WL9105
+```
+
+### WL9106
+
+A `*.migration.ts` file under `src/app` is outside the folders `warlock migrate` reads, so it never runs. Migrations are discovered in `<module>/migrations/` and in `models/<name>/migrations/` folders at any depth below `src/app`. `warlock doctor` names each file it finds; move it into one of those folders.
+
+```bash
+npx warlock explain WL9106
 ```

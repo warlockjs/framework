@@ -24,12 +24,14 @@ export const sendInvoice = defineJob({
 async function onInvoiceReady(invoiceId: string) {
   await sendInvoice.dispatch(
     { invoiceId },
-    { jobId: `invoice:${invoiceId}` }, // deterministic id from the domain data
+    { jobId: `invoice-${invoiceId}` }, // deterministic id from the domain data
   );
 }
 ```
 
 ## Why this works
+
+A `jobId` cannot contain `:` and cannot be made only of digits. `dispatch()` throws `InvalidJobDefinitionError` for those ids on every driver (Redis, local and test fakes alike), so a bad id fails in development instead of in production. Use a separator such as `-`: `invoice-43`.
 
 A second `dispatch()` call with a `jobId` that still exists in Redis
 (waiting, delayed, or active) is a no-op — BullMQ recognizes the id and
@@ -48,7 +50,7 @@ while the job exists in the queue.
 ## Checking whether it actually ran twice
 
 ```ts
-const existing = await sendInvoice.find(`invoice:${invoiceId}`);
+const existing = await sendInvoice.find(`invoice-${invoiceId}`);
 
 if (existing) {
   console.log(existing.state); // "waiting" | "active" | "completed" | ...
@@ -61,7 +63,7 @@ if (existing) {
 within the delay window collapse into one run:
 
 ```ts
-await sendInvoice.dispatch({ invoiceId }, { jobId: `invoice:${invoiceId}`, delay: "30s" });
+await sendInvoice.dispatch({ invoiceId }, { jobId: `invoice-${invoiceId}`, delay: "30s" });
 ```
 
 If five identical triggers arrive within 30 seconds, only the first

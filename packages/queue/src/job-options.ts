@@ -29,6 +29,33 @@ export const DEFAULT_REMOVE_ON_COMPLETE = {
 /** Failed jobs kept when nothing configures retention: one week, at most 5,000. */
 export const DEFAULT_REMOVE_ON_FAIL = { age: "7d", count: 5000 } as const satisfies JobRetention;
 
+/**
+ * Reject a `jobId` the broker cannot store, whatever the driver: a `:` or an
+ * id made only of digits. Running the same check for every driver keeps a
+ * dispatch that works against a local or fake queue from failing in production.
+ */
+export function assertJobId(jobId: string | undefined): void {
+  if (jobId === undefined) return;
+
+  if (typeof jobId !== "string" || jobId === "") {
+    throw new InvalidJobDefinitionError(
+      `\`jobId\` must be a non-empty string, got ${JSON.stringify(jobId)}. Pass an id such as "invoice-43".`,
+    );
+  }
+
+  if (jobId.includes(":")) {
+    throw new InvalidJobDefinitionError(
+      `\`jobId\` "${jobId}" contains ":", which Redis-backed queues reserve as a key separator. Use another separator, for example "${jobId.split(":").join("-")}".`,
+    );
+  }
+
+  if (/^\d+$/.test(jobId)) {
+    throw new InvalidJobDefinitionError(
+      `\`jobId\` "${jobId}" is made only of digits, which collides with the ids the queue generates. Add a prefix, for example "invoice-${jobId}".`,
+    );
+  }
+}
+
 export function resolveJobOptions(
   definition: JobOptions,
   options: DispatchOptions,
@@ -37,6 +64,7 @@ export function resolveJobOptions(
   const timeout = options.timeout ?? definition.timeout ?? defaults.timeout;
   const failOnTimeout = options.failOnTimeout ?? definition.failOnTimeout ?? defaults.failOnTimeout;
   assertFailOnTimeout(failOnTimeout);
+  assertJobId(options.jobId);
 
   return {
     attempts: options.attempts ?? definition.attempts ?? defaults.attempts,

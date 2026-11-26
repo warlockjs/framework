@@ -37,10 +37,28 @@ export class DatabaseWriterValidationError extends Error {
   public readonly errors: ValidationResult["errors"];
 
   /**
+   * Name of the violated constraint or index when the error comes from a
+   * unique violation and the driver reported it.
+   */
+  public readonly constraint?: string;
+
+  /**
+   * Every column (or field) named by the violated constraint, unquoted.
+   * Empty when the error is not a constraint violation.
+   */
+  public readonly columns: string[];
+
+  /**
+   * The driver error that caused this validation error, when there is one.
+   */
+  public readonly cause?: unknown;
+
+  /**
    * Create a new DatabaseWriterValidationError.
    *
    * @param message - Error message (typically "Validation failed")
    * @param errors - Array of validation errors from seal
+   * @param details - Optional constraint name, columns and the driver error behind it
    *
    * @example
    * ```typescript
@@ -49,10 +67,17 @@ export class DatabaseWriterValidationError extends Error {
    * ]);
    * ```
    */
-  public constructor(message: string, errors: ValidationResult["errors"]) {
+  public constructor(
+    message: string,
+    errors: ValidationResult["errors"],
+    details: { constraint?: string; columns?: string[]; cause?: unknown } = {},
+  ) {
     super(message);
     this.name = "DatabaseWriterValidationError";
     this.errors = errors;
+    this.constraint = details.constraint;
+    this.columns = details.columns ?? [];
+    this.cause = details.cause;
 
     // Maintain proper stack trace for where error was thrown (V8 only)
     if (Error.captureStackTrace) {
