@@ -140,6 +140,400 @@
   ],
   "releases": [
     {
+      "version": "5.65.0",
+      "id": "v5-65-0",
+      "date": "November 26, 2026",
+      "isUnreleased": false,
+      "headlineHtml": "Web pages in API tests from each worker's own server, a failed production boot that exits, and five app requests: <code>useBlocker</code> for unsaved changes, <code>rawBody</code> for webhook signatures, the request in the error formatter, per-site locales and a login policy that knows how and where a user signs in.",
+      "highlights": [
+        "The request helpers' per-worker test server starts the web connector, so pages and API routes read the worker's own database and web apps no longer need <code>src/test-global-setup.ts</code>.",
+        "<code>useBlocker(when, confirm?)</code> and <code>routerEvents.onBeforeNavigate()</code> guard <code>&lt;Link&gt;</code> clicks, <code>navigateTo()</code> and Back/Forward; route option <code>rawBody: true</code> exposes <code>request.rawBody</code>; the <code>http.errorResponse</code> context carries <code>request</code> and <code>error</code>.",
+        "<code>web.sites.&lt;key&gt;.localeRouting</code> takes <code>locales</code> and <code>defaultLocale</code>; <code>auth.canAuthenticate(user, { via, request })</code> and <code>authService.verifyCredentials()</code> tell a wrong password from a refused account.",
+        "<code>warlock start</code> exits non-zero when the build fails to boot; <code>query().limit(n).update()</code> respects the limit; unique violations name every column; <code>warlock migrate</code> finds nested model migrations and <code>warlock doctor</code> warns about skipped ones (<code>WL9106</code>).",
+        "<code>scry --search</code> folds the top file's impact into its answer; the Grimoire devtools tab no longer blocks the server at start; new apps pass their own <code>grimoire check</code> and run <code>warlock e2e</code> with only <code>.env.e2e</code>."
+      ],
+      "upgradeNotes": [
+        "Web apps can delete <code>src/test-global-setup.ts</code> and its <code>globalSetup</code> line; set <code>WARLOCK_TEST_DATABASES</code> to the number of test databases.",
+        "A payload passed at login now merges over the model's <code>accessTokenPayload()</code> claims instead of replacing them.",
+        "<code>dispatch({ jobId })</code> rejects ids with <code>:</code> or made only of digits on every driver; use ids such as <code>invoice-43</code>.",
+        "<code>setupTest({ importModule })</code> loads the app's <code>main.ts</code> files after boot; a throwing <code>main.ts</code> now fails the setup.",
+        "<code>scry --search</code> text output prints an <code>impact of &lt;file&gt;:</code> block in place of the <code>next:</code> line when there is an impact; parse <code>--json</code>."
+      ],
+      "summaryHtml": null,
+      "notesUrl": "https://github.com/warlockjs/framework/blob/main/releases/5.65.0-summary.md",
+      "mode": "detail",
+      "packages": [
+        {
+          "name": "@warlock.js/core",
+          "slug": "core",
+          "total": 17,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 6
+            },
+            {
+              "type": "Changed",
+              "n": 5
+            },
+            {
+              "type": "Fixed",
+              "n": 6
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "Route option <code>rawBody: true</code> keeps the exact request body as <code>request.rawBody</code> (a <code>Buffer</code>) and <code>request.rawBodyText()</code>, so webhook signatures can be verified over the bytes the sender signed. It works in production and in the dev server, and body limits still apply."
+            },
+            {
+              "type": "Added",
+              "html": "The <code>http.errorResponse</code> context now carries <code>request</code> (the Warlock request the reply answers) and <code>error</code> (the thrown value), so a formatter can capture 5xx failures with their route, method, user and request id. Both are <code>undefined</code> for replies sent before routing."
+            },
+            {
+              "type": "Added",
+              "html": "<code>useHashedPassword({ keepHashes: true })</code> stores a value that already is a bcrypt or scrypt hash as it is (seeding, imports) and hashes everything else; <code>isPasswordHash(value)</code> and the <code>HashedPasswordOptions</code> type are exported."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock doctor</code> warns (<code>WL9106</code>) about a <code>*.migration.ts</code> file under <code>src/app</code> that <code>warlock migrate</code> would never run."
+            },
+            {
+              "type": "Added",
+              "html": "<code>createTestHttpServer({ web: true })</code> starts the app's web connector on the test server, so pages render next to API routes; the per-worker server of the request helpers sets it."
+            },
+            {
+              "type": "Added",
+              "html": "<code>warlock e2e</code> starts the disposable app with the app's <code>.env.e2e</code> (else <code>.env</code>) as the base of its environment, sets <code>WARLOCK_E2E=1</code>, and takes an <code>envFile</code> option (a path inside the app, or <code>false</code>) on the app fixture."
+            },
+            {
+              "type": "Changed",
+              "html": "The request helpers' per-worker server also serves web pages, from the worker's own database, so <code>warlock add test</code> no longer generates <code>src/test-global-setup.ts</code> or a <code>globalSetup</code> line for a web app. An app that still has them keeps working; delete both to move to the worker servers."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>setupTest({ importModule })</code> loads the app's <code>main.ts</code> files right after boot, once per worker, so a service spec that sends no request sees what the mains register. A <code>main.ts</code> that throws now fails <code>setupTest()</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>warlock add test</code> writes a header sentence at the top of the generated <code>src/test-runner.ts</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The e2e browser starts with <code>--no-sandbox</code> when the process runs as root, unless <code>browser.args</code> already carries <code>--no-sandbox</code> or <code>--enable-sandbox</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "Documented that dotted query keys (<code>createdAt.from=…</code>) become nested objects while JSON bodies keep their keys as sent."
+            },
+            {
+              "type": "Fixed",
+              "html": "A failure while a production build boots (<code>warlock start</code>, <code>node dist/app.js</code>) now exits non-zero after it is logged, instead of leaving a process that is up but serves nothing. Errors after boot, and in the dev server, are still only logged."
+            },
+            {
+              "type": "Fixed",
+              "html": "After an unhandled error the dev server survives, <code>warlock dev</code> prints <code>⚠ dev is still running after an unhandled error</code> instead of <code>✖ dev failed</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>collectFiles()</code> gives a migration under <code>models/&lt;name&gt;/migrations/</code> the <code>migration</code> role instead of <code>model</code>, so Grimoire no longer reports it as a file no flow reaches."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock migrate</code> discovers migrations in <code>models/&lt;name&gt;/migrations/</code> folders at any depth below <code>src/app</code> (for example <code>ai/capabilities/models/tool/migrations/</code>), not only one level down; <code>&lt;module&gt;/migrations/</code> is still read."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock add queue</code> (and <code>warlock add bull-board</code>) under pnpm approves the install script of <code>msgpackr-extract</code>, which the queue installs, as <code>warlock add image</code> does for <code>sharp</code>; pnpm 11+ no longer fails the install."
+            },
+            {
+              "type": "Fixed",
+              "html": "The e2e spec for a covered click no longer depends on wall-clock time, so it passes on a loaded machine."
+            }
+          ]
+        },
+        {
+          "name": "create-warlock",
+          "slug": "create-warlock",
+          "total": 14,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 4
+            },
+            {
+              "type": "Changed",
+              "n": 7
+            },
+            {
+              "type": "Fixed",
+              "n": 3
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>format:file</code> script in new apps: <code>npm run format:file -- &lt;paths&gt;</code> formats only the files you name, while <code>format</code> and <code>format:check</code> keep covering <code>./src</code>."
+            },
+            {
+              "type": "Added",
+              "html": "The starter's design-system scenes now drive <code>/dev/components</code>, and the components page also answers when <code>WARLOCK_E2E=1</code>."
+            },
+            {
+              "type": "Added",
+              "html": "The starter's <code>.env.example</code> explains <code>.env.e2e</code>, which <code>warlock e2e</code> reads."
+            },
+            {
+              "type": "Added",
+              "html": "New apps declare their site in <code>grimoire/apps/default</code>, an <code>accounts</code> feature (sign-in, password reset, posts, users, uploads) and a design-system <code>language</code> flow, with tests that prove each criterion, so a fresh app's <code>warlock grimoire check --all</code> reports no errors or warnings."
+            },
+            {
+              "type": "Changed",
+              "html": "The starter's cache config falls back to the in-memory driver in an end-to-end or test run when <code>CACHE_DRIVER</code> is unset."
+            },
+            {
+              "type": "Changed",
+              "html": "The contact feature's folders now include its home-page UI, so a contact task may edit it."
+            },
+            {
+              "type": "Changed",
+              "html": "Starter source files carry a header sentence, and the contact form has tests proving its criteria."
+            },
+            {
+              "type": "Changed",
+              "html": "The shadcn design-system components use logical Tailwind classes, so a scaffold passes its own <code>logical-css</code> rule."
+            },
+            {
+              "type": "Changed",
+              "html": "The starter's root comment now says the whole document is hydrated; the scaffold <code>AGENTS.md</code> covers the multi-site components page path, <code>format:file</code>, <code>.env.e2e</code> and the scry-first guidance."
+            },
+            {
+              "type": "Changed",
+              "html": "The unused starter files <code>src/app/users/services/get-users.service.ts</code> and <code>login-social.ts</code> are gone; the users list goes through <code>listUsersService</code>."
+            },
+            {
+              "type": "Changed",
+              "html": "The database config comments no longer mention a shared test server: each worker's server serves the API and the pages from the worker's own database."
+            },
+            {
+              "type": "Fixed",
+              "html": "pnpm 11+ scaffolds with the <code>queue</code> (or <code>bull-board</code>) feature no longer fail the install on <code>msgpackr-extract</code>; it is approved in every pnpm layout."
+            },
+            {
+              "type": "Fixed",
+              "html": "A scaffold step that did not succeed (template copy, install, features, git, secret keys, cache warm-up) is printed with a failure mark instead of a check mark."
+            },
+            {
+              "type": "Fixed",
+              "html": "The starter contact form says \"Could not reach the server. Check your connection and send the message again.\" when the request never reaches the server, instead of the browser's own error text."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/web",
+          "slug": "web",
+          "total": 8,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 5
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>routerEvents.onBeforeNavigate(listener)</code> runs before a <code>&lt;Link&gt;</code> click, <code>navigateTo()</code> or Back/Forward and cancels the navigation when a listener returns <code>false</code> or a promise of <code>false</code>; the listener receives <code>{ to, from, type }</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>useBlocker(when, confirm?, options?)</code> guards a page with unsaved changes, with an opt-in <code>beforeUnload</code> prompt for reloads and closing the tab."
+            },
+            {
+              "type": "Added",
+              "html": "A site's <code>localeRouting</code> accepts <code>locales</code> (a subset of <code>app.localeCodes</code>) and <code>defaultLocale</code>. Prefix routes, the not-found locale pin, route <code>locales.json</code> checks and <code>?locale=</code>/cookie/header switching use the site's own set, and a code outside it is answered in the site's default. A code that <code>app.localeCodes</code> does not declare stops boot with an error naming the site. Sites without the options behave as before. New exported type <code>SiteLocaleRouting</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "Chunk-cycle members with equal code no longer share one output file: each member's identity is part of its name, and the build stops with an error naming both chunks if two chunks would be written to one file."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>warlock build</code> parses route <code>locales.json</code> files against <code>app.localeCodes</code>, so a file that boot refuses (for example locale codes mixed with nested entries) fails the build with the same error and file path."
+            },
+            {
+              "type": "Fixed",
+              "html": "An unsupported font <code>fallback</code> (for example <code>\"Tahoma\"</code> from a JSON manifest) is refused before any font work with <code>Font \"&lt;family&gt;\": fallback \"&lt;value&gt;\" is not supported. Use one of: …</code> instead of failing every page render."
+            },
+            {
+              "type": "Fixed",
+              "html": "The production 404 page for a prefixed URL such as <code>/ar/missing</code> renders in that locale, as development does."
+            },
+            {
+              "type": "Fixed",
+              "html": "The <code>measure-web-vitals</code> skill no longer claims <code>root.tsx</code> is not hydrated; only its <code>&lt;head&gt;</code> content is."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/auth",
+          "slug": "auth",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 2
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>authService.verifyCredentials(Model, credentials, request?)</code> returns <code>{ type: \"ok\", user }</code>, <code>{ type: \"invalid\" }</code> or <code>{ type: \"refused\", user }</code>, so an app can reveal a suspended account only after the right password. Unknown accounts still spend the same hashing time. New exported type <code>CredentialsVerification</code>."
+            },
+            {
+              "type": "Added",
+              "html": "<code>auth.canAuthenticate(user, context?)</code> now receives <code>{ via, request? }</code> (types <code>AuthenticationContext</code> and <code>AuthenticationMethod</code>); <code>via</code> is <code>\"password\"</code>, <code>\"otp\"</code>, <code>\"passkey\"</code>, <code>\"oauth\"</code>, <code>\"token\"</code>, <code>\"refresh\"</code> or <code>\"custom\"</code>. <code>login</code>, <code>attemptLogin</code> and <code>verifyOtp</code> take the request, <code>completeLogin</code> takes the context, and the auth middleware and automatic renewal pass theirs. One-argument policies keep working."
+            },
+            {
+              "type": "Changed",
+              "html": "Access tokens are built from the user model's <code>accessTokenPayload()</code> on login, refresh and automatic renewal, so a claim added by the override stays on the session. A payload passed at login is merged over those claims (it no longer replaces them) and is not kept for later refreshes; <code>id</code>, <code>userType</code> and <code>jti</code> are always set from the user."
+            },
+            {
+              "type": "Changed",
+              "html": "<code>deleteForUser</code> and <code>findForUser</code> on the access and refresh token models also match <code>user_type</code>."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>removeAllAccessTokens()</code> (and so logout without a refresh token, <code>revokeAllTokens</code> and password reset) no longer deletes the access tokens of another user type that has the same id."
+            },
+            {
+              "type": "Fixed",
+              "html": "The documented <code>accessTokenPayload()</code> override is now used when issuing tokens."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/grimoire",
+          "slug": "grimoire",
+          "total": 6,
+          "counts": [
+            {
+              "type": "Added",
+              "n": 2
+            },
+            {
+              "type": "Changed",
+              "n": 3
+            },
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Added",
+              "html": "<code>warlock scry --search</code> (and the <code>grimoire_search</code> MCP tool) now folds the top file's impact into its answer: an <code>impact of &lt;file&gt;:</code> block with the importers not already listed (at most 8, with a <code>+n more</code> count) and the routes, flows and tests that reach it (at most 5 each). <code>--json</code> carries it as <code>impact</code>. One search answers \"what changes with it\" without a second <code>--impact</code> call; the <code>next:</code> line stays only when the answer has no impact block."
+            },
+            {
+              "type": "Added",
+              "html": "The devtools panel takes a <code>warm</code> option to open the book ahead of the first tab view (default: on in development with the default adapter, off otherwise)."
+            },
+            {
+              "type": "Changed",
+              "html": "Creating the devtools panel never scans the app. In production the book opens on the first tab view, from the stored book when it is current and built in memory otherwise; in development the optional warm-up starts after boot instead of during it."
+            },
+            {
+              "type": "Changed",
+              "html": "The source scan of a book build runs in a worker thread when the framework's tooling can be loaded there, so a large app keeps answering requests while the book builds."
+            },
+            {
+              "type": "Changed",
+              "html": "The <code>use-the-grimoire</code> skill and the MCP tool descriptions prefer the Grimoire MCP tools where a client supports them, and say the search answer already includes the impact list."
+            },
+            {
+              "type": "Fixed",
+              "html": "The Grimoire devtools tab no longer blocks the event loop for seconds at server start on large apps."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/cascade",
+          "slug": "cascade",
+          "total": 3,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            },
+            {
+              "type": "Fixed",
+              "n": 2
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "A unique-index violation that slips past the <code>unique</code> rule now names every column of the index without quotes (<code>tenantId, receiptFileId</code>), and the thrown <code>DatabaseWriterValidationError</code> carries <code>constraint</code>, <code>columns</code> and <code>cause</code> (the driver error), on PostgreSQL and MongoDB."
+            },
+            {
+              "type": "Fixed",
+              "html": "<code>query().limit(n).update(...)</code> now changes only the rows <code>limit()</code> (with <code>orderBy()</code> and <code>skip()</code>) selects instead of every match, on PostgreSQL and MongoDB; the returned count is the number of rows changed."
+            },
+            {
+              "type": "Fixed",
+              "html": "The transactions skill and docs now say what really shares the transaction: an async call started while the callback runs shares it, work started after the callback returns runs outside it; use <code>afterCommit()</code> for events."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/ai",
+          "slug": "ai",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Fixed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Fixed",
+              "html": "The <code>pii</code> guard's <code>credit-card</code> category redacts only Luhn-valid card numbers of 13 to 19 digits, with spaces or hyphens only between digits. Order, listing and reference numbers of the same length stay visible, and the space after a card number is no longer swallowed by the mask."
+            }
+          ]
+        },
+        {
+          "name": "@warlock.js/queue",
+          "slug": "queue",
+          "total": 1,
+          "counts": [
+            {
+              "type": "Changed",
+              "n": 1
+            }
+          ],
+          "items": [
+            {
+              "type": "Changed",
+              "html": "<code>dispatch({ jobId })</code> now rejects an id containing <code>:</code> or made only of digits with <code>InvalidJobDefinitionError</code> on every driver (Redis, local and the queue fake), instead of failing only on Redis. Use an id such as <code>invoice-43</code>."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "version": "5.64.0",
       "id": "v5-64-0",
       "date": "November 23, 2026",

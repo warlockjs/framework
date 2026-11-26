@@ -5,7 +5,7 @@ Newest first. Each entry records the release that shipped it and how it was veri
 ## 5.65.0 (2026-11-26)
 
 Source: owner ask 2026-11-26 ("finish all tasks in a single release"): every open task a minor can carry, from the 2026-11-26 findings check, the Manazil wave 11 findings and the 5.64.0 release.
-Shipped in release v5.65.0 (tag `v5.65.0`). Verification: one full verify pass (format, lint, public text, release notes, skills, strictness, typecheck, every package's tests, devtools UI gate, docs build) with the failed steps fixed and re-run green; live PostgreSQL 16, MongoDB 7 (replica set) and Redis 7 suites; a scaffolded-app check (`findings/5.65/reports/`, git-ignored).
+Shipped in release v5.65.0 (tag `v5.65.0` on d98940b99, publish run 45806426947, on npm 2026-11-26 11:30 UTC). Verification: one full verify pass (format, lint, public text, release notes, skills, strictness, typecheck, every package's tests, devtools UI gate, docs build) with the failed steps fixed and re-run green; live PostgreSQL 16, MongoDB 7 (replica set) and Redis 7 suites; a scaffolded-app check (`findings/5.65/reports/`, git-ignored).
 
 ### T-231 [bug] web fonts: an unsupported `fallback` from a JSON manifest fails every page render
 

@@ -1,4 +1,23 @@
 {
+  "5.65.0": {
+    "publishedAt": "2026-11-26T11:30:21.249Z",
+    "matrix": "none",
+    "headline": "Web pages in API tests from each worker's own server, a failed production boot that exits, and five app requests: `useBlocker` for unsaved changes, `rawBody` for webhook signatures, the request in the error formatter, per-site locales and a login policy that knows how and where a user signs in.",
+    "highlights": [
+      "The request helpers' per-worker test server starts the web connector, so pages and API routes read the worker's own database and web apps no longer need `src/test-global-setup.ts`.",
+      "`useBlocker(when, confirm?)` and `routerEvents.onBeforeNavigate()` guard `<Link>` clicks, `navigateTo()` and Back/Forward; route option `rawBody: true` exposes `request.rawBody`; the `http.errorResponse` context carries `request` and `error`.",
+      "`web.sites.<key>.localeRouting` takes `locales` and `defaultLocale`; `auth.canAuthenticate(user, { via, request })` and `authService.verifyCredentials()` tell a wrong password from a refused account.",
+      "`warlock start` exits non-zero when the build fails to boot; `query().limit(n).update()` respects the limit; unique violations name every column; `warlock migrate` finds nested model migrations and `warlock doctor` warns about skipped ones (`WL9106`).",
+      "`scry --search` folds the top file's impact into its answer; the Grimoire devtools tab no longer blocks the server at start; new apps pass their own `grimoire check` and run `warlock e2e` with only `.env.e2e`."
+    ],
+    "upgradeNotes": [
+      "Web apps can delete `src/test-global-setup.ts` and its `globalSetup` line; set `WARLOCK_TEST_DATABASES` to the number of test databases.",
+      "A payload passed at login now merges over the model's `accessTokenPayload()` claims instead of replacing them.",
+      "`dispatch({ jobId })` rejects ids with `:` or made only of digits on every driver; use ids such as `invoice-43`.",
+      "`setupTest({ importModule })` loads the app's `main.ts` files after boot; a throwing `main.ts` now fails the setup.",
+      "`scry --search` text output prints an `impact of <file>:` block in place of the `next:` line when there is an impact; parse `--json`."
+    ]
+  },
   "5.64.0": {
     "publishedAt": "2026-11-23T09:12:36.370Z",
     "matrix": "none",
