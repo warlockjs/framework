@@ -66,8 +66,44 @@ export interface AuthMiddlewareOptions extends Partial<AuthCredentialDescriptor>
   redirect?: { to: string; returnUrlParam?: string };
 }
 
-/** Application policy that decides whether a resolved user may authenticate. */
-export type CanAuthenticate = (user: Auth) => boolean | Promise<boolean>;
+/** How a user is being authenticated when `auth.canAuthenticate` runs. */
+export type AuthenticationMethod =
+  | "password"
+  | "otp"
+  | "passkey"
+  | "oauth"
+  /** A bearer/cookie access token on a request, or tokens issued for a user directly. */
+  | "token"
+  /** A refresh token exchanged for a new pair, or automatic session renewal. */
+  | "refresh"
+  /** An app calling `completeLogin()` after its own verification. */
+  | "custom";
+
+/** What `auth.canAuthenticate` receives next to the user. */
+export type AuthenticationContext = {
+  /** The request being served; absent where the call site has none (for example a refresh by token string). */
+  request?: Request;
+  /** The method that is authenticating the user. */
+  via: AuthenticationMethod;
+};
+
+/**
+ * Application policy that decides whether a resolved user may authenticate.
+ * The optional second argument says how and, where one exists, on which request.
+ */
+export type CanAuthenticate = (
+  user: Auth,
+  context?: AuthenticationContext,
+) => boolean | Promise<boolean>;
+
+/** Result of `authService.verifyCredentials()`. */
+export type CredentialsVerification<UserType extends Auth = Auth> =
+  /** Account found, password right and allowed to authenticate. */
+  | { type: "ok"; user: UserType }
+  /** Unknown account or wrong password. */
+  | { type: "invalid" }
+  /** Password right, but `auth.canAuthenticate` refuses the account. */
+  | { type: "refused"; user: UserType };
 
 /** Password credentials plus the application-defined identity fields. */
 export type AuthCredentials = Record<string, unknown> & {

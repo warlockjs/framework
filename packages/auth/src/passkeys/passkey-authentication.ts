@@ -139,5 +139,5 @@ export async function verifyPasskeyAuthentication(
     throw new InvalidPasskeyError("credential-owner-missing");
   }
 
-  return authService.completeLogin(user, deviceInfo);
+  return authService.completeLogin(user, deviceInfo, { via: "passkey", request });
 }

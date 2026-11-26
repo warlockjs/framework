@@ -103,15 +103,23 @@ describe("AccessToken statics", () => {
 
     await AccessToken.deleteForUser(user, "tok");
 
-    expect(query.where).toHaveBeenCalledWith({ user_id: 7 });
+    expect(query.where).toHaveBeenCalledWith({ user_id: 7, user_type: "admin" });
     expect(query.whereIn).toHaveBeenCalledWith("token", TOK_FORMS);
     expect(query.delete).toHaveBeenCalledOnce();
   });
 
-  it("deleteAllForUser deletes every token for the user", async () => {
+  it("deleteAllForUser deletes every token for the user, filtered by user type too", async () => {
     await AccessToken.deleteAllForUser(user);
 
-    expect(modelDelete).toHaveBeenCalledWith({ user_id: 7 });
+    expect(modelDelete).toHaveBeenCalledWith({ user_id: 7, user_type: "admin" });
+  });
+
+  it("deleteAllForUser leaves another identity with the same id alone", async () => {
+    await AccessToken.deleteAllForUser({ id: 7, userType: "student" } as never);
+
+    expect(modelDelete).toHaveBeenCalledWith({ user_id: 7, user_type: "student" });
+    expect(modelDelete).not.toHaveBeenCalledWith({ user_id: 7 });
+    expect(modelDelete).not.toHaveBeenCalledWith({ user_id: 7, user_type: "staff" });
   });
 
   it("purgeExpired destroys each expired row and returns the count", async () => {

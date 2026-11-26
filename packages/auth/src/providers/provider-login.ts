@@ -167,5 +167,5 @@ export async function completeProviderLogin<T extends Auth>(
 
   const user = await resolveProviderUser(Model, profile);
 
-  return authService.completeLogin(user, deviceInfo);
+  return authService.completeLogin(user, deviceInfo, { via: "oauth", request });
 }

@@ -192,7 +192,7 @@ export class RefreshToken extends Model {
    */
   public static findForUser(user: Auth, token: string): Promise<RefreshToken | null> {
     return this.query()
-      .where({ user_id: user.id })
+      .where({ user_id: user.id, user_type: user.userType })
       .whereIn("token", storedTokenForms(token))
       .first();
   }
@@ -215,7 +215,7 @@ export class RefreshToken extends Model {
    */
   public static deleteForUser(user: Auth, token: string) {
     return this.query()
-      .where({ user_id: user.id })
+      .where({ user_id: user.id, user_type: user.userType })
       .whereIn("token", storedTokenForms(token))
       .delete();
   }

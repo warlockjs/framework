@@ -170,12 +170,12 @@ describe("RefreshToken serialization hides the bearer token", () => {
     const query = vi.spyOn(RefreshToken, "query").mockReturnValue(builder as never);
 
     await RefreshToken.findByToken(REFRESH_TOKEN_VALUE);
-    await RefreshToken.findForUser({ id: 7 } as never, REFRESH_TOKEN_VALUE);
+    await RefreshToken.findForUser({ id: 7, userType: "user" } as never, REFRESH_TOKEN_VALUE);
 
     const forms = [digest(REFRESH_TOKEN_VALUE), REFRESH_TOKEN_VALUE];
     expect(builder.whereIn).toHaveBeenNthCalledWith(1, "token", forms);
     expect(builder.whereIn).toHaveBeenNthCalledWith(2, "token", forms);
-    expect(builder.where).toHaveBeenCalledWith({ user_id: 7 });
+    expect(builder.where).toHaveBeenCalledWith({ user_id: 7, user_type: "user" });
     query.mockRestore();
   });
 

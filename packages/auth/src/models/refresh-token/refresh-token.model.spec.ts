@@ -197,7 +197,7 @@ describe("RefreshToken statics", () => {
     expect(query.whereIn).toHaveBeenCalledWith("token", forms);
 
     await RefreshToken.findForUser(user, "tok");
-    expect(query.where).toHaveBeenCalledWith({ user_id: 7 });
+    expect(query.where).toHaveBeenCalledWith({ user_id: 7, user_type: "user" });
 
     await RefreshToken.deleteForUser(user, "tok");
     expect(query.delete).toHaveBeenCalledOnce();

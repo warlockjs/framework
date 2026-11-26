@@ -184,12 +184,16 @@ function buildUser(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 
-  return {
+  const user = {
     id: fields.id,
     userType: fields.userType,
     string: (key: string) => fields[key],
     get: (key: string) => fields[key],
-  } as never;
+    // Mirrors `Auth.accessTokenPayload()`: the model hook the service reads.
+    accessTokenPayload: () => authService.buildAccessTokenPayload(user as never),
+  };
+
+  return user as never;
 }
 
 function buildRefreshTokenRow(fields: Record<string, unknown>, isValid = true) {
@@ -1677,5 +1681,151 @@ describe("hashTokensAtRest", () => {
       await expect(authService.renewAutomaticSession("old", "user")).resolves.toBeNull();
       expect(refreshTokenRevokeFamily).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("authService.verifyCredentials", () => {
+  it("reports a refused account only after the right password", async () => {
+    const user = buildUser();
+    const Model = { first: vi.fn().mockResolvedValue(user) } as never;
+    configKey.mockImplementation((key: string, fallback?: unknown) =>
+      key === "auth.canAuthenticate" ? () => false : fallback,
+    );
+
+    verifyPassword.mockResolvedValue(true);
+    expect(
+      await authService.verifyCredentials(Model, { email: "a@b.c", password: "right" }),
+    ).toEqual({
+      type: "refused",
+      user,
+    });
+
+    verifyPassword.mockResolvedValue(false);
+    expect(
+      await authService.verifyCredentials(Model, { email: "a@b.c", password: "wrong" }),
+    ).toEqual({
+      type: "invalid",
+    });
+  });
+
+  it("reports ok for an allowed account with the right password", async () => {
+    const user = buildUser();
+    const Model = { first: vi.fn().mockResolvedValue(user) } as never;
+    verifyPassword.mockResolvedValue(true);
+
+    expect(await authService.verifyCredentials(Model, { email: "a@b.c", password: "x" })).toEqual({
+      type: "ok",
+      user,
+    });
+  });
+
+  it("reports invalid for an unknown account, after the same dummy password check", async () => {
+    const Model = { first: vi.fn().mockResolvedValue(null) } as never;
+    hashPassword.mockResolvedValue("dummy-hash");
+    verifyPassword.mockResolvedValue(false);
+
+    expect(await authService.verifyCredentials(Model, { email: "no@b.c", password: "x" })).toEqual({
+      type: "invalid",
+    });
+    expect(verifyPassword).toHaveBeenCalledOnce();
+    expect(emit).not.toHaveBeenCalled();
+  });
+
+  it("keeps attemptLogin answering null with its own events for a refused account", async () => {
+    const Model = { first: vi.fn().mockResolvedValue(buildUser()) } as never;
+    configKey.mockImplementation((key: string, fallback?: unknown) =>
+      key === "auth.canAuthenticate" ? () => false : fallback,
+    );
+    verifyPassword.mockResolvedValue(true);
+
+    expect(await authService.attemptLogin(Model, { email: "a@b.c", password: "x" })).toBeNull();
+    expect(emit).toHaveBeenCalledWith(
+      "login.failed",
+      { email: "a@b.c" },
+      "Authentication not allowed",
+    );
+  });
+});
+
+describe("authService.canAuthenticate context", () => {
+  it("hands the policy the login method and the request", async () => {
+    const policy = vi.fn().mockReturnValue(true);
+    configKey.mockImplementation((key: string, fallback?: unknown) =>
+      key === "auth.canAuthenticate" ? policy : fallback,
+    );
+    const request = { id: "req" } as never;
+    const user = buildUser();
+    verifyPassword.mockResolvedValue(true);
+
+    await authService.verifyCredentials(
+      { first: vi.fn().mockResolvedValue(user) } as never,
+      { email: "a@b.c", password: "x" },
+      request,
+    );
+    await authService.completeLogin(user as never, undefined, { via: "oauth", request });
+    await authService.completeLogin(user as never);
+    await authService.generateAccessToken(user);
+
+    expect(policy).toHaveBeenNthCalledWith(1, user, { via: "password", request });
+    expect(policy).toHaveBeenNthCalledWith(2, user, { via: "oauth", request });
+    expect(policy).toHaveBeenNthCalledWith(3, user, { via: "custom" });
+    expect(policy).toHaveBeenNthCalledWith(4, user, { via: "token" });
+  });
+
+  it("keeps a one-argument policy working", async () => {
+    configKey.mockImplementation((key: string, fallback?: unknown) =>
+      key === "auth.canAuthenticate" ? (u: { id: number }) => u.id === 1 : fallback,
+    );
+
+    expect(await authService.canAuthenticate(buildUser(), { via: "token" })).toBe(true);
+    expect(await authService.canAuthenticate(buildUser({ id: 2 }), { via: "token" })).toBe(false);
+  });
+});
+
+describe("authService access token claims from the model hook", () => {
+  function userWithTenant(tenantId: number) {
+    const user = buildUser() as unknown as { accessTokenPayload: () => Record<string, unknown> };
+    const base = user.accessTokenPayload;
+
+    user.accessTokenPayload = () => ({ ...base(), tenantId });
+
+    return user as never;
+  }
+
+  const claimsOfLastToken = () =>
+    defined(jwtGenerate.mock.calls.at(-1), "signer call")[0] as Record<string, unknown>;
+
+  it("adds the model's claims on a plain issue, with identity forced last", async () => {
+    await authService.generateAccessToken(userWithTenant(7), { tenantId: 9, id: 99 });
+
+    expect(claimsOfLastToken()).toMatchObject({ tenantId: 9, id: 1, userType: "user" });
+
+    await authService.generateAccessToken(userWithTenant(7));
+
+    expect(claimsOfLastToken()).toMatchObject({ tenantId: 7, id: 1 });
+  });
+
+  it("keeps the model's claims after login, refresh and automatic renewal", async () => {
+    const user = userWithTenant(7);
+    configKey.mockImplementation((key: string, fallback?: unknown) =>
+      key === "auth.userType.user" ? { find: vi.fn().mockResolvedValue(user) } : fallback,
+    );
+    verifyPassword.mockResolvedValue(true);
+
+    await authService.login({ first: vi.fn().mockResolvedValue(user) } as never, {
+      email: "a@b.c",
+      password: "x",
+    });
+    expect(claimsOfLastToken().tenantId).toBe(7);
+
+    jwtVerifyRefreshToken.mockResolvedValue({ userId: 1, userType: "user", familyId: "fam-1" });
+    refreshTokenFindByToken.mockResolvedValue(buildRefreshTokenRow({ family_id: "fam-1" }, true));
+    await authService.refreshTokens("valid");
+    expect(claimsOfLastToken().tenantId).toBe(7);
+
+    jwtGenerate.mockClear();
+    refreshTokenFindByToken.mockResolvedValue(buildRefreshTokenRow({ family_id: "fam-1" }, true));
+    await authService.renewAutomaticSession("valid", "user").catch(() => undefined);
+    expect(claimsOfLastToken().tenantId).toBe(7);
   });
 });

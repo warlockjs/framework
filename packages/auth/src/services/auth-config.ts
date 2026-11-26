@@ -4,6 +4,7 @@ import { log } from "@warlock.js/logger";
 import { type Algorithm } from "fast-jwt";
 import ms from "ms";
 import type {
+  AuthenticationContext,
   AuthNotification,
   CanAuthenticate,
   NormalizeCredentials,
@@ -192,13 +193,13 @@ function resolve<T>(newKey: string, legacyKey: string, fallback?: T): T {
  * config and the legacy `auth.jwt.*` shape both resolve the same way.
  */
 export const authConfig = {
-  canAuthenticate: async (user: Auth): Promise<boolean> => {
+  canAuthenticate: async (user: Auth, context?: AuthenticationContext): Promise<boolean> => {
     const canAuthenticate = config.key<CanAuthenticate>(
       "auth.canAuthenticate",
       permitAuthentication,
     );
 
-    return canAuthenticate(user);
+    return canAuthenticate(user, context);
   },
   /**
    * Store only a SHA-256 digest of each access and refresh token

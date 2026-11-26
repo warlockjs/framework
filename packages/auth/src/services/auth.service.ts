@@ -14,9 +14,11 @@ import {
 import type {
   AccessTokenOutput,
   AuthCredentials,
+  AuthenticationContext,
   ClearAuthCookieOptions,
   DeviceInfo,
   LoginResult,
+  CredentialsVerification,
   SetAuthCookieOptions,
   TokenPair,
 } from "../contracts/types";
@@ -160,13 +162,17 @@ class AuthService {
     };
   }
 
-  /** One policy seam keeps account-state checks identical across all auth paths. */
-  public async canAuthenticate(user: Auth): Promise<boolean> {
-    return authConfig.canAuthenticate(user);
+  /**
+   * One policy seam keeps account-state checks identical across all auth paths.
+   * `context` tells the `auth.canAuthenticate` policy how the user is
+   * authenticating (`via`) and, when the call site has one, the request.
+   */
+  public async canAuthenticate(user: Auth, context?: AuthenticationContext): Promise<boolean> {
+    return authConfig.canAuthenticate(user, context);
   }
 
-  private async assertCanAuthenticate(user: Auth): Promise<void> {
-    if (!(await this.canAuthenticate(user))) {
+  private async assertCanAuthenticate(user: Auth, context?: AuthenticationContext): Promise<void> {
+    if (!(await this.canAuthenticate(user, context))) {
       throw new ForbiddenError("This user cannot authenticate.");
     }
   }
@@ -176,10 +182,14 @@ class AuthService {
     payload?: Record<string, unknown>,
     familyId?: string,
   ): Promise<AccessTokenOutput> {
-    // The identity claims always come from the user the row is issued to: a
-    // custom payload may add claims, never point the token at someone else.
+    // Claims come from the user model's `accessTokenPayload()` hook, so a model
+    // override applies on login, refresh and renewal alike. An explicit payload
+    // adds to them. The identity claims always come from the user the row is
+    // issued to: a custom payload may add claims, never point the token at
+    // someone else.
     const data = {
-      ...(payload || this.buildAccessTokenPayload(user)),
+      ...user.accessTokenPayload(),
+      ...payload,
       id: user.id,
       userType: user.userType,
       jti: randomUUID(),
@@ -208,7 +218,7 @@ class AuthService {
     user: Auth,
     payload?: Record<string, unknown>,
   ): Promise<AccessTokenOutput> {
-    await this.assertCanAuthenticate(user);
+    await this.assertCanAuthenticate(user, { via: "token" });
 
     return this.issueAccessToken(user, payload);
   }
@@ -301,7 +311,7 @@ class AuthService {
   ): Promise<RefreshToken | undefined> {
     if (!authConfig.refreshToken.enabled()) return;
 
-    await this.assertCanAuthenticate(user);
+    await this.assertCanAuthenticate(user, { via: "token" });
 
     if (deviceInfo?.familyId) {
       return this.issueInSuppliedFamily(user, deviceInfo.familyId, (family) =>
@@ -366,7 +376,7 @@ class AuthService {
    * Issue both an access and a refresh token, emitting the creation events.
    */
   public async createTokenPair(user: Auth, deviceInfo?: DeviceInfo): Promise<TokenPair> {
-    await this.assertCanAuthenticate(user);
+    await this.assertCanAuthenticate(user, { via: "token" });
 
     if (authConfig.refreshToken.enabled() && deviceInfo?.familyId) {
       return this.issueInSuppliedFamily(user, deviceInfo.familyId, (family) =>
@@ -437,7 +447,7 @@ class AuthService {
 
       if (!user) return null;
 
-      if (!(await this.canAuthenticate(user))) return null;
+      if (!(await this.canAuthenticate(user, { via: "refresh" }))) return null;
 
       const rotationEnabled = authConfig.refreshToken.rotation();
 
@@ -478,7 +488,13 @@ class AuthService {
   public async renewAutomaticSession(
     refreshTokenString: string,
     expectedUserType: string,
-    options: { overlapMs?: number; deviceInfo?: DeviceInfo; maxAgeMs?: number } = {},
+    options: {
+      overlapMs?: number;
+      deviceInfo?: DeviceInfo;
+      maxAgeMs?: number;
+      /** The request being renewed, passed to the `auth.canAuthenticate` policy. */
+      request?: Request;
+    } = {},
   ): Promise<TokenPair | null> {
     let decoded: { userId: number; userType: string; familyId: string } | null;
     try {
@@ -530,7 +546,11 @@ class AuthService {
       const UserModel = config.key(`auth.userType.${decoded.userType}`);
       if (!UserModel) throw new Error(`User type ${decoded.userType} is unknown type.`);
       const user = (await UserModel.find(decoded.userId)) as Auth | null;
-      if (!user || !(await this.canAuthenticate(user))) return null;
+      if (
+        !user ||
+        !(await this.canAuthenticate(user, { via: "refresh", request: options.request }))
+      )
+        return null;
 
       if (!(await oldToken.revokeIfActive())) {
         // A newer successor is never substituted here. A stale automatic
@@ -774,16 +794,34 @@ class AuthService {
   }
 
   /**
-   * Resolve a user by credentials, verifying the password. Returns `null` on a
-   * missing user or a wrong password, emitting `login.failed` either way.
+   * Check credentials and report WHY they failed, without emitting events or
+   * touching the stored hash:
+   *
+   * - `{ type: "ok", user }`: the account exists, the password is right and
+   *   `auth.canAuthenticate` allows it.
+   * - `{ type: "invalid" }`: unknown account or wrong password (both take the
+   *   same time, so the answer does not reveal which).
+   * - `{ type: "refused", user }`: the password is right but
+   *   `auth.canAuthenticate` refuses the account (suspended, not yet approved).
+   *   Reveal this only after the correct password, as here.
    */
-  public async attemptLogin<T extends Auth>(
+  public async verifyCredentials<T extends Auth>(
     Model: ChildModel<T>,
-    data: AuthCredentials,
-  ): Promise<T | null> {
-    const { password, ...otherData } = data;
+    credentials: AuthCredentials,
+    request?: Request,
+  ): Promise<CredentialsVerification<T>> {
+    const { reason: _reason, ...result } = await this.checkCredentials(Model, credentials, request);
 
-    authEvents.emit("login.attempt", otherData);
+    return result as CredentialsVerification<T>;
+  }
+
+  /** The shared check: `verifyCredentials` plus the reason `attemptLogin` reports in its event. */
+  private async checkCredentials<T extends Auth>(
+    Model: ChildModel<T>,
+    credentials: AuthCredentials,
+    request?: Request,
+  ): Promise<CredentialsVerification<T> & { reason?: string }> {
+    const { password, ...otherData } = credentials;
 
     const user = await this.findLoginUser(Model, otherData);
     const storedHash = user?.string("password");
@@ -795,22 +833,50 @@ class AuthService {
         .then((hash) => this.verifyPassword(String(password ?? ""), hash))
         .catch(() => false);
 
-      authEvents.emit("login.failed", otherData, user ? "Invalid password" : "User not found");
-
-      return null;
+      return { type: "invalid", reason: user ? "Invalid password" : "User not found" };
     }
 
     if (!(await this.verifyPassword(password, storedHash))) {
-      authEvents.emit("login.failed", otherData, "Invalid password");
+      return { type: "invalid", reason: "Invalid password" };
+    }
+
+    if (!(await this.canAuthenticate(user, { via: "password", request }))) {
+      return { type: "refused", user };
+    }
+
+    return { type: "ok", user };
+  }
+
+  /**
+   * Resolve a user by credentials, verifying the password. Returns `null` on a
+   * missing user, a wrong password or a refused account, emitting
+   * `login.failed` either way. Use {@link verifyCredentials} to tell them apart.
+   */
+  public async attemptLogin<T extends Auth>(
+    Model: ChildModel<T>,
+    data: AuthCredentials,
+    request?: Request,
+  ): Promise<T | null> {
+    const { password, ...otherData } = data;
+
+    authEvents.emit("login.attempt", otherData);
+
+    const result = await this.checkCredentials(Model, data, request);
+
+    if (result.type === "invalid") {
+      authEvents.emit("login.failed", otherData, result.reason ?? "Invalid password");
 
       return null;
     }
 
-    if (!(await this.canAuthenticate(user))) {
+    if (result.type === "refused") {
       authEvents.emit("login.failed", otherData, "Authentication not allowed");
 
       return null;
     }
+
+    const user = result.user;
+    const storedHash = user.string("password") as string;
 
     await this.rehashPassword(user, String(password), storedHash);
 
@@ -848,8 +914,9 @@ class AuthService {
     Model: ChildModel<T>,
     credentials: AuthCredentials,
     deviceInfo?: DeviceInfo,
+    request?: Request,
   ): Promise<LoginResult<T> | null> {
-    const user = await this.attemptLogin(Model, credentials);
+    const user = await this.attemptLogin(Model, credentials, request);
 
     if (!user) {
       return null;
@@ -865,13 +932,17 @@ class AuthService {
    * what {@link login} produces: the same tokens, rows and events. Pair with
    * {@link setAuthCookie} for a cookie session, as with password login.
    *
+   * `context` is passed to the policy: `via` names the login method (default
+   * `"custom"`) and `request` is the request being served, when there is one.
+   *
    * Never call this for a user you have not authenticated.
    */
   public async completeLogin<T extends Auth>(
     user: T,
     deviceInfo?: DeviceInfo,
+    context?: Partial<AuthenticationContext>,
   ): Promise<LoginResult<T>> {
-    await this.assertCanAuthenticate(user);
+    await this.assertCanAuthenticate(user, { ...context, via: context?.via ?? "custom" });
 
     return this.finalizeLogin(user, deviceInfo);
   }
@@ -892,7 +963,7 @@ class AuthService {
   ): Promise<LoginResult<T> | null> {
     assertCsrfOriginAllowed(request);
 
-    const result = await this.login(Model, credentials, deviceInfo);
+    const result = await this.login(Model, credentials, deviceInfo, request);
 
     if (!result) return null;
 

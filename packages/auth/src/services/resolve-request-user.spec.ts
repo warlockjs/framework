@@ -182,7 +182,10 @@ describe("resolveRequestUser", () => {
     });
 
     expect(resolved).toBe(user);
-    expect(renewAutomaticSession).toHaveBeenCalledWith("old-refresh", "user", { overlapMs: 4_000 });
+    expect(renewAutomaticSession).toHaveBeenCalledWith("old-refresh", "user", {
+      overlapMs: 4_000,
+      request,
+    });
     expect(setAuthCookie).toHaveBeenNthCalledWith(
       1,
       response,

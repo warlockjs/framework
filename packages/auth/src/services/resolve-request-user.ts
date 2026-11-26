@@ -112,6 +112,7 @@ export async function resolveRequestUserOutcome(
     const pair = await authService.renewAutomaticSession(refreshToken, renewalUserType, {
       overlapMs: options.overlapMs,
       maxAgeMs: options.maxAgeMs,
+      request,
     });
     if (!pair?.refreshToken) return false;
 
@@ -205,7 +206,7 @@ export async function resolveRequestUserOutcome(
     return fail("invalid");
   }
 
-  if (!(await authService.canAuthenticate(currentUser))) {
+  if (!(await authService.canAuthenticate(currentUser, { via: "token", request }))) {
     return fail("unauthorized");
   }
 
