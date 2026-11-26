@@ -9,8 +9,9 @@ Use `@warlock.js/core/e2e`, a Node-only subpath, and default-export `defineE2E` 
 `e2e/*.e2e.ts`. Run `npx warlock e2e`. The CLI loads TypeScript itself; no Vitest
 bootstrap, Playwright, Puppeteer or external browser server is needed.
 
-Every run copies the app into a temporary directory, excludes dotenv files and
-symlinks, links installed dependencies for reads, seeds its own environment and
+Every run copies the app into a temporary directory, excludes symlinks and dotenv files
+(the app's `.env.e2e`, else `.env`, is read as the base of the app's environment, `app.envFile`
+names another one or `false` none), links installed dependencies for reads, seeds its own environment and
 owns the app/browser process groups. Keep foreground commands in the fixture;
 never use a shared dev server or daemonize. Map the disposable `dataRoot` into the
 app's actual storage/database config. The harness cannot infer that mapping.
@@ -72,7 +73,7 @@ export default defineE2E({
 For an existing app, replace `prepare` and `start`; default start is
 `[process.execPath, "dist/app.js"]`. Optional
 `build: [process.execPath, "node_modules/@warlock.js/core/bin/warlock.js", "build"]`
-builds inside the copy. Supply app-specific test service variables via `env` and
+builds inside the copy. The app runs with `WARLOCK_E2E=1`. Supply app-specific test service variables via `env` and
 exclude production data directories with `exclude: ["storage", "data"]`.
 By default the fixture supplies an OS-assigned `PORT`/`HTTP_PORT`. Prefer the
 port-file handshake above when the app supports binding `0` itself.
@@ -108,8 +109,8 @@ port-file handshake above when the app supports binding `0` itself.
 
 Use `--browser /path/to/chrome` or `WARLOCK_E2E_BROWSER` if discovery fails.
 Set `browser.startupTimeoutMs` (default 30 seconds) when the browser is slow to start, for example on shared CI runners.
-`browser: { args: ["--no-sandbox"] }` is an explicit option for controlled root
-containers; it is not a default. On Windows, command arrays should invoke JS tools
+`--no-sandbox` is added automatically when the process runs as root (uid 0); put `--no-sandbox`
+or `--enable-sandbox` in `browser.args` to decide it yourself. On Windows, command arrays should invoke JS tools
 through `process.execPath`, avoiding `.cmd` executables that require a shell.
 
 Read `.warlock/e2e/run-*/evidence.json` and the PNGs/logs on failure. Evidence keeps

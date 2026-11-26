@@ -397,9 +397,13 @@ Pass `importModule` whenever the test needs the app's modules to run. Without it
 
 The modules are found from the project at the current working directory (`src/app/*/routes.ts`, `main.ts`, events, locales), so run the tests from the project root. That works for a project inside a dot-directory such as a git worktree under `.claude/worktrees/`. If the project has route or `main.ts` files on disk and the load finds none, `createTestHttpServer()` throws an error naming the project root and the file counts, instead of serving an empty application. A worker that moves to another project root loads that project's modules again.
 
+Only `src/app/main.ts` and `src/app/<module>/main.ts` are loaded: a `main.ts` one level deeper (`src/app/<module>/<feature>/main.ts`) is not, in tests or in `warlock dev`. `routes.ts` is likewise read one level down, from `src/app/<module>/routes.ts`.
+
+When `setupTest()` gets `importModule` (and starts connectors), it loads the app's modules right after the runtime boots, once per worker. A service spec that never sends a request therefore already sees what the `main.ts` files register (listeners, jobs, model events). `createTestHttpServer({ loadAppModules: true })` reuses that load. A `main.ts` that throws now fails `setupTest()` instead of the first request.
+
 ### Ephemeral ports
 
-`startHttpTestServer({ port: 0 })` lets the OS pick a free port and publishes the bound one to the workers, so the suite never collides with `warlock dev` or another suite. `warlock add test` generates `src/test-global-setup.ts` with it. `createTestHttpServer()` always uses an OS-assigned port.
+`startHttpTestServer({ port: 0 })` lets the OS pick a free port and publishes the bound one to the workers, so the suite never collides with `warlock dev` or another suite. `warlock add test` no longer generates a `src/test-global-setup.ts`; an app that still has one keeps it working. `createTestHttpServer()` always uses an OS-assigned port.
 
 ### Response snapshots
 

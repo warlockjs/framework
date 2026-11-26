@@ -688,6 +688,19 @@ async function runTestRuntimeStartup(
     await timeTestStep("fakes", () =>
       installTestFakes(fakes, { isolatedStorage: scope.lifetime === "worker" }),
     );
+
+    // The app's `main.ts` files run now, not at the first request: a service spec
+    // that never sends a request still sees what the mains register. Once per
+    // worker (`createTestHttpServer` reuses the result). Needs `importModule`, and
+    // a runtime without connectors has nothing for the mains to register against.
+    if (options?.importModule && effectiveSelection !== false) {
+      await timeTestStep("appModules", async () => {
+        const { loadAppModulesOnce } = await import("./load-app-modules-once");
+
+        await loadAppModulesOnce(options.importModule);
+      });
+    }
+
     if (scope.lifetime === "worker") {
       // The booted application is the state every later file returns to.
       await captureTestRouterSnapshot();

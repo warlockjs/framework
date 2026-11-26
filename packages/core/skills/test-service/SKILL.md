@@ -627,9 +627,12 @@ const name = process.env.VITEST ? workerDatabaseName("app_test") : "app";
   (`loadAppModules`) load once per worker and are reused.
 - The request helpers (`testGet`, `actingAs`, ...) send to an HTTP server that starts
   in the worker on first use, so it reads the worker's own database and records in the
-  worker's fakes; the runtime closes it with the file. A global `startHttpTestServer()`
+  worker's fakes (in a web app it also serves the pages); the runtime closes it with the file. A global `startHttpTestServer()`
   server (main process, no worker id) reads worker 1's database: run such a suite with
   `maxWorkers: 1`.
+- `setupTest({ importModule })` loads the app's `main.ts` files (only `src/app/main.ts` and
+  `src/app/<module>/main.ts`) once per worker right after boot, so a service spec that sends no
+  request still sees what the mains register; a `main.ts` that throws fails `setupTest()`.
 - `recommendedTestWorkers()` stays within `WARLOCK_TEST_DATABASES` (the number of test
   databases you created) when that variable is set.
 - `isolate: false` shares module state between files of a worker: singletons,

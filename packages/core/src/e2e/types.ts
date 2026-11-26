@@ -24,7 +24,18 @@ export type AppFixtureOptions = {
   build?: Command | ((fixture: FixtureContext) => Command);
   /** Defaults to [process.execPath, "dist/app.js"]. Must stay in the foreground. */
   start?: Command | ((fixture: FixtureContext) => Command);
-  /** Only these app variables are added to the isolated environment. */
+  /**
+   * The dotenv file the disposable app starts with, relative to the app directory.
+   * Defaults to `.env.e2e` when the app has one, else `.env`. Its values are the
+   * base of the app's environment: `NODE_ENV`, `env` and the fixture's own variables
+   * win over them. Pass `false` to start without one. The file is read, never copied
+   * as is; the disposable app gets one `.env` holding the merged result.
+   */
+  envFile?: string | false;
+  /**
+   * Variables added on top of the env file. The fixture also sets `WARLOCK_E2E=1`,
+   * so the app can tell it runs under `warlock e2e`.
+   */
   env?: Record<string, string> | ((fixture: FixtureContext) => Record<string, string>);
   /** Directories prepended to PATH, for fixture-owned fake engines/binaries. */
   path?: string[];
@@ -39,7 +50,7 @@ export type AppFixtureOptions = {
 };
 export type BrowserOptions = {
   binary?: string;
-  /** Additional Chrome flags, e.g. --no-sandbox in a controlled root container. */
+  /** Additional Chrome flags. `--no-sandbox` is added by itself when the process runs as root. */
   args?: string[];
   /**
    * How long to wait for the browser to report its DevTools endpoint.

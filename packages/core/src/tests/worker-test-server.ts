@@ -5,7 +5,9 @@
  * Vitest's main process cannot read it, so the request helpers (`testGet`,
  * `actingAs`, ...) talk to a server that lives in the worker. It starts on the
  * first request of a test file, serves the app's routes through the real
- * plugins, and is closed with the file's runtime.
+ * plugins, and is closed with the file's runtime. When the app declares the web
+ * connector, the server starts it too, so pages render against the worker's own
+ * database.
  *
  * A port published by `startHttpTestServer()` in `globalSetup` still wins:
  * that is the explicit choice of a shared server.
@@ -63,7 +65,7 @@ export async function resolveTestServerUrl(): Promise<string> {
 
 async function startWorkerServer(): Promise<TestHttpServer> {
   const { createTestHttpServer } = await import("./test-http-server");
-  const server = await createTestHttpServer({ loadAppModules: true, importModule });
+  const server = await createTestHttpServer({ loadAppModules: true, importModule, web: true });
   const close = server.close;
   const handle = current;
 
